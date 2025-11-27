@@ -52,6 +52,7 @@ export interface ReservationContextType {
   reservation: ReservationState;
   addReservationItem: (item: Omit<ReservationItem, 'id'>) => void;
   removeReservationItem: (id: string) => void;
+  removeReservationItemsByType: (type: ReservationItem['type']) => void;
   updateReservationItem: (id: string, item: Partial<ReservationItem>) => void;
   resetReservation: () => void;
 }
