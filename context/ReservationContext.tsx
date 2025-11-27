@@ -125,7 +125,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
   }, []);
 
   const resetReservation = useCallback(() => {
-    setReservation(initialReservationState);
+    setReservation(getInitialReservationState());
   }, []);
 
   const value: ReservationContextType = {
