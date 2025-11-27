@@ -5,6 +5,7 @@ import Image from 'next/image';
 import DashedLine from './DashedLine';
 import type { StepComponentProps } from '@/types/reservation';
 import { useReservation } from '@/context/ReservationContext';
+import { saveStep1FormData, loadStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
 
 interface ParentData {
   id: string;
@@ -69,14 +70,16 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
   };
 
   const [participantData, setParticipantData] = useState({
-    firstName: 'Imię',
-    lastName: 'Nazwisko',
+    firstName: '',
+    lastName: '',
     age: '',
     gender: '',
-    city: 'Miejscowość',
+    city: '',
+    selectedParticipant: '',
   });
 
   const [diet, setDiet] = useState<'standard' | 'vegetarian' | null>(null);
+  const [accommodationRequest, setAccommodationRequest] = useState('');
   const prevDietRef = useRef<'standard' | 'vegetarian' | null>(null);
   const { reservation } = useReservation();
 
@@ -109,6 +112,36 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
     dysfunctions: '',
     psychiatric: '',
   });
+
+  const [additionalNotes, setAdditionalNotes] = useState('');
+
+  // Load data from sessionStorage on mount
+  useEffect(() => {
+    const savedData = loadStep1FormData();
+    if (savedData) {
+      setParents(savedData.parents);
+      setParticipantData(savedData.participantData);
+      setDiet(savedData.diet);
+      setAccommodationRequest(savedData.accommodationRequest);
+      setHealthQuestions(savedData.healthQuestions);
+      setHealthDetails(savedData.healthDetails);
+      setAdditionalNotes(savedData.additionalNotes);
+    }
+  }, []);
+
+  // Save data to sessionStorage whenever any field changes
+  useEffect(() => {
+    const formData: Step1FormData = {
+      parents,
+      participantData,
+      diet,
+      accommodationRequest,
+      healthQuestions,
+      healthDetails,
+      additionalNotes,
+    };
+    saveStep1FormData(formData);
+  }, [parents, participantData, diet, accommodationRequest, healthQuestions, healthDetails, additionalNotes]);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -259,11 +292,11 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
               className="w-8 h-8 sm:w-10 sm:h-10"
             />
             <select
-              value={participantData.firstName}
-              onChange={(e) => setParticipantData({ ...participantData, firstName: e.target.value })}
+              value={participantData.selectedParticipant}
+              onChange={(e) => setParticipantData({ ...participantData, selectedParticipant: e.target.value })}
               className="w-2/3 px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10"
             >
-              <option>Wybierz z listy</option>
+              <option value="">Wybierz z listy</option>
               <option value="Jan">Jan</option>
               <option value="Anna">Anna</option>
             </select>
@@ -395,6 +428,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
         </h2>
         <section className="bg-white p-4 sm:p-6">
           <textarea
+            value={accommodationRequest}
+            onChange={(e) => setAccommodationRequest(e.target.value)}
             rows={4}
             className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
             placeholder="Uzupełnij to pole, jeśli występują specjalne prośby o zakwaterowanie, np. z rodzeństwem lub znajomym/znajomymi (wpisz imię i nazwisko)"
@@ -589,6 +624,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                 Informacje dodatkowe / Uwagi
               </label>
               <textarea
+                value={additionalNotes}
+                onChange={(e) => setAdditionalNotes(e.target.value)}
                 rows={4}
                 className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
                 placeholder="Wprowadź dodatkowe informacje..."

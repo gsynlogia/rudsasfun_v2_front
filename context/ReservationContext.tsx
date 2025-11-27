@@ -1,21 +1,31 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import type { ReservationState, ReservationContextType, ReservationItem } from '@/types/reservation';
+import { saveReservationState, loadReservationState } from '@/utils/sessionStorage';
 
 const BASE_PRICE = 2200;
 
-const initialReservationState: ReservationState = {
-  basePrice: BASE_PRICE,
-  items: [
-    {
-      id: 'base',
-      name: 'Cena podstawowa',
-      price: BASE_PRICE,
-      type: 'base',
-    },
-  ],
-  totalPrice: BASE_PRICE,
+const getInitialReservationState = (): ReservationState => {
+  // Try to load from sessionStorage first
+  const savedState = loadReservationState();
+  if (savedState) {
+    return savedState;
+  }
+  
+  // Otherwise return default state
+  return {
+    basePrice: BASE_PRICE,
+    items: [
+      {
+        id: 'base',
+        name: 'Cena podstawowa',
+        price: BASE_PRICE,
+        type: 'base',
+      },
+    ],
+    totalPrice: BASE_PRICE,
+  };
 };
 
 const ReservationContext = createContext<ReservationContextType | undefined>(undefined);
@@ -30,7 +40,12 @@ interface ReservationProviderProps {
  * Singleton pattern: single source of truth for reservation data
  */
 export function ReservationProvider({ children }: ReservationProviderProps) {
-  const [reservation, setReservation] = useState<ReservationState>(initialReservationState);
+  const [reservation, setReservation] = useState<ReservationState>(getInitialReservationState);
+
+  // Save to sessionStorage whenever reservation state changes
+  useEffect(() => {
+    saveReservationState(reservation);
+  }, [reservation]);
 
   const addReservationItem = useCallback((item: Omit<ReservationItem, 'id'>) => {
     setReservation((prev) => {
