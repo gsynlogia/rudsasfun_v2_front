@@ -39,7 +39,7 @@ export interface ReservationItem {
   id: string;
   name: string;
   price: number;
-  type: 'base' | 'diet' | 'accommodation' | 'other';
+  type: 'base' | 'diet' | 'accommodation' | 'addon' | 'protection' | 'promotion' | 'other';
 }
 
 export interface ReservationState {
@@ -50,7 +50,7 @@ export interface ReservationState {
 
 export interface ReservationContextType {
   reservation: ReservationState;
-  addReservationItem: (item: Omit<ReservationItem, 'id'>) => void;
+  addReservationItem: (item: Omit<ReservationItem, 'id'>, customId?: string) => void;
   removeReservationItem: (id: string) => void;
   removeReservationItemsByType: (type: ReservationItem['type']) => void;
   updateReservationItem: (id: string, item: Partial<ReservationItem>) => void;

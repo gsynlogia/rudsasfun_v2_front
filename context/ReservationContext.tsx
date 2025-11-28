@@ -6,14 +6,7 @@ import { saveReservationState, loadReservationState } from '@/utils/sessionStora
 
 const BASE_PRICE = 2200;
 
-const getInitialReservationState = (): ReservationState => {
-  // Try to load from sessionStorage first
-  const savedState = loadReservationState();
-  if (savedState) {
-    return savedState;
-  }
-  
-  // Otherwise return default state
+const getDefaultReservationState = (): ReservationState => {
   return {
     basePrice: BASE_PRICE,
     items: [
@@ -40,33 +33,73 @@ interface ReservationProviderProps {
  * Singleton pattern: single source of truth for reservation data
  */
 export function ReservationProvider({ children }: ReservationProviderProps) {
-  const [reservation, setReservation] = useState<ReservationState>(getInitialReservationState);
+  // Start with default state to avoid hydration mismatch
+  const [reservation, setReservation] = useState<ReservationState>(getDefaultReservationState);
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  // Save to sessionStorage whenever reservation state changes
+  // Load from sessionStorage only on client side after mount
   useEffect(() => {
-    saveReservationState(reservation);
-  }, [reservation]);
+    const savedState = loadReservationState();
+    if (savedState) {
+      setReservation(savedState);
+    }
+    setIsHydrated(true);
+  }, []);
 
-  const addReservationItem = useCallback((item: Omit<ReservationItem, 'id'>) => {
+  // Save to sessionStorage whenever reservation state changes (only after hydration)
+  useEffect(() => {
+    if (isHydrated) {
+      saveReservationState(reservation);
+    }
+  }, [reservation, isHydrated]);
+
+  const addReservationItem = useCallback((item: Omit<ReservationItem, 'id'>, customId?: string) => {
     setReservation((prev) => {
-      // Check if item with same type already exists (for diet, only one can be selected)
-      const existingItemIndex = prev.items.findIndex(
-        (i) => i.type === item.type && i.type !== 'base'
-      );
-
-      let newItems: ReservationItem[];
-      if (existingItemIndex !== -1 && item.type !== 'base') {
-        // Replace existing item of the same type (keep existing ID)
-        newItems = [...prev.items];
-        newItems[existingItemIndex] = { ...item, id: prev.items[existingItemIndex].id };
-      } else if (item.type === 'base') {
-        // Don't add base if it already exists
-        return prev;
-      } else {
-        // Add new item with type-based ID for easier tracking
-        newItems = [...prev.items, { ...item, id: `${item.type}-${Date.now()}` }];
+      // If customId is provided, check if item with that ID already exists
+      if (customId) {
+        const existingItemIndex = prev.items.findIndex(i => i.id === customId);
+        if (existingItemIndex !== -1) {
+          // Item already exists with this ID, don't add duplicate
+          return prev;
+        }
       }
 
+      // For addon type, allow multiple items (don't replace)
+      // For other types (diet, protection, promotion), only one can exist
+      if (item.type === 'addon') {
+        // Check if this exact addon already exists (by name)
+        const existingAddon = prev.items.find(
+          i => i.type === 'addon' && i.name === item.name
+        );
+        if (existingAddon) {
+          // Addon already exists, don't add duplicate
+          return prev;
+        }
+      } else if (item.type !== 'base') {
+        // For non-addon types, replace existing item of the same type
+        const existingItemIndex = prev.items.findIndex(
+          (i) => i.type === item.type && i.type !== 'base'
+        );
+        if (existingItemIndex !== -1) {
+          const newItems = [...prev.items];
+          newItems[existingItemIndex] = { ...item, id: prev.items[existingItemIndex].id };
+          const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
+          return {
+            ...prev,
+            items: newItems,
+            totalPrice,
+          };
+        }
+      }
+
+      if (item.type === 'base') {
+        // Don't add base if it already exists
+        return prev;
+      }
+
+      // Add new item with custom ID or generate one
+      const itemId = customId || `${item.type}-${Date.now()}`;
+      const newItems = [...prev.items, { ...item, id: itemId }];
       const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
 
       return {
@@ -125,7 +158,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
   }, []);
 
   const resetReservation = useCallback(() => {
-    setReservation(getInitialReservationState());
+    setReservation(getDefaultReservationState());
   }, []);
 
   const value: ReservationContextType = {

@@ -5,6 +5,7 @@
 
 const STORAGE_KEYS = {
   STEP1_FORM_DATA: 'radsasfun_step1_form_data',
+  STEP2_FORM_DATA: 'radsasfun_step2_form_data',
   RESERVATION_STATE: 'radsasfun_reservation_state',
 } as const;
 
@@ -49,7 +50,7 @@ export interface ReservationStorageState {
     id: string;
     name: string;
     price: number;
-    type: 'base' | 'diet' | 'accommodation' | 'other';
+    type: 'base' | 'diet' | 'accommodation' | 'addon' | 'protection' | 'promotion' | 'transport' | 'source' | 'other';
   }>;
   totalPrice: number;
 }
@@ -152,11 +153,76 @@ export function clearReservationState(): void {
   }
 }
 
+export interface Step2FormData {
+  selectedAddons: string[];
+  selectedProtection: string;
+  selectedPromotion: string;
+  transportData: {
+    departureType: string;
+    departureCity: string;
+    returnType: string;
+    returnCity: string;
+  };
+  sources: {
+    kolejna: boolean;
+    znajomi: boolean;
+    internet: boolean;
+    wycieczka: boolean;
+    inne: boolean;
+  };
+  inneText: string;
+}
+
+/**
+ * Save Step2 form data to sessionStorage
+ */
+export function saveStep2FormData(data: Step2FormData): void {
+  if (!isStorageAvailable()) return;
+  
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.STEP2_FORM_DATA, JSON.stringify(data));
+  } catch (error) {
+    console.error('Error saving Step2 form data to sessionStorage:', error);
+  }
+}
+
+/**
+ * Load Step2 form data from sessionStorage
+ */
+export function loadStep2FormData(): Step2FormData | null {
+  if (!isStorageAvailable()) return null;
+  
+  try {
+    const data = sessionStorage.getItem(STORAGE_KEYS.STEP2_FORM_DATA);
+    if (!data) return null;
+    return JSON.parse(data) as Step2FormData;
+  } catch (error) {
+    console.error('Error loading Step2 form data from sessionStorage:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear Step2 form data from sessionStorage
+ */
+export function clearStep2FormData(): void {
+  if (!isStorageAvailable()) return;
+  
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.STEP2_FORM_DATA);
+  } catch (error) {
+    console.error('Error clearing Step2 form data from sessionStorage:', error);
+  }
+}
+
 /**
  * Clear all application data from sessionStorage
  */
 export function clearAllSessionData(): void {
   clearStep1FormData();
+  clearStep2FormData();
   clearReservationState();
 }
+
+
 
