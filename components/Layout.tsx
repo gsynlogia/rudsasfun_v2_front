@@ -42,10 +42,10 @@ export default function Layout({
   };
 
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
       <Header />
 
-      <main className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8">
+      <main className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Breadcrumbs */}
         <div className="mb-3 sm:mb-4">
           <nav className="text-xs sm:text-sm text-gray-500">
@@ -70,9 +70,9 @@ export default function Layout({
         <ProgressBar steps={steps} onStepClick={onStepClick} />
 
         {/* Main Content Layout */}
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
           {/* Left Column - Form Steps */}
-          <div className="flex-1 lg:w-[75%]">
+          <div className="flex-1 lg:w-[75%] w-full">
             {children}
             {/* Navigation Buttons - inside left column, aligned to right */}
             <NavigationButtons
@@ -84,7 +84,12 @@ export default function Layout({
           </div>
 
           {/* Right Column - Summary - Mobile: below, Desktop: sticky */}
-          <aside className="lg:w-[25%] order-1 lg:order-2 lg:sticky lg:top-6 lg:self-start">
+          <aside 
+            className="lg:w-[25%] w-full order-1 lg:order-2 lg:sticky lg:top-24 lg:self-start"
+            style={{ 
+              alignSelf: 'flex-start'
+            }}
+          >
             <ReservationSummary />
           </aside>
         </div>
