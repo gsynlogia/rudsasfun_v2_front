@@ -176,25 +176,25 @@ export default function AddonsSection() {
   useEffect(() => {
     if (!isInitialized) return; // Don't save during initial load
     
-    const savedData = loadStep2FormData() || {};
+    const savedData = loadStep2FormData();
     const formData = {
       selectedAddons: Array.from(selectedAddons),
-      selectedProtection: savedData.selectedProtection || '',
-      selectedPromotion: savedData.selectedPromotion || '',
-      transportData: savedData.transportData || {
+      selectedProtection: savedData?.selectedProtection || '',
+      selectedPromotion: savedData?.selectedPromotion || '',
+      transportData: savedData?.transportData || {
         departureType: '',
         departureCity: '',
         returnType: '',
         returnCity: '',
       },
-      sources: savedData.sources || {
+      sources: savedData?.sources || {
         kolejna: false,
         znajomi: false,
         internet: false,
         wycieczka: false,
         inne: false,
       },
-      inneText: savedData.inneText || '',
+      inneText: savedData?.inneText || '',
     };
     saveStep2FormData(formData);
   }, [selectedAddons, isInitialized]);
