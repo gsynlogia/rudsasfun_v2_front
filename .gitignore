@@ -43,3 +43,8 @@ next-env.d.ts
 # logs
 frontend.log
 *.log
+
+# test files and screenshots
+test-sticky*.js
+sticky-test-screenshots/
+*.pid

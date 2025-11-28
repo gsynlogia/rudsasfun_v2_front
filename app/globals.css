@@ -19,20 +19,28 @@
   --font-mono: var(--font-geist-mono);
 }
 
-html {
+/* Increased specificity: html[lang] has higher specificity than just html */
+/* Using attribute selector increases specificity from 0,0,0,1 to 0,0,1,1 */
+html[lang],
+html:root {
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden !important;
-  overflow-y: visible !important;
-  height: 100% !important;
+  overflow-x: hidden;
+  overflow-y: visible;
+  height: 100%;
 }
 
-body {
+/* Increased specificity: combining multiple class selectors increases specificity */
+/* body.antialiased has specificity 0,0,1,1 which is higher than just body (0,0,0,1) */
+/* Adding both classes increases specificity to 0,0,2,1 */
+body.antialiased.geist_a71539c9-module__T19VSG__variable,
+body.antialiased.geist_mono_8d43a2aa-module__8Li5zG__variable,
+body.antialiased {
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden !important;
-  overflow-y: visible !important;
-  overflow: visible !important;
+  overflow-x: hidden;
+  overflow-y: visible;
+  overflow: visible;
   position: relative;
   color: var(--foreground);
   font-family: 'Inter', 'Roboto', 'Open Sans', Arial, Helvetica, sans-serif;
@@ -45,7 +53,7 @@ body {
   background-repeat: no-repeat;
   background-attachment: scroll;
   background-color: rgba(243, 244, 246, 0.7); /* Transparent gray overlay */
-  height: auto !important;
+  height: auto;
 }
 
 * {
@@ -90,17 +98,21 @@ body {
   }
 }
 
-/* Sticky wrapper for reservation summary */
+/* Sticky wrapper for reservation summary - increased specificity */
+/* Note: This class is not currently used, but kept for potential future use */
+aside.sticky-wrapper,
 .sticky-wrapper {
-  position: static !important;
+  position: static;
 }
 
 @media (min-width: 1024px) {
-  .sticky-wrapper {
-    position: -webkit-sticky !important;
-    position: sticky !important;
-    top: 24px !important;
-    align-self: flex-start !important;
-    will-change: transform !important;
+  /* Increased specificity with combined selectors */
+  aside.sticky-wrapper.lg\:sticky,
+  .sticky-wrapper.lg\:sticky {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 24px;
+    align-self: flex-start;
+    will-change: transform;
   }
 }
