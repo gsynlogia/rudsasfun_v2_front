@@ -163,13 +163,7 @@ export interface Step2FormData {
     returnType: string;
     returnCity: string;
   };
-  sources: {
-    kolejna: boolean;
-    znajomi: boolean;
-    internet: boolean;
-    wycieczka: boolean;
-    inne: boolean;
-  };
+  selectedSource: string; // 'kolejna' | 'znajomi' | 'internet' | 'wycieczka' | 'inne' | ''
   inneText: string;
 }
 

@@ -187,13 +187,7 @@ export default function AddonsSection() {
         returnType: '',
         returnCity: '',
       },
-      sources: savedData?.sources || {
-        kolejna: false,
-        znajomi: false,
-        internet: false,
-        wycieczka: false,
-        inne: false,
-      },
+      selectedSource: savedData?.selectedSource || '',
       inneText: savedData?.inneText || '',
     };
     saveStep2FormData(formData);

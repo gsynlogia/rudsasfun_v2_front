@@ -5,24 +5,18 @@ import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 /**
  * SourceSection Component
- * Displays checkbox options for "Skąd dowiedziałeś się o Radsas Fun?"
+ * Displays radio button options for "Skąd dowiedziałeś się o Radsas Fun?" (single choice)
  */
 export default function SourceSection() {
-  const [sources, setSources] = useState({
-    kolejna: false,
-    znajomi: false,
-    internet: false,
-    wycieczka: false,
-    inne: false,
-  });
+  const [selectedSource, setSelectedSource] = useState<string>('');
   const [inneText, setInneText] = useState('');
 
   // Load data from sessionStorage on mount
   useEffect(() => {
     const savedData = loadStep2FormData();
     if (savedData) {
-      if (savedData.sources) {
-        setSources(savedData.sources);
+      if (savedData.selectedSource) {
+        setSelectedSource(savedData.selectedSource);
       }
       if (savedData.inneText) {
         setInneText(savedData.inneText);
@@ -30,20 +24,28 @@ export default function SourceSection() {
     }
   }, []);
 
-  // Save to sessionStorage whenever sources or inneText changes
+  // Save to sessionStorage whenever selectedSource or inneText changes
   useEffect(() => {
     const savedData = loadStep2FormData();
     const formData = {
-      ...savedData,
-      sources,
+      selectedAddons: savedData?.selectedAddons || [],
+      selectedProtection: savedData?.selectedProtection || '',
+      selectedPromotion: savedData?.selectedPromotion || '',
+      transportData: savedData?.transportData || {
+        departureType: '',
+        departureCity: '',
+        returnType: '',
+        returnCity: '',
+      },
+      selectedSource,
       inneText,
     };
-    saveStep2FormData(formData as any);
-  }, [sources, inneText]);
+    saveStep2FormData(formData);
+  }, [selectedSource, inneText]);
 
-  const updateSource = (key: keyof typeof sources, value: boolean) => {
-    setSources((prev) => ({ ...prev, [key]: value }));
-    if (key === 'inne' && !value) {
+  const handleSourceChange = (value: string) => {
+    setSelectedSource(value);
+    if (value !== 'inne') {
       setInneText('');
     }
   };
@@ -57,10 +59,12 @@ export default function SourceSection() {
         <div className="space-y-3 sm:space-y-4">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
-              type="checkbox"
-              checked={sources.kolejna}
-              onChange={(e) => updateSource('kolejna', e.target.checked)}
-              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 rounded"
+              type="radio"
+              name="source"
+              value="kolejna"
+              checked={selectedSource === 'kolejna'}
+              onChange={(e) => handleSourceChange(e.target.value)}
+              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400"
             />
             <span className="text-xs sm:text-sm text-gray-700">
               To moja kolejna impreza z Radsas Fun
@@ -69,10 +73,12 @@ export default function SourceSection() {
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input
-              type="checkbox"
-              checked={sources.znajomi}
-              onChange={(e) => updateSource('znajomi', e.target.checked)}
-              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 rounded"
+              type="radio"
+              name="source"
+              value="znajomi"
+              checked={selectedSource === 'znajomi'}
+              onChange={(e) => handleSourceChange(e.target.value)}
+              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400"
             />
             <span className="text-xs sm:text-sm text-gray-700">
               Od znajomych
@@ -81,10 +87,12 @@ export default function SourceSection() {
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input
-              type="checkbox"
-              checked={sources.internet}
-              onChange={(e) => updateSource('internet', e.target.checked)}
-              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 rounded"
+              type="radio"
+              name="source"
+              value="internet"
+              checked={selectedSource === 'internet'}
+              onChange={(e) => handleSourceChange(e.target.value)}
+              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400"
             />
             <span className="text-xs sm:text-sm text-gray-700">
               Z Internetu
@@ -93,10 +101,12 @@ export default function SourceSection() {
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input
-              type="checkbox"
-              checked={sources.wycieczka}
-              onChange={(e) => updateSource('wycieczka', e.target.checked)}
-              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 rounded"
+              type="radio"
+              name="source"
+              value="wycieczka"
+              checked={selectedSource === 'wycieczka'}
+              onChange={(e) => handleSourceChange(e.target.value)}
+              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400"
             />
             <span className="text-xs sm:text-sm text-gray-700">
               Byłem na wycieczce szkolnej z Radsas Fun
@@ -106,16 +116,18 @@ export default function SourceSection() {
           <div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
-                type="checkbox"
-                checked={sources.inne}
-                onChange={(e) => updateSource('inne', e.target.checked)}
-                className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 rounded"
+                type="radio"
+                name="source"
+                value="inne"
+                checked={selectedSource === 'inne'}
+                onChange={(e) => handleSourceChange(e.target.value)}
+                className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400"
               />
               <span className="text-xs sm:text-sm text-gray-700">
                 Inne – jakie?
               </span>
             </label>
-            {sources.inne && (
+            {selectedSource === 'inne' && (
               <input
                 type="text"
                 value={inneText}
