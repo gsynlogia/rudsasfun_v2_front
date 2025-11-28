@@ -85,7 +85,7 @@ export default function Layout({
 
           {/* Right Column - Summary - Mobile: below, Desktop: sticky */}
           <aside 
-            className="lg:w-[25%] w-full order-1 lg:order-2 lg:sticky lg:top-24 lg:self-start"
+            className="lg:w-[25%] w-full order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start"
             style={{ 
               alignSelf: 'flex-start'
             }}

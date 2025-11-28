@@ -115,4 +115,11 @@ aside.sticky-wrapper,
     align-self: flex-start;
     will-change: transform;
   }
+  
+  /* Override Tailwind's lg:top-4 to use * 4 instead of * 24 */
+  /* Increased specificity: aside.lg\:top-4 has higher specificity than .lg\:top-4 */
+  aside.lg\:top-4.lg\:sticky,
+  aside.lg\:top-4 {
+    top: calc(var(--spacing) * 4);
+  }
 }
