@@ -6,6 +6,7 @@
 const STORAGE_KEYS = {
   STEP1_FORM_DATA: 'radsasfun_step1_form_data',
   STEP2_FORM_DATA: 'radsasfun_step2_form_data',
+  STEP3_FORM_DATA: 'radsasfun_step3_form_data',
   RESERVATION_STATE: 'radsasfun_reservation_state',
 } as const;
 
@@ -209,12 +210,83 @@ export function clearStep2FormData(): void {
   }
 }
 
+export interface Step3FormData {
+  invoiceType: 'private' | 'company';
+  privateData: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    street: string;
+    postalCode: string;
+    city: string;
+    nip: string;
+  };
+  companyData: {
+    companyName: string;
+    nip: string;
+    street: string;
+    postalCode: string;
+    city: string;
+  };
+  deliveryType: 'electronic' | 'paper';
+  differentAddress: boolean;
+  deliveryAddress: {
+    street: string;
+    postalCode: string;
+    city: string;
+  };
+}
+
+/**
+ * Save Step3 form data to sessionStorage
+ */
+export function saveStep3FormData(data: Step3FormData): void {
+  if (!isStorageAvailable()) return;
+  
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.STEP3_FORM_DATA, JSON.stringify(data));
+  } catch (error) {
+    console.error('Error saving Step3 form data to sessionStorage:', error);
+  }
+}
+
+/**
+ * Load Step3 form data from sessionStorage
+ */
+export function loadStep3FormData(): Step3FormData | null {
+  if (!isStorageAvailable()) return null;
+  
+  try {
+    const data = sessionStorage.getItem(STORAGE_KEYS.STEP3_FORM_DATA);
+    if (!data) return null;
+    return JSON.parse(data) as Step3FormData;
+  } catch (error) {
+    console.error('Error loading Step3 form data from sessionStorage:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear Step3 form data from sessionStorage
+ */
+export function clearStep3FormData(): void {
+  if (!isStorageAvailable()) return;
+  
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.STEP3_FORM_DATA);
+  } catch (error) {
+    console.error('Error clearing Step3 form data from sessionStorage:', error);
+  }
+}
+
 /**
  * Clear all application data from sessionStorage
  */
 export function clearAllSessionData(): void {
   clearStep1FormData();
   clearStep2FormData();
+  clearStep3FormData();
   clearReservationState();
 }
 
