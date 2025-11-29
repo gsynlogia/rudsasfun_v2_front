@@ -1,0 +1,157 @@
+import { notFound } from 'next/navigation';
+import LayoutClient from '@/components/LayoutClient';
+import Step1 from '@/components/Step1';
+import Step2 from '@/components/Step2';
+import Step3 from '@/components/Step3';
+import Step4 from '@/components/Step4';
+import Step5 from '@/components/Step5';
+import type { StepNumber, CampWithProperty } from '@/types/reservation';
+import { getCampEdition } from '@/utils/api-server';
+
+interface PageProps {
+  params: Promise<{
+    campId: string;
+    editionId: string;
+    step: string;
+  }>;
+}
+
+/**
+ * Dynamic route page for reservation steps
+ * Route: /camps/[campId]/edition/[editionId]/step/[step]
+ * 
+ * Fetches camp data on server side before rendering to avoid hydration errors
+ * This is a Server Component - data is fetched before mount
+ */
+export default async function ReservationStepPage({ params }: PageProps) {
+  const { campId, editionId, step } = await params;
+  
+  // Validate step number
+  const stepNumber = parseInt(step, 10);
+  if (isNaN(stepNumber) || stepNumber < 1 || stepNumber > 5) {
+    notFound();
+  }
+
+  // Validate campId and editionId
+  const parsedCampId = parseInt(campId, 10);
+  const parsedEditionId = parseInt(editionId, 10);
+  
+  if (isNaN(parsedCampId) || parsedCampId < 1) {
+    console.error('[ReservationStepPage] Invalid camp ID:', campId);
+    notFound();
+  }
+  
+  if (isNaN(parsedEditionId) || parsedEditionId < 1) {
+    console.error('[ReservationStepPage] Invalid edition ID:', editionId);
+    notFound();
+  }
+
+  // Fetch camp data on server side (before mount - prevents hydration errors)
+  // Max 10 seconds timeout
+  let campData: CampWithProperty;
+  try {
+    campData = await getCampEdition(parsedCampId, parsedEditionId);
+    
+    // Check if camp/edition exists (id = 0 means doesn't exist)
+    // This is NOT an error - just information that resource doesn't exist
+    if (!campData || !campData.camp || !campData.property) {
+      // Return empty data - will be handled by LayoutClient
+      campData = {
+        camp: {
+          id: 0,
+          name: "",
+          created_at: null,
+          updated_at: null,
+          properties: null
+        },
+        property: {
+          id: 0,
+          camp_id: 0,
+          period: "",
+          city: "",
+          start_date: "1970-01-01",
+          end_date: "1970-01-01",
+          days_count: 0,
+          created_at: null,
+          updated_at: null
+        }
+      };
+    } else if (campData.camp.id === 0 || campData.property.id === 0) {
+      // Camp or edition doesn't exist - this is OK, not an error
+      // Keep the data as is - LayoutClient will handle displaying message
+    } else {
+      // Verify IDs match for existing data
+      if (campData.camp.id !== parsedCampId || 
+          campData.property.id !== parsedEditionId || 
+          campData.property.camp_id !== parsedCampId) {
+        // IDs don't match - treat as not found (not an error)
+        campData = {
+          camp: {
+            id: 0,
+            name: "",
+            created_at: null,
+            updated_at: null,
+            properties: null
+          },
+          property: {
+            id: 0,
+            camp_id: 0,
+            period: "",
+            city: "",
+            start_date: "1970-01-01",
+            end_date: "1970-01-01",
+            days_count: 0,
+            created_at: null,
+            updated_at: null
+          }
+        };
+      }
+    }
+  } catch (error) {
+    // Only actual errors (timeout, server errors) should throw
+    // Missing camp/edition is NOT an error
+    console.error('[ReservationStepPage] Error fetching camp data:', error);
+    throw error;
+  }
+
+  // Calculate completed steps (all previous steps)
+  const completedSteps: StepNumber[] = [];
+  for (let i = 1; i < stepNumber; i++) {
+    completedSteps.push(i as StepNumber);
+  }
+
+  const currentStep = stepNumber as StepNumber;
+
+  const renderStep = () => {
+    const stepProps = {
+      onNext: undefined,
+      onPrevious: undefined,
+    };
+    
+    switch (currentStep) {
+      case 1:
+        return <Step1 {...stepProps} />;
+      case 2:
+        return <Step2 {...stepProps} />;
+      case 3:
+        return <Step3 {...stepProps} />;
+      case 4:
+        return <Step4 {...stepProps} />;
+      case 5:
+        return <Step5 {...stepProps} />;
+      default:
+        return <Step1 {...stepProps} />;
+    }
+  };
+
+  return (
+    <LayoutClient
+      currentStep={currentStep}
+      completedSteps={completedSteps}
+      campData={campData}
+    >
+      {renderStep()}
+    </LayoutClient>
+  );
+}
+

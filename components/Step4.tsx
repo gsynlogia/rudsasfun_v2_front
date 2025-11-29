@@ -6,7 +6,7 @@ import type { StepComponentProps } from '@/types/reservation';
  * Step4 Component - Consents and Regulations
  * Placeholder for consents and regulations form
  */
-export default function Step4({ onNext, onPrevious }: StepComponentProps) {
+export default function Step4({ onNext, onPrevious, disabled = false }: StepComponentProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>

@@ -23,7 +23,7 @@ interface ParentData {
  * Step1 Component - Personal Data
  * Contains: Parent/Guardian data, Participant data, Diet, Accommodation request, Health status
  */
-export default function Step1({ onNext, onPrevious }: StepComponentProps) {
+export default function Step1({ onNext, onPrevious, disabled = false }: StepComponentProps) {
   const { addReservationItem, removeReservationItemsByType } = useReservation();
   
   const [parents, setParents] = useState<ParentData[]>([
@@ -160,7 +160,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                 {parents.length > 1 && (
                   <button
                     onClick={() => removeParent(parent.id)}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium"
+                    disabled={disabled}
+                    className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Usuń opiekuna
                   </button>
@@ -177,7 +178,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     type="text"
                     value={parent.firstName}
                     onChange={(e) => updateParent(parent.id, 'firstName', e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -188,7 +190,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     type="text"
                     value={parent.lastName}
                     onChange={(e) => updateParent(parent.id, 'lastName', e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -199,7 +202,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     type="email"
                     value={parent.email}
                     onChange={(e) => updateParent(parent.id, 'email', e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -210,7 +214,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     <select
                       value={parent.phone}
                       onChange={(e) => updateParent(parent.id, 'phone', e.target.value)}
-                      className="px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10"
+                      disabled={disabled}
+                      className="px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="+48">+48</option>
                       <option value="+1">+1</option>
@@ -220,7 +225,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                       value={parent.phoneNumber}
                       onChange={(e) => updateParent(parent.id, 'phoneNumber', e.target.value)}
                       placeholder="111 222 333"
-                      className="flex-1 px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      disabled={disabled}
+                      className="flex-1 px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -232,7 +238,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     type="text"
                     value={parent.street}
                     onChange={(e) => updateParent(parent.id, 'street', e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -244,7 +251,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     value={parent.postalCode}
                     onChange={(e) => updateParent(parent.id, 'postalCode', e.target.value)}
                     placeholder="np. 00-000"
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -255,7 +263,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     type="text"
                     value={parent.city}
                     onChange={(e) => updateParent(parent.id, 'city', e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -266,7 +275,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
           <div className="flex justify-end mt-4">
             <button
               onClick={addParent}
-              className="text-[#03adf0] hover:text-[#0288c7] text-sm font-medium flex items-center gap-1"
+              disabled={disabled}
+              className="text-[#03adf0] hover:text-[#0288c7] text-sm font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -294,7 +304,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
             <select
               value={participantData.selectedParticipant}
               onChange={(e) => setParticipantData({ ...participantData, selectedParticipant: e.target.value })}
-              className="w-2/3 px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10"
+              disabled={disabled}
+              className="w-2/3 px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               <option value="">Wybierz z listy</option>
               <option value="Jan">Jan</option>
@@ -314,7 +325,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                 value={participantData.firstName}
                 onChange={(e) => setParticipantData({ ...participantData, firstName: e.target.value })}
                 placeholder="Imię"
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                disabled={disabled}
+                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -326,7 +338,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                 value={participantData.lastName}
                 onChange={(e) => setParticipantData({ ...participantData, lastName: e.target.value })}
                 placeholder="Nazwisko"
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                disabled={disabled}
+                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -336,7 +349,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
               <select
                 value={participantData.age}
                 onChange={(e) => setParticipantData({ ...participantData, age: e.target.value })}
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10"
+                disabled={disabled}
+                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option>Wybierz z listy</option>
                 <option value="7">7</option>
@@ -359,7 +373,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
               <select
                 value={participantData.gender}
                 onChange={(e) => setParticipantData({ ...participantData, gender: e.target.value })}
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10"
+                disabled={disabled}
+                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option>Wybierz z listy</option>
                 <option value="Chłopiec">Chłopiec</option>
@@ -375,7 +390,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                 value={participantData.city}
                 onChange={(e) => setParticipantData({ ...participantData, city: e.target.value })}
                 placeholder="Miejscowość"
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                disabled={disabled}
+                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -391,11 +407,12 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
           <div className="flex flex-wrap gap-3 sm:gap-4">
             <button
               onClick={() => setDiet('standard')}
+              disabled={disabled}
               className={`w-32 h-32 sm:w-36 sm:h-36 flex flex-col items-center justify-center gap-2 transition-colors ${
                 diet === 'standard'
                   ? 'bg-[#03adf0] text-white'
                   : 'bg-gray-100 text-gray-600'
-              }`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -405,11 +422,12 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
             </button>
             <button
               onClick={() => setDiet('vegetarian')}
+              disabled={disabled}
               className={`w-32 h-32 sm:w-36 sm:h-36 flex flex-col items-center justify-center gap-2 transition-colors ${
                 diet === 'vegetarian'
                   ? 'bg-[#03adf0] text-white'
                   : 'bg-gray-100 text-gray-600'
-              }`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -431,7 +449,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
             value={accommodationRequest}
             onChange={(e) => setAccommodationRequest(e.target.value)}
             rows={4}
-            className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+            disabled={disabled}
+            className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="Uzupełnij to pole, jeśli występują specjalne prośby o zakwaterowanie, np. z rodzeństwem lub znajomym/znajomymi (wpisz imię i nazwisko)"
           />
         </section>
@@ -464,7 +483,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     value="Tak"
                     checked={healthQuestions.chronicDiseases === 'Tak'}
                     onChange={(e) => setHealthQuestions({ ...healthQuestions, chronicDiseases: e.target.value })}
-                    className="text-[#03adf0] focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="text-[#03adf0] focus:ring-[#03adf0] disabled:cursor-not-allowed"
                   />
                   <span className="text-xs sm:text-sm text-gray-700">Tak</span>
                 </label>
@@ -478,7 +498,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                       setHealthQuestions({ ...healthQuestions, chronicDiseases: e.target.value });
                       setHealthDetails({ ...healthDetails, chronicDiseases: '' });
                     }}
-                    className="text-[#03adf0] focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="text-[#03adf0] focus:ring-[#03adf0] disabled:cursor-not-allowed"
                   />
                   <span className="text-xs sm:text-sm text-gray-700">Nie</span>
                 </label>
@@ -488,7 +509,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                   value={healthDetails.chronicDiseases}
                   onChange={(e) => setHealthDetails({ ...healthDetails, chronicDiseases: e.target.value })}
                   placeholder="Opisz choroby przewlekłe..."
-                  className="mt-3 w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] overflow-hidden"
+                  disabled={disabled}
+                  className="mt-3 w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] overflow-hidden disabled:bg-gray-100 disabled:cursor-not-allowed"
                   style={{
                     animation: 'expandWidth 0.5s ease-out forwards, expandHeight 0.5s ease-out forwards',
                   }}
@@ -516,7 +538,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     value="Tak"
                     checked={healthQuestions.dysfunctions === 'Tak'}
                     onChange={(e) => setHealthQuestions({ ...healthQuestions, dysfunctions: e.target.value })}
-                    className="text-[#03adf0] focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="text-[#03adf0] focus:ring-[#03adf0] disabled:cursor-not-allowed"
                   />
                   <span className="text-xs sm:text-sm text-gray-700">Tak</span>
                 </label>
@@ -530,7 +553,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                       setHealthQuestions({ ...healthQuestions, dysfunctions: e.target.value });
                       setHealthDetails({ ...healthDetails, dysfunctions: '' });
                     }}
-                    className="text-[#03adf0] focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="text-[#03adf0] focus:ring-[#03adf0] disabled:cursor-not-allowed"
                   />
                   <span className="text-xs sm:text-sm text-gray-700">Nie</span>
                 </label>
@@ -540,7 +564,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                   value={healthDetails.dysfunctions}
                   onChange={(e) => setHealthDetails({ ...healthDetails, dysfunctions: e.target.value })}
                   placeholder="Opisz dysfunkcje..."
-                  className="mt-3 w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] overflow-hidden"
+                  disabled={disabled}
+                  className="mt-3 w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] overflow-hidden disabled:bg-gray-100 disabled:cursor-not-allowed"
                   style={{
                     animation: 'expandWidth 0.5s ease-out forwards, expandHeight 0.5s ease-out forwards',
                   }}
@@ -568,7 +593,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                     value="Tak"
                     checked={healthQuestions.psychiatric === 'Tak'}
                     onChange={(e) => setHealthQuestions({ ...healthQuestions, psychiatric: e.target.value })}
-                    className="text-[#03adf0] focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="text-[#03adf0] focus:ring-[#03adf0] disabled:cursor-not-allowed"
                   />
                   <span className="text-xs sm:text-sm text-gray-700">Tak</span>
                 </label>
@@ -582,7 +608,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                       setHealthQuestions({ ...healthQuestions, psychiatric: e.target.value });
                       setHealthDetails({ ...healthDetails, psychiatric: '' });
                     }}
-                    className="text-[#03adf0] focus:ring-[#03adf0]"
+                    disabled={disabled}
+                    className="text-[#03adf0] focus:ring-[#03adf0] disabled:cursor-not-allowed"
                   />
                   <span className="text-xs sm:text-sm text-gray-700">Nie</span>
                 </label>
@@ -592,7 +619,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                   value={healthDetails.psychiatric}
                   onChange={(e) => setHealthDetails({ ...healthDetails, psychiatric: e.target.value })}
                   placeholder="Opisz problemy psychiatryczne..."
-                  className="mt-3 w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] overflow-hidden"
+                  disabled={disabled}
+                  className="mt-3 w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] overflow-hidden disabled:bg-gray-100 disabled:cursor-not-allowed"
                   style={{
                     animation: 'expandWidth 0.5s ease-out forwards, expandHeight 0.5s ease-out forwards',
                   }}
@@ -627,7 +655,8 @@ export default function Step1({ onNext, onPrevious }: StepComponentProps) {
                 value={additionalNotes}
                 onChange={(e) => setAdditionalNotes(e.target.value)}
                 rows={4}
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                disabled={disabled}
+                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="Wprowadź dodatkowe informacje..."
               />
             </div>

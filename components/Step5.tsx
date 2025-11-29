@@ -6,7 +6,7 @@ import type { StepComponentProps } from '@/types/reservation';
  * Step5 Component - Summary
  * Placeholder for summary view
  */
-export default function Step5({ onNext, onPrevious }: StepComponentProps) {
+export default function Step5({ onNext, onPrevious, disabled = false }: StepComponentProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>

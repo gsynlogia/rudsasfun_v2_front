@@ -54,6 +54,16 @@ export interface ReservationStorageState {
     type: 'base' | 'diet' | 'accommodation' | 'addon' | 'protection' | 'promotion' | 'transport' | 'source' | 'other';
   }>;
   totalPrice: number;
+  camp?: {
+    id: number;
+    name: string;
+    properties: {
+      period: string;
+      city: string;
+      start_date: string;
+      end_date: string;
+    };
+  };
 }
 
 /**

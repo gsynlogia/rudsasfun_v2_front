@@ -14,7 +14,7 @@ import { saveStep2FormData, loadStep2FormData, type Step2FormData } from '@/util
  * Step2 Component - Reservation Details
  * Contains: Addons, Protection, Promotions, Transport, Source information
  */
-export default function Step2({ onNext, onPrevious }: StepComponentProps) {
+export default function Step2({ onNext, onPrevious, disabled = false }: StepComponentProps) {
   // Load data from sessionStorage on mount
   useEffect(() => {
     const savedData = loadStep2FormData();

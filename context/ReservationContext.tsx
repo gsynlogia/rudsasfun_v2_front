@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import type { ReservationState, ReservationContextType, ReservationItem } from '@/types/reservation';
+import type { ReservationState, ReservationContextType, ReservationItem, ReservationCamp } from '@/types/reservation';
 import { saveReservationState, loadReservationState } from '@/utils/sessionStorage';
 
 const BASE_PRICE = 2200;
@@ -157,6 +157,13 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
     });
   }, []);
 
+  const updateReservationCamp = useCallback((camp: ReservationCamp) => {
+    setReservation((prev) => ({
+      ...prev,
+      camp,
+    }));
+  }, []);
+
   const resetReservation = useCallback(() => {
     setReservation(getDefaultReservationState());
   }, []);
@@ -167,6 +174,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
     removeReservationItem,
     removeReservationItemsByType,
     updateReservationItem,
+    updateReservationCamp,
     resetReservation,
   };
 

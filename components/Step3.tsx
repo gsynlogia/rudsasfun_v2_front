@@ -12,7 +12,7 @@ import { saveStep3FormData, loadStep3FormData, type Step3FormData } from '@/util
  * Step3 Component - Invoices
  * Contains: Invoice type selection, Invoice data form, Invoice delivery options
  */
-export default function Step3({ onNext, onPrevious }: StepComponentProps) {
+export default function Step3({ onNext, onPrevious, disabled = false }: StepComponentProps) {
   // Load data from sessionStorage on mount
   useEffect(() => {
     const savedData = loadStep3FormData();

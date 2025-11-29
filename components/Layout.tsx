@@ -33,13 +33,13 @@ export default function Layout({
   });
 
   const handleNext = () => {
-    if (currentStep < TOTAL_STEPS) {
+    if (currentStep < TOTAL_STEPS && onStepClick) {
       onStepClick((currentStep + 1) as StepNumber);
     }
   };
 
   const handlePrevious = () => {
-    if (currentStep > 1) {
+    if (currentStep > 1 && onStepClick) {
       onStepClick((currentStep - 1) as StepNumber);
     }
   };
@@ -78,7 +78,7 @@ export default function Layout({
         </p>
 
         {/* Progress Bar */}
-        <ProgressBar steps={steps} onStepClick={onStepClick} />
+        <ProgressBar steps={steps} onStepClick={onStepClick || (() => {})} />
 
         {/* Main Content Layout */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
