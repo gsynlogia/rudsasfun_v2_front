@@ -1,5 +1,7 @@
 'use client';
 
+import { useCamp } from '@/hooks/useCamp';
+import { formatDateRange } from '@/utils/api';
 import Header from './Header';
 import ProgressBar from './ProgressBar';
 import ReservationSummary from './ReservationSummary';
@@ -18,6 +20,7 @@ export default function Layout({
   children,
 }: LayoutProps) {
   const TOTAL_STEPS = 5;
+  const { camp, loading, error } = useCamp();
 
   const steps = Array.from({ length: TOTAL_STEPS }, (_, i) => {
     const stepNumber = (i + 1) as StepNumber;
@@ -59,7 +62,15 @@ export default function Layout({
 
         {/* Page Title */}
         <h1 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-2 leading-snug">
-          Rezerwacja obozu "Laserowy Paintball" - Lato 2022 - Wiele - 12.07 - 21.07.2022 (10 dni)
+          {loading ? (
+            'Ładowanie danych obozu...'
+          ) : error ? (
+            'Błąd ładowania danych obozu'
+          ) : camp ? (
+            `Rezerwacja obozu "${camp.name}" - ${camp.period === 'lato' ? 'Lato' : 'Zima'} ${new Date(camp.start_date).getFullYear()} - ${camp.city} - ${formatDateRange(camp.start_date, camp.end_date)} (${camp.days_count} ${camp.days_count === 1 ? 'dzień' : 'dni'})`
+          ) : (
+            'Rezerwacja obozu'
+          )}
         </h1>
 
         <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
