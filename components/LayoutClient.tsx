@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { formatDateRange } from '@/utils/api';
-import Header from './Header';
+import HeaderTop from './HeaderTop';
+import HeaderSecondary from './HeaderSecondary';
 import ProgressBar from './ProgressBar';
 import ReservationSummary from './ReservationSummary';
 import Footer from './Footer';
@@ -126,7 +127,8 @@ export default function LayoutClient({
 
   return (
     <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
-      <Header />
+      <HeaderTop />
+      <HeaderSecondary />
 
       <main className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Breadcrumbs */}
