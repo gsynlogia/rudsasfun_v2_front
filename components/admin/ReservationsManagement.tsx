@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
+import { useRouter } from 'next/navigation';
 import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, Clock, AlertCircle } from 'lucide-react';
 
 /**
@@ -116,26 +117,24 @@ const generateReservations = (): Reservation[] => {
 };
 
 export default function ReservationsManagement() {
+  const router = useRouter();
+  
   // Generate reservations only on client side to avoid hydration mismatch
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   
   // State for expanded rows
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   
-  // State for modals
-  const [editModalOpen, setEditModalOpen] = useState(false);
+  // State for delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
-  
-  // State for edit form
-  const [editFormData, setEditFormData] = useState<Partial<Reservation>>({});
 
   useEffect(() => {
     // Generate data only on client side
     setAllReservations(generateReservations());
   }, []);
   
-  // Toggle row expansion
+  // Toggle row expansion with animation
   const toggleRowExpansion = (reservationId: number) => {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
@@ -148,19 +147,10 @@ export default function ReservationsManagement() {
     });
   };
   
-  // Handle edit click
+  // Handle edit click - navigate to edit page
   const handleEditClick = (reservation: Reservation, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedReservation(reservation);
-    setEditFormData({
-      reservationName: reservation.reservationName,
-      participantName: reservation.participantName,
-      email: reservation.email,
-      campName: reservation.campName,
-      tripName: reservation.tripName,
-      status: reservation.status,
-    });
-    setEditModalOpen(true);
+    router.push(`/admin-panel/reservations/${reservation.id}/edit`);
   };
   
   // Handle delete click
@@ -176,15 +166,6 @@ export default function ReservationsManagement() {
     console.log('Delete reservation:', selectedReservation?.id);
     setDeleteModalOpen(false);
     setSelectedReservation(null);
-  };
-  
-  // Handle edit save (without actual save)
-  const handleEditSave = () => {
-    // TODO: Implement actual save when backend is ready
-    console.log('Save reservation:', editFormData);
-    setEditModalOpen(false);
-    setSelectedReservation(null);
-    setEditFormData({});
   };
 
   // State for search, filters, sorting, and pagination
@@ -718,7 +699,7 @@ export default function ReservationsManagement() {
                   return (
                     <Fragment key={reservation.id}>
                       <tr 
-                        className={`hover:bg-gray-50 cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50' : ''}`}
+                        className={`hover:bg-gray-50 cursor-pointer transition-all duration-200 ${isExpanded ? 'bg-blue-50' : ''}`}
                         onClick={() => toggleRowExpansion(reservation.id)}
                       >
                         <td className="px-4 py-2 whitespace-nowrap">
@@ -793,7 +774,7 @@ export default function ReservationsManagement() {
                         </td>
                         </tr>
                       {isExpanded && (
-                        <tr className="bg-blue-50">
+                        <tr className="bg-blue-50 animate-slideDown">
                           <td colSpan={8} className="px-4 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                               {/* Participant Details */}
@@ -973,139 +954,24 @@ export default function ReservationsManagement() {
         </div>
       </div>
 
-      {/* Edit Modal */}
-      {editModalOpen && selectedReservation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Edytuj rezerwację</h2>
-                <button
-                  onClick={() => {
-                    setEditModalOpen(false);
-                    setSelectedReservation(null);
-                    setEditFormData({});
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nazwa rezerwacji
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.reservationName || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, reservationName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
-                    style={{ borderRadius: 0 }}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Uczestnik
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.participantName || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, participantName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
-                    style={{ borderRadius: 0 }}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={editFormData.email || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
-                    style={{ borderRadius: 0 }}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Obóz
-                    </label>
-                    <input
-                      type="text"
-                      value={editFormData.campName || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, campName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
-                      style={{ borderRadius: 0 }}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Wycieczka
-                    </label>
-                    <input
-                      type="text"
-                      value={editFormData.tripName || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, tripName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
-                      style={{ borderRadius: 0 }}
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={editFormData.status || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
-                    style={{ borderRadius: 0 }}
-                  >
-                    <option value="aktywna">Aktywna</option>
-                    <option value="zakończona">Zakończona</option>
-                    <option value="anulowana">Anulowana</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-end gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setEditModalOpen(false);
-                    setSelectedReservation(null);
-                    setEditFormData({});
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-colors"
-                  style={{ borderRadius: 0 }}
-                >
-                  Anuluj
-                </button>
-                <button
-                  onClick={handleEditSave}
-                  className="px-4 py-2 text-sm font-medium text-white bg-[#03adf0] border-2 border-[#03adf0] hover:bg-[#0288c7] transition-colors"
-                  style={{ borderRadius: 0 }}
-                >
-                  Zapisz
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal - Professional with transparent background */}
       {deleteModalOpen && selectedReservation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div 
+          className="fixed inset-0 flex items-center justify-center z-50 p-4 animate-fadeIn"
+          style={{ 
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            backdropFilter: 'blur(2px)',
+          }}
+          onClick={() => {
+            setDeleteModalOpen(false);
+            setSelectedReservation(null);
+          }}
+        >
+          <div 
+            className="bg-white shadow-2xl max-w-md w-full animate-scaleIn"
+            style={{ borderRadius: 0 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6">
               <div className="flex items-center gap-4 mb-4">
                 <div className="flex-shrink-0">
@@ -1129,14 +995,14 @@ export default function ReservationsManagement() {
                     setDeleteModalOpen(false);
                     setSelectedReservation(null);
                   }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-all duration-200"
                   style={{ borderRadius: 0 }}
                 >
                   Anuluj
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border-2 border-red-600 hover:bg-red-700 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border-2 border-red-600 hover:bg-red-700 transition-all duration-200"
                   style={{ borderRadius: 0 }}
                 >
                   Usuń
@@ -1146,6 +1012,55 @@ export default function ReservationsManagement() {
           </div>
         </div>
       )}
+
+      {/* Animations CSS */}
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            max-height: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            max-height: 1000px;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+
+        .animate-scaleIn {
+          animation: scaleIn 0.3s ease-out;
+        }
+
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out;
+          overflow: hidden;
+        }
+      `}</style>
     </div>
   );
 }
