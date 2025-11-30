@@ -21,9 +21,9 @@ const fetchCampById = (id: number): Promise<Camp | null> => {
     });
 };
 
-export default function CampEditPage({ params }: { params: { id: string } }) {
+export default function CampEditPage({ params }: { params: Promise<{ campId: string }> | { campId: string } }) {
   const router = useRouter();
-  const campId = parseInt(params.id);
+  const [campId, setCampId] = useState<number | null>(null);
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const [camp, setCamp] = useState<Camp | null>(null);
@@ -32,6 +32,31 @@ export default function CampEditPage({ params }: { params: { id: string } }) {
   const [formData, setFormData] = useState<Partial<Camp>>({});
   const [saving, setSaving] = useState(false);
 
+  // Resolve params (handle both Promise and direct params)
+  useEffect(() => {
+    const resolveParams = async () => {
+      try {
+        const resolvedParams = params instanceof Promise ? await params : params;
+        const resolvedCampId = parseInt(resolvedParams.campId);
+        
+        if (isNaN(resolvedCampId)) {
+          setError('Nieprawidłowe parametry URL');
+          setLoading(false);
+          return;
+        }
+        
+        setCampId(resolvedCampId);
+      } catch (err) {
+        console.error('[CampEditPage] Error resolving params:', err);
+        setError('Błąd podczas parsowania parametrów');
+        setLoading(false);
+      }
+    };
+    
+    resolveParams();
+  }, [params]);
+
+  // Load camp data
   useEffect(() => {
     if (campId) {
       fetchCampById(campId)
@@ -45,12 +70,10 @@ export default function CampEditPage({ params }: { params: { id: string } }) {
           setLoading(false);
         })
         .catch(err => {
+          console.error('[CampEditPage] Error loading camp:', err);
           setError(err instanceof Error ? err.message : 'Błąd podczas ładowania obozu');
-          console.error('Error loading camp:', err);
           setLoading(false);
         });
-    } else {
-      setLoading(false);
     }
   }, [campId]);
 
@@ -63,6 +86,11 @@ export default function CampEditPage({ params }: { params: { id: string } }) {
     try {
       setSaving(true);
       setError(null);
+
+      if (!campId) {
+        setError('Brak wymaganego parametru campId');
+        return;
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/camps/${campId}`, {
         method: 'PUT',

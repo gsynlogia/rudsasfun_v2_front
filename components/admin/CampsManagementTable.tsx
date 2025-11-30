@@ -37,9 +37,8 @@ export default function CampsManagementTable() {
   const [deleteAdditionalInfo, setDeleteAdditionalInfo] = useState<string | undefined>(undefined);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // State for property form (add/edit edition)
+  // State for property form (add edition only - edit is on separate page)
   const [showPropertyForm, setShowPropertyForm] = useState(false);
-  const [editingProperty, setEditingProperty] = useState<{ campId: number; property: CampProperty } | null>(null);
   const [selectedCampIdForProperty, setSelectedCampIdForProperty] = useState<number | null>(null);
 
   // State for search, filters, sorting, and pagination
@@ -341,20 +340,19 @@ export default function CampsManagementTable() {
     router.push('/admin-panel/camps/new');
   };
 
-  // Handle create property (edition)
+  // Handle create property (edition) - opens modal
   const handleCreateProperty = (campId: number, e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log('[CampsManagementTable] Opening create property modal for camp:', campId);
     setSelectedCampIdForProperty(campId);
-    setEditingProperty(null);
     setShowPropertyForm(true);
   };
 
-  // Handle edit property (edition)
+  // Handle edit property (edition) - navigate to edit page
   const handleEditProperty = (campId: number, property: CampProperty, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedCampIdForProperty(campId);
-    setEditingProperty({ campId, property });
-    setShowPropertyForm(true);
+    console.log('[CampsManagementTable] Navigating to edition edit page:', { campId, editionId: property.id });
+    router.push(`/admin-panel/camps/${campId}/editions/${property.id}/edit`);
   };
 
   // Handle delete property (edition) - now uses modal
@@ -363,18 +361,18 @@ export default function CampsManagementTable() {
     handleDeletePropertyClick(campId, property.id, propertyName, e);
   };
 
-  // Handle property form success
+  // Handle property form success (only for creating new edition)
   const handlePropertyFormSuccess = async () => {
+    console.log('[CampsManagementTable] Property form success - reloading camps');
     setShowPropertyForm(false);
-    setEditingProperty(null);
     setSelectedCampIdForProperty(null);
     await loadCamps();
   };
 
   // Handle property form cancel
   const handlePropertyFormCancel = () => {
+    console.log('[CampsManagementTable] Property form cancelled');
     setShowPropertyForm(false);
-    setEditingProperty(null);
     setSelectedCampIdForProperty(null);
   };
 
@@ -914,7 +912,7 @@ export default function CampsManagementTable() {
           >
             <CampPropertyForm
               campId={selectedCampIdForProperty}
-              property={editingProperty?.property || null}
+              property={null} // Always null - modal is only for creating new editions
               onSuccess={handlePropertyFormSuccess}
               onCancel={handlePropertyFormCancel}
             />
