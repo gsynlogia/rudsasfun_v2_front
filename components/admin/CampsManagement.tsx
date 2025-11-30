@@ -192,6 +192,7 @@ export default function CampsManagement() {
             <button
               onClick={handleCreateCamp}
               className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white rounded-lg hover:bg-[#0288c7] transition-colors text-sm font-medium"
+              style={{ cursor: 'pointer' }}
             >
               <Plus className="w-4 h-4" />
               Dodaj obóz
@@ -203,6 +204,7 @@ export default function CampsManagement() {
               <button
                 onClick={handleBackToList}
                 className="text-sm text-gray-600 hover:text-[#03adf0] mb-2 transition-colors"
+                style={{ cursor: 'pointer' }}
               >
                 ← Wróć do listy obozów
               </button>
@@ -214,6 +216,7 @@ export default function CampsManagement() {
               <button
                 onClick={() => handleEditCamp(selectedCamp!)}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                style={{ cursor: 'pointer' }}
               >
                 <Edit className="w-4 h-4" />
                 Edytuj obóz
@@ -221,6 +224,7 @@ export default function CampsManagement() {
               <button
                 onClick={handleCreateProperty}
                 className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white rounded-lg hover:bg-[#0288c7] transition-colors text-sm font-medium"
+                style={{ cursor: 'pointer' }}
               >
                 <Plus className="w-4 h-4" />
                 Dodaj edycję
@@ -355,6 +359,7 @@ export default function CampsManagement() {
                                 onClick={() => handleEditProperty(selectedCamp.id, property)}
                                 className="text-[#03adf0] hover:text-[#0288c7] transition-colors"
                                 title="Edytuj edycję"
+                                style={{ cursor: 'pointer' }}
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
@@ -362,6 +367,7 @@ export default function CampsManagement() {
                                 onClick={() => handleDeleteProperty(selectedCamp.id, property.id)}
                                 className="text-red-600 hover:text-red-700 transition-colors"
                                 title="Usuń edycję"
+                                style={{ cursor: 'pointer' }}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -378,6 +384,7 @@ export default function CampsManagement() {
                   <button
                     onClick={handleCreateProperty}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white rounded-lg hover:bg-[#0288c7] transition-colors text-sm font-medium"
+                    style={{ cursor: 'pointer' }}
                   >
                     <Plus className="w-4 h-4" />
                     Dodaj pierwszą edycję

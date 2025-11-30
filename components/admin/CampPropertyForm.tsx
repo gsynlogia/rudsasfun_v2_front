@@ -107,6 +107,7 @@ export default function CampPropertyForm({
           onClick={onCancel}
           className="text-gray-400 hover:text-gray-600 transition-colors"
           title="Anuluj"
+          style={{ cursor: 'pointer' }}
         >
           <X className="w-5 h-5" />
         </button>
@@ -207,14 +208,16 @@ export default function CampPropertyForm({
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            style={{ cursor: loading ? 'not-allowed' : 'pointer' }}
           >
             Anuluj
           </button>
           <button
             type="submit"
             disabled={loading || !city.trim() || !startDate || !endDate}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#03adf0] rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#03adf0] rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50"
+            style={{ cursor: (loading || !city.trim() || !startDate || !endDate) ? 'not-allowed' : 'pointer' }}
           >
             <Save className="w-4 h-4" />
             {loading ? 'Zapisywanie...' : isEditMode ? 'Zapisz zmiany' : 'Dodaj edycję'}

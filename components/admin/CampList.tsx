@@ -64,6 +64,7 @@ export default function CampList({
                   onClick={() => onSelectCamp(camp)}
                   className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-[#03adf0] hover:bg-[#0288c7] rounded-lg transition-colors"
                   title="Zarządzaj edycjami"
+                  style={{ cursor: 'pointer' }}
                 >
                   Zarządzaj edycjami
                 </button>
@@ -71,6 +72,7 @@ export default function CampList({
                   onClick={() => onEditCamp(camp)}
                   className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                   title="Edytuj obóz"
+                  style={{ cursor: 'pointer' }}
                 >
                   <Edit className="w-4 h-4" />
                   <span className="hidden sm:inline">Edytuj</span>
@@ -79,6 +81,7 @@ export default function CampList({
                   onClick={() => onDeleteCamp(camp.id)}
                   className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   title="Usuń obóz"
+                  style={{ cursor: 'pointer' }}
                 >
                   <Trash2 className="w-4 h-4" />
                   <span className="hidden sm:inline">Usuń</span>

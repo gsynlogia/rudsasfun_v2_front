@@ -422,7 +422,7 @@ export default function ReservationsManagement() {
               ? 'bg-white text-[#03adf0] border-2 border-[#03adf0]'
               : 'bg-white text-[#03adf0] border-2 border-[#03adf0] hover:bg-[#03adf0] hover:text-white'
           }`}
-          style={{ borderRadius: 0 }}
+          style={{ borderRadius: 0, cursor: 'pointer' }}
         >
           Tylko aktywne
         </button>
@@ -433,7 +433,7 @@ export default function ReservationsManagement() {
               ? 'bg-white text-[#03adf0] border-2 border-[#03adf0]'
               : 'bg-white text-[#03adf0] border-2 border-[#03adf0] hover:bg-[#03adf0] hover:text-white'
           }`}
-          style={{ borderRadius: 0 }}
+          style={{ borderRadius: 0, cursor: 'pointer' }}
         >
           Tylko zakończone
         </button>
@@ -444,7 +444,7 @@ export default function ReservationsManagement() {
               ? 'bg-white text-[#03adf0] border-2 border-[#03adf0]'
               : 'bg-white text-[#03adf0] border-2 border-[#03adf0] hover:bg-[#03adf0] hover:text-white'
           }`}
-          style={{ borderRadius: 0 }}
+          style={{ borderRadius: 0, cursor: 'pointer' }}
         >
           Tylko anulowane
         </button>
@@ -455,7 +455,7 @@ export default function ReservationsManagement() {
               ? 'bg-white text-[#03adf0] border-2 border-[#03adf0]'
               : 'bg-white text-[#03adf0] border-2 border-[#03adf0] hover:bg-[#03adf0] hover:text-white'
           }`}
-          style={{ borderRadius: 0 }}
+          style={{ borderRadius: 0, cursor: 'pointer' }}
         >
           Tylko Lato 2022
         </button>
@@ -466,7 +466,7 @@ export default function ReservationsManagement() {
               ? 'bg-white text-[#03adf0] border-2 border-[#03adf0]'
               : 'bg-white text-[#03adf0] border-2 border-[#03adf0] hover:bg-[#03adf0] hover:text-white'
           }`}
-          style={{ borderRadius: 0 }}
+          style={{ borderRadius: 0, cursor: 'pointer' }}
         >
           Tylko Lato 2023
         </button>
@@ -478,7 +478,7 @@ export default function ReservationsManagement() {
             className={`px-3 py-1.5 text-xs font-medium border-2 border-[#03adf0] bg-white text-[#03adf0] focus:outline-none focus:ring-2 focus:ring-[#03adf0] min-w-[200px] text-left flex items-center justify-between gap-2 ${
               isCampSelectOpen ? 'bg-[#03adf0] text-white' : ''
             }`}
-            style={{ borderRadius: 0 }}
+            style={{ borderRadius: 0, cursor: 'pointer' }}
           >
             <span className="flex-1 truncate">
               {campFilters.length === 0
@@ -518,11 +518,12 @@ export default function ReservationsManagement() {
                   filteredCamps.map((camp) => {
                     const isSelected = campFilters.includes(camp);
                     return (
-                      <label
+                        <label
                         key={camp}
-                        className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors ${
+                        className={`flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors ${
                           isSelected ? 'bg-blue-50' : ''
                         }`}
+                        style={{ cursor: 'pointer' }}
                       >
                         <div className="relative flex items-center">
                           <input
@@ -530,8 +531,8 @@ export default function ReservationsManagement() {
                             checked={isSelected}
                             onChange={() => handleCampFilterChange(camp)}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0] cursor-pointer"
-                            style={{ borderRadius: 0 }}
+                            className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0]"
+                            style={{ borderRadius: 0, cursor: 'pointer' }}
                           />
                           {isSelected && (
                             <Check className="absolute left-0 w-4 h-4 text-[#03adf0] pointer-events-none" />
@@ -567,6 +568,7 @@ export default function ReservationsManagement() {
                       removeCampFilter(camp);
                     }}
                     className="hover:bg-[#0288c7] transition-colors"
+                    style={{ cursor: 'pointer' }}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -587,7 +589,7 @@ export default function ReservationsManagement() {
           <button
             onClick={clearFilters}
             className="px-3 py-1.5 text-xs font-medium bg-white text-[#03adf0] border-2 border-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors"
-            style={{ borderRadius: 0 }}
+            style={{ borderRadius: 0, cursor: 'pointer' }}
           >
             Wyczyść filtry
           </button>
@@ -625,8 +627,9 @@ export default function ReservationsManagement() {
             <thead className="bg-gray-50 sticky top-0">
               <tr>
                 <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('reservationName')}
+                  style={{ cursor: 'pointer' }}
                 >
                   <div className="flex items-center gap-1">
                     Nazwa rezerwacji
@@ -634,8 +637,9 @@ export default function ReservationsManagement() {
                   </div>
                 </th>
                 <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('participantName')}
+                  style={{ cursor: 'pointer' }}
                 >
                   <div className="flex items-center gap-1">
                     Uczestnik
@@ -643,8 +647,9 @@ export default function ReservationsManagement() {
                   </div>
                 </th>
                 <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('email')}
+                  style={{ cursor: 'pointer' }}
                 >
                   <div className="flex items-center gap-1">
                     Email
@@ -652,8 +657,9 @@ export default function ReservationsManagement() {
                   </div>
                 </th>
                 <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('campName')}
+                  style={{ cursor: 'pointer' }}
                 >
                   <div className="flex items-center gap-1">
                     Obóz
@@ -661,8 +667,9 @@ export default function ReservationsManagement() {
                   </div>
                 </th>
                 <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('tripName')}
+                  style={{ cursor: 'pointer' }}
                 >
                   <div className="flex items-center gap-1">
                     Wycieczka
@@ -670,8 +677,9 @@ export default function ReservationsManagement() {
                   </div>
                 </th>
                 <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('status')}
+                  style={{ cursor: 'pointer' }}
                 >
                   <div className="flex items-center gap-1">
                     Status
@@ -679,8 +687,9 @@ export default function ReservationsManagement() {
                   </div>
                 </th>
                 <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('createdAt')}
+                  style={{ cursor: 'pointer' }}
                 >
                   <div className="flex items-center gap-1">
                     Data utworzenia
@@ -699,8 +708,9 @@ export default function ReservationsManagement() {
                   return (
                     <Fragment key={reservation.id}>
                       <tr 
-                        className={`hover:bg-gray-50 cursor-pointer transition-all duration-200 ${isExpanded ? 'bg-blue-50' : ''}`}
+                        className={`hover:bg-gray-50 transition-all duration-200 ${isExpanded ? 'bg-blue-50' : ''}`}
                         onClick={() => toggleRowExpansion(reservation.id)}
+                        style={{ cursor: 'pointer' }}
                       >
                         <td className="px-4 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2">
@@ -760,6 +770,7 @@ export default function ReservationsManagement() {
                               onClick={(e) => handleEditClick(reservation, e)}
                               className="p-1.5 text-[#03adf0] hover:bg-blue-50 transition-colors"
                               title="Edytuj"
+                              style={{ cursor: 'pointer' }}
                             >
                               <Edit className="w-4 h-4" />
                             </button>
@@ -767,6 +778,7 @@ export default function ReservationsManagement() {
                               onClick={(e) => handleDeleteClick(reservation, e)}
                               className="p-1.5 text-red-600 hover:bg-red-50 transition-colors"
                               title="Usuń"
+                              style={{ cursor: 'pointer' }}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -895,8 +907,8 @@ export default function ReservationsManagement() {
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                style={{ borderRadius: 0 }}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                style={{ borderRadius: 0, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
               >
                 Poprzednia
               </button>
@@ -915,7 +927,7 @@ export default function ReservationsManagement() {
                           ? 'bg-[#03adf0] text-white'
                           : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                       }`}
-                      style={{ borderRadius: 0 }}
+                      style={{ borderRadius: 0, cursor: 'pointer' }}
                     >
                       {page}
                     </button>
@@ -928,8 +940,8 @@ export default function ReservationsManagement() {
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                style={{ borderRadius: 0 }}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                style={{ borderRadius: 0, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
               >
                 Następna
               </button>
@@ -996,14 +1008,14 @@ export default function ReservationsManagement() {
                     setSelectedReservation(null);
                   }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-all duration-200"
-                  style={{ borderRadius: 0 }}
+                  style={{ borderRadius: 0, cursor: 'pointer' }}
                 >
                   Anuluj
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
                   className="px-4 py-2 text-sm font-medium text-white bg-red-600 border-2 border-red-600 hover:bg-red-700 transition-all duration-200"
-                  style={{ borderRadius: 0 }}
+                  style={{ borderRadius: 0, cursor: 'pointer' }}
                 >
                   Usuń
                 </button>

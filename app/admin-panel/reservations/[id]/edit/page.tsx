@@ -76,7 +76,7 @@ export default function ReservationEditPage() {
             <button
               onClick={handleCancel}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded"
-              style={{ borderRadius: 0 }}
+              style={{ borderRadius: 0, cursor: 'pointer' }}
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -176,14 +176,14 @@ export default function ReservationEditPage() {
             <button
               onClick={handleCancel}
               className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-all duration-200"
-              style={{ borderRadius: 0 }}
+              style={{ borderRadius: 0, cursor: 'pointer' }}
             >
               Anuluj
             </button>
             <button
               onClick={handleSave}
               className="px-6 py-2 text-sm font-medium text-white bg-[#03adf0] border-2 border-[#03adf0] hover:bg-[#0288c7] transition-all duration-200 flex items-center gap-2"
-              style={{ borderRadius: 0 }}
+              style={{ borderRadius: 0, cursor: 'pointer' }}
             >
               <Save className="w-4 h-4" />
               Zapisz

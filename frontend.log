@@ -141,3 +141,33 @@
  GET /admin-panel/reservations 200 in 62ms (compile: 2ms, render: 60ms)
  GET /admin-panel/reservations 200 in 9ms (compile: 1896µs, render: 7ms)
  GET /admin-panel/reservations 200 in 42ms (compile: 2ms, render: 40ms)
+ GET /admin-panel/reservations 200 in 35ms (compile: 2ms, render: 33ms)
+ GET /admin-panel/reservations/1/edit 200 in 26ms (compile: 8ms, render: 18ms)
+ GET /admin-panel/reservations 200 in 23ms (compile: 5ms, render: 17ms)
+ ✓ Compiled in 13ms
+ ✓ Compiled in 13ms
+ ✓ Compiled in 13ms
+ ✓ Compiled in 16ms
+ ✓ Compiled in 13ms
+ ✓ Compiled in 15ms
+ ✓ Compiled in 14ms
+ ✓ Compiled in 15ms
+ ✓ Compiled in 17ms
+ ✓ Compiled in 20ms
+ ✓ Compiled in 17ms
+ ✓ Compiled in 19ms
+ ✓ Compiled in 41ms
+ ✓ Compiled in 17ms
+ ✓ Compiled in 19ms
+ ✓ Compiled in 19ms
+ ✓ Compiled in 18ms
+ ✓ Compiled in 18ms
+ ✓ Compiled in 18ms
+ ✓ Compiled in 18ms
+ ✓ Compiled in 14ms
+ ✓ Compiled in 14ms
+ ✓ Compiled in 14ms
+ ✓ Compiled in 13ms
+ ✓ Compiled in 13ms
+ ✓ Compiled in 12ms
+ ✓ Compiled in 47ms

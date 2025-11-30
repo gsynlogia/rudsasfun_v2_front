@@ -89,6 +89,7 @@ export default function AdminSidebar() {
                     paddingRight: '24px',
                     justifyContent: 'flex-start',
                     borderRadius: 0,
+                    cursor: 'pointer',
                   }}
                 >
                   <Icon 
@@ -130,6 +131,7 @@ export default function AdminSidebar() {
               paddingRight: '24px',
               justifyContent: 'flex-start',
               borderRadius: 0,
+              cursor: 'pointer',
             }}
           >
             <LogOut 
