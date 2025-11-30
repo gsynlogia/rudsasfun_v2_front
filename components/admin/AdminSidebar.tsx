@@ -21,6 +21,12 @@ export default function AdminSidebar() {
   const menuItems = [
     {
       href: '/admin-panel',
+      icon: Calendar,
+      label: 'Rezerwacje',
+      key: 'reservations',
+    },
+    {
+      href: '/admin-panel/camps',
       icon: Tent,
       label: 'Obozy',
       key: 'camps',
@@ -31,23 +37,12 @@ export default function AdminSidebar() {
       label: 'Płatności',
       key: 'payments',
     },
-    {
-      href: '/admin-panel/reservations',
-      icon: Calendar,
-      label: 'Rezerwacje',
-      key: 'reservations',
-    },
-    {
-      href: '/admin-panel/settings',
-      icon: Settings,
-      label: 'Ustawienia',
-      key: 'settings',
-    },
   ];
 
   const isActive = (href: string) => {
     if (href === '/admin-panel') {
-      return pathname === '/admin-panel';
+      // For main page, only active if exactly /admin-panel (not /admin-panel/camps, etc.)
+      return pathname === '/admin-panel' || pathname === '/admin-panel/';
     }
     return pathname.startsWith(href);
   };
@@ -117,6 +112,48 @@ export default function AdminSidebar() {
             );
           })}
         </div>
+
+        {/* Separator before settings and logout - Full width */}
+        <div className="h-px bg-gray-200 w-full" />
+
+        {/* Settings - Before logout */}
+        <Link
+          href="/admin-panel/settings"
+          className={`flex items-center transition-colors ${
+            pathname.startsWith('/admin-panel/settings')
+              ? 'bg-[#E0F2FF]'
+              : 'bg-white hover:bg-gray-50 active:bg-gray-100'
+          }`}
+          style={{ 
+            height: '60px',
+            paddingLeft: '24px',
+            paddingRight: '24px',
+            justifyContent: 'flex-start',
+            borderRadius: 0,
+            cursor: 'pointer',
+          }}
+        >
+          <Settings 
+            className="flex-shrink-0"
+            style={{
+              width: '22px',
+              height: '22px',
+              strokeWidth: 2,
+              color: pathname.startsWith('/admin-panel/settings') ? '#0F172A' : '#9CA3AF',
+            }}
+          />
+          <span 
+            className="flex-1 ml-4"
+            style={{
+              fontSize: '16px',
+              fontWeight: 500,
+              lineHeight: '24px',
+              color: pathname.startsWith('/admin-panel/settings') ? '#0F172A' : '#9CA3AF',
+            }}
+          >
+            Ustawienia
+          </span>
+        </Link>
 
         {/* Separator before logout - Full width */}
         <div className="h-px bg-gray-200 w-full" />

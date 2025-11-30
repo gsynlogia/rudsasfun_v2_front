@@ -1,22 +1,18 @@
 import AdminLayout from '@/components/admin/AdminLayout';
+import PaymentsManagement from '@/components/admin/PaymentsManagement';
 
 /**
  * Admin Panel - Payments Page
  * Route: /admin-panel/payments
  * 
- * Placeholder for payments management
+ * Displays payments management with detailed payment verification
  */
 export const dynamic = 'force-dynamic';
 
 export default function PaymentsPage() {
   return (
     <AdminLayout>
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Płatności</h1>
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <p className="text-gray-500">Funkcjonalność płatności będzie tutaj...</p>
-        </div>
-      </div>
+      <PaymentsManagement />
     </AdminLayout>
   );
 }

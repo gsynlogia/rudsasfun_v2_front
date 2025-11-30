@@ -1,5 +1,5 @@
 import AdminLayout from '@/components/admin/AdminLayout';
-import CampsManagement from '@/components/admin/CampsManagement';
+import ReservationsManagement from '@/components/admin/ReservationsManagement';
 
 /**
  * Admin Panel Main Page
@@ -18,7 +18,7 @@ export default function AdminPanelPage() {
   
   return (
     <AdminLayout>
-      <CampsManagement />
+      <ReservationsManagement />
     </AdminLayout>
   );
 }
