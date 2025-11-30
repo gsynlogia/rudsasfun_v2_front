@@ -6,6 +6,7 @@ import {
   Tent, 
   CreditCard, 
   Calendar, 
+  Truck,
   Settings, 
   LogOut
 } from 'lucide-react';
@@ -36,6 +37,12 @@ export default function AdminSidebar() {
       icon: CreditCard,
       label: 'Płatności',
       key: 'payments',
+    },
+    {
+      href: '/admin-panel/transports',
+      icon: Truck,
+      label: 'Transport',
+      key: 'transports',
     },
   ];
 

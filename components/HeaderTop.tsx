@@ -9,13 +9,21 @@ import Link from 'next/link';
  * First navigation bar with logo and utility links
  * Used in both reservation process and admin panel
  */
-export default function HeaderTop() {
+interface HeaderTopProps {
+  fixed?: boolean;
+}
+
+export default function HeaderTop({ fixed = false }: HeaderTopProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const headerClasses = fixed 
+    ? "bg-white fixed top-0 left-0 right-0 z-50"
+    : "bg-white";
+
   return (
-    <header className="bg-white">
+    <header className={headerClasses}>
       {/* Top navigation bar - White background with bottom shadow */}
-      <div className="bg-white relative z-10" style={{ boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)' }}>
+      <div className="bg-white w-full" style={{ boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)' }}>
         <div className="max-w-container px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between">
           {/* Logo on the left */}
           <div className="flex items-center">

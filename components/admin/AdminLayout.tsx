@@ -16,16 +16,14 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen w-full bg-gray-50">
-      {/* Top Bar - Only first bar (no secondary menu) */}
-      <div className="relative">
-        <HeaderTop />
-        
-        {/* Sidebar positioned absolutely, starting from bottom edge of header */}
-        <AdminSidebar />
-      </div>
+      {/* Top Bar - Fixed position, stays at top when scrolling */}
+      <HeaderTop fixed={true} />
+      
+      {/* Sidebar positioned absolutely, starting from bottom edge of header (84px) */}
+      <AdminSidebar />
 
-      {/* Main Content Area */}
-      <div className="flex">
+      {/* Main Content Area - Add padding-top to account for fixed header (84px) */}
+      <div className="flex" style={{ paddingTop: '84px' }}>
         {/* Spacer for sidebar width - fixed 256px */}
         <div 
           className="flex-shrink-0" 

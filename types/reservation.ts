@@ -49,6 +49,26 @@ export interface Camp {
 }
 
 /**
+ * CampPropertyTransport interface - 1:1 with backend CampPropertyTransportResponse
+ * All fields match exactly with backend JSON response
+ */
+export interface CampPropertyTransport {
+  id: number;
+  name?: string | null; // Optional transport name
+  property_id?: number | null; // Optional - transport can be independent
+  departure_type: 'collective' | 'own';
+  departure_city?: string | null;
+  departure_collective_price?: number | null; // Price for collective transport in PLN
+  departure_own_price?: number | null; // Not used for own transport
+  return_type: 'collective' | 'own';
+  return_city?: string | null;
+  return_collective_price?: number | null; // Price for collective transport in PLN
+  return_own_price?: number | null; // Not used for own transport
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/**
  * CampWithProperty interface - 1:1 with backend CampWithPropertyResponse
  * All fields match exactly with backend JSON response
  */
