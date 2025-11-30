@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Test: Camp Edition Edit Page
- * Tests the creation and navigation to camp edition edit page
+ * Test: Camp Turnus Edit Page
+ * Tests the creation and navigation to camp turnus edit page
  */
-test.describe('Camp Edition Edit Page', () => {
+test.describe('Camp Turnus Edit Page', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to camps page first
     await page.goto('http://localhost:3000/admin-panel/camps');
@@ -22,7 +22,7 @@ test.describe('Camp Edition Edit Page', () => {
     );
   });
 
-  test('should navigate to edition edit page when clicking edit icon on an edition', async ({ page }) => {
+  test('should navigate to turnus edit page when clicking edit icon on a turnus', async ({ page }) => {
     // Find first camp row and expand it
     const firstCampRow = page.locator('tbody tr').first();
     await firstCampRow.click();
@@ -30,18 +30,18 @@ test.describe('Camp Edition Edit Page', () => {
     // Wait for expanded content
     await page.waitForSelector('.bg-blue-50', { timeout: 5000 });
     
-    // Find first edition edit button
-    const editButton = page.locator('button[title="Edytuj edycję"]').first();
+    // Find first turnus edit button
+    const editButton = page.locator('button[title="Edytuj turnus"]').first();
     await expect(editButton).toBeVisible();
     
     // Click edit button
     await editButton.click();
     
     // Wait for navigation to edit page
-    await page.waitForURL(/\/admin-panel\/camps\/\d+\/editions\/\d+\/edit/, { timeout: 10000 });
+    await page.waitForURL(/\/admin-panel\/camps\/\d+\/turnus\/\d+\/edit/, { timeout: 10000 });
     
     // Verify we're on the edit page
-    await expect(page.locator('h1')).toContainText('Edytuj edycję');
+    await expect(page.locator('h1')).toContainText('Edytuj turnus');
     
     // Verify form fields are present
     await expect(page.locator('label:has-text("Okres")')).toBeVisible();
@@ -52,10 +52,10 @@ test.describe('Camp Edition Edit Page', () => {
     // Verify camp info is displayed
     await expect(page.locator('text=Obóz')).toBeVisible();
     
-    console.log('[TEST] ✅ Navigation to edition edit page successful');
+    console.log('[TEST] ✅ Navigation to turnus edit page successful');
   });
 
-  test('should display campId and editionId in URL', async ({ page }) => {
+  test('should display campId and turnusId in URL', async ({ page }) => {
     // Find first camp row and expand it
     const firstCampRow = page.locator('tbody tr').first();
     await firstCampRow.click();
@@ -63,27 +63,27 @@ test.describe('Camp Edition Edit Page', () => {
     // Wait for expanded content
     await page.waitForSelector('.bg-blue-50', { timeout: 5000 });
     
-    // Find first edition edit button
-    const editButton = page.locator('button[title="Edytuj edycję"]').first();
+    // Find first turnus edit button
+    const editButton = page.locator('button[title="Edytuj turnus"]').first();
     await expect(editButton).toBeVisible();
     
     // Click edit button
     await editButton.click();
     
     // Wait for navigation
-    await page.waitForURL(/\/admin-panel\/camps\/\d+\/editions\/\d+\/edit/, { timeout: 10000 });
+    await page.waitForURL(/\/admin-panel\/camps\/\d+\/turnus\/\d+\/edit/, { timeout: 10000 });
     
-    // Verify URL contains campId and editionId
+    // Verify URL contains campId and turnusId
     const url = page.url();
-    expect(url).toMatch(/\/admin-panel\/camps\/\d+\/editions\/\d+\/edit/);
+    expect(url).toMatch(/\/admin-panel\/camps\/\d+\/turnus\/\d+\/edit/);
     
     // Extract IDs from URL
-    const match = url.match(/\/camps\/(\d+)\/editions\/(\d+)\/edit/);
+    const match = url.match(/\/camps\/(\d+)\/turnus\/(\d+)\/edit/);
     expect(match).not.toBeNull();
     expect(match![1]).toBeTruthy(); // campId
-    expect(match![2]).toBeTruthy(); // editionId
+    expect(match![2]).toBeTruthy(); // turnusId
     
-    console.log('[TEST] ✅ URL contains campId and editionId:', { campId: match![1], editionId: match![2] });
+    console.log('[TEST] ✅ URL contains campId and turnusId:', { campId: match![1], turnusId: match![2] });
   });
 });
 

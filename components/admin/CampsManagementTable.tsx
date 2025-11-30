@@ -33,11 +33,11 @@ export default function CampsManagementTable() {
   const [deleteItemType, setDeleteItemType] = useState<DeleteItemType>('camp');
   const [deleteItemName, setDeleteItemName] = useState<string>('');
   const [deleteItemId, setDeleteItemId] = useState<number | null>(null);
-  const [deleteCampId, setDeleteCampId] = useState<number | null>(null); // For edition deletion
+  const [deleteCampId, setDeleteCampId] = useState<number | null>(null); // For turnus deletion
   const [deleteAdditionalInfo, setDeleteAdditionalInfo] = useState<string | undefined>(undefined);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // State for property form (add edition only - edit is on separate page)
+  // State for property form (add turnus only - edit is on separate page)
   const [showPropertyForm, setShowPropertyForm] = useState(false);
   const [selectedCampIdForProperty, setSelectedCampIdForProperty] = useState<number | null>(null);
 
@@ -278,10 +278,10 @@ export default function CampsManagementTable() {
     setDeleteModalOpen(true);
   };
 
-  // Handle delete click for property/edition
+  // Handle delete click for property/turnus
   const handleDeletePropertyClick = (campId: number, propertyId: number, propertyName: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setDeleteItemType('edition');
+    setDeleteItemType('turnus');
     setDeleteItemName(propertyName);
     setDeleteItemId(propertyId);
     setDeleteCampId(campId);
@@ -300,7 +300,7 @@ export default function CampsManagementTable() {
       let url: string;
       if (deleteItemType === 'camp') {
         url = `${API_BASE_URL}/api/camps/${deleteItemId}`;
-      } else if (deleteItemType === 'edition' && deleteCampId) {
+      } else if (deleteItemType === 'turnus' && deleteCampId) {
         url = `${API_BASE_URL}/api/camps/${deleteCampId}/properties/${deleteItemId}`;
       } else {
         throw new Error('Invalid delete operation');
@@ -340,7 +340,7 @@ export default function CampsManagementTable() {
     router.push('/admin-panel/camps/new');
   };
 
-  // Handle create property (edition) - opens modal
+  // Handle create property (turnus) - opens modal
   const handleCreateProperty = (campId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     console.log('[CampsManagementTable] Opening create property modal for camp:', campId);
@@ -348,20 +348,20 @@ export default function CampsManagementTable() {
     setShowPropertyForm(true);
   };
 
-  // Handle edit property (edition) - navigate to edit page
+  // Handle edit property (turnus) - navigate to edit page
   const handleEditProperty = (campId: number, property: CampProperty, e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('[CampsManagementTable] Navigating to edition edit page:', { campId, editionId: property.id });
-    router.push(`/admin-panel/camps/${campId}/editions/${property.id}/edit`);
+    console.log('[CampsManagementTable] Navigating to turnus edit page:', { campId, turnusId: property.id });
+    router.push(`/admin-panel/camps/${campId}/turnus/${property.id}/edit`);
   };
 
-  // Handle delete property (edition) - now uses modal
+  // Handle delete property (turnus) - now uses modal
   const handleDeleteProperty = (campId: number, property: CampProperty, e: React.MouseEvent) => {
     const propertyName = `${getPeriodLabel(property.period)} - ${property.city}`;
     handleDeletePropertyClick(campId, property.id, propertyName, e);
   };
 
-  // Handle property form success (only for creating new edition)
+  // Handle property form success (only for creating new turnus)
   const handlePropertyFormSuccess = async () => {
     console.log('[CampsManagementTable] Property form success - reloading camps');
     setShowPropertyForm(false);
@@ -647,12 +647,12 @@ export default function CampsManagementTable() {
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="flex items-center gap-1">
-                    Liczba edycji
+                    Liczba turnusów
                     <SortIcon column="propertiesCount" />
                   </div>
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Edycje
+                  Turnusy
                 </th>
                 <th
                   className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
@@ -744,14 +744,14 @@ export default function CampsManagementTable() {
                           <td colSpan={6} className="px-4 py-4">
                             <div className="space-y-4">
                               <div className="flex items-center justify-between mb-3">
-                                <h4 className="font-semibold text-sm text-gray-900">Edycje obozu</h4>
+                                <h4 className="font-semibold text-sm text-gray-900">Turnusy obozu</h4>
                                 <button
                                   onClick={(e) => handleCreateProperty(camp.id, e)}
                                   className="flex items-center gap-2 px-3 py-1.5 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200 text-xs font-medium"
                                   style={{ borderRadius: 0, cursor: 'pointer' }}
                                 >
                                   <Plus className="w-3 h-3" />
-                                  Dodaj edycję
+                                  Dodaj turnus
                                 </button>
                               </div>
                               {camp.properties && camp.properties.length > 0 ? (
@@ -767,7 +767,7 @@ export default function CampsManagementTable() {
                                             <button
                                               onClick={(e) => handleEditProperty(camp.id, property, e)}
                                               className="p-1 text-[#03adf0] hover:bg-blue-50 transition-all duration-200"
-                                              title="Edytuj edycję"
+                                              title="Edytuj turnus"
                                               style={{ cursor: 'pointer' }}
                                             >
                                               <Edit className="w-3 h-3" />
@@ -775,7 +775,7 @@ export default function CampsManagementTable() {
                                             <button
                                               onClick={(e) => handleDeleteProperty(camp.id, property, e)}
                                               className="p-1 text-red-600 hover:bg-red-50 transition-all duration-200"
-                                              title="Usuń edycję"
+                                              title="Usuń turnus"
                                               style={{ cursor: 'pointer' }}
                                             >
                                               <Trash2 className="w-3 h-3" />
@@ -801,14 +801,14 @@ export default function CampsManagementTable() {
                                 </div>
                               ) : (
                                 <div className="text-sm text-gray-500 text-center py-4">
-                                  <p className="mb-3">Brak edycji dla tego obozu</p>
+                                  <p className="mb-3">Brak turnusów dla tego obozu</p>
                                   <button
                                     onClick={(e) => handleCreateProperty(camp.id, e)}
                                     className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200 text-xs font-medium"
                                     style={{ borderRadius: 0, cursor: 'pointer' }}
                                   >
                                     <Plus className="w-3 h-3" />
-                                    Dodaj pierwszą edycję
+                                    Dodaj pierwszy turnus
                                   </button>
                                 </div>
                               )}
@@ -912,7 +912,7 @@ export default function CampsManagementTable() {
           >
             <CampPropertyForm
               campId={selectedCampIdForProperty}
-              property={null} // Always null - modal is only for creating new editions
+              property={null} // Always null - modal is only for creating new turnusy
               onSuccess={handlePropertyFormSuccess}
               onCancel={handlePropertyFormCancel}
             />

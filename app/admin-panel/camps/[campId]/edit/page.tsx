@@ -3,10 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
-import { ArrowLeft, Save } from 'lucide-react';
-import type { Camp } from '@/types/reservation';
+import { ArrowLeft, Save, Edit, MapPin, Calendar, Plus } from 'lucide-react';
+import type { Camp, CampProperty } from '@/types/reservation';
 
-// Mock function to simulate fetching camp data
+/**
+ * Fetch camp by ID
+ */
 const fetchCampById = (id: number): Promise<Camp | null> => {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   return fetch(`${API_BASE_URL}/api/camps/${id}`)
@@ -18,6 +20,31 @@ const fetchCampById = (id: number): Promise<Camp | null> => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       return response.json();
+    })
+    .catch(err => {
+      console.error('[CampEditPage] Error fetching camp:', err);
+      throw err;
+    });
+};
+
+/**
+ * Fetch camp turnusy/properties
+ */
+const fetchCampTurnusy = (campId: number): Promise<CampProperty[]> => {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  return fetch(`${API_BASE_URL}/api/camps/${campId}/editions`)
+    .then(response => {
+      if (!response.ok) {
+        if (response.status === 404) {
+          return [];
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .catch(err => {
+      console.error('[CampEditPage] Error fetching camp turnusy:', err);
+      throw err;
     });
 };
 
@@ -27,7 +54,9 @@ export default function CampEditPage({ params }: { params: Promise<{ campId: str
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const [camp, setCamp] = useState<Camp | null>(null);
+  const [turnusy, setTurnusy] = useState<CampProperty[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingTurnusy, setLoadingTurnusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Camp>>({});
   const [saving, setSaving] = useState(false);
@@ -76,6 +105,46 @@ export default function CampEditPage({ params }: { params: Promise<{ campId: str
         });
     }
   }, [campId]);
+
+  // Load camp turnusy
+  useEffect(() => {
+    if (campId) {
+      setLoadingTurnusy(true);
+      fetchCampTurnusy(campId)
+        .then(data => {
+          console.log('[CampEditPage] Loaded turnusy:', data);
+          setTurnusy(data || []);
+          setLoadingTurnusy(false);
+        })
+        .catch(err => {
+          console.error('[CampEditPage] Error loading turnusy:', err);
+          setTurnusy([]);
+          setLoadingTurnusy(false);
+        });
+    }
+  }, [campId]);
+
+  // Helper functions
+  const getPeriodLabel = (period: string) => {
+    return period === 'lato' ? 'Lato' : 'Zima';
+  };
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const handleEditTurnus = (turnusId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!campId) return;
+    console.log('[CampEditPage] Navigating to turnus edit:', { campId, turnusId });
+    router.push(`/admin-panel/camps/${campId}/turnus/${turnusId}/edit`);
+  };
 
   const handleSave = async () => {
     if (!formData.name || !formData.name.trim()) {
@@ -204,6 +273,64 @@ export default function CampEditPage({ params }: { params: Promise<{ campId: str
               </div>
             )}
           </div>
+
+          {/* Camp Turnusy Table */}
+          {camp && (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Turnusy obozu</h2>
+                {loadingTurnusy && (
+                  <span className="text-xs text-gray-500">Ładowanie...</span>
+                )}
+              </div>
+
+              {turnusy.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {turnusy.map((turnus) => (
+                    <div
+                      key={turnus.id}
+                      className="bg-white rounded-lg p-4 border border-gray-200 hover:border-[#03adf0] hover:shadow-md transition-all duration-200 cursor-pointer"
+                      onClick={(e) => handleEditTurnus(turnus.id, e)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {getPeriodLabel(turnus.period)}
+                          </span>
+                          <button
+                            onClick={(e) => handleEditTurnus(turnus.id, e)}
+                            className="p-1 text-[#03adf0] hover:bg-blue-50 transition-all duration-200"
+                            title="Edytuj turnus"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <Edit className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <MapPin className="w-3 h-3 text-gray-400" />
+                          <span className="text-gray-900">{turnus.city}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <Calendar className="w-3 h-3 text-gray-400" />
+                          <span className="text-gray-600">
+                            {formatDate(turnus.start_date)} - {formatDate(turnus.end_date)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          Liczba dni: <span className="font-medium text-gray-900">{turnus.days_count || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : !loadingTurnusy ? (
+                <div className="text-sm text-gray-500 text-center py-4">
+                  <p>Brak turnusów dla tego obozu</p>
+                </div>
+              ) : null}
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-3 mt-6">
             <button

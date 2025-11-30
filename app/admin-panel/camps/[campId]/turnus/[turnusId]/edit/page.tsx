@@ -22,14 +22,14 @@ const fetchCampById = (id: number): Promise<Camp | null> => {
       return response.json();
     })
     .catch(err => {
-      console.error('[CampEditionEditPage] Error fetching camp:', err);
+      console.error('[CampTurnusEditPage] Error fetching camp:', err);
       throw err;
     });
 };
 
 /**
- * Fetch camp property/edition by camp ID and property ID
- * Uses GET /api/camps/{camp_id}/editions endpoint
+ * Fetch camp property/turnus by camp ID and property ID
+ * Uses GET /api/camps/{camp_id}/editions endpoint (backend still uses 'editions')
  */
 const fetchCampProperty = (campId: number, propertyId: number): Promise<CampProperty | null> => {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -48,26 +48,26 @@ const fetchCampProperty = (campId: number, propertyId: number): Promise<CampProp
       return properties.find(p => p.id === propertyId) || null;
     })
     .catch(err => {
-      console.error('[CampEditionEditPage] Error fetching camp property:', err);
+      console.error('[CampTurnusEditPage] Error fetching camp property:', err);
       throw err;
     });
 };
 
 /**
- * Camp Edition Edit Page
- * Route: /admin-panel/camps/[campId]/editions/[editionId]/edit
+ * Camp Turnus Edit Page
+ * Route: /admin-panel/camps/[campId]/turnus/[turnusId]/edit
  * 
- * Allows editing a specific camp edition/property
+ * Allows editing a specific camp turnus/property
  */
-export default function CampEditionEditPage({ 
+export default function CampTurnusEditPage({ 
   params 
 }: { 
-  params: Promise<{ campId: string; editionId: string }> | { campId: string; editionId: string }
+  params: Promise<{ campId: string; turnusId: string }> | { campId: string; turnusId: string }
 }) {
   const router = useRouter();
   // Handle both Promise and direct params (Next.js 13+ compatibility)
   const [campId, setCampId] = useState<number | null>(null);
-  const [editionId, setEditionId] = useState<number | null>(null);
+  const [turnusId, setTurnusId] = useState<number | null>(null);
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const [camp, setCamp] = useState<Camp | null>(null);
@@ -88,19 +88,19 @@ export default function CampEditionEditPage({
       try {
         const resolvedParams = params instanceof Promise ? await params : params;
         const resolvedCampId = parseInt(resolvedParams.campId);
-        const resolvedEditionId = parseInt(resolvedParams.editionId);
+        const resolvedTurnusId = parseInt(resolvedParams.turnusId);
         
-        if (isNaN(resolvedCampId) || isNaN(resolvedEditionId)) {
-          console.error('[CampEditionEditPage] Invalid params:', resolvedParams);
+        if (isNaN(resolvedCampId) || isNaN(resolvedTurnusId)) {
+          console.error('[CampTurnusEditPage] Invalid params:', resolvedParams);
           setError('Nieprawidłowe parametry URL');
           setLoading(false);
           return;
         }
         
         setCampId(resolvedCampId);
-        setEditionId(resolvedEditionId);
+        setTurnusId(resolvedTurnusId);
       } catch (err) {
-        console.error('[CampEditionEditPage] Error resolving params:', err);
+        console.error('[CampTurnusEditPage] Error resolving params:', err);
         setError('Błąd podczas parsowania parametrów');
         setLoading(false);
       }
@@ -111,21 +111,21 @@ export default function CampEditionEditPage({
 
   // Load camp and property data
   useEffect(() => {
-    if (campId && editionId) {
+    if (campId && turnusId) {
       Promise.all([
         fetchCampById(campId),
-        fetchCampProperty(campId, editionId)
+        fetchCampProperty(campId, turnusId)
       ])
         .then(([campData, propertyData]) => {
           setCamp(campData);
           setProperty(propertyData);
           
           if (!campData) {
-            console.error(`[CampEditionEditPage] Camp ${campId} not found`);
+            console.error(`[CampTurnusEditPage] Camp ${campId} not found`);
             setError(`Obóz o ID ${campId} nie został znaleziony.`);
           } else if (!propertyData) {
-            console.error(`[CampEditionEditPage] Property ${editionId} for camp ${campId} not found`);
-            setError(`Edycja o ID ${editionId} dla obozu ${campId} nie została znaleziona.`);
+            console.error(`[CampTurnusEditPage] Property ${turnusId} for camp ${campId} not found`);
+            setError(`Turnus o ID ${turnusId} dla obozu ${campId} nie został znaleziony.`);
           } else {
             // Populate form with property data
             setPeriod(propertyData.period as 'lato' | 'zima');
@@ -133,17 +133,17 @@ export default function CampEditionEditPage({
             // Convert ISO date to YYYY-MM-DD format for input
             setStartDate(propertyData.start_date.split('T')[0]);
             setEndDate(propertyData.end_date.split('T')[0]);
-            console.log('[CampEditionEditPage] Data loaded successfully:', { campId, editionId });
+            console.log('[CampTurnusEditPage] Data loaded successfully:', { campId, turnusId });
           }
           setLoading(false);
         })
         .catch(err => {
-          console.error('[CampEditionEditPage] Error loading data:', err);
+          console.error('[CampTurnusEditPage] Error loading data:', err);
           setError(err instanceof Error ? err.message : 'Błąd podczas ładowania danych');
           setLoading(false);
         });
     }
-  }, [campId, editionId]);
+  }, [campId, turnusId]);
 
   const handleSave = async () => {
     if (!city.trim() || !startDate || !endDate) {
@@ -160,8 +160,8 @@ export default function CampEditionEditPage({
       return;
     }
 
-    if (!campId || !editionId) {
-      console.error('[CampEditionEditPage] Missing required params for save:', { campId, editionId });
+    if (!campId || !turnusId) {
+      console.error('[CampTurnusEditPage] Missing required params for save:', { campId, turnusId });
       setError('Brak wymaganych parametrów');
       return;
     }
@@ -170,9 +170,9 @@ export default function CampEditionEditPage({
       setSaving(true);
       setError(null);
 
-      console.log('[CampEditionEditPage] Saving:', { campId, editionId, period, city, startDate, endDate });
+      console.log('[CampTurnusEditPage] Saving:', { campId, turnusId, period, city, startDate, endDate });
 
-      const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${editionId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${turnusId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -187,15 +187,15 @@ export default function CampEditionEditPage({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        console.error('[CampEditionEditPage] Save error:', errorData);
+        console.error('[CampTurnusEditPage] Save error:', errorData);
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
 
-      console.log('[CampEditionEditPage] Save successful, navigating to camps list');
+      console.log('[CampTurnusEditPage] Save successful, navigating to camps list');
       router.push('/admin-panel/camps');
     } catch (err) {
-      console.error('[CampEditionEditPage] Error saving:', err);
-      setError(err instanceof Error ? err.message : 'Błąd podczas zapisywania edycji obozu');
+      console.error('[CampTurnusEditPage] Error saving:', err);
+      setError(err instanceof Error ? err.message : 'Błąd podczas zapisywania turnusu obozu');
     } finally {
       setSaving(false);
     }
@@ -208,7 +208,7 @@ export default function CampEditionEditPage({
   if (loading) {
     return (
       <AdminLayout>
-        <div className="p-4 text-center text-gray-600">Ładowanie edycji obozu...</div>
+        <div className="p-4 text-center text-gray-600">Ładowanie turnusu obozu...</div>
       </AdminLayout>
     );
   }
@@ -239,8 +239,8 @@ export default function CampEditionEditPage({
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
             {camp && property 
-              ? `Edytuj edycję: ${camp.name} - ${getPeriodLabel(property.period)} ${property.city}`
-              : 'Edytuj edycję obozu'}
+              ? `Edytuj turnus: ${camp.name} - ${getPeriodLabel(property.period)} ${property.city}`
+              : 'Edytuj turnus obozu'}
           </h1>
           <button
             onClick={() => router.push('/admin-panel/camps')}
@@ -365,7 +365,7 @@ export default function CampEditionEditPage({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">
-                    ID edycji
+                    ID turnusu
                   </label>
                   <p className="text-sm text-gray-900">{property.id}</p>
                 </div>
