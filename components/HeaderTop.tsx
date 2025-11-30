@@ -25,7 +25,7 @@ export default function HeaderTop() {
               width={150}
               height={60}
               className="h-5 sm:h-7 md:h-10 lg:max-h-[60px] w-auto"
-              style={{ maxHeight: '60px', height: 'auto' }}
+              style={{ maxHeight: '60px', height: 'auto', width: 'auto' }}
               priority
             />
           </div>
@@ -123,4 +123,5 @@ export default function HeaderTop() {
     </header>
   );
 }
+
 

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
+import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, Clock, AlertCircle } from 'lucide-react';
 
 /**
  * Reservations Management Component
@@ -12,15 +12,55 @@ import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown
  * TODO: Implement server-side filtering and pagination
  */
 
-// Generate random reservations data
-const generateReservations = () => {
+// Reservation detail data interface
+interface ReservationDetails {
+  phone: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  birthDate: string;
+  age: number;
+  parentName: string;
+  parentEmail: string;
+  parentPhone: string;
+  paymentStatus: string;
+  paymentMethod: string;
+  totalAmount: number;
+  paidAmount: number;
+  notes: string;
+  specialRequests: string;
+  dietaryRestrictions: string;
+  medicalInfo: string;
+}
+
+// Extended reservation interface
+interface Reservation {
+  id: number;
+  reservationName: string;
+  participantName: string;
+  email: string;
+  campName: string;
+  tripName: string;
+  status: string;
+  createdAt: string;
+  details: ReservationDetails;
+}
+
+// Generate random reservations data with details
+const generateReservations = (): Reservation[] => {
   const camps = ['Laserowy Paintball', 'Obóz Letni', 'Obóz Zimowy', 'Paintball Extreme', 'Obóz Przygody', 'Camp Adventure', 'Summer Camp', 'Winter Camp'];
   const trips = ['Lato 2022 - Wiele', 'Lato 2023 - Wiele', 'Zima 2023 - Wiele', 'Lato 2024 - Wiele', 'Zima 2024 - Wiele'];
   const statuses = ['aktywna', 'zakończona', 'anulowana'];
   const firstNames = ['Jan', 'Anna', 'Piotr', 'Maria', 'Tomasz', 'Katarzyna', 'Michał', 'Agnieszka', 'Paweł', 'Magdalena', 'Krzysztof', 'Ewa', 'Robert', 'Joanna', 'Marcin', 'Aleksandra', 'Łukasz', 'Natalia', 'Jakub', 'Monika'];
   const lastNames = ['Kowalski', 'Nowak', 'Wiśniewski', 'Zielińska', 'Lewandowski', 'Szymańska', 'Dąbrowski', 'Kozłowska', 'Jankowski', 'Wojcik', 'Krawczyk', 'Mazur', 'Kwiatkowski', 'Nowakowska', 'Pawłowski', 'Górska', 'Michalski', 'Zawadzka', 'Nowicki', 'Jabłońska'];
+  const cities = ['Warszawa', 'Kraków', 'Gdańsk', 'Wrocław', 'Poznań', 'Łódź', 'Katowice', 'Lublin'];
+  const streets = ['ul. Główna', 'ul. Słoneczna', 'ul. Kwiatowa', 'ul. Parkowa', 'ul. Leśna', 'ul. Polna', 'ul. Ogrodowa', 'ul. Spacerowa'];
+  const paymentStatuses = ['Opłacona', 'Częściowo opłacona', 'Nieopłacona'];
+  const paymentMethods = ['Przelew', 'Karta', 'Gotówka', 'Online'];
+  const dietaryOptions = ['Standardowa', 'Wegetariańska', 'Wegańska', 'Bezglutenowa', 'Brak'];
+  const medicalOptions = ['Brak', 'Alergia na orzechy', 'Astma', 'Cukrzyca', 'Inne'];
   
-  const reservations = [];
+  const reservations: Reservation[] = [];
   const startDate = new Date(2024, 0, 1);
   
   for (let i = 1; i <= 100; i++) {
@@ -33,6 +73,14 @@ const generateReservations = () => {
     const date = new Date(startDate);
     date.setDate(date.getDate() + Math.floor(Math.random() * 120));
     
+    const birthDate = new Date(2010 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
+    const age = new Date().getFullYear() - birthDate.getFullYear();
+    const totalAmount = 1500 + Math.floor(Math.random() * 1000);
+    const paidAmount = status === 'aktywna' ? totalAmount : (status === 'zakończona' ? totalAmount : Math.floor(totalAmount * 0.5));
+    
+    const parentFirstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const parentLastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    
     reservations.push({
       id: i,
       reservationName: `REZ-2024-${String(i).padStart(3, '0')}`,
@@ -42,6 +90,25 @@ const generateReservations = () => {
       tripName: trip,
       status: status,
       createdAt: date.toISOString().split('T')[0],
+      details: {
+        phone: `+48 ${Math.floor(Math.random() * 900000000) + 100000000}`,
+        address: `${streets[Math.floor(Math.random() * streets.length)]} ${Math.floor(Math.random() * 100) + 1}`,
+        city: cities[Math.floor(Math.random() * cities.length)],
+        postalCode: `${Math.floor(Math.random() * 90) + 10}-${Math.floor(Math.random() * 900) + 100}`,
+        birthDate: birthDate.toISOString().split('T')[0],
+        age: age,
+        parentName: `${parentFirstName} ${parentLastName}`,
+        parentEmail: `${parentFirstName.toLowerCase()}.${parentLastName.toLowerCase()}@example.com`,
+        parentPhone: `+48 ${Math.floor(Math.random() * 900000000) + 100000000}`,
+        paymentStatus: paymentStatuses[Math.floor(Math.random() * paymentStatuses.length)],
+        paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
+        totalAmount: totalAmount,
+        paidAmount: paidAmount,
+        notes: `Uwagi dotyczące rezerwacji ${i}. Klient preferuje pokój na parterze.`,
+        specialRequests: i % 3 === 0 ? 'Prośba o pokój z widokiem na morze' : 'Brak',
+        dietaryRestrictions: dietaryOptions[Math.floor(Math.random() * dietaryOptions.length)],
+        medicalInfo: medicalOptions[Math.floor(Math.random() * medicalOptions.length)],
+      },
     });
   }
   
@@ -50,21 +117,75 @@ const generateReservations = () => {
 
 export default function ReservationsManagement() {
   // Generate reservations only on client side to avoid hydration mismatch
-  const [allReservations, setAllReservations] = useState<Array<{
-    id: number;
-    reservationName: string;
-    participantName: string;
-    email: string;
-    campName: string;
-    tripName: string;
-    status: string;
-    createdAt: string;
-  }>>([]);
+  const [allReservations, setAllReservations] = useState<Reservation[]>([]);
+  
+  // State for expanded rows
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  
+  // State for modals
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  
+  // State for edit form
+  const [editFormData, setEditFormData] = useState<Partial<Reservation>>({});
 
   useEffect(() => {
     // Generate data only on client side
     setAllReservations(generateReservations());
   }, []);
+  
+  // Toggle row expansion
+  const toggleRowExpansion = (reservationId: number) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(reservationId)) {
+        newSet.delete(reservationId);
+      } else {
+        newSet.add(reservationId);
+      }
+      return newSet;
+    });
+  };
+  
+  // Handle edit click
+  const handleEditClick = (reservation: Reservation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedReservation(reservation);
+    setEditFormData({
+      reservationName: reservation.reservationName,
+      participantName: reservation.participantName,
+      email: reservation.email,
+      campName: reservation.campName,
+      tripName: reservation.tripName,
+      status: reservation.status,
+    });
+    setEditModalOpen(true);
+  };
+  
+  // Handle delete click
+  const handleDeleteClick = (reservation: Reservation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedReservation(reservation);
+    setDeleteModalOpen(true);
+  };
+  
+  // Handle delete confirmation (without actual deletion)
+  const handleDeleteConfirm = () => {
+    // TODO: Implement actual deletion when backend is ready
+    console.log('Delete reservation:', selectedReservation?.id);
+    setDeleteModalOpen(false);
+    setSelectedReservation(null);
+  };
+  
+  // Handle edit save (without actual save)
+  const handleEditSave = () => {
+    // TODO: Implement actual save when backend is ready
+    console.log('Save reservation:', editFormData);
+    setEditModalOpen(false);
+    setSelectedReservation(null);
+    setEditFormData({});
+  };
 
   // State for search, filters, sorting, and pagination
   const [searchQuery, setSearchQuery] = useState('');
@@ -585,69 +706,196 @@ export default function ReservationsManagement() {
                     <SortIcon column="createdAt" />
                   </div>
                 </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                  Akcje
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {paginatedReservations.length > 0 ? (
-                paginatedReservations.map((reservation) => (
-                  <tr key={reservation.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900">
-                          {reservation.reservationName}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">
-                          {reservation.participantName}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">
-                          {reservation.email}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">
-                          {reservation.campName}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">
-                          {reservation.tripName}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                          reservation.status
-                        )}`}
+                paginatedReservations.map((reservation) => {
+                  const isExpanded = expandedRows.has(reservation.id);
+                  return (
+                    <Fragment key={reservation.id}>
+                      <tr 
+                        className={`hover:bg-gray-50 cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50' : ''}`}
+                        onClick={() => toggleRowExpansion(reservation.id)}
                       >
-                        {reservation.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(reservation.createdAt)}
-                    </td>
-                  </tr>
-                ))
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-medium text-gray-900">
+                              {reservation.reservationName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm text-gray-900">
+                              {reservation.participantName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm text-gray-900">
+                              {reservation.email}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm text-gray-900">
+                              {reservation.campName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm text-gray-900">
+                              {reservation.tripName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                              reservation.status
+                            )}`}
+                          >
+                            {reservation.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(reservation.createdAt)}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={(e) => handleEditClick(reservation, e)}
+                              className="p-1.5 text-[#03adf0] hover:bg-blue-50 transition-colors"
+                              title="Edytuj"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteClick(reservation, e)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 transition-colors"
+                              title="Usuń"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                        </tr>
+                      {isExpanded && (
+                        <tr className="bg-blue-50">
+                          <td colSpan={8} className="px-4 py-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {/* Participant Details */}
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-sm text-gray-900 mb-2">Dane uczestnika</h4>
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Telefon:</span>
+                                    <span className="text-gray-900">{reservation.details.phone}</span>
+                                  </div>
+                                  <div className="flex items-start gap-2">
+                                    <MapPin className="w-3 h-3 text-gray-400 mt-0.5" />
+                                    <div>
+                                      <span className="text-gray-600">Adres: </span>
+                                      <span className="text-gray-900">{reservation.details.address}, {reservation.details.postalCode} {reservation.details.city}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Data urodzenia:</span>
+                                    <span className="text-gray-900">{formatDate(reservation.details.birthDate)} ({reservation.details.age} lat)</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Parent Details */}
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-sm text-gray-900 mb-2">Dane opiekuna</h4>
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <User className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Imię i nazwisko:</span>
+                                    <span className="text-gray-900">{reservation.details.parentName}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Mail className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Email:</span>
+                                    <span className="text-gray-900">{reservation.details.parentEmail}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Telefon:</span>
+                                    <span className="text-gray-900">{reservation.details.parentPhone}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Payment Details */}
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-sm text-gray-900 mb-2">Płatności</h4>
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <CreditCard className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Status:</span>
+                                    <span className="text-gray-900">{reservation.details.paymentStatus}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <CreditCard className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Metoda:</span>
+                                    <span className="text-gray-900">{reservation.details.paymentMethod}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Kwota:</span>
+                                    <span className="text-gray-900">{reservation.details.paidAmount} / {reservation.details.totalAmount} PLN</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Additional Info */}
+                              <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                                <h4 className="font-semibold text-sm text-gray-900 mb-2">Dodatkowe informacje</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                                  <div>
+                                    <span className="text-gray-600">Dieta:</span>
+                                    <span className="text-gray-900 ml-2">{reservation.details.dietaryRestrictions}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Informacje medyczne:</span>
+                                    <span className="text-gray-900 ml-2">{reservation.details.medicalInfo}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Specjalne prośby:</span>
+                                    <span className="text-gray-900 ml-2">{reservation.details.specialRequests}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Uwagi:</span>
+                                    <span className="text-gray-900 ml-2">{reservation.details.notes}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
                     Brak rezerwacji spełniających kryteria wyszukiwania
                   </td>
                 </tr>
@@ -724,6 +972,180 @@ export default function ReservationsManagement() {
           </div>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {editModalOpen && selectedReservation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Edytuj rezerwację</h2>
+                <button
+                  onClick={() => {
+                    setEditModalOpen(false);
+                    setSelectedReservation(null);
+                    setEditFormData({});
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nazwa rezerwacji
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.reservationName || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, reservationName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+                    style={{ borderRadius: 0 }}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Uczestnik
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.participantName || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, participantName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+                    style={{ borderRadius: 0 }}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editFormData.email || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+                    style={{ borderRadius: 0 }}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Obóz
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.campName || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, campName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+                      style={{ borderRadius: 0 }}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Wycieczka
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.tripName || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, tripName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+                      style={{ borderRadius: 0 }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={editFormData.status || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+                    style={{ borderRadius: 0 }}
+                  >
+                    <option value="aktywna">Aktywna</option>
+                    <option value="zakończona">Zakończona</option>
+                    <option value="anulowana">Anulowana</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-end gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setEditModalOpen(false);
+                    setSelectedReservation(null);
+                    setEditFormData({});
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-colors"
+                  style={{ borderRadius: 0 }}
+                >
+                  Anuluj
+                </button>
+                <button
+                  onClick={handleEditSave}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#03adf0] border-2 border-[#03adf0] hover:bg-[#0288c7] transition-colors"
+                  style={{ borderRadius: 0 }}
+                >
+                  Zapisz
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && selectedReservation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="w-8 h-8 text-red-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Potwierdź usunięcie</h2>
+                </div>
+              </div>
+              
+              <p className="text-sm text-gray-600 mb-6">
+                Czy na pewno chcesz usunąć rezerwację <strong>{selectedReservation.reservationName}</strong> dla uczestnika <strong>{selectedReservation.participantName}</strong>?
+              </p>
+              <p className="text-xs text-gray-500 mb-6">
+                Ta operacja jest nieodwracalna. (Uwaga: To jest tylko modal potwierdzenia - faktyczne usunięcie będzie zaimplementowane później)
+              </p>
+              
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setDeleteModalOpen(false);
+                    setSelectedReservation(null);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-colors"
+                  style={{ borderRadius: 0 }}
+                >
+                  Anuluj
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border-2 border-red-600 hover:bg-red-700 transition-colors"
+                  style={{ borderRadius: 0 }}
+                >
+                  Usuń
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
