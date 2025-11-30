@@ -6,6 +6,7 @@ import { Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDow
 import type { Camp, CampProperty } from '@/types/reservation';
 import CampPropertyForm from './CampPropertyForm';
 import DeleteConfirmationModal, { DeleteItemType } from './DeleteConfirmationModal';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -306,13 +307,10 @@ export default function CampsManagementTable() {
         throw new Error('Invalid delete operation');
       }
 
-      const response = await fetch(url, {
+      // Use authenticated API call for DELETE operations
+      await authenticatedApiCall(url, {
         method: 'DELETE',
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       await loadCamps();
       handleDeleteCancel();

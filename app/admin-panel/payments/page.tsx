@@ -1,5 +1,8 @@
+'use client';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import PaymentsManagement from '@/components/admin/PaymentsManagement';
+import SectionGuard from '@/components/admin/SectionGuard';
 
 /**
  * Admin Panel - Payments Page
@@ -7,13 +10,13 @@ import PaymentsManagement from '@/components/admin/PaymentsManagement';
  * 
  * Displays payments management with detailed payment verification
  */
-export const dynamic = 'force-dynamic';
-
 export default function PaymentsPage() {
   return (
-    <AdminLayout>
-      <PaymentsManagement />
-    </AdminLayout>
+    <SectionGuard section="payments">
+      <AdminLayout>
+        <PaymentsManagement />
+      </AdminLayout>
+    </SectionGuard>
   );
 }
 

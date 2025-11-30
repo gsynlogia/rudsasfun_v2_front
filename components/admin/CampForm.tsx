@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import type { Camp } from '@/types/reservation';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface CampFormProps {
   camp: Camp | null; // null for create, Camp object for edit
@@ -41,18 +42,11 @@ export default function CampForm({ camp, onSuccess, onCancel }: CampFormProps) {
       const method = isEditMode ? 'PUT' : 'POST';
       const body = JSON.stringify({ name: name.trim() });
 
-      const response = await fetch(url, {
+      // Use authenticated API call for POST/PUT operations
+      await authenticatedApiCall(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-      }
 
       onSuccess();
     } catch (err) {

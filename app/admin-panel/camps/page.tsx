@@ -1,5 +1,8 @@
+'use client';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import CampsManagementTable from '@/components/admin/CampsManagementTable';
+import SectionGuard from '@/components/admin/SectionGuard';
 
 /**
  * Admin Panel - Camps Page
@@ -7,13 +10,13 @@ import CampsManagementTable from '@/components/admin/CampsManagementTable';
  * 
  * Displays camps management table
  */
-export const dynamic = 'force-dynamic';
-
 export default function CampsPage() {
   return (
-    <AdminLayout>
-      <CampsManagementTable />
-    </AdminLayout>
+    <SectionGuard section="camps">
+      <AdminLayout>
+        <CampsManagementTable />
+      </AdminLayout>
+    </SectionGuard>
   );
 }
 

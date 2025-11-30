@@ -1,24 +1,21 @@
+'use client';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import ReservationsManagement from '@/components/admin/ReservationsManagement';
+import SectionGuard from '@/components/admin/SectionGuard';
 
 /**
  * Admin Panel Main Page
  * Route: /admin-panel
  * 
- * This is a Server Component
- * Future: Will include authentication/authorization checks here
+ * Displays reservations management
  */
-export const dynamic = 'force-dynamic';
-
 export default function AdminPanelPage() {
-  // Future: Add authentication check here
-  // if (!isAuthenticated || !isAdmin) {
-  //   redirect('/login');
-  // }
-  
   return (
-    <AdminLayout>
-      <ReservationsManagement />
-    </AdminLayout>
+    <SectionGuard section="reservations">
+      <AdminLayout>
+        <ReservationsManagement />
+      </AdminLayout>
+    </SectionGuard>
   );
 }
