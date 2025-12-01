@@ -24,7 +24,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
       <HeaderTop />
       
       {/* Main Content Area with Sidebar */}
-      <div className="flex-1 flex flex-col lg:flex-row bg-gradient-to-b from-blue-50 to-blue-100 min-h-screen relative">
+      <div className="flex-1 bg-gradient-to-b from-blue-50 to-blue-100 min-h-screen relative">
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -46,26 +46,30 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
           />
         )}
 
-        {/* Left Sidebar - Hidden on mobile, visible on desktop */}
+        {/* Mobile Sidebar - Fixed overlay, outside wrapper */}
         <div className={`
+          lg:hidden
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0
-          fixed lg:static
-          top-0 left-0
-          h-full lg:h-auto
-          z-50 lg:z-auto
+          fixed top-0 left-0 h-full z-50
           transition-transform duration-300 ease-in-out
-          lg:transition-none
         `}>
           <ProfileSidebar onClose={() => setMobileMenuOpen(false)} />
         </div>
-        
-        {/* Right Content Area */}
-        <main className="flex-1 bg-gray-50 min-h-screen w-full lg:w-auto">
-          <div className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8">
-            {children}
+
+        {/* Wrapper - 1600px max-width with 60px padding like in reference */}
+        <div className="max-w-container mx-auto px-[60px]">
+          <div className="flex flex-col lg:flex-row gap-0 py-4 sm:py-8">
+            {/* Desktop Sidebar - Inside wrapper, wider to fit all text */}
+            <div className="hidden lg:block flex-shrink-0 lg:w-[400px]">
+              <ProfileSidebar />
+            </div>
+            
+            {/* Right Content Area - narrower to make room for wider sidebar */}
+            <main className="flex-1 min-h-screen w-full lg:min-h-0 lg:pl-6">
+              {children}
+            </main>
           </div>
-        </main>
+        </div>
       </div>
       
       {/* Footer - Existing component */}

@@ -2,20 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  Calendar, 
-  History, 
-  Bell, 
-  MapPin, 
-  Phone, 
-  DollarSign, 
-  FileText, 
-  HelpCircle, 
-  Download, 
-  Shield, 
-  Star, 
-  User 
-} from 'lucide-react';
 
 interface ProfileSidebarProps {
   onClose?: () => void;
@@ -24,37 +10,86 @@ interface ProfileSidebarProps {
 interface MenuItem {
   label: string;
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  iconSvg: string;
 }
 
 const menuItems: MenuItem[] = [
-  { label: 'Aktualne rezerwacje', href: '/profil/aktualne-rezerwacje', icon: Calendar },
-  { label: 'Historia rezerwacji', href: '/profil/historia-rezerwacji', icon: History },
-  { label: 'Wiadomości i powiadomienia', href: '/profil/wiadomosci-i-powiadomienia', icon: Bell },
-  { label: 'Transport z miast', href: '/profil/transport-z-miast', icon: MapPin },
-  { label: 'Kontakt do kierownictwa', href: '/profil/kontakt-do-kierownictwa', icon: Phone },
-  { label: 'Cennik usług dodatkowych', href: '/profil/cennik-uslug-dodatkowych', icon: DollarSign },
-  { label: 'Faktury i płatności', href: '/profil/faktury-i-platnosci', icon: FileText },
-  { label: 'Obozowy niezbędnik i FAQ', href: '/profil/obozowy-niezbednik-faq', icon: HelpCircle },
-  { label: 'Do pobrania', href: '/profil/do-pobrania', icon: Download },
-  { label: 'Gwarancja jakości', href: '/profil/gwarancja-jakosci', icon: Shield },
-  { label: 'Oceń portal', href: '/profil/ocen-portal', icon: Star },
-  { label: 'Moje konto', href: '/profil/moje-konto', icon: User },
+  { 
+    label: 'Aktualne rezerwacje', 
+    href: '/profil/aktualne-rezerwacje', 
+    iconSvg: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="m9 16 2 2 4-4"></path>'
+  },
+  { 
+    label: 'Historia rezerwacji', 
+    href: '/profil/historia-rezerwacji', 
+    iconSvg: '<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>'
+  },
+  { 
+    label: 'Wiadomości i powiadomienia', 
+    href: '/profil/wiadomosci-i-powiadomienia', 
+    iconSvg: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>'
+  },
+  { 
+    label: 'Transport z miast', 
+    href: '/profil/transport-z-miast', 
+    iconSvg: '<path d="M8 6v6"></path><path d="M15 6v6"></path><path d="M2 12h19.6"></path><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"></path><circle cx="7" cy="18" r="2"></circle><path d="M9 18h5"></path><circle cx="16" cy="18" r="2"></circle>'
+  },
+  { 
+    label: 'Kontakt do kierownictwa', 
+    href: '/profil/kontakt-do-kierownictwa', 
+    iconSvg: '<path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><circle cx="12" cy="10" r="2"></circle><line x1="8" x2="8" y1="2" y2="4"></line><line x1="16" x2="16" y1="2" y2="4"></line>'
+  },
+  { 
+    label: 'Cennik usług dodatkowych', 
+    href: '/profil/cennik-uslug-dodatkowych', 
+    iconSvg: '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>'
+  },
+  { 
+    label: 'Faktury i płatności', 
+    href: '/profil/faktury-i-platnosci', 
+    iconSvg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>'
+  },
+  { 
+    label: 'Obozowy niezbędnik i FAQ', 
+    href: '/profil/obozowy-niezbednik-faq', 
+    iconSvg: '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>'
+  },
+  { 
+    label: 'Do pobrania', 
+    href: '/profil/do-pobrania', 
+    iconSvg: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>'
+  },
+  { 
+    label: 'Gwarancja jakości', 
+    href: '/profil/gwarancja-jakosci', 
+    iconSvg: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>'
+  },
+  { 
+    label: 'Oceń portal', 
+    href: '/profil/ocen-portal', 
+    iconSvg: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path>'
+  },
+  { 
+    label: 'Moje konto', 
+    href: '/profil/moje-konto', 
+    iconSvg: '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>'
+  },
 ];
 
 /**
  * ProfileSidebar Component
  * Left sidebar navigation for user profile pages
+ * Based on RADSAS_FUN_panel reference
  */
 export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
   const pathname = usePathname();
   
   return (
-    <aside className="w-64 sm:w-72 h-full lg:h-auto p-4 sm:p-6 flex-shrink-0 relative bg-gradient-to-b from-blue-50 to-blue-100 lg:bg-transparent overflow-y-auto">
-      {/* Blue vertical tab on the left edge with vertical text - Hidden on mobile */}
-      <div className="hidden lg:flex absolute left-0 top-0 bottom-0 w-8 bg-[#03adf0] rounded-r-lg items-center justify-center">
-        <div 
-          className="text-white text-[11px] font-semibold"
+    <aside className="w-[400px] h-full lg:h-auto flex-shrink-0 relative">
+      {/* Blue vertical tab on the left edge with vertical text and icons in one line */}
+      <div className="hidden lg:flex absolute left-0 top-0 w-[55px] h-[240px] bg-[#00a8e8] rounded-bl-[35px] flex-col items-center justify-between py-6 pb-4 z-10">
+        <span 
+          className="text-white text-[0.85rem] font-semibold tracking-wide whitespace-nowrap flex-1 flex items-center py-2"
           style={{ 
             writingMode: 'vertical-rl',
             textOrientation: 'mixed',
@@ -62,29 +97,44 @@ export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
           }}
         >
           Uczestnicy obozów
+        </span>
+        {/* Icon - white element */}
+        <div className="flex items-center justify-center mb-4 mt-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-users">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <path d="M16 3.128a4 4 0 0 1 0 7.744"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <circle cx="9" cy="7" r="4"/>
+          </svg>
         </div>
       </div>
       
-      {/* White card with shadow */}
-      <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 md:p-6 relative lg:ml-10 h-full lg:h-auto">
-        {/* Welcome section */}
-        <div className="mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-gray-200">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#03adf0] flex items-center justify-center flex-shrink-0">
-              <User className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+      {/* White card with shadow - matching reference styles: border-radius: 0 50px 0 0 */}
+      <div className="bg-white rounded-tr-[50px] shadow-[4px_0_15px_rgba(0,0,0,0.1)] p-6 relative lg:ml-[55px] h-full lg:h-auto">
+        {/* Welcome section - NOT a menu item, no arrow, no hover */}
+        <div className="px-5 py-4 border-b border-[#e5e7eb]">
+          <div className="flex items-center gap-3">
+            <div className="w-[70px] h-[70px] rounded-full flex items-center justify-center flex-shrink-0">
+              {/* Avatar icon - using placeholder, should be replaced with Group 323.svg */}
+              <div className="w-full h-full rounded-full bg-[#00a8e8] flex items-center justify-center">
+                <svg viewBox="0 0 24 24" fill="white" className="w-10 h-10">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+              </div>
             </div>
             <div>
-              <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5 sm:mb-1">HEJ</p>
-              <p className="text-xs sm:text-sm font-semibold text-gray-900">Witaj, Andrzej</p>
+              <h2 className="text-base font-semibold text-[#1f2937] leading-tight">
+                Witaj, <span className="text-[#00a8e8]">Andrzej</span>
+              </h2>
             </div>
           </div>
         </div>
         
         {/* Menu items */}
-        <nav className="space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
+        <nav className="space-y-0">
+          {menuItems.map((item, index) => {
             const isActive = pathname === item.href;
+            const isLast = index === menuItems.length - 1;
             
             return (
               <Link
@@ -92,26 +142,136 @@ export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
                 href={item.href}
                 onClick={() => onClose?.()}
                 className={`
-                  flex items-center justify-between w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg transition-colors
+                  flex flex-row items-center justify-between w-full min-h-[48px] transition-colors cursor-pointer
+                  ${!isLast ? 'border-b border-[#e5e7eb]' : ''}
                   ${isActive 
-                    ? 'bg-[#EAF6FE] text-[#03adf0]' 
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'bg-[#EAF6FE]' 
+                    : 'bg-white hover:bg-gray-50'
                   }
                 `}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingLeft: '20px',
+                  paddingRight: '20px'
+                }}
               >
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                  <Icon 
-                    className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${isActive ? 'text-[#03adf0]' : 'text-gray-500'}`} 
-                  />
-                  <span className="text-xs sm:text-sm font-medium truncate">{item.label}</span>
-                </div>
+                {/* Left Icon - fixed size, no shrink/grow */}
                 <svg 
-                  className={`w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 ${isActive ? 'text-[#03adf0]' : 'text-gray-400'}`} 
+                  className={`w-5 h-5 flex-shrink-0 flex-grow-0 ${isActive ? 'text-[#1f2937]' : 'text-[#9ca3af]'}`}
+                  viewBox="0 0 24 24" 
+                  fill={isActive ? "currentColor" : "none"} 
+                  stroke="currentColor" 
+                  strokeWidth={isActive ? "0" : "2"}
+                  style={{ flexShrink: 0, flexGrow: 0 }}
+                >
+                    {item.iconSvg === '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="m9 16 2 2 4-4"></path>' && (
+                      <>
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                        <path d="m9 16 2 2 4-4"></path>
+                      </>
+                    )}
+                    {item.iconSvg === '<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>' && (
+                      <>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </>
+                    )}
+                    {item.iconSvg === '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>' && (
+                      <>
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                      </>
+                    )}
+                    {item.iconSvg === '<path d="M8 6v6"></path><path d="M15 6v6"></path><path d="M2 12h19.6"></path><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"></path><circle cx="7" cy="18" r="2"></circle><path d="M9 18h5"></path><circle cx="16" cy="18" r="2"></circle>' && (
+                      <>
+                        <path d="M8 6v6"></path>
+                        <path d="M15 6v6"></path>
+                        <path d="M2 12h19.6"></path>
+                        <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"></path>
+                        <circle cx="7" cy="18" r="2"></circle>
+                        <path d="M9 18h5"></path>
+                        <circle cx="16" cy="18" r="2"></circle>
+                      </>
+                    )}
+                    {item.iconSvg === '<path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><circle cx="12" cy="10" r="2"></circle><line x1="8" x2="8" y1="2" y2="4"></line><line x1="16" x2="16" y1="2" y2="4"></line>' && (
+                      <>
+                        <path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2"></path>
+                        <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                        <circle cx="12" cy="10" r="2"></circle>
+                        <line x1="8" x2="8" y1="2" y2="4"></line>
+                        <line x1="16" x2="16" y1="2" y2="4"></line>
+                      </>
+                    )}
+                    {item.iconSvg === '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>' && (
+                      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    )}
+                    {item.iconSvg === '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>' && (
+                      <>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                      </>
+                    )}
+                    {item.iconSvg === '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>' && (
+                      <>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                      </>
+                    )}
+                    {item.iconSvg === '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>' && (
+                      <>
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </>
+                    )}
+                    {item.iconSvg === '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>' && (
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    )}
+                    {item.iconSvg === '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path>' && (
+                      <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path>
+                    )}
+                    {item.iconSvg === '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>' && (
+                      <>
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                      </>
+                    )}
+                  </svg>
+                
+                {/* Text label - between icon and arrow, with ellipsis */}
+                <span 
+                  className={`text-sm ml-3 ${isActive ? 'text-[#1f2937] font-semibold' : 'text-[#9ca3af] font-normal'}`}
+                  style={{
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    flexGrow: 1,
+                    flexShrink: 1
+                  }}
+                >
+                  {item.label}
+                </span>
+                
+                {/* Right Arrow - fixed size, no shrink/grow */}
+                <svg 
+                  className={`w-4 h-4 flex-shrink-0 flex-grow-0 ml-3 ${isActive ? 'text-[#00a8e8]' : 'text-[#9ca3af]'}`} 
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
+                  strokeWidth="2"
+                  style={{ flexShrink: 0, flexGrow: 0 }}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
               </Link>
             );
@@ -121,4 +281,3 @@ export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
     </aside>
   );
 }
-
