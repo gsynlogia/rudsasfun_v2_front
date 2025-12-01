@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 interface ProfileSidebarProps {
@@ -114,14 +115,14 @@ export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
         {/* Welcome section - NOT a menu item, no arrow, no hover */}
         <div className="px-5 py-4 border-b border-[#e5e7eb]">
           <div className="flex items-center gap-3">
-            <div className="w-[70px] h-[70px] rounded-full flex items-center justify-center flex-shrink-0">
-              {/* Avatar icon - using placeholder, should be replaced with Group 323.svg */}
-              <div className="w-full h-full rounded-full bg-[#00a8e8] flex items-center justify-center">
-                <svg viewBox="0 0 24 24" fill="white" className="w-10 h-10">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-              </div>
-            </div>
+            {/* Avatar icon - decorative pattern from wzór-dekoracyjny-3.svg */}
+            <Image
+              src="/wzor-dekoracyjny-3.svg"
+              alt="Avatar"
+              width={70}
+              height={70}
+              className="flex-shrink-0"
+            />
             <div>
               <h2 className="text-base font-semibold text-[#1f2937] leading-tight">
                 Witaj, <span className="text-[#00a8e8]">Andrzej</span>
