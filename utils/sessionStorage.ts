@@ -7,6 +7,8 @@ const STORAGE_KEYS = {
   STEP1_FORM_DATA: 'radsasfun_step1_form_data',
   STEP2_FORM_DATA: 'radsasfun_step2_form_data',
   STEP3_FORM_DATA: 'radsasfun_step3_form_data',
+  STEP4_FORM_DATA: 'radsasfun_step4_form_data',
+  STEP5_FORM_DATA: 'radsasfun_step5_form_data',
   RESERVATION_STATE: 'radsasfun_reservation_state',
 } as const;
 
@@ -290,6 +292,104 @@ export function clearStep3FormData(): void {
   }
 }
 
+export interface Step4FormData {
+  selectAllConsents: boolean;
+  consent1: boolean; // Regulamin portalu i Polityka prywatności
+  consent2: boolean; // Warunki uczestnictwa
+  consent3: boolean; // Zgoda na zdjęcia
+  consent4: boolean; // Składka na fundusze gwarancyjne
+}
+
+/**
+ * Save Step4 form data to sessionStorage
+ */
+export function saveStep4FormData(data: Step4FormData): void {
+  if (!isStorageAvailable()) return;
+  
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.STEP4_FORM_DATA, JSON.stringify(data));
+  } catch (error) {
+    console.error('Error saving Step4 form data to sessionStorage:', error);
+  }
+}
+
+/**
+ * Load Step4 form data from sessionStorage
+ */
+export function loadStep4FormData(): Step4FormData | null {
+  if (!isStorageAvailable()) return null;
+  
+  try {
+    const data = sessionStorage.getItem(STORAGE_KEYS.STEP4_FORM_DATA);
+    if (!data) return null;
+    return JSON.parse(data) as Step4FormData;
+  } catch (error) {
+    console.error('Error loading Step4 form data from sessionStorage:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear Step4 form data from sessionStorage
+ */
+export function clearStep4FormData(): void {
+  if (!isStorageAvailable()) return;
+  
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.STEP4_FORM_DATA);
+  } catch (error) {
+    console.error('Error clearing Step4 form data from sessionStorage:', error);
+  }
+}
+
+export interface Step5FormData {
+  payNow: boolean;
+  paymentMethod: 'online' | 'blik' | '';
+  paymentAmount: 'full' | 'deposit' | '';
+}
+
+/**
+ * Save Step5 form data to sessionStorage
+ */
+export function saveStep5FormData(data: Step5FormData): void {
+  if (!isStorageAvailable()) return;
+  
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.STEP5_FORM_DATA, JSON.stringify(data));
+  } catch (error) {
+    console.error('Error saving Step5 form data to sessionStorage:', error);
+  }
+}
+
+/**
+ * Load Step5 form data from sessionStorage
+ */
+export function loadStep5FormData(): Step5FormData | null {
+  if (!isStorageAvailable()) return null;
+  
+  try {
+    const data = sessionStorage.getItem(STORAGE_KEYS.STEP5_FORM_DATA);
+    if (!data) return null;
+    return JSON.parse(data) as Step5FormData;
+  } catch (error) {
+    console.error('Error loading Step5 form data from sessionStorage:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear Step5 form data from sessionStorage
+ */
+export function clearStep5FormData(): void {
+  if (!isStorageAvailable()) return;
+  
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.STEP5_FORM_DATA);
+  } catch (error) {
+    console.error('Error clearing Step5 form data from sessionStorage:', error);
+  }
+}
+
 /**
  * Clear all application data from sessionStorage
  */
@@ -297,6 +397,8 @@ export function clearAllSessionData(): void {
   clearStep1FormData();
   clearStep2FormData();
   clearStep3FormData();
+  clearStep4FormData();
+  clearStep5FormData();
   clearReservationState();
 }
 
