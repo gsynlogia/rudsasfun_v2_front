@@ -20,6 +20,17 @@ export default function CurrentReservations() {
       dates: '12.07 – 21.07.2022 (10 dni)',
       resort: 'Ośrodek: Beaver',
     },
+    {
+      id: '2',
+      participantName: 'Katarzyna Guzik',
+      status: 'Zarezerwowana',
+      age: '12 lat',
+      gender: 'Kobieta / Female',
+      city: 'Warszawa',
+      campName: 'Laserowy Paintball',
+      dates: '12.07 – 21.07.2022 (10 dni)',
+      resort: 'Ośrodek: Beaver',
+    },
   ];
 
   return (
