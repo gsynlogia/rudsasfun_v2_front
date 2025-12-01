@@ -111,15 +111,25 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     return price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  // Helper function to get safe value or default
+  const getValueOrNotSet = (value: string | null | undefined, defaultValue: string = 'Nie ustawiono'): string => {
+    if (!value || value.trim() === '' || value === 'np. 00-000' || value === 'Miejscowość' || value === 'Adres e-mail' || value === 'Ulica i numer budynku/mieszkania' || value === 'Imię' || value === 'Nazwisko') {
+      return defaultValue;
+    }
+    return value;
+  };
+
   // Get transport type label
-  const getTransportTypeLabel = (type: string): string => {
+  const getTransportTypeLabel = (type: string | null | undefined): string => {
+    if (!type || type.trim() === '') return 'Nie wybrano';
     if (type === 'zbiorowy') return 'Transport zbiorowy';
     if (type === 'wlasny') return 'Transport własny';
-    return '';
+    return 'Nie wybrano';
   };
 
   // Get city label
-  const getCityLabel = (cityValue: string): string => {
+  const getCityLabel = (cityValue: string | null | undefined): string => {
+    if (!cityValue || cityValue.trim() === '') return 'Nie wybrano';
     const cities: Record<string, string> = {
       'warszawa': 'Warszawa',
       'krakow': 'Kraków',
@@ -127,28 +137,30 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
       'wroclaw': 'Wrocław',
       'poznan': 'Poznań',
     };
-    return cities[cityValue] || cityValue;
+    return cities[cityValue] || getValueOrNotSet(cityValue, 'Nie wybrano');
   };
 
   // Get diet label
-  const getDietLabel = (diet: string | null): string => {
+  const getDietLabel = (diet: string | null | undefined): string => {
     if (diet === 'standard') return 'Standardowa (0,00zł)';
     if (diet === 'vegetarian') return 'Wegetariańska (50,00zł)';
-    return 'Standardowa (0,00zł)';
+    return 'Nie wybrano';
   };
 
   // Get gender label
-  const getGenderLabel = (gender: string): string => {
+  const getGenderLabel = (gender: string | null | undefined): string => {
+    if (!gender || gender.trim() === '') return 'Nie wybrano';
     if (gender === 'male') return 'Mężczyzna / Male';
     if (gender === 'female') return 'Kobieta / Female';
     return gender;
   };
 
   // Get health status label
-  const getHealthStatusLabel = (value: string): string => {
+  const getHealthStatusLabel = (value: string | null | undefined): string => {
+    if (!value || value.trim() === '') return 'Nie';
     if (value === 'yes' || value === 'tak') return 'Tak';
     if (value === 'no' || value === 'nie') return 'Nie';
-    return value || 'Nie';
+    return value;
   };
 
   // Get addons list
@@ -256,9 +268,16 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     setValidationError('');
   };
 
-  // Get first parent data (for summary)
+  // Get first parent data (for summary) with safe defaults
   const firstParent = step1Data?.parents?.[0];
   const participant = step1Data?.participantData;
+  
+  // Helper to format phone number
+  const formatPhone = (phone: string | undefined, phoneNumber: string | undefined): string => {
+    const fullPhone = `${phone || ''} ${phoneNumber || ''}`.trim();
+    if (!fullPhone || fullPhone === '+48' || fullPhone === '') return 'Nie ustawiono';
+    return fullPhone;
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -276,14 +295,16 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Dane rodzica/opiekuna prawnego
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-                {firstParent && (
+                {firstParent ? (
                   <>
-                    <div>{firstParent.firstName} {firstParent.lastName}</div>
-                    <div>{firstParent.email}</div>
-                    <div>{firstParent.phone} {firstParent.phoneNumber}</div>
-                    <div>{firstParent.street}</div>
-                    <div>{firstParent.postalCode} {firstParent.city}</div>
+                    <div>{getValueOrNotSet(firstParent.firstName)} {getValueOrNotSet(firstParent.lastName)}</div>
+                    <div>{getValueOrNotSet(firstParent.email)}</div>
+                    <div>{formatPhone(firstParent.phone, firstParent.phoneNumber)}</div>
+                    <div>{getValueOrNotSet(firstParent.street)}</div>
+                    <div>{getValueOrNotSet(firstParent.postalCode)} {getValueOrNotSet(firstParent.city)}</div>
                   </>
+                ) : (
+                  <div className="text-gray-500 italic">Nie ustawiono</div>
                 )}
               </div>
             </div>
@@ -294,13 +315,15 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Dane uczestnika
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-                {participant && (
+                {participant ? (
                   <>
-                    <div>{participant.firstName} {participant.lastName}</div>
-                    <div>{participant.age}</div>
+                    <div>{getValueOrNotSet(participant.firstName)} {getValueOrNotSet(participant.lastName)}</div>
+                    <div>{getValueOrNotSet(participant.age)}</div>
                     <div>{getGenderLabel(participant.gender)}</div>
-                    <div>{participant.city}</div>
+                    <div>{getValueOrNotSet(participant.city)}</div>
                   </>
+                ) : (
+                  <div className="text-gray-500 italic">Nie ustawiono</div>
                 )}
               </div>
             </div>
@@ -316,15 +339,17 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Stan zdrowia uczestnika
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-                {step1Data && (
+                {step1Data ? (
                   <>
-                    <div>Choroby przewlekłe: {getHealthStatusLabel(step1Data.healthQuestions?.chronicDiseases || '')}</div>
-                    <div>Dysfunkcje: {getHealthStatusLabel(step1Data.healthQuestions?.dysfunctions || '')}</div>
-                    <div>Leczenie psychiatryczne: {getHealthStatusLabel(step1Data.healthQuestions?.psychiatric || '')}</div>
-                    {step1Data.additionalNotes && (
+                    <div>Choroby przewlekłe: {getHealthStatusLabel(step1Data.healthQuestions?.chronicDiseases)}</div>
+                    <div>Dysfunkcje: {getHealthStatusLabel(step1Data.healthQuestions?.dysfunctions)}</div>
+                    <div>Leczenie psychiatryczne: {getHealthStatusLabel(step1Data.healthQuestions?.psychiatric)}</div>
+                    {step1Data.additionalNotes && step1Data.additionalNotes.trim() !== '' ? (
                       <div>Inne: {step1Data.additionalNotes}</div>
-                    )}
+                    ) : null}
                   </>
+                ) : (
+                  <div className="text-gray-500 italic">Nie ustawiono</div>
                 )}
               </div>
             </div>
@@ -335,7 +360,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Dieta uczestnika
               </h3>
               <div className="text-xs sm:text-sm text-gray-700">
-                {getDietLabel(step1Data?.diet || null)}
+                {step1Data ? getDietLabel(step1Data.diet) : 'Nie wybrano'}
               </div>
             </div>
           </div>
@@ -350,7 +375,9 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Wniosek o zakwaterowanie
               </h3>
               <div className="text-xs sm:text-sm text-gray-700">
-                {step1Data?.accommodationRequest || 'Brak'}
+                {step1Data?.accommodationRequest && step1Data.accommodationRequest.trim() !== '' 
+                  ? step1Data.accommodationRequest 
+                  : 'Nie ustawiono'}
               </div>
             </div>
             
@@ -365,7 +392,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                     <div key={index}>{addon}</div>
                   ))
                 ) : (
-                  <div>Brak</div>
+                  <div className="text-gray-500 italic">Nie wybrano</div>
                 )}
               </div>
             </div>
@@ -381,7 +408,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Ochrony
               </h3>
               <div className="text-xs sm:text-sm text-gray-700">
-                {getProtectionLabel() || 'Brak'}
+                {getProtectionLabel() || 'Nie wybrano'}
               </div>
             </div>
             
@@ -391,7 +418,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Promocje
               </h3>
               <div className="text-xs sm:text-sm text-gray-700">
-                {getPromotionLabel() || 'Brak'}
+                {getPromotionLabel() || 'Nie wybrano'}
               </div>
             </div>
           </div>
@@ -406,7 +433,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Transport do ośrodka
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-                {step2Data?.transportData && (
+                {step2Data?.transportData ? (
                   <>
                     <div>{getTransportTypeLabel(step2Data.transportData.departureType)} (0,00zł)</div>
                     <div>{getCityLabel(step2Data.transportData.departureCity)}</div>
@@ -420,6 +447,8 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                       </a>
                     </div>
                   </>
+                ) : (
+                  <div className="text-gray-500 italic">Nie ustawiono</div>
                 )}
               </div>
             </div>
@@ -430,7 +459,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Transport z ośrodka
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-                {step2Data?.transportData && (
+                {step2Data?.transportData ? (
                   <>
                     <div>{getTransportTypeLabel(step2Data.transportData.returnType)} (0,00zł)</div>
                     <div>{getCityLabel(step2Data.transportData.returnCity)}</div>
@@ -444,6 +473,8 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                       </a>
                     </div>
                   </>
+                ) : (
+                  <div className="text-gray-500 italic">Nie ustawiono</div>
                 )}
               </div>
             </div>
@@ -459,25 +490,30 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Dane do faktury
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-                {step3Data && (
+                {step3Data ? (
                   <>
-                    {step3Data.invoiceType === 'private' && step3Data.privateData && (
+                    {step3Data.invoiceType === 'private' && step3Data.privateData ? (
                       <>
-                        <div>{step3Data.privateData.firstName} {step3Data.privateData.lastName}</div>
-                        {step3Data.privateData.nip && <div>{step3Data.privateData.nip}</div>}
-                        <div>{step3Data.privateData.street}</div>
-                        <div>{step3Data.privateData.postalCode} {step3Data.privateData.city}</div>
+                        <div>{getValueOrNotSet(step3Data.privateData.firstName)} {getValueOrNotSet(step3Data.privateData.lastName)}</div>
+                        {step3Data.privateData.nip && step3Data.privateData.nip.trim() !== '' && (
+                          <div>{step3Data.privateData.nip}</div>
+                        )}
+                        <div>{getValueOrNotSet(step3Data.privateData.street)}</div>
+                        <div>{getValueOrNotSet(step3Data.privateData.postalCode)} {getValueOrNotSet(step3Data.privateData.city)}</div>
                       </>
-                    )}
-                    {step3Data.invoiceType === 'company' && step3Data.companyData && (
+                    ) : step3Data.invoiceType === 'company' && step3Data.companyData ? (
                       <>
-                        <div>{step3Data.companyData.companyName}</div>
-                        <div>{step3Data.companyData.nip}</div>
-                        <div>{step3Data.companyData.street}</div>
-                        <div>{step3Data.companyData.postalCode} {step3Data.companyData.city}</div>
+                        <div>{getValueOrNotSet(step3Data.companyData.companyName)}</div>
+                        <div>{getValueOrNotSet(step3Data.companyData.nip)}</div>
+                        <div>{getValueOrNotSet(step3Data.companyData.street)}</div>
+                        <div>{getValueOrNotSet(step3Data.companyData.postalCode)} {getValueOrNotSet(step3Data.companyData.city)}</div>
                       </>
+                    ) : (
+                      <div className="text-gray-500 italic">Nie ustawiono</div>
                     )}
                   </>
+                ) : (
+                  <div className="text-gray-500 italic">Nie ustawiono</div>
                 )}
               </div>
             </div>
@@ -488,7 +524,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Forma faktury
               </h3>
               <div className="text-xs sm:text-sm text-gray-700">
-                {getInvoiceDeliveryLabel()}
+                {step3Data ? getInvoiceDeliveryLabel() : 'Nie wybrano'}
               </div>
             </div>
           </div>
