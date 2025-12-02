@@ -1,12 +1,11 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-export default function PaymentFailurePage() {
+function PaymentFailureContent() {
   const searchParams = useSearchParams();
   const [orderId, setOrderId] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
