@@ -9,9 +9,12 @@ interface CampWithProperties extends Camp {
 
 interface CampListProps {
   camps: CampWithProperties[];
-  onSelectCamp: (camp: CampWithProperties) => void;
+  onSelectCamp?: (camp: CampWithProperties) => void;
   onEditCamp: (camp: Camp) => void;
-  onDeleteCamp: (campId: number) => void;
+  onDeleteCamp: (campId: number) => void | Promise<void>;
+  onCreateProperty?: (campId: number) => void;
+  onEditProperty?: (campId: number, property: CampProperty) => void;
+  onDeleteProperty?: (campId: number, propertyId: number) => void | Promise<void>;
 }
 
 /**
@@ -23,6 +26,9 @@ export default function CampList({
   onSelectCamp,
   onEditCamp,
   onDeleteCamp,
+  onCreateProperty,
+  onEditProperty,
+  onDeleteProperty,
 }: CampListProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -61,7 +67,7 @@ export default function CampList({
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => onSelectCamp(camp)}
+                  onClick={() => onSelectCamp?.(camp)}
                   className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-[#03adf0] hover:bg-[#0288c7] rounded-lg transition-colors"
                   title="Zarządzaj edycjami"
                   style={{ cursor: 'pointer' }}
