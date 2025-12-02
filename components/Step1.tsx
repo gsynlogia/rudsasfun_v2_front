@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import DashedLine from './DashedLine';
 import type { StepComponentProps } from '@/types/reservation';
@@ -262,19 +262,35 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   }, [validateAllMemoized]);
 
   // Load data from sessionStorage on mount
-  useEffect(() => {
+  // Since we use key prop in parent component, this will run every time user navigates to Step1
+  useLayoutEffect(() => {
     const savedData = loadStep1FormData();
     if (savedData) {
-      setParents(savedData.parents);
-      setParticipantData(savedData.participantData);
+      // Only update if data exists in sessionStorage
+      if (savedData.parents && savedData.parents.length > 0) {
+        setParents(savedData.parents);
+      }
+      if (savedData.participantData) {
+        setParticipantData(savedData.participantData);
+      }
       // Set diet to 'standard' if null or undefined (default selection)
-      setDiet(savedData.diet || 'standard');
-      setAccommodationRequest(savedData.accommodationRequest);
-      setHealthQuestions(savedData.healthQuestions);
-      setHealthDetails(savedData.healthDetails);
-      setAdditionalNotes(savedData.additionalNotes);
+      if (savedData.diet !== undefined && savedData.diet !== null) {
+        setDiet(savedData.diet);
+      }
+      if (savedData.accommodationRequest !== undefined) {
+        setAccommodationRequest(savedData.accommodationRequest || '');
+      }
+      if (savedData.healthQuestions) {
+        setHealthQuestions(savedData.healthQuestions);
+      }
+      if (savedData.healthDetails) {
+        setHealthDetails(savedData.healthDetails);
+      }
+      if (savedData.additionalNotes !== undefined) {
+        setAdditionalNotes(savedData.additionalNotes || '');
+      }
     }
-  }, []);
+  }, []); // Empty deps - will run on every mount (which happens when key changes)
 
   // Save data to sessionStorage whenever any field changes
   useEffect(() => {

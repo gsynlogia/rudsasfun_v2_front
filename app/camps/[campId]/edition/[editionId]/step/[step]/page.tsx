@@ -128,19 +128,23 @@ export default async function ReservationStepPage({ params }: PageProps) {
       onPrevious: undefined,
     };
     
+    // Use pathname as key to force remount when navigating between steps
+    // This ensures sessionStorage data is loaded correctly
+    const stepKey = `${campId}-${editionId}-${currentStep}`;
+    
     switch (currentStep) {
       case 1:
-        return <Step1 {...stepProps} />;
+        return <Step1 key={stepKey} {...stepProps} />;
       case 2:
-        return <Step2 {...stepProps} />;
+        return <Step2 key={stepKey} {...stepProps} />;
       case 3:
-        return <Step3 {...stepProps} />;
+        return <Step3 key={stepKey} {...stepProps} />;
       case 4:
-        return <Step4 {...stepProps} />;
+        return <Step4 key={stepKey} {...stepProps} />;
       case 5:
-        return <Step5 {...stepProps} />;
+        return <Step5 key={stepKey} {...stepProps} />;
       default:
-        return <Step1 {...stepProps} />;
+        return <Step1 key={stepKey} {...stepProps} />;
     }
   };
 

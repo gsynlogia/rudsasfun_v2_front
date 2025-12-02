@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { clearAllSessionData } from '@/utils/sessionStorage';
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
@@ -15,6 +16,10 @@ function PaymentSuccessContent() {
     const trIdParam = searchParams.get('tr_id');
     setOrderId(orderIdParam);
     setTransactionId(trIdParam);
+    
+    // Clear all session storage data after successful payment
+    // This is the ONLY place where we clear session storage
+    clearAllSessionData();
   }, [searchParams]);
 
   return (
