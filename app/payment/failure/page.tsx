@@ -76,10 +76,10 @@ function PaymentFailureContent() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
-              href="/"
+              href="/profil/aktualne-rezerwacje?payment=failed"
               className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-colors text-center"
             >
-              Powrót do strony głównej
+              Zobacz moje rezerwacje
             </Link>
             <button
               onClick={() => window.history.back()}

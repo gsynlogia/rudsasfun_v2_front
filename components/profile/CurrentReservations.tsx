@@ -1,12 +1,37 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import ReservationCard from './ReservationCard';
+import { useToast } from '@/components/ToastContainer';
 
 /**
  * CurrentReservations Component
  * Main component displaying current reservations list
  */
 export default function CurrentReservations() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { showSuccess, showWarning, showError } = useToast();
+
+  // Check for payment status in query params
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    const reservationId = searchParams.get('reservation_id');
+
+    if (paymentStatus === 'success') {
+      showSuccess('Płatność została pomyślnie zarezerwowana. Twoja rezerwacja jest teraz aktywna.', 8000);
+      // Remove query params from URL without reload
+      router.replace('/profil/aktualne-rezerwacje', { scroll: false });
+    } else if (paymentStatus === 'failed') {
+      showError('Płatność nie powiodła się. Proszę spróbować ponownie.', 8000);
+      router.replace('/profil/aktualne-rezerwacje', { scroll: false });
+    } else if (paymentStatus === 'pending') {
+      showWarning('Płatność jest w trakcie przetwarzania. Sprawdzimy status i powiadomimy Cię.', 8000);
+      router.replace('/profil/aktualne-rezerwacje', { scroll: false });
+    }
+  }, [searchParams, router, showSuccess, showWarning, showError]);
+
   // TODO: Load reservations from API/sessionStorage
   const reservations = [
     {

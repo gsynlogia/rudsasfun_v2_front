@@ -68,12 +68,20 @@ function PaymentSuccessContent() {
           <p className="text-sm text-gray-600">
             Potwierdzenie płatności zostało wysłane na Twój adres e-mail.
           </p>
-          <Link
-            href="/"
-            className="inline-block w-full px-6 py-3 bg-[#03adf0] text-white font-semibold rounded-lg hover:bg-[#0288c7] transition-colors"
-          >
-            Powrót do strony głównej
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              href="/profil/aktualne-rezerwacje?payment=success"
+              className="flex-1 px-6 py-3 bg-[#03adf0] text-white font-semibold rounded-lg hover:bg-[#0288c7] transition-colors text-center"
+            >
+              Zobacz moje rezerwacje
+            </Link>
+            <Link
+              href="/"
+              className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-colors text-center"
+            >
+              Powrót do strony głównej
+            </Link>
+          </div>
         </div>
       </div>
     </div>

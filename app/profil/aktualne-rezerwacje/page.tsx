@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import NotificationsStrip from '@/components/profile/NotificationsStrip';
 import CurrentReservations from '@/components/profile/CurrentReservations';
 
@@ -9,7 +10,9 @@ export default function CurrentReservationsPage() {
   return (
     <>
       <NotificationsStrip />
-      <CurrentReservations />
+      <Suspense fallback={<div>Ładowanie...</div>}>
+        <CurrentReservations />
+      </Suspense>
     </>
   );
 }
