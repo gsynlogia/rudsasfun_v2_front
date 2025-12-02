@@ -45,6 +45,8 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
   const validationAttemptedRef = useRef(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string>('');
+  const [isCreatingReservation, setIsCreatingReservation] = useState(false);
+  const [reservationError, setReservationError] = useState<string>('');
 
   // Load data from sessionStorage on mount
   useEffect(() => {
