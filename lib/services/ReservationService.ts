@@ -266,11 +266,13 @@ class ReservationService {
       },
       step3: {
         invoiceType: step3Data.invoiceType,
-        privateData: step3Data.privateData,
-        companyData: step3Data.companyData,
+        privateData: step3Data.invoiceType === 'private' ? step3Data.privateData : undefined,
+        companyData: step3Data.invoiceType === 'company' ? step3Data.companyData : undefined,
         deliveryType: step3Data.deliveryType,
         differentAddress: step3Data.differentAddress,
-        deliveryAddress: step3Data.deliveryAddress,
+        deliveryAddress: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
+          ? step3Data.deliveryAddress 
+          : undefined,
       },
       step4: {
         consent1: step4Data.consent1,
