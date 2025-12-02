@@ -281,3 +281,6 @@ class ReservationService {
 
 export const reservationService = new ReservationService();
 
+// Export class for static methods
+export { ReservationService };
+
