@@ -255,7 +255,12 @@ class ReservationService {
         selectedAddons: step2Data.selectedAddons,
         selectedProtection: step2Data.selectedProtection,
         selectedPromotion: step2Data.selectedPromotion,
-        transportData: step2Data.transportData,
+        transportData: {
+          departureType: step2Data.transportData.departureType as 'zbiorowy' | 'wlasny',
+          departureCity: step2Data.transportData.departureCity,
+          returnType: step2Data.transportData.returnType as 'zbiorowy' | 'wlasny',
+          returnCity: step2Data.transportData.returnCity,
+        },
         selectedSource: step2Data.selectedSource,
         inneText: step2Data.inneText,
       },
