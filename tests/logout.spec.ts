@@ -41,7 +41,7 @@ test.describe('Logout Functionality', () => {
     
     // Request magic link
     await page.fill('input[type="email"]', 'szymon.guzik@gmail.com');
-    await page.click('button:has-text("Wyślij magic link")');
+      await page.click('button:has-text("Zaloguj")');
     await page.waitForSelector('text=Email wysłany!', { timeout: 10000 });
     
     // Get token from backend (simulating email click)

@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect, Fragment } from 'react';
 import { Search, ChevronUp, ChevronDown, Check, X, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw } from 'lucide-react';
 import PaymentConfirmationModal from './PaymentConfirmationModal';
 import RefundConfirmationModal from './RefundConfirmationModal';
+import { reservationService } from '@/lib/services/ReservationService';
+import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 
 /**
  * Payment Item Status
@@ -58,106 +60,114 @@ interface ReservationPayment {
 }
 
 /**
- * Generate payment items for a reservation based on reservation data
+ * Generate payment items for a reservation based on real reservation data and payments
  */
-const generatePaymentItems = (reservation: any): PaymentItem[] => {
+const generatePaymentItems = (reservation: any, payments: PaymentResponse[]): PaymentItem[] => {
   const items: PaymentItem[] = [];
   let itemId = 1;
-
-  // Camp base price
-  const campStatus = Math.random();
-  const campStatusType = campStatus > 0.85 ? 'canceled' : (campStatus > 0.75 ? 'returned' : (campStatus > 0.3 ? 'paid' : 'unpaid'));
+  
+  // Find payments for this reservation (order_id should match reservation id)
+  const reservationPayments = payments.filter(p => p.order_id === String(reservation.id));
+  const totalPaid = reservationPayments
+    .filter(p => p.status === 'success')
+    .reduce((sum, p) => sum + (p.paid_amount || p.amount), 0);
+  
+  // Camp base price (total_price from reservation)
+  const campAmount = reservation.total_price || 0;
+  const campPaid = totalPaid >= campAmount;
   items.push({
     id: `item-${itemId++}`,
-    name: `Obóz: ${reservation.campName}`,
+    name: `Obóz: ${reservation.camp_name || 'Nieznany obóz'}`,
     type: 'camp',
-    amount: 1500 + Math.floor(Math.random() * 1000),
-    status: campStatusType,
-    paidDate: (campStatusType === 'paid' || campStatusType === 'returned') ? new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
-    paymentMethod: (campStatusType === 'paid' || campStatusType === 'returned') ? ['Przelew', 'Karta', 'Gotówka', 'Online'][Math.floor(Math.random() * 4)] : undefined,
-    canceledDate: campStatusType === 'canceled' ? new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
+    amount: campAmount,
+    status: campPaid ? 'paid' : 'unpaid',
+    paidDate: campPaid && reservationPayments.length > 0 
+      ? (reservationPayments[0].paid_at || reservationPayments[0].created_at)?.split('T')[0]
+      : undefined,
+    paymentMethod: campPaid && reservationPayments.length > 0 
+      ? (reservationPayments[0].channel_id === 64 ? 'BLIK' : 
+         reservationPayments[0].channel_id === 53 ? 'Karta' : 'Online')
+      : undefined,
   });
 
-  // Protection (Tarcza/Oaza)
-  if (Math.random() > 0.5) {
-    const protectionStatus = Math.random();
-    const protectionStatusType = protectionStatus > 0.85 ? 'canceled' : (protectionStatus > 0.8 ? 'returned' : (protectionStatus > 0.4 ? 'paid' : 'unpaid'));
+  // Protection (Tarcza/Oaza) - if selected_protection exists
+  if (reservation.selected_protection) {
+    const protectionAmount = 200; // Default protection price
+    const protectionPaid = totalPaid >= (campAmount + protectionAmount);
     items.push({
       id: `item-${itemId++}`,
-      name: 'Ochrona rezerwacji (Tarcza/Oaza)',
+      name: `Ochrona rezerwacji (${reservation.selected_protection === 'shield' ? 'Tarcza' : 'Oaza'})`,
       type: 'protection',
-      amount: 200,
-      status: protectionStatusType,
-      paidDate: (protectionStatusType === 'paid' || protectionStatusType === 'returned') ? new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
-      paymentMethod: (protectionStatusType === 'paid' || protectionStatusType === 'returned') ? ['Przelew', 'Karta', 'Gotówka', 'Online'][Math.floor(Math.random() * 4)] : undefined,
-      canceledDate: protectionStatusType === 'canceled' ? new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
+      amount: protectionAmount,
+      status: protectionPaid ? 'paid' : 'unpaid',
+      paidDate: protectionPaid && reservationPayments.length > 0 
+        ? (reservationPayments[0].paid_at || reservationPayments[0].created_at)?.split('T')[0]
+        : undefined,
+      paymentMethod: protectionPaid && reservationPayments.length > 0 
+        ? (reservationPayments[0].channel_id === 64 ? 'BLIK' : 
+           reservationPayments[0].channel_id === 53 ? 'Karta' : 'Online')
+        : undefined,
     });
   }
 
-  // Insurance
-  if (Math.random() > 0.6) {
-    const insuranceStatus = Math.random();
-    const insuranceStatusType = insuranceStatus > 0.85 ? 'canceled' : (insuranceStatus > 0.8 ? 'returned' : (insuranceStatus > 0.5 ? 'paid' : 'unpaid'));
-    items.push({
-      id: `item-${itemId++}`,
-      name: 'Ubezpieczenie',
-      type: 'insurance',
-      amount: 150,
-      status: insuranceStatusType,
-      paidDate: (insuranceStatusType === 'paid' || insuranceStatusType === 'returned') ? new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
-      paymentMethod: (insuranceStatusType === 'paid' || insuranceStatusType === 'returned') ? ['Przelew', 'Karta', 'Gotówka', 'Online'][Math.floor(Math.random() * 4)] : undefined,
-      canceledDate: insuranceStatusType === 'canceled' ? new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
-    });
-  }
-
-  // Diet (if not standard)
-  if (Math.random() > 0.7) {
-    const dietStatus = Math.random();
-    const dietStatusType = dietStatus > 0.85 ? 'canceled' : (dietStatus > 0.8 ? 'returned' : (dietStatus > 0.6 ? 'paid' : 'unpaid'));
+  // Diet (if vegetarian)
+  if (reservation.diet === 'vegetarian') {
+    const dietAmount = 50; // Default diet price
+    const dietPaid = totalPaid >= (campAmount + (reservation.selected_protection ? 200 : 0) + dietAmount);
     items.push({
       id: `item-${itemId++}`,
       name: 'Dieta wegetariańska',
       type: 'diet',
-      amount: 50,
-      status: dietStatusType,
-      paidDate: (dietStatusType === 'paid' || dietStatusType === 'returned') ? new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
-      paymentMethod: (dietStatusType === 'paid' || dietStatusType === 'returned') ? ['Przelew', 'Karta', 'Gotówka', 'Online'][Math.floor(Math.random() * 4)] : undefined,
-      canceledDate: dietStatusType === 'canceled' ? new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
+      amount: dietAmount,
+      status: dietPaid ? 'paid' : 'unpaid',
+      paidDate: dietPaid && reservationPayments.length > 0 
+        ? (reservationPayments[0].paid_at || reservationPayments[0].created_at)?.split('T')[0]
+        : undefined,
+      paymentMethod: dietPaid && reservationPayments.length > 0 
+        ? (reservationPayments[0].channel_id === 64 ? 'BLIK' : 
+           reservationPayments[0].channel_id === 53 ? 'Karta' : 'Online')
+        : undefined,
     });
   }
 
-  // Addons (Skuter, Banan, Quady)
-  const addons = [
-    { name: 'Skuter wodny', amount: 150 },
-    { name: 'Banan wodny', amount: 0 },
-    { name: 'Quady', amount: 150 },
-  ];
-
-  addons.forEach(addon => {
-    if (Math.random() > 0.6) {
-      const addonStatus = Math.random();
-      const addonStatusType = addonStatus > 0.85 ? 'canceled' : (addonStatus > 0.8 ? 'returned' : (addonStatus > 0.5 ? 'paid' : 'unpaid'));
-      items.push({
-        id: `item-${itemId++}`,
-        name: addon.name,
-        type: 'addon',
-        amount: addon.amount,
-        status: addonStatusType,
-        paidDate: (addonStatusType === 'paid' || addonStatusType === 'returned') ? new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
-        paymentMethod: (addonStatusType === 'paid' || addonStatusType === 'returned') ? ['Przelew', 'Karta', 'Gotówka', 'Online'][Math.floor(Math.random() * 4)] : undefined,
-        canceledDate: addonStatusType === 'canceled' ? new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
-      });
-    }
-  });
+  // Addons (if selected_addons exists)
+  if (reservation.selected_addons && Array.isArray(reservation.selected_addons) && reservation.selected_addons.length > 0) {
+    const addonPrices: Record<string, number> = {
+      'Skuter wodny': 150,
+      'Banan wodny': 0,
+      'Quady': 150,
+    };
+    
+    reservation.selected_addons.forEach((addonName: string) => {
+      const addonAmount = addonPrices[addonName] || 0;
+      if (addonAmount > 0) {
+        const addonPaid = totalPaid >= (campAmount + addonAmount);
+        items.push({
+          id: `item-${itemId++}`,
+          name: addonName,
+          type: 'addon',
+          amount: addonAmount,
+          status: addonPaid ? 'paid' : 'unpaid',
+          paidDate: addonPaid && reservationPayments.length > 0 
+            ? (reservationPayments[0].paid_at || reservationPayments[0].created_at)?.split('T')[0]
+            : undefined,
+          paymentMethod: addonPaid && reservationPayments.length > 0 
+            ? (reservationPayments[0].channel_id === 64 ? 'BLIK' : 
+               reservationPayments[0].channel_id === 53 ? 'Karta' : 'Online')
+            : undefined,
+        });
+      }
+    });
+  }
 
   return items;
 };
 
 /**
- * Generate payment details for a reservation
+ * Generate payment details for a reservation based on real data
  */
-const generatePaymentDetails = (reservation: any): PaymentDetails => {
-  const items = generatePaymentItems(reservation);
+const generatePaymentDetails = (reservation: any, payments: PaymentResponse[]): PaymentDetails => {
+  const items = generatePaymentItems(reservation, payments);
   // Only count non-canceled and non-returned items in total amount
   const activeItems = items.filter(item => item.status !== 'canceled' && item.status !== 'returned');
   const totalAmount = activeItems.reduce((sum, item) => sum + item.amount, 0);
@@ -166,61 +176,56 @@ const generatePaymentDetails = (reservation: any): PaymentDetails => {
   // All active items must be paid (canceled and returned items don't count)
   const allActiveItemsPaid = activeItems.length > 0 && activeItems.every(item => item.status === 'paid');
   const hasCanceledItems = items.some(item => item.status === 'canceled');
+  
+  // Find payments for this reservation
+  const reservationPayments = payments.filter(p => p.order_id === String(reservation.id));
+  const hasSuccessfulPayment = reservationPayments.some(p => p.status === 'success');
 
   return {
     reservationId: reservation.id,
-    totalAmount,
-    paidAmount,
-    remainingAmount,
+    totalAmount: reservation.total_price || totalAmount,
+    paidAmount: reservation.deposit_amount || paidAmount,
+    remainingAmount: (reservation.total_price || totalAmount) - (reservation.deposit_amount || paidAmount),
     items,
-    invoiceNumber: `FV-2024-${String(reservation.id).padStart(4, '0')}`,
-    invoiceLink: `/invoices/FV-2024-${String(reservation.id).padStart(4, '0')}.pdf`,
-    invoicePaid: allActiveItemsPaid && !hasCanceledItems && Math.random() > 0.3, // 70% chance invoice is paid if all active items paid and no canceled items
-    orderDate: reservation.createdAt, // Data zamówienia = data utworzenia rezerwacji
+    invoiceNumber: `FV-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(4, '0')}`,
+    invoiceLink: `/invoices/FV-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(4, '0')}.pdf`,
+    invoicePaid: allActiveItemsPaid && !hasCanceledItems && hasSuccessfulPayment,
+    orderDate: reservation.created_at.split('T')[0],
   };
 };
 
 /**
- * Generate reservations with payment details
+ * Map backend reservation and payments to frontend format
  */
-const generateReservationsWithPayments = (): ReservationPayment[] => {
-  const camps = ['Laserowy Paintball', 'Obóz Letni', 'Obóz Zimowy', 'Paintball Extreme', 'Obóz Przygody', 'Camp Adventure', 'Summer Camp', 'Winter Camp'];
-  const trips = ['Lato 2022 - Wiele', 'Lato 2023 - Wiele', 'Zima 2023 - Wiele', 'Lato 2024 - Wiele', 'Zima 2024 - Wiele'];
-  const statuses = ['aktywna', 'zakończona', 'anulowana'];
-  const firstNames = ['Jan', 'Anna', 'Piotr', 'Maria', 'Tomasz', 'Katarzyna', 'Michał', 'Agnieszka', 'Paweł', 'Magdalena'];
-  const lastNames = ['Kowalski', 'Nowak', 'Wiśniewski', 'Zielińska', 'Lewandowski', 'Szymańska', 'Dąbrowski', 'Kozłowska', 'Jankowski', 'Wojcik'];
+const mapReservationToPaymentFormat = (
+  reservation: any,
+  payments: PaymentResponse[]
+): ReservationPayment => {
+  const participantName = `${reservation.participant_first_name || ''} ${reservation.participant_last_name || ''}`.trim();
+  const firstParent = reservation.parents_data && reservation.parents_data.length > 0 
+    ? reservation.parents_data[0] 
+    : null;
+  const email = firstParent?.email || reservation.invoice_email || '';
+  const campName = reservation.camp_name || 'Nieznany obóz';
+  const tripName = reservation.property_name || `${reservation.property_period || ''} - ${reservation.property_city || ''}`.trim() || 'Nieznany turnus';
+  
+  // Map status
+  let status = reservation.status || 'pending';
+  if (status === 'pending') status = 'aktywna';
+  if (status === 'cancelled') status = 'anulowana';
+  if (status === 'completed') status = 'zakończona';
 
-  const reservations: ReservationPayment[] = [];
-  const startDate = new Date(2024, 0, 1);
-
-  for (let i = 1; i <= 50; i++) {
-    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-    const camp = camps[Math.floor(Math.random() * camps.length)];
-    const trip = trips[Math.floor(Math.random() * trips.length)];
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + Math.floor(Math.random() * 120));
-
-    const reservation = {
-      id: i,
-      reservationName: `REZ-2024-${String(i).padStart(3, '0')}`,
-      participantName: `${firstName} ${lastName}`,
-      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
-      campName: camp,
-      tripName: trip,
-      status: status,
-      createdAt: date.toISOString().split('T')[0],
-    };
-
-    reservations.push({
-      ...reservation,
-      paymentDetails: generatePaymentDetails(reservation),
-    });
-  }
-
-  return reservations;
+  return {
+    id: reservation.id,
+    reservationName: `REZ-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(3, '0')}`,
+    participantName: participantName || 'Brak danych',
+    email: email,
+    campName: campName,
+    tripName: tripName,
+    status: status,
+    createdAt: reservation.created_at.split('T')[0],
+    paymentDetails: generatePaymentDetails(reservation, payments),
+  };
 };
 
 /**
@@ -229,6 +234,8 @@ const generateReservationsWithPayments = (): ReservationPayment[] => {
  */
 export default function PaymentsManagement() {
   const [reservations, setReservations] = useState<ReservationPayment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -245,10 +252,47 @@ export default function PaymentsManagement() {
   const [refundFinalModalOpen, setRefundFinalModalOpen] = useState(false);
   const [selectedItemForRefund, setSelectedItemForRefund] = useState<{ reservationId: number; item: PaymentItem } | null>(null);
 
-  // Load reservations with payment data
+  // Load reservations and payments from API
   useEffect(() => {
-    const data = generateReservationsWithPayments();
-    setReservations(data);
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        console.log('Fetching reservations and payments...');
+        
+        // Fetch reservations first
+        const reservationsData = await reservationService.listReservations(0, 1000).catch(err => {
+          console.error('Error fetching reservations:', err);
+          throw new Error(`Błąd pobierania rezerwacji: ${err.message}`);
+        });
+        
+        // Try to fetch payments, but don't fail if it doesn't work
+        let paymentsData: PaymentResponse[] = [];
+        try {
+          paymentsData = await paymentService.listPayments(0, 1000);
+        } catch (err) {
+          console.warn('Warning: Could not fetch payments, continuing with empty array:', err);
+          // Continue with empty payments array - reservations will still work
+        }
+        
+        console.log(`Fetched ${reservationsData.length} reservations and ${paymentsData.length} payments`);
+        
+        // Map reservations to payment format
+        const mappedReservations = reservationsData.map(reservation => 
+          mapReservationToPaymentFormat(reservation, paymentsData)
+        );
+        
+        setReservations(mappedReservations);
+      } catch (err) {
+        console.error('Error fetching payments data:', err);
+        setError(err instanceof Error ? err.message : 'Błąd podczas ładowania danych płatności');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
   }, []);
 
   // Filter and sort reservations
@@ -676,6 +720,44 @@ export default function PaymentsManagement() {
       <ChevronDown className="w-4 h-4 text-[#03adf0]" />
     );
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="mb-2" style={{ marginTop: 0, paddingTop: 0 }}>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Płatności</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#03adf0] mb-4"></div>
+            <p className="text-gray-600">Ładowanie płatności...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="mb-2" style={{ marginTop: 0, paddingTop: 0 }}>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Płatności</h1>
+        </div>
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+          <p className="text-red-700 font-semibold">Błąd</p>
+          <p className="text-red-600 text-sm">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+          >
+            Spróbuj ponownie
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">

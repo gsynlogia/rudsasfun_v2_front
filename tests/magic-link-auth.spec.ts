@@ -21,7 +21,7 @@ test.describe('Magic Link Authentication', () => {
     await expect(emailInput).toBeVisible();
     
     // Check if submit button is visible
-    const submitButton = page.locator('button:has-text("Wyślij magic link")');
+    const submitButton = page.locator('button:has-text("Zaloguj")');
     await expect(submitButton).toBeVisible();
   });
 
@@ -31,7 +31,7 @@ test.describe('Magic Link Authentication', () => {
     await page.screenshot({ path: 'screenshots_playwright/magic-link-02-email-filled.png', fullPage: true });
     
     // Submit form
-    await page.click('button:has-text("Wyślij magic link")');
+      await page.click('button:has-text("Zaloguj")');
     
     // Wait for success message
     await page.waitForSelector('text=Email wysłany!', { timeout: 10000 });
@@ -47,7 +47,7 @@ test.describe('Magic Link Authentication', () => {
     await page.fill('input[type="email"]', 'invalid-email');
     
     // Try to submit (browser validation should prevent)
-    await page.click('button:has-text("Wyślij magic link")');
+      await page.click('button:has-text("Zaloguj")');
     
     // Check if browser validation error appears
     const emailInput = page.locator('input[type="email"]');

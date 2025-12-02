@@ -45,7 +45,7 @@ test.describe('Magic Link Redirect Flow', () => {
 
       // Step 4: Request magic link
       await page.fill('input[type="email"]', 'szymon.guzik@gmail.com');
-      await page.click('button:has-text("Wyślij magic link")');
+      await page.click('button:has-text("Zaloguj")');
       await page.waitForSelector('text=Email wysłany!', { timeout: 10000 });
       await page.screenshot({ path: 'screenshots_playwright/magic-link-redirect-04-email-sent.png', fullPage: true });
 
@@ -123,7 +123,7 @@ test.describe('Magic Link Redirect Flow', () => {
 
     // Request magic link
     await page.fill('input[type="email"]', 'test@example.com');
-    await page.click('button:has-text("Wyślij magic link")');
+      await page.click('button:has-text("Zaloguj")');
     await page.waitForSelector('text=Email wysłany!', { timeout: 10000 });
     
     // Verify redirect is still in localStorage

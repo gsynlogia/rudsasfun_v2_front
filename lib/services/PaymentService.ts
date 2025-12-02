@@ -36,6 +36,24 @@ export interface PaymentStatusResponse {
   paid_at: string | null;
 }
 
+export interface PaymentResponse {
+  id: number;
+  transaction_id: string;
+  order_id: string;
+  amount: number;
+  paid_amount: number | null;
+  description: string | null;
+  status: string;
+  payer_email: string;
+  payer_name: string | null;
+  channel_id: number | null;
+  payment_url: string | null;
+  title: string | null;
+  created_at: string;
+  paid_at: string | null;
+  webhook_received_at: string | null;
+}
+
 export interface PaymentMethodsResponse {
   banks: Array<{
     id: number;
@@ -169,6 +187,47 @@ class PaymentService {
     }
 
     return await response.json();
+  }
+
+  /**
+   * List all payments
+   */
+  async listPayments(skip: number = 0, limit: number = 100): Promise<PaymentResponse[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/payments?skip=${skip}&limit=${limit}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+        let errorMessage = 'Request failed';
+        if (typeof error.detail === 'string') {
+          errorMessage = error.detail;
+        } else if (Array.isArray(error.detail)) {
+          errorMessage = error.detail.map((e: any) => {
+            if (typeof e === 'string') return e;
+            if (e.msg) return `${e.loc?.join('.') || 'field'}: ${e.msg}`;
+            return JSON.stringify(e);
+          }).join(', ');
+        } else if (error.detail && typeof error.detail === 'object') {
+          errorMessage = JSON.stringify(error.detail);
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        throw new Error(errorMessage || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (err) {
+      // Handle network errors
+      if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        throw new Error(`Nie można połączyć się z serwerem. Sprawdź czy backend działa na ${API_BASE_URL}`);
+      }
+      throw err;
+    }
   }
 }
 

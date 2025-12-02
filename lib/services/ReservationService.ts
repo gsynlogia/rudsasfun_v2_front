@@ -109,6 +109,43 @@ export interface ReservationResponse {
   deposit_amount: number | null;
   created_at: string;
   updated_at: string;
+  camp_name: string | null;
+  property_name: string | null;
+  property_city: string | null;
+  property_period: string | null;
+  participant_first_name: string | null;
+  participant_last_name: string | null;
+  participant_age: string | null;
+  participant_gender: string | null;
+  participant_city: string | null;
+  parents_data: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    phoneNumber: string;
+    street: string;
+    postalCode: string;
+    city: string;
+  }> | null;
+  invoice_type: string | null;
+  invoice_first_name: string | null;
+  invoice_last_name: string | null;
+  invoice_email: string | null;
+  invoice_phone: string | null;
+  invoice_company_name: string | null;
+  invoice_nip: string | null;
+  invoice_street: string | null;
+  invoice_postal_code: string | null;
+  invoice_city: string | null;
+  departure_type: string | null;
+  departure_city: string | null;
+  return_type: string | null;
+  return_city: string | null;
+  diet: string | null;
+  accommodation_request: string | null;
+  selected_source: string | null;
 }
 
 export interface ValidationErrorDetail {

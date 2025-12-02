@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { magicLinkService } from '@/lib/services/MagicLinkService';
 import { authService } from '@/lib/services/AuthService';
 import { saveMagicLinkRedirect, loadMagicLinkRedirect, clearMagicLinkRedirect } from '@/utils/localStorage';
@@ -124,22 +123,10 @@ function LoginContent() {
                   disabled={loading || !email}
                   className="w-full bg-[#03adf0] text-white py-2 px-4 rounded-lg font-medium hover:bg-[#0288c7] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Wysyłanie...' : 'Wyślij magic link'}
+                  {loading ? 'Wysyłanie...' : 'Zaloguj'}
                 </button>
               </form>
             )}
-
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <p className="text-sm text-gray-600 text-center mb-4">
-                Zaloguj się jako administrator
-              </p>
-              <Link
-                href="/admin-panel/login"
-                className="block w-full text-center text-sm text-[#03adf0] hover:text-[#0288c7] transition-colors"
-              >
-                Panel administratora →
-              </Link>
-            </div>
           </div>
         </div>
       </main>

@@ -3,14 +3,11 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, Clock, AlertCircle } from 'lucide-react';
+import { reservationService } from '@/lib/services/ReservationService';
 
 /**
  * Reservations Management Component
- * Displays hardcoded sample reservations data
- * This is a preview component - actual functionality will be implemented later
- * 
- * TODO: Replace hardcoded data with API fetch from backend
- * TODO: Implement server-side filtering and pagination
+ * Displays real reservations data from backend API
  */
 
 // Reservation detail data interface
@@ -34,7 +31,7 @@ interface ReservationDetails {
   medicalInfo: string;
 }
 
-// Extended reservation interface
+// Extended reservation interface matching backend response
 interface Reservation {
   id: number;
   reservationName: string;
@@ -47,80 +44,136 @@ interface Reservation {
   details: ReservationDetails;
 }
 
-// Generate random reservations data with details
-const generateReservations = (): Reservation[] => {
-  const camps = ['Laserowy Paintball', 'Obóz Letni', 'Obóz Zimowy', 'Paintball Extreme', 'Obóz Przygody', 'Camp Adventure', 'Summer Camp', 'Winter Camp'];
-  const trips = ['Lato 2022 - Wiele', 'Lato 2023 - Wiele', 'Zima 2023 - Wiele', 'Lato 2024 - Wiele', 'Zima 2024 - Wiele'];
-  const statuses = ['aktywna', 'zakończona', 'anulowana'];
-  const firstNames = ['Jan', 'Anna', 'Piotr', 'Maria', 'Tomasz', 'Katarzyna', 'Michał', 'Agnieszka', 'Paweł', 'Magdalena', 'Krzysztof', 'Ewa', 'Robert', 'Joanna', 'Marcin', 'Aleksandra', 'Łukasz', 'Natalia', 'Jakub', 'Monika'];
-  const lastNames = ['Kowalski', 'Nowak', 'Wiśniewski', 'Zielińska', 'Lewandowski', 'Szymańska', 'Dąbrowski', 'Kozłowska', 'Jankowski', 'Wojcik', 'Krawczyk', 'Mazur', 'Kwiatkowski', 'Nowakowska', 'Pawłowski', 'Górska', 'Michalski', 'Zawadzka', 'Nowicki', 'Jabłońska'];
-  const cities = ['Warszawa', 'Kraków', 'Gdańsk', 'Wrocław', 'Poznań', 'Łódź', 'Katowice', 'Lublin'];
-  const streets = ['ul. Główna', 'ul. Słoneczna', 'ul. Kwiatowa', 'ul. Parkowa', 'ul. Leśna', 'ul. Polna', 'ul. Ogrodowa', 'ul. Spacerowa'];
-  const paymentStatuses = ['Opłacona', 'Częściowo opłacona', 'Nieopłacona'];
-  const paymentMethods = ['Przelew', 'Karta', 'Gotówka', 'Online'];
-  const dietaryOptions = ['Standardowa', 'Wegetariańska', 'Wegańska', 'Bezglutenowa', 'Brak'];
-  const medicalOptions = ['Brak', 'Alergia na orzechy', 'Astma', 'Cukrzyca', 'Inne'];
+// Backend reservation response interface
+interface BackendReservation {
+  id: number;
+  camp_id: number;
+  property_id: number;
+  status: string;
+  total_price: number;
+  deposit_amount: number | null;
+  created_at: string;
+  updated_at: string;
+  camp_name: string | null;
+  property_name: string | null;
+  property_city: string | null;
+  property_period: string | null;
+  participant_first_name: string | null;
+  participant_last_name: string | null;
+  participant_age: string | null;
+  participant_gender: string | null;
+  participant_city: string | null;
+  parents_data: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    phoneNumber: string;
+    street: string;
+    postalCode: string;
+    city: string;
+  }> | null;
+  invoice_type: string | null;
+  invoice_first_name: string | null;
+  invoice_last_name: string | null;
+  invoice_email: string | null;
+  invoice_phone: string | null;
+  invoice_company_name: string | null;
+  invoice_nip: string | null;
+  invoice_street: string | null;
+  invoice_postal_code: string | null;
+  invoice_city: string | null;
+  departure_type: string | null;
+  departure_city: string | null;
+  return_type: string | null;
+  return_city: string | null;
+  diet: string | null;
+  accommodation_request: string | null;
+  selected_source: string | null;
+}
+
+// Map backend reservation to frontend format
+const mapBackendToFrontend = (backendReservation: BackendReservation): Reservation => {
+  const firstParent = backendReservation.parents_data && backendReservation.parents_data.length > 0 
+    ? backendReservation.parents_data[0] 
+    : null;
   
-  const reservations: Reservation[] = [];
-  const startDate = new Date(2024, 0, 1);
+  const participantName = `${backendReservation.participant_first_name || ''} ${backendReservation.participant_last_name || ''}`.trim();
+  const email = firstParent?.email || backendReservation.invoice_email || '';
+  const campName = backendReservation.camp_name || 'Nieznany obóz';
+  const tripName = backendReservation.property_name || `${backendReservation.property_period || ''} - ${backendReservation.property_city || ''}`.trim() || 'Nieznany turnus';
   
-  for (let i = 1; i <= 100; i++) {
-    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-    const camp = camps[Math.floor(Math.random() * camps.length)];
-    const trip = trips[Math.floor(Math.random() * trips.length)];
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-    
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + Math.floor(Math.random() * 120));
-    
-    const birthDate = new Date(2010 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
-    const age = new Date().getFullYear() - birthDate.getFullYear();
-    const totalAmount = 1500 + Math.floor(Math.random() * 1000);
-    const paidAmount = status === 'aktywna' ? totalAmount : (status === 'zakończona' ? totalAmount : Math.floor(totalAmount * 0.5));
-    
-    const parentFirstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const parentLastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-    
-    reservations.push({
-      id: i,
-      reservationName: `REZ-2024-${String(i).padStart(3, '0')}`,
-      participantName: `${firstName} ${lastName}`,
-      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
-      campName: camp,
-      tripName: trip,
-      status: status,
-      createdAt: date.toISOString().split('T')[0],
-      details: {
-        phone: `+48 ${Math.floor(Math.random() * 900000000) + 100000000}`,
-        address: `${streets[Math.floor(Math.random() * streets.length)]} ${Math.floor(Math.random() * 100) + 1}`,
-        city: cities[Math.floor(Math.random() * cities.length)],
-        postalCode: `${Math.floor(Math.random() * 90) + 10}-${Math.floor(Math.random() * 900) + 100}`,
-        birthDate: birthDate.toISOString().split('T')[0],
-        age: age,
-        parentName: `${parentFirstName} ${parentLastName}`,
-        parentEmail: `${parentFirstName.toLowerCase()}.${parentLastName.toLowerCase()}@example.com`,
-        parentPhone: `+48 ${Math.floor(Math.random() * 900000000) + 100000000}`,
-        paymentStatus: paymentStatuses[Math.floor(Math.random() * paymentStatuses.length)],
-        paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
-        totalAmount: totalAmount,
-        paidAmount: paidAmount,
-        notes: `Uwagi dotyczące rezerwacji ${i}. Klient preferuje pokój na parterze.`,
-        specialRequests: i % 3 === 0 ? 'Prośba o pokój z widokiem na morze' : 'Brak',
-        dietaryRestrictions: dietaryOptions[Math.floor(Math.random() * dietaryOptions.length)],
-        medicalInfo: medicalOptions[Math.floor(Math.random() * medicalOptions.length)],
-      },
-    });
+  // Map status
+  let status = backendReservation.status || 'pending';
+  if (status === 'pending') status = 'aktywna';
+  if (status === 'cancelled') status = 'anulowana';
+  if (status === 'completed') status = 'zakończona';
+  
+  // Calculate payment status
+  const totalAmount = backendReservation.total_price || 0;
+  const paidAmount = backendReservation.deposit_amount || 0;
+  let paymentStatus = 'Nieopłacona';
+  if (paidAmount >= totalAmount) {
+    paymentStatus = 'Opłacona';
+  } else if (paidAmount > 0) {
+    paymentStatus = 'Częściowo opłacona';
   }
   
-  return reservations;
+  // Get parent name
+  const parentName = firstParent 
+    ? `${firstParent.firstName} ${firstParent.lastName}`
+    : (backendReservation.invoice_type === 'private' 
+      ? `${backendReservation.invoice_first_name || ''} ${backendReservation.invoice_last_name || ''}`.trim()
+      : backendReservation.invoice_company_name || 'Brak danych');
+  
+  const parentEmail = firstParent?.email || backendReservation.invoice_email || '';
+  const parentPhone = firstParent?.phoneNumber || backendReservation.invoice_phone || '';
+  
+  // Calculate age from participant_age string
+  const age = backendReservation.participant_age ? parseInt(backendReservation.participant_age) : 0;
+  const currentYear = new Date().getFullYear();
+  const birthYear = currentYear - age;
+  const birthDate = new Date(birthYear, 0, 1).toISOString().split('T')[0];
+  
+  return {
+    id: backendReservation.id,
+    reservationName: `REZ-${new Date(backendReservation.created_at).getFullYear()}-${String(backendReservation.id).padStart(3, '0')}`,
+    participantName: participantName || 'Brak danych',
+    email: email,
+    campName: campName,
+    tripName: tripName,
+    status: status,
+    createdAt: backendReservation.created_at.split('T')[0],
+    details: {
+      phone: firstParent?.phoneNumber || backendReservation.invoice_phone || '',
+      address: firstParent?.street || backendReservation.invoice_street || '',
+      city: firstParent?.city || backendReservation.invoice_city || backendReservation.participant_city || '',
+      postalCode: firstParent?.postalCode || backendReservation.invoice_postal_code || '',
+      birthDate: birthDate,
+      age: age,
+      parentName: parentName || 'Brak danych',
+      parentEmail: parentEmail,
+      parentPhone: parentPhone,
+      paymentStatus: paymentStatus,
+      paymentMethod: 'Online', // Default, could be enhanced with payment data
+      totalAmount: totalAmount,
+      paidAmount: paidAmount,
+      notes: backendReservation.accommodation_request || 'Brak uwag',
+      specialRequests: backendReservation.accommodation_request || 'Brak',
+      dietaryRestrictions: backendReservation.diet === 'vegetarian' ? 'Wegetariańska' : 'Standardowa',
+      medicalInfo: 'Brak informacji', // Could be enhanced with health_questions data
+    },
+  };
 };
 
 export default function ReservationsManagement() {
   const router = useRouter();
   
-  // Generate reservations only on client side to avoid hydration mismatch
+  // State for reservations from API
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // State for expanded rows
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -129,9 +182,24 @@ export default function ReservationsManagement() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
 
+  // Fetch reservations from API
   useEffect(() => {
-    // Generate data only on client side
-    setAllReservations(generateReservations());
+    const fetchReservations = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const backendReservations = await reservationService.listReservations(0, 1000);
+        const mappedReservations = backendReservations.map(mapBackendToFrontend);
+        setAllReservations(mappedReservations);
+      } catch (err) {
+        console.error('Error fetching reservations:', err);
+        setError(err instanceof Error ? err.message : 'Błąd podczas ładowania rezerwacji');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchReservations();
   }, []);
   
   // Toggle row expansion with animation
@@ -386,6 +454,44 @@ export default function ReservationsManagement() {
       <ChevronDown className="w-4 h-4 text-[#03adf0]" />
     );
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="mb-2" style={{ marginTop: 0, paddingTop: 0 }}>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Rezerwacje</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#03adf0] mb-4"></div>
+            <p className="text-gray-600">Ładowanie rezerwacji...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="mb-2" style={{ marginTop: 0, paddingTop: 0 }}>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Rezerwacje</h1>
+        </div>
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+          <p className="text-red-700 font-semibold">Błąd</p>
+          <p className="text-red-600 text-sm">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+          >
+            Spróbuj ponownie
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -950,21 +1056,6 @@ export default function ReservationsManagement() {
         )}
       </div>
 
-      {/* Info message */}
-      <div className="mt-2 bg-blue-50 border-l-4 border-blue-400 p-2 rounded">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <p className="text-xs text-blue-700">
-              To jest przykładowy widok rezerwacji z hardcoded danymi. Funkcjonalność zarządzania rezerwacjami będzie zaimplementowana później. Filtrowanie i sortowanie będzie wykonywane po stronie serwera (API fetch).
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Delete Confirmation Modal - Professional with transparent background */}
       {deleteModalOpen && selectedReservation && (
