@@ -979,3 +979,34 @@ Import trace:
  GET /profil/aktualne-rezerwacje?payment=success 200 in 18ms (compile: 4ms, render: 14ms)
  GET /profil/aktualne-rezerwacje 200 in 19ms (compile: 1482µs, render: 17ms)
  GET /profil/aktualne-rezerwacje 200 in 9ms (compile: 1159µs, render: 7ms)
+ GET / 307 in 120ms (compile: 72ms, render: 49ms)
+ GET /camps/1/edition/1/step/1 200 in 36ms (compile: 4ms, render: 31ms)
+ ⨯ Error: useReservation must be used within a ReservationProvider
+    at useReservation (context/ReservationContext.tsx:196:11)
+    at LayoutClient (components/LayoutClient.tsx:30:64)
+  194 |   const context = useContext(ReservationContext);
+  195 |   if (context === undefined) {
+> 196 |     throw new Error('useReservation must be used within a ReservationProvider');
+      |           ^
+  197 |   }
+  198 |   return context;
+  199 | } {
+  digest: '2750650826'
+}
+ GET / 307 in 113ms (compile: 1427µs, render: 111ms)
+ GET /camps/1/edition/1/step/1 200 in 58ms (compile: 1426µs, render: 56ms)
+ ✓ Compiled in 30ms
+ GET /profil/aktualne-rezerwacje 200 in 31ms (compile: 1419µs, render: 29ms)
+ GET /camps/1/edition/1/step/1 200 in 20ms (compile: 3ms, render: 17ms)
+ ✓ Compiled in 104ms
+ GET / 200 in 170ms (compile: 68ms, render: 103ms)
+ GET / 200 in 50ms (compile: 4ms, render: 45ms)
+ ✓ Compiled in 76ms
+ GET /profil/aktualne-rezerwacje 200 in 72ms (compile: 1448µs, render: 70ms)
+ GET / 200 in 57ms (compile: 36ms, render: 21ms)
+ GET / 200 in 72ms (compile: 2ms, render: 69ms)
+ GET /camps/1/edition/1/step/1 200 in 42ms (compile: 10ms, render: 33ms)
+ GET /camps/1/edition/2/step/1 200 in 31ms (compile: 5ms, render: 26ms)
+ GET /camps/1/edition/1/step/1 200 in 31ms (compile: 5ms, render: 26ms)
+ GET /camps/1/edition/1/step/1 200 in 39ms (compile: 6ms, render: 33ms)
+ GET /camps/1/edition/2/step/1 200 in 35ms (compile: 6ms, render: 29ms)
