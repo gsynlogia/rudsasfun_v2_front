@@ -8,14 +8,15 @@ import Footer from '@/components/Footer';
  * Route: /
  * 
  * This is a dynamic route - marked as such to prevent static generation errors
+ * Uses the same layout structure as reservation pages for consistency
  */
 export const dynamic = 'force-dynamic';
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
       <Header />
-      <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12 max-w-4xl">
+      <main className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
         <CampsList />
       </main>
       <Footer />
