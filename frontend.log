@@ -863,3 +863,119 @@
  ✓ Compiled in 23ms
  ✓ Compiled in 37ms
  ✓ Compiled in 21ms
+ ✓ Compiled in 20ms
+ ⨯ ./components/Step5.tsx:18:1
+Export ReservationService doesn't exist in target module
+[0m [90m 16 |[39m [36mimport[39m { useReservation } [36mfrom[39m [32m'@/context/ReservationContext'[39m[33m;[39m
+ [90m 17 |[39m [36mimport[39m { paymentService[33m,[39m type [33mCreatePaymentRequest[39m } [36mfrom[39m [32m'@/lib/services/PaymentService'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 18 |[39m [36mimport[39m { reservationService[33m,[39m [33mReservationService[39m } [36mfrom[39m [32m'@/lib/services/ReservationService'[39m[33m;[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 19 |[39m [36mimport[39m { loadStep4FormData } [36mfrom[39m [32m'@/utils/sessionStorage'[39m[33m;[39m
+ [90m 20 |[39m
+ [90m 21 |[39m [90m/**[39m[0m
+
+The export ReservationService was not found in module [project]/lib/services/ReservationService.ts [app-client] (ecmascript).
+Did you mean to import reservationService?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Server Component:
+    ./components/Step5.tsx
+    ./app/camps/[campId]/edition/[editionId]/step/[step]/page.tsx
+
+
+
+./components/Step5.tsx:18:1
+Export ReservationService doesn't exist in target module
+[0m [90m 16 |[39m [36mimport[39m { useReservation } [36mfrom[39m [32m'@/context/ReservationContext'[39m[33m;[39m
+ [90m 17 |[39m [36mimport[39m { paymentService[33m,[39m type [33mCreatePaymentRequest[39m } [36mfrom[39m [32m'@/lib/services/PaymentService'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 18 |[39m [36mimport[39m { reservationService[33m,[39m [33mReservationService[39m } [36mfrom[39m [32m'@/lib/services/ReservationService'[39m[33m;[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 19 |[39m [36mimport[39m { loadStep4FormData } [36mfrom[39m [32m'@/utils/sessionStorage'[39m[33m;[39m
+ [90m 20 |[39m
+ [90m 21 |[39m [90m/**[39m[0m
+
+The export ReservationService was not found in module [project]/lib/services/ReservationService.ts [app-ssr] (ecmascript).
+Did you mean to import reservationService?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Server Component:
+    ./components/Step5.tsx
+    ./app/camps/[campId]/edition/[editionId]/step/[step]/page.tsx
+
+
+ GET /camps/1/edition/1/step/1 500 in 589ms (compile: 521ms, render: 68ms)
+ GET /camps/1/edition/1/step/1 200 in 201ms (compile: 57ms, render: 144ms)
+ ✓ Compiled in 21ms
+ ✓ Compiled in 23ms
+ ✓ Compiled in 24ms
+ ✓ Compiled in 22ms
+ GET /camps/1/edition/1/step/1 200 in 120ms (compile: 68ms, render: 52ms)
+ GET /camps/1/edition/1/step/1 200 in 18ms (compile: 2ms, render: 16ms)
+ ✓ Compiled in 19ms
+ GET /camps/1/edition/1/step/1 200 in 13ms (compile: 1987µs, render: 11ms)
+ ✓ Compiled in 20ms
+ GET /camps/1/edition/1/step/1 200 in 13ms (compile: 1916µs, render: 11ms)
+ ✓ Compiled in 20ms
+ GET /camps/1/edition/1/step/1 200 in 199ms (compile: 3ms, render: 196ms)
+ GET /camps/1/edition/1/step/2 200 in 31ms (compile: 5ms, render: 26ms)
+ GET /camps/1/edition/1/step/1 200 in 25ms (compile: 6ms, render: 19ms)
+ GET /camps/1/edition/1/step/1 200 in 70ms (compile: 6ms, render: 64ms)
+ GET /camps/1/edition/1/step/2 200 in 47ms (compile: 9ms, render: 38ms)
+ GET /camps/1/edition/1/step/1 200 in 33ms (compile: 5ms, render: 28ms)
+ GET /camps/1/edition/1/step/1 200 in 74ms (compile: 7ms, render: 68ms)
+ GET /camps/1/edition/1/step/2 200 in 38ms (compile: 6ms, render: 31ms)
+ GET /camps/1/edition/1/step/1 200 in 43ms (compile: 10ms, render: 33ms)
+ GET /camps/1/edition/1/step/1 200 in 83ms (compile: 7ms, render: 75ms)
+ ✓ Compiled in 28ms
+ ✓ Compiled in 25ms
+ GET /camps/1/edition/1/step/1 200 in 69ms (compile: 48ms, render: 22ms)
+ ✓ Compiled in 23ms
+ GET /camps/1/edition/1/step/1 200 in 186ms (compile: 60ms, render: 126ms)
+ GET /profil/aktualne-rezerwacje 200 in 52ms (compile: 7ms, render: 45ms)
+ ✓ Compiled in 35ms
+ ✓ Compiled in 33ms
+ GET /camps/1/edition/1/step/1 200 in 128ms (compile: 50ms, render: 78ms)
+ GET /profil/aktualne-rezerwacje 200 in 57ms (compile: 45ms, render: 13ms)
+ GET /profil/aktualne-rezerwacje 200 in 24ms (compile: 1029µs, render: 23ms)
+ GET /camps/1/edition/1/step/1 200 in 24ms (compile: 887µs, render: 24ms)
+ GET /profil/aktualne-rezerwacje 200 in 11ms (compile: 1212µs, render: 9ms)
+ GET /profil/aktualne-rezerwacje 200 in 12ms (compile: 1370µs, render: 11ms)
+ GET /camps/1/edition/1/step/1 200 in 29ms (compile: 1311µs, render: 28ms)
+ GET /profil/aktualne-rezerwacje 200 in 21ms (compile: 1082µs, render: 20ms)
+ GET /camps/1/edition/1/step/1 200 in 22ms (compile: 1064µs, render: 21ms)
+ GET /profil/aktualne-rezerwacje 200 in 31ms (compile: 1296µs, render: 30ms)
+ GET /camps/1/edition/1/step/1 200 in 32ms (compile: 6ms, render: 26ms)
+ GET /profil/aktualne-rezerwacje 200 in 23ms (compile: 1264µs, render: 22ms)
+ GET /camps/1/edition/1/step/1 200 in 23ms (compile: 1182µs, render: 22ms)
+ GET /profil/aktualne-rezerwacje 200 in 27ms (compile: 1135µs, render: 26ms)
+ GET /camps/1/edition/1/step/1 200 in 31ms (compile: 1058µs, render: 30ms)
+ GET /profil/aktualne-rezerwacje 200 in 15ms (compile: 3ms, render: 12ms)
+ GET /profil/aktualne-rezerwacje 200 in 33ms (compile: 1881µs, render: 31ms)
+ GET /camps/1/edition/1/step/1 200 in 21ms (compile: 1695µs, render: 19ms)
+ GET /camps/1/edition/1/step/1 200 in 20ms (compile: 3ms, render: 17ms)
+ GET /camps/1/edition/1/step/1 200 in 15ms (compile: 2ms, render: 12ms)
+ ✓ Compiled in 121ms
+ GET /profil/aktualne-rezerwacje 200 in 231ms (compile: 84ms, render: 147ms)
+ GET /camps/1/edition/1/step/1 200 in 238ms (compile: 136ms, render: 101ms)
+ GET /profil/aktualne-rezerwacje 200 in 129ms (compile: 1210µs, render: 128ms)
+ GET /camps/1/edition/1/step/1 200 in 58ms (compile: 1581µs, render: 56ms)
+ GET /camps/1/edition/1/step/1 200 in 125ms (compile: 3ms, render: 122ms)
+ ✓ Compiled in 20ms
+ GET /profil/aktualne-rezerwacje 200 in 75ms (compile: 42ms, render: 32ms)
+ GET /camps/1/edition/1/step/1 200 in 16ms (compile: 1973µs, render: 14ms)
+ GET /camps/1/edition/1/step/2 200 in 38ms (compile: 5ms, render: 33ms)
+ GET /camps/1/edition/1/step/3 200 in 39ms (compile: 8ms, render: 31ms)
+ GET /camps/1/edition/1/step/4 200 in 37ms (compile: 8ms, render: 28ms)
+ GET /camps/1/edition/1/step/5 200 in 39ms (compile: 7ms, render: 32ms)
+ GET /camps/1/edition/1/step/4 200 in 30ms (compile: 3ms, render: 27ms)
+ GET /camps/1/edition/1/step/3 200 in 23ms (compile: 4ms, render: 20ms)
+ ✓ Compiled in 18ms
+ GET /camps/1/edition/1/step/4 200 in 85ms (compile: 56ms, render: 29ms)
+ GET /camps/1/edition/1/step/5 200 in 31ms (compile: 5ms, render: 26ms)
+ GET /camps/1/edition/1/step/5 200 in 98ms (compile: 7ms, render: 91ms)
+ GET /payment/success?reservation_id=3 200 in 116ms (compile: 71ms, render: 45ms)
+ GET /profil/aktualne-rezerwacje?payment=success 200 in 18ms (compile: 4ms, render: 14ms)
+ GET /profil/aktualne-rezerwacje 200 in 19ms (compile: 1482µs, render: 17ms)
+ GET /profil/aktualne-rezerwacje 200 in 9ms (compile: 1159µs, render: 7ms)
