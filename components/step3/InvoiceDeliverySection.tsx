@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Mail, FileText, MapPin } from 'lucide-react';
 import { loadStep3FormData, saveStep3FormData } from '@/utils/sessionStorage';
 import { useReservation } from '@/context/ReservationContext';
@@ -22,6 +22,8 @@ export default function InvoiceDeliverySection() {
     city: '',
   });
 
+  const [deliveryAddressErrors, setDeliveryAddressErrors] = useState<Record<string, string>>({});
+  const validationAttemptedRef = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Load data from sessionStorage on mount and whenever component is visible
@@ -139,8 +141,52 @@ export default function InvoiceDeliverySection() {
     }
   };
 
+  // Validate delivery address (only when paper + different address)
+  const validateDeliveryAddress = useCallback((): boolean => {
+    // Only validate if paper delivery and different address is checked
+    if (deliveryType !== 'paper' || !differentAddress) {
+      setDeliveryAddressErrors({});
+      return true; // No validation needed
+    }
+
+    const errors: Record<string, string> = {};
+
+    if (!deliveryAddress.street || deliveryAddress.street.trim() === '') {
+      errors.street = 'Pole obowiązkowe';
+    }
+    if (!deliveryAddress.postalCode || deliveryAddress.postalCode.trim() === '') {
+      errors.postalCode = 'Pole obowiązkowe';
+    }
+    if (!deliveryAddress.city || deliveryAddress.city.trim() === '') {
+      errors.city = 'Pole obowiązkowe';
+    }
+
+    setDeliveryAddressErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [deliveryType, differentAddress, deliveryAddress]);
+
+  // Expose validation function for external use (e.g., Step3 validation)
+  useEffect(() => {
+    (window as any).validateInvoiceDeliverySection = () => {
+      validationAttemptedRef.current = true;
+      return validateDeliveryAddress();
+    };
+
+    return () => {
+      delete (window as any).validateInvoiceDeliverySection;
+    };
+  }, [validateDeliveryAddress]);
+
   const updateDeliveryAddressField = (field: keyof typeof deliveryAddress, value: string) => {
     setDeliveryAddress((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field when user starts typing
+    if (deliveryAddressErrors[field]) {
+      setDeliveryAddressErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
   };
 
   return (
@@ -223,9 +269,14 @@ export default function InvoiceDeliverySection() {
                         value={deliveryAddress.street}
                         onChange={(e) => updateDeliveryAddressField('street', e.target.value)}
                         placeholder="Ulica i numer budynku/mieszkania"
-                        className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                          deliveryAddressErrors.street ? 'border-red-500' : 'border-gray-400'
+                        }`}
                       />
                     </div>
+                    {deliveryAddressErrors.street && (
+                      <p className="text-xs text-red-500 mt-1">{deliveryAddressErrors.street}</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -240,9 +291,14 @@ export default function InvoiceDeliverySection() {
                           value={deliveryAddress.postalCode}
                           onChange={(e) => updateDeliveryAddressField('postalCode', e.target.value)}
                           placeholder="np. 00-000"
-                          className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                          className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                            deliveryAddressErrors.postalCode ? 'border-red-500' : 'border-gray-400'
+                          }`}
                         />
                       </div>
+                      {deliveryAddressErrors.postalCode && (
+                        <p className="text-xs text-red-500 mt-1">{deliveryAddressErrors.postalCode}</p>
+                      )}
                     </div>
 
                     <div>
@@ -256,9 +312,14 @@ export default function InvoiceDeliverySection() {
                           value={deliveryAddress.city}
                           onChange={(e) => updateDeliveryAddressField('city', e.target.value)}
                           placeholder="Miejscowość"
-                          className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                          className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                            deliveryAddressErrors.city ? 'border-red-500' : 'border-gray-400'
+                          }`}
                         />
                       </div>
+                      {deliveryAddressErrors.city && (
+                        <p className="text-xs text-red-500 mt-1">{deliveryAddressErrors.city}</p>
+                      )}
                     </div>
                   </div>
                 </div>

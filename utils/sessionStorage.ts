@@ -176,6 +176,7 @@ export interface Step2FormData {
     returnType: string;
     returnCity: string;
   };
+  transportModalConfirmed?: boolean; // Whether the different cities modal has been confirmed
   selectedSource: string; // 'kolejna' | 'znajomi' | 'internet' | 'wycieczka' | 'inne' | ''
   inneText: string;
 }

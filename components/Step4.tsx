@@ -31,6 +31,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
 
   const [formData, setFormData] = useState<Step4FormData>(getInitialState);
   const [validationError, setValidationError] = useState<string>('');
+  const [consentErrors, setConsentErrors] = useState<Record<string, string>>({});
   const validationAttemptedRef = useRef(false);
 
   // Load data from sessionStorage on mount
@@ -43,7 +44,23 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
 
   // Validate consents - check if all are checked
   const validateConsents = (): boolean => {
-    return formData.consent1 && formData.consent2 && formData.consent3 && formData.consent4;
+    const errors: Record<string, string> = {};
+
+    if (!formData.consent1) {
+      errors.consent1 = 'Pole obowiązkowe';
+    }
+    if (!formData.consent2) {
+      errors.consent2 = 'Pole obowiązkowe';
+    }
+    if (!formData.consent3) {
+      errors.consent3 = 'Pole obowiązkowe';
+    }
+    if (!formData.consent4) {
+      errors.consent4 = 'Pole obowiązkowe';
+    }
+
+    setConsentErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // Monitor pathname changes - if user navigates to step 5 without validation, redirect back
@@ -87,12 +104,24 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
       consent4: checked,
     });
     setValidationError('');
+    // Clear all errors when all are selected
+    if (checked) {
+      setConsentErrors({});
+    }
   };
 
   // Handle individual consent checkbox
   const handleConsentChange = (consentKey: keyof Step4FormData, checked: boolean) => {
     setFormData(prev => ({ ...prev, [consentKey]: checked }));
     setValidationError('');
+    // Clear error for this consent when checked
+    if (checked && consentErrors[consentKey]) {
+      setConsentErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[consentKey];
+        return newErrors;
+      });
+    }
   };
 
   // Clear validation error when all consents are checked
@@ -184,37 +213,46 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                 checked={formData.consent1}
                 onChange={(e) => handleConsentChange('consent1', e.target.checked)}
                 disabled={disabled}
-                className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 mt-0.5 flex-shrink-0"
+                className={`w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 mt-0.5 flex-shrink-0 ${
+                  consentErrors.consent1 ? 'border-red-500' : 'border-gray-400'
+                }`}
               />
-              <label
-                htmlFor="consent1"
-                className="text-xs sm:text-sm text-gray-700 cursor-pointer flex-1 leading-relaxed"
-              >
-                Zapoznałem się z{' '}
-                <a
-                  href="#"
-                  className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleDocumentDownload('Regulamin portalu Radsas Fun');
-                  }}
+              <div className="flex-1">
+                <label
+                  htmlFor="consent1"
+                  className={`text-xs sm:text-sm cursor-pointer flex-1 leading-relaxed ${
+                    consentErrors.consent1 ? 'text-red-600' : 'text-gray-700'
+                  }`}
                 >
-                  Regulaminem portalu
-                </a>{' '}
-                oraz{' '}
-                <a
-                  href="#"
-                  className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleDocumentDownload('Polityka prywatności');
-                  }}
-                >
-                  Polityką prywatności
-                </a>{' '}
-                i akceptuję ich postanowienia.
-                <span className="text-red-500 ml-1">*</span>
-              </label>
+                  Zapoznałem się z{' '}
+                  <a
+                    href="#"
+                    className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDocumentDownload('Regulamin portalu Radsas Fun');
+                    }}
+                  >
+                    Regulaminem portalu
+                  </a>{' '}
+                  oraz{' '}
+                  <a
+                    href="#"
+                    className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDocumentDownload('Polityka prywatności');
+                    }}
+                  >
+                    Polityką prywatności
+                  </a>{' '}
+                  i akceptuję ich postanowienia.
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                {consentErrors.consent1 && (
+                  <p className="text-xs text-red-500 mt-1">{consentErrors.consent1}</p>
+                )}
+              </div>
             </div>
 
             {/* Consent 2 */}
@@ -225,26 +263,35 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                 checked={formData.consent2}
                 onChange={(e) => handleConsentChange('consent2', e.target.checked)}
                 disabled={disabled}
-                className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 mt-0.5 flex-shrink-0"
+                className={`w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 mt-0.5 flex-shrink-0 ${
+                  consentErrors.consent2 ? 'border-red-500' : 'border-gray-400'
+                }`}
               />
-              <label
-                htmlFor="consent2"
-                className="text-xs sm:text-sm text-gray-700 cursor-pointer flex-1 leading-relaxed"
-              >
-                Zapoznałem się z{' '}
-                <a
-                  href="#"
-                  className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleDocumentDownload('Szczegółowy regulamin Imprez turystycznych oraz warunki uczestnictwa w imprezach turystycznych RADSAS FUN');
-                  }}
+              <div className="flex-1">
+                <label
+                  htmlFor="consent2"
+                  className={`text-xs sm:text-sm cursor-pointer flex-1 leading-relaxed ${
+                    consentErrors.consent2 ? 'text-red-600' : 'text-gray-700'
+                  }`}
                 >
-                  Warunkami uczestnictwa
-                </a>{' '}
-                i akceptuję ich postanowienia.
-                <span className="text-red-500 ml-1">*</span>
-              </label>
+                  Zapoznałem się z{' '}
+                  <a
+                    href="#"
+                    className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDocumentDownload('Szczegółowy regulamin Imprez turystycznych oraz warunki uczestnictwa w imprezach turystycznych RADSAS FUN');
+                    }}
+                  >
+                    Warunkami uczestnictwa
+                  </a>{' '}
+                  i akceptuję ich postanowienia.
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                {consentErrors.consent2 && (
+                  <p className="text-xs text-red-500 mt-1">{consentErrors.consent2}</p>
+                )}
+              </div>
             </div>
 
             {/* Consent 3 */}
@@ -255,15 +302,24 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                 checked={formData.consent3}
                 onChange={(e) => handleConsentChange('consent3', e.target.checked)}
                 disabled={disabled}
-                className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 mt-0.5 flex-shrink-0"
+                className={`w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 mt-0.5 flex-shrink-0 ${
+                  consentErrors.consent3 ? 'border-red-500' : 'border-gray-400'
+                }`}
               />
-              <label
-                htmlFor="consent3"
-                className="text-xs sm:text-sm text-gray-700 cursor-pointer flex-1 leading-relaxed"
-              >
-                Zgoda na zdjęcia i ich udostępnianie - obecne i dodawane zgody do opracowania przez Zamawiającego.
-                <span className="text-red-500 ml-1">*</span>
-              </label>
+              <div className="flex-1">
+                <label
+                  htmlFor="consent3"
+                  className={`text-xs sm:text-sm cursor-pointer flex-1 leading-relaxed ${
+                    consentErrors.consent3 ? 'text-red-600' : 'text-gray-700'
+                  }`}
+                >
+                  Zgoda na zdjęcia i ich udostępnianie - obecne i dodawane zgody do opracowania przez Zamawiającego.
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                {consentErrors.consent3 && (
+                  <p className="text-xs text-red-500 mt-1">{consentErrors.consent3}</p>
+                )}
+              </div>
             </div>
 
             {/* Consent 4 */}
@@ -274,15 +330,24 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                 checked={formData.consent4}
                 onChange={(e) => handleConsentChange('consent4', e.target.checked)}
                 disabled={disabled}
-                className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 mt-0.5 flex-shrink-0"
+                className={`w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 mt-0.5 flex-shrink-0 ${
+                  consentErrors.consent4 ? 'border-red-500' : 'border-gray-400'
+                }`}
               />
-              <label
-                htmlFor="consent4"
-                className="text-xs sm:text-sm text-gray-700 cursor-pointer flex-1 leading-relaxed"
-              >
-                Radsas Fun w ramach ceny odprowadza składkę w kwocie 2,00 PLN na rzecz Turystycznego Funduszu Gwarancyjnego oraz 2 PLN na rzecz Ubezpieczeniowego Funduszu Gwarancyjnego zgodnie z ustawą.
-                <span className="text-red-500 ml-1">*</span>
-              </label>
+              <div className="flex-1">
+                <label
+                  htmlFor="consent4"
+                  className={`text-xs sm:text-sm cursor-pointer flex-1 leading-relaxed ${
+                    consentErrors.consent4 ? 'text-red-600' : 'text-gray-700'
+                  }`}
+                >
+                  Radsas Fun w ramach ceny odprowadza składkę w kwocie 2,00 PLN na rzecz Turystycznego Funduszu Gwarancyjnego oraz 2 PLN na rzecz Ubezpieczeniowego Funduszu Gwarancyjnego zgodnie z ustawą.
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                {consentErrors.consent4 && (
+                  <p className="text-xs text-red-500 mt-1">{consentErrors.consent4}</p>
+                )}
+              </div>
             </div>
           </div>
 

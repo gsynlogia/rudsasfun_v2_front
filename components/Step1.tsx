@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import DashedLine from './DashedLine';
 import type { StepComponentProps } from '@/types/reservation';
@@ -29,16 +29,22 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   const [parents, setParents] = useState<ParentData[]>([
     {
       id: '1',
-      firstName: 'Andrzej',
-      lastName: 'Nazwisko',
-      email: 'Adres e-mail',
+      firstName: '',
+      lastName: '',
+      email: '',
       phone: '+48',
       phoneNumber: '',
-      street: 'Ulica i numer budynku/mieszkania',
-      postalCode: 'np. 00-000',
-      city: 'Miejscowość',
+      street: '',
+      postalCode: '',
+      city: '',
     },
   ]);
+
+  // Validation errors for parent fields
+  const [parentErrors, setParentErrors] = useState<Record<string, Record<string, string>>>({});
+  // Validation errors for participant fields
+  const [participantErrors, setParticipantErrors] = useState<Record<string, string>>({});
+  const validationAttemptedRef = useRef(false);
 
   const addParent = () => {
     if (parents.length >= 2) return;
@@ -60,13 +66,90 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   const removeParent = (id: string) => {
     if (parents.length > 1) {
       setParents(parents.filter((p) => p.id !== id));
+      // Remove errors for deleted parent
+      setParentErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[id];
+        return newErrors;
+      });
     }
   };
 
+  // Update parent and clear errors for that field
   const updateParent = (id: string, field: keyof ParentData, value: string) => {
     setParents(
       parents.map((p) => (p.id === id ? { ...p, [field]: value } : p))
     );
+    
+    // Clear error for this field when user starts typing
+    if (validationAttemptedRef.current && parentErrors[id]?.[field]) {
+      setParentErrors((prev) => {
+        const newErrors = { ...prev };
+        if (newErrors[id]) {
+          const { [field]: _, ...rest } = newErrors[id];
+          if (Object.keys(rest).length === 0) {
+            delete newErrors[id];
+          } else {
+            newErrors[id] = rest;
+          }
+        }
+        return newErrors;
+      });
+    }
+  };
+
+  // Validate parent fields
+  const validateParent = (parent: ParentData): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    
+    if (!parent.firstName || parent.firstName.trim() === '') {
+      errors.firstName = 'Pole obowiązkowe';
+    }
+    
+    if (!parent.lastName || parent.lastName.trim() === '') {
+      errors.lastName = 'Pole obowiązkowe';
+    }
+    
+    if (!parent.email || parent.email.trim() === '') {
+      errors.email = 'Pole obowiązkowe';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parent.email)) {
+      errors.email = 'Nieprawidłowy adres e-mail';
+    }
+    
+    if (!parent.phoneNumber || parent.phoneNumber.trim() === '') {
+      errors.phoneNumber = 'Pole obowiązkowe';
+    }
+    
+    if (!parent.street || parent.street.trim() === '') {
+      errors.street = 'Pole obowiązkowe';
+    }
+    
+    if (!parent.postalCode || parent.postalCode.trim() === '') {
+      errors.postalCode = 'Pole obowiązkowe';
+    }
+    
+    if (!parent.city || parent.city.trim() === '') {
+      errors.city = 'Pole obowiązkowe';
+    }
+    
+    return errors;
+  };
+
+  // Validate all parents
+  const validateAllParents = (): boolean => {
+    const allErrors: Record<string, Record<string, string>> = {};
+    let isValid = true;
+    
+    parents.forEach((parent) => {
+      const errors = validateParent(parent);
+      if (Object.keys(errors).length > 0) {
+        allErrors[parent.id] = errors;
+        isValid = false;
+      }
+    });
+    
+    setParentErrors(allErrors);
+    return isValid;
   };
 
   const [participantData, setParticipantData] = useState({
@@ -78,7 +161,47 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     selectedParticipant: '',
   });
 
-  const [diet, setDiet] = useState<'standard' | 'vegetarian' | null>(null);
+  // Validate participant fields - use useCallback to ensure it uses current participantData
+  const validateParticipant = useCallback((): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    
+    if (!participantData.firstName || participantData.firstName.trim() === '') {
+      errors.firstName = 'Pole obowiązkowe';
+    }
+    
+    if (!participantData.lastName || participantData.lastName.trim() === '') {
+      errors.lastName = 'Pole obowiązkowe';
+    }
+    
+    if (!participantData.age || participantData.age.trim() === '' || participantData.age === 'Wybierz z listy') {
+      errors.age = 'Pole obowiązkowe';
+    }
+    
+    if (!participantData.gender || participantData.gender.trim() === '' || participantData.gender === 'Wybierz z listy') {
+      errors.gender = 'Pole obowiązkowe';
+    }
+    
+    if (!participantData.city || participantData.city.trim() === '') {
+      errors.city = 'Pole obowiązkowe';
+    }
+    
+    return errors;
+  }, [participantData]);
+
+  // Validate all (parents + participant)
+  const validateAll = (): boolean => {
+    // Always validate both parents and participant, even if one fails
+    const parentsValid = validateAllParents();
+    const participantErrors = validateParticipant();
+    const participantValid = Object.keys(participantErrors).length === 0;
+    
+    // Always set participant errors, even if parents validation failed
+    setParticipantErrors(participantErrors);
+    
+    return parentsValid && participantValid;
+  };
+
+  const [diet, setDiet] = useState<'standard' | 'vegetarian' | null>('standard');
   const [accommodationRequest, setAccommodationRequest] = useState('');
   const prevDietRef = useRef<'standard' | 'vegetarian' | null>(null);
   const { reservation } = useReservation();
@@ -115,13 +238,37 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
 
   const [additionalNotes, setAdditionalNotes] = useState('');
 
+  // Memoize validateAll to ensure it uses current values
+  const validateAllMemoized = useCallback(() => {
+    validationAttemptedRef.current = true;
+    // Always validate both parents and participant, even if one fails
+    const parentsValid = validateAllParents();
+    const participantErrors = validateParticipant();
+    const participantValid = Object.keys(participantErrors).length === 0;
+    
+    // Always set participant errors, even if parents validation failed
+    setParticipantErrors(participantErrors);
+    
+    return parentsValid && participantValid;
+  }, [parents, participantData, validateParticipant]);
+
+  // Expose validation function for external use (e.g., LayoutClient)
+  useEffect(() => {
+    (window as any).validateStep1 = validateAllMemoized;
+
+    return () => {
+      delete (window as any).validateStep1;
+    };
+  }, [validateAllMemoized]);
+
   // Load data from sessionStorage on mount
   useEffect(() => {
     const savedData = loadStep1FormData();
     if (savedData) {
       setParents(savedData.parents);
       setParticipantData(savedData.participantData);
-      setDiet(savedData.diet);
+      // Set diet to 'standard' if null or undefined (default selection)
+      setDiet(savedData.diet || 'standard');
       setAccommodationRequest(savedData.accommodationRequest);
       setHealthQuestions(savedData.healthQuestions);
       setHealthDetails(savedData.healthDetails);
@@ -179,8 +326,13 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     value={parent.firstName}
                     onChange={(e) => updateParent(parent.id, 'firstName', e.target.value)}
                     disabled={disabled}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                      parentErrors[parent.id]?.firstName ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
+                  {parentErrors[parent.id]?.firstName && (
+                    <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].firstName}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -191,8 +343,13 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     value={parent.lastName}
                     onChange={(e) => updateParent(parent.id, 'lastName', e.target.value)}
                     disabled={disabled}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                      parentErrors[parent.id]?.lastName ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
+                  {parentErrors[parent.id]?.lastName && (
+                    <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].lastName}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -203,8 +360,13 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     value={parent.email}
                     onChange={(e) => updateParent(parent.id, 'email', e.target.value)}
                     disabled={disabled}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                      parentErrors[parent.id]?.email ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
+                  {parentErrors[parent.id]?.email && (
+                    <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].email}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -220,14 +382,20 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                       <option value="+48">+48</option>
                       <option value="+1">+1</option>
                     </select>
-                    <input
-                      type="tel"
-                      value={parent.phoneNumber}
-                      onChange={(e) => updateParent(parent.id, 'phoneNumber', e.target.value)}
-                      placeholder="111 222 333"
-                      disabled={disabled}
-                      className="flex-1 px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    />
+                    <div className="flex-1">
+                      <input
+                        type="tel"
+                        value={parent.phoneNumber}
+                        onChange={(e) => updateParent(parent.id, 'phoneNumber', e.target.value)}
+                        disabled={disabled}
+                        className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                          parentErrors[parent.id]?.phoneNumber ? 'border-red-500' : 'border-gray-400'
+                        }`}
+                      />
+                      {parentErrors[parent.id]?.phoneNumber && (
+                        <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].phoneNumber}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -239,8 +407,13 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     value={parent.street}
                     onChange={(e) => updateParent(parent.id, 'street', e.target.value)}
                     disabled={disabled}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                      parentErrors[parent.id]?.street ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
+                  {parentErrors[parent.id]?.street && (
+                    <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].street}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -250,10 +423,14 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     type="text"
                     value={parent.postalCode}
                     onChange={(e) => updateParent(parent.id, 'postalCode', e.target.value)}
-                    placeholder="np. 00-000"
                     disabled={disabled}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                      parentErrors[parent.id]?.postalCode ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
+                  {parentErrors[parent.id]?.postalCode && (
+                    <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].postalCode}</p>
+                  )}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -264,8 +441,13 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     value={parent.city}
                     onChange={(e) => updateParent(parent.id, 'city', e.target.value)}
                     disabled={disabled}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                      parentErrors[parent.id]?.city ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
+                  {parentErrors[parent.id]?.city && (
+                    <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].city}</p>
+                  )}
                 </div>
               </div>
             </section>
@@ -323,11 +505,25 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
               <input
                 type="text"
                 value={participantData.firstName}
-                onChange={(e) => setParticipantData({ ...participantData, firstName: e.target.value })}
+                onChange={(e) => {
+                  setParticipantData({ ...participantData, firstName: e.target.value });
+                  // Clear error when user starts typing
+                  if (validationAttemptedRef.current && participantErrors.firstName) {
+                    setParticipantErrors((prev) => {
+                      const { firstName: _, ...rest } = prev;
+                      return rest;
+                    });
+                  }
+                }}
                 placeholder="Imię"
                 disabled={disabled}
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                  participantErrors.firstName ? 'border-red-500' : 'border-gray-400'
+                }`}
               />
+              {participantErrors.firstName && (
+                <p className="mt-1 text-xs text-red-600">{participantErrors.firstName}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -336,11 +532,25 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
               <input
                 type="text"
                 value={participantData.lastName}
-                onChange={(e) => setParticipantData({ ...participantData, lastName: e.target.value })}
+                onChange={(e) => {
+                  setParticipantData({ ...participantData, lastName: e.target.value });
+                  // Clear error when user starts typing
+                  if (validationAttemptedRef.current && participantErrors.lastName) {
+                    setParticipantErrors((prev) => {
+                      const { lastName: _, ...rest } = prev;
+                      return rest;
+                    });
+                  }
+                }}
                 placeholder="Nazwisko"
                 disabled={disabled}
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                  participantErrors.lastName ? 'border-red-500' : 'border-gray-400'
+                }`}
               />
+              {participantErrors.lastName && (
+                <p className="mt-1 text-xs text-red-600">{participantErrors.lastName}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -348,9 +558,20 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
               </label>
               <select
                 value={participantData.age}
-                onChange={(e) => setParticipantData({ ...participantData, age: e.target.value })}
+                onChange={(e) => {
+                  setParticipantData({ ...participantData, age: e.target.value });
+                  // Clear error when user selects
+                  if (validationAttemptedRef.current && participantErrors.age) {
+                    setParticipantErrors((prev) => {
+                      const { age: _, ...rest } = prev;
+                      return rest;
+                    });
+                  }
+                }}
                 disabled={disabled}
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                  participantErrors.age ? 'border-red-500' : 'border-gray-400'
+                }`}
               >
                 <option>Wybierz z listy</option>
                 <option value="7">7</option>
@@ -365,6 +586,9 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                 <option value="16">16</option>
                 <option value="17">17</option>
               </select>
+              {participantErrors.age && (
+                <p className="mt-1 text-xs text-red-600">{participantErrors.age}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -372,14 +596,28 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
               </label>
               <select
                 value={participantData.gender}
-                onChange={(e) => setParticipantData({ ...participantData, gender: e.target.value })}
+                onChange={(e) => {
+                  setParticipantData({ ...participantData, gender: e.target.value });
+                  // Clear error when user selects
+                  if (validationAttemptedRef.current && participantErrors.gender) {
+                    setParticipantErrors((prev) => {
+                      const { gender: _, ...rest } = prev;
+                      return rest;
+                    });
+                  }
+                }}
                 disabled={disabled}
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                  participantErrors.gender ? 'border-red-500' : 'border-gray-400'
+                }`}
               >
                 <option>Wybierz z listy</option>
                 <option value="Chłopiec">Chłopiec</option>
                 <option value="Dziewczynka">Dziewczynka</option>
               </select>
+              {participantErrors.gender && (
+                <p className="mt-1 text-xs text-red-600">{participantErrors.gender}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -388,11 +626,25 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
               <input
                 type="text"
                 value={participantData.city}
-                onChange={(e) => setParticipantData({ ...participantData, city: e.target.value })}
+                onChange={(e) => {
+                  setParticipantData({ ...participantData, city: e.target.value });
+                  // Clear error when user starts typing
+                  if (validationAttemptedRef.current && participantErrors.city) {
+                    setParticipantErrors((prev) => {
+                      const { city: _, ...rest } = prev;
+                      return rest;
+                    });
+                  }
+                }}
                 placeholder="Miejscowość"
                 disabled={disabled}
-                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                  participantErrors.city ? 'border-red-500' : 'border-gray-400'
+                }`}
               />
+              {participantErrors.city && (
+                <p className="mt-1 text-xs text-red-600">{participantErrors.city}</p>
+              )}
             </div>
           </div>
         </section>

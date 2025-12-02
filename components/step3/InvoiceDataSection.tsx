@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Building2, User, Mail, Phone, MapPin, FileText, Info, Download } from 'lucide-react';
 import { loadStep3FormData, saveStep3FormData } from '@/utils/sessionStorage';
 import DashedLine from '../DashedLine';
@@ -32,6 +32,11 @@ export default function InvoiceDataSection() {
     postalCode: '',
     city: '',
   });
+
+  // Validation errors
+  const [privateErrors, setPrivateErrors] = useState<Record<string, string>>({});
+  const [companyErrors, setCompanyErrors] = useState<Record<string, string>>({});
+  const validationAttemptedRef = useRef(false);
 
   // Load data from sessionStorage on mount and whenever component is visible
   useEffect(() => {
@@ -106,12 +111,105 @@ export default function InvoiceDataSection() {
     saveStep3FormData(formData as any);
   }, [invoiceType, privateData, companyData]);
 
+  // Validate private person fields
+  const validatePrivate = useCallback((): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!privateData.firstName || privateData.firstName.trim() === '') {
+      errors.firstName = 'Pole obowiązkowe';
+    }
+    if (!privateData.lastName || privateData.lastName.trim() === '') {
+      errors.lastName = 'Pole obowiązkowe';
+    }
+    if (!privateData.email || privateData.email.trim() === '') {
+      errors.email = 'Pole obowiązkowe';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(privateData.email)) {
+      errors.email = 'Nieprawidłowy adres e-mail';
+    }
+    if (!privateData.phone || privateData.phone.trim() === '') {
+      errors.phone = 'Pole obowiązkowe';
+    }
+    if (!privateData.street || privateData.street.trim() === '') {
+      errors.street = 'Pole obowiązkowe';
+    }
+    if (!privateData.postalCode || privateData.postalCode.trim() === '') {
+      errors.postalCode = 'Pole obowiązkowe';
+    }
+    if (!privateData.city || privateData.city.trim() === '') {
+      errors.city = 'Pole obowiązkowe';
+    }
+
+    setPrivateErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [privateData]);
+
+  // Validate company fields
+  const validateCompany = useCallback((): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!companyData.companyName || companyData.companyName.trim() === '') {
+      errors.companyName = 'Pole obowiązkowe';
+    }
+    if (!companyData.nip || companyData.nip.trim() === '') {
+      errors.nip = 'Pole obowiązkowe';
+    }
+    if (!companyData.street || companyData.street.trim() === '') {
+      errors.street = 'Pole obowiązkowe';
+    }
+    if (!companyData.postalCode || companyData.postalCode.trim() === '') {
+      errors.postalCode = 'Pole obowiązkowe';
+    }
+    if (!companyData.city || companyData.city.trim() === '') {
+      errors.city = 'Pole obowiązkowe';
+    }
+
+    setCompanyErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [companyData]);
+
+  // Combined validation
+  const validateInvoiceData = useCallback((): boolean => {
+    if (invoiceType === 'private') {
+      return validatePrivate();
+    } else {
+      return validateCompany();
+    }
+  }, [invoiceType, validatePrivate, validateCompany]);
+
+  // Expose validation function for external use (e.g., Step3 validation)
+  useEffect(() => {
+    (window as any).validateInvoiceDataSection = () => {
+      validationAttemptedRef.current = true;
+      return validateInvoiceData();
+    };
+
+    return () => {
+      delete (window as any).validateInvoiceDataSection;
+    };
+  }, [validateInvoiceData]);
+
   const updatePrivateField = (field: keyof typeof privateData, value: string) => {
     setPrivateData((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field when user starts typing
+    if (privateErrors[field]) {
+      setPrivateErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
   };
 
   const updateCompanyField = (field: keyof typeof companyData, value: string) => {
     setCompanyData((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field when user starts typing
+    if (companyErrors[field]) {
+      setCompanyErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
   };
 
   return (
@@ -154,9 +252,14 @@ export default function InvoiceDataSection() {
                     value={privateData.firstName}
                     onChange={(e) => updatePrivateField('firstName', e.target.value)}
                     placeholder="Imię"
-                    className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                      privateErrors.firstName ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
                 </div>
+                {privateErrors.firstName && (
+                  <p className="text-xs text-red-500 mt-1">{privateErrors.firstName}</p>
+                )}
               </div>
 
               <div>
@@ -170,9 +273,14 @@ export default function InvoiceDataSection() {
                     value={privateData.lastName}
                     onChange={(e) => updatePrivateField('lastName', e.target.value)}
                     placeholder="Nazwisko"
-                    className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                      privateErrors.lastName ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
                 </div>
+                {privateErrors.lastName && (
+                  <p className="text-xs text-red-500 mt-1">{privateErrors.lastName}</p>
+                )}
               </div>
             </div>
 
@@ -187,9 +295,14 @@ export default function InvoiceDataSection() {
                   value={privateData.email}
                   onChange={(e) => updatePrivateField('email', e.target.value)}
                   placeholder="Adres e-mail"
-                  className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                  className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                    privateErrors.email ? 'border-red-500' : 'border-gray-400'
+                  }`}
                 />
               </div>
+              {privateErrors.email && (
+                <p className="text-xs text-red-500 mt-1">{privateErrors.email}</p>
+              )}
             </div>
 
             <div>
@@ -203,9 +316,14 @@ export default function InvoiceDataSection() {
                   value={privateData.phone}
                   onChange={(e) => updatePrivateField('phone', e.target.value)}
                   placeholder="+48"
-                  className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                  className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                    privateErrors.phone ? 'border-red-500' : 'border-gray-400'
+                  }`}
                 />
               </div>
+              {privateErrors.phone && (
+                <p className="text-xs text-red-500 mt-1">{privateErrors.phone}</p>
+              )}
             </div>
 
             <div>
@@ -219,9 +337,14 @@ export default function InvoiceDataSection() {
                   value={privateData.street}
                   onChange={(e) => updatePrivateField('street', e.target.value)}
                   placeholder="Ulica i numer budynku/mieszkania"
-                  className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                  className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                    privateErrors.street ? 'border-red-500' : 'border-gray-400'
+                  }`}
                 />
               </div>
+              {privateErrors.street && (
+                <p className="text-xs text-red-500 mt-1">{privateErrors.street}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -236,9 +359,14 @@ export default function InvoiceDataSection() {
                     value={privateData.postalCode}
                     onChange={(e) => updatePrivateField('postalCode', e.target.value)}
                     placeholder="np. 00-000"
-                    className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                      privateErrors.postalCode ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
                 </div>
+                {privateErrors.postalCode && (
+                  <p className="text-xs text-red-500 mt-1">{privateErrors.postalCode}</p>
+                )}
               </div>
 
               <div>
@@ -252,9 +380,14 @@ export default function InvoiceDataSection() {
                     value={privateData.city}
                     onChange={(e) => updatePrivateField('city', e.target.value)}
                     placeholder="Miejscowość"
-                    className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                      privateErrors.city ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
                 </div>
+                {privateErrors.city && (
+                  <p className="text-xs text-red-500 mt-1">{privateErrors.city}</p>
+                )}
               </div>
             </div>
 
@@ -288,9 +421,14 @@ export default function InvoiceDataSection() {
                   value={companyData.companyName}
                   onChange={(e) => updateCompanyField('companyName', e.target.value)}
                   placeholder="Nazwa firmy"
-                  className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                  className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                    companyErrors.companyName ? 'border-red-500' : 'border-gray-400'
+                  }`}
                 />
               </div>
+              {companyErrors.companyName && (
+                <p className="text-xs text-red-500 mt-1">{companyErrors.companyName}</p>
+              )}
             </div>
 
             <div>
@@ -304,9 +442,14 @@ export default function InvoiceDataSection() {
                   value={companyData.nip}
                   onChange={(e) => updateCompanyField('nip', e.target.value)}
                   placeholder="NIP"
-                  className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                  className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                    companyErrors.nip ? 'border-red-500' : 'border-gray-400'
+                  }`}
                 />
               </div>
+              {companyErrors.nip && (
+                <p className="text-xs text-red-500 mt-1">{companyErrors.nip}</p>
+              )}
             </div>
 
             <div>
@@ -320,9 +463,14 @@ export default function InvoiceDataSection() {
                   value={companyData.street}
                   onChange={(e) => updateCompanyField('street', e.target.value)}
                   placeholder="Ulica i numer budynku/mieszkania"
-                  className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                  className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                    companyErrors.street ? 'border-red-500' : 'border-gray-400'
+                  }`}
                 />
               </div>
+              {companyErrors.street && (
+                <p className="text-xs text-red-500 mt-1">{companyErrors.street}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -337,9 +485,14 @@ export default function InvoiceDataSection() {
                     value={companyData.postalCode}
                     onChange={(e) => updateCompanyField('postalCode', e.target.value)}
                     placeholder="np. 00-000"
-                    className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                      companyErrors.postalCode ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
                 </div>
+                {companyErrors.postalCode && (
+                  <p className="text-xs text-red-500 mt-1">{companyErrors.postalCode}</p>
+                )}
               </div>
 
               <div>
@@ -353,9 +506,14 @@ export default function InvoiceDataSection() {
                     value={companyData.city}
                     onChange={(e) => updateCompanyField('city', e.target.value)}
                     placeholder="Miejscowość"
-                    className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                      companyErrors.city ? 'border-red-500' : 'border-gray-400'
+                    }`}
                   />
                 </div>
+                {companyErrors.city && (
+                  <p className="text-xs text-red-500 mt-1">{companyErrors.city}</p>
+                )}
               </div>
             </div>
           </div>
