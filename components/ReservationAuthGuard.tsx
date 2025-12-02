@@ -1,20 +1,22 @@
 'use client';
 
 import { useEffect, useState, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { authService } from '@/lib/services/AuthService';
+import { saveMagicLinkRedirect } from '@/utils/localStorage';
 
-interface AuthGuardProps {
+interface ReservationAuthGuardProps {
   children: ReactNode;
-  requireAdmin?: boolean;
 }
 
 /**
- * AuthGuard Component
- * Protects admin panel routes - redirects to login if not authenticated
+ * ReservationAuthGuard Component
+ * Protects reservation routes - redirects to login if not authenticated
+ * Allows both admin and client users
  */
-export default function AuthGuard({ children, requireAdmin = false }: AuthGuardProps) {
+export default function ReservationAuthGuard({ children }: ReservationAuthGuardProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +27,10 @@ export default function AuthGuard({ children, requireAdmin = false }: AuthGuardP
       // Check if user is authenticated
       if (!authService.isAuthenticated()) {
         if (isMounted) {
-          router.push('/admin-panel/login');
+          // Save current path to localStorage for magic link redirect
+          saveMagicLinkRedirect(pathname);
+          // Redirect to login with current path as redirect
+          router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
         }
         return;
       }
@@ -34,23 +39,12 @@ export default function AuthGuard({ children, requireAdmin = false }: AuthGuardP
       const user = await authService.verifyToken();
       if (!user) {
         if (isMounted) {
-          router.push('/admin-panel/login');
+          router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
         }
         return;
       }
 
-      // Check admin group or user_type if required
-      if (requireAdmin) {
-        const isAdmin = user.user_type === 'admin' || user.groups?.includes('admin');
-        if (!isAdmin) {
-          if (isMounted) {
-            // Show message that only admins can access
-            router.push('/admin-panel/login?error=admin_only');
-          }
-          return;
-        }
-      }
-
+      // Both admin and client users can access reservation
       if (isMounted) {
         setIsAuthorized(true);
         setLoading(false);
@@ -62,7 +56,7 @@ export default function AuthGuard({ children, requireAdmin = false }: AuthGuardP
     return () => {
       isMounted = false;
     };
-  }, [router, requireAdmin]);
+  }, [router, pathname]);
 
   if (loading) {
     return (
@@ -81,5 +75,4 @@ export default function AuthGuard({ children, requireAdmin = false }: AuthGuardP
 
   return <>{children}</>;
 }
-
 

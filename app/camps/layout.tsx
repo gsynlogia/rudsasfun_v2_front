@@ -1,18 +1,9 @@
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "RADSASfun - rezerwacja",
-  description: "Proces rezerwacji obozu RADSASfun",
-};
+import ReservationAuthWrapper from '@/components/ReservationAuthWrapper';
 
 export default function CampsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <ReservationAuthWrapper>{children}</ReservationAuthWrapper>;
 }
-
-
-
-

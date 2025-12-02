@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { authService } from '@/lib/services/AuthService';
 import HeaderTop from '@/components/HeaderTop';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -19,17 +20,29 @@ export default function LoginPage() {
         // Verify token is still valid
         const user = await authService.verifyToken();
         if (user) {
-          // User is authenticated, redirect to admin panel
-          // Use replace to avoid adding to history
-          router.replace('/admin-panel');
+          // Check if user is admin
+          if (authService.isAdmin()) {
+            // User is authenticated admin, redirect to admin panel
+            router.replace('/admin-panel');
+          } else {
+            // User is client, show error message
+            setError('Tylko administratorzy mogą logować się do panelu administracyjnego. Użyj magic link do logowania jako klient.');
+            authService.logout();
+          }
         } else {
           // Token invalid, clear it
           authService.logout();
         }
       }
+      
+      // Check for error query param
+      const errorParam = searchParams.get('error');
+      if (errorParam === 'admin_only') {
+        setError('Tylko administratorzy mogą uzyskać dostęp do panelu administracyjnego.');
+      }
     };
     checkAuth();
-  }, [router]);
+  }, [router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +129,21 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#03adf0]"></div>
+          <p className="mt-4 text-sm text-gray-600">Ładowanie...</p>
+        </div>
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   );
 }
 

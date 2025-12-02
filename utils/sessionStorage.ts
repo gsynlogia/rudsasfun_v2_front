@@ -1,6 +1,7 @@
 /**
  * Session Storage Utilities
  * Handles saving and loading form data and reservation state to sessionStorage
+ * Note: Magic link redirect is handled in utils/localStorage.ts
  */
 
 const STORAGE_KEYS = {
@@ -9,7 +10,7 @@ const STORAGE_KEYS = {
   STEP3_FORM_DATA: 'radsasfun_step3_form_data',
   STEP4_FORM_DATA: 'radsasfun_step4_form_data',
   STEP5_FORM_DATA: 'radsasfun_step5_form_data',
-  RESERVATION_STATE: 'radsasfun_reservation_state',
+  RESERVATION_STATE: 'radsasfun_reservation_state', // Stays in sessionStorage
 } as const;
 
 export interface Step1FormData {

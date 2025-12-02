@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatDateRange } from '@/utils/api';
+import { saveMagicLinkRedirect } from '@/utils/localStorage';
 import type { Camp, CampProperty } from '@/types/reservation';
 
 interface CampWithProperties extends Camp {
@@ -45,7 +46,14 @@ export default function CampsList() {
   };
 
   const handleSelectCamp = (campId: number, editionId: number) => {
-    router.push(`/camps/${campId}/edition/${editionId}/step/1`);
+    // Create reservation URL
+    const reservationUrl = `/camps/${campId}/edition/${editionId}/step/1`;
+    
+    // Save redirect URL to localStorage BEFORE redirecting to login
+    saveMagicLinkRedirect(reservationUrl);
+    
+    // Redirect to login with reservation URL as redirect parameter
+    router.push(`/login?redirect=${encodeURIComponent(reservationUrl)}`);
   };
 
   const formatPeriod = (period: string) => {

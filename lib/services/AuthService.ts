@@ -15,6 +15,8 @@ export interface LoginResponse {
   user: {
     id: number;
     login: string;
+    email?: string;
+    user_type?: string;
     groups: string[];
     accessible_sections?: string[];
     created_at?: string;
@@ -25,6 +27,8 @@ export interface LoginResponse {
 export interface User {
   id: number;
   login: string;
+  email?: string;
+  user_type?: string;
   groups: string[];
   accessible_sections?: string[];
   created_at?: string;
@@ -75,8 +79,29 @@ class AuthService {
 
   /**
    * Logout user
+   * Clears token and user data from localStorage
+   * Optionally calls backend logout endpoint
    */
-  logout(): void {
+  async logout(): Promise<void> {
+    const token = this.getToken();
+    
+    // Call backend logout endpoint if token exists (optional, for logging)
+    if (token) {
+      try {
+        await fetch(`${API_BASE_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            ...this.getAuthHeader(),
+          },
+        }).catch(() => {
+          // Ignore errors - logout should work even if backend is unavailable
+        });
+      } catch {
+        // Ignore errors
+      }
+    }
+    
+    // Clear local storage
     if (typeof window !== 'undefined') {
       localStorage.removeItem(this.tokenKey);
       localStorage.removeItem(this.userKey);
@@ -113,11 +138,29 @@ class AuthService {
   }
 
   /**
-   * Check if user has admin group
+   * Check if user has admin group or is admin type
    */
   isAdmin(): boolean {
     const user = this.getCurrentUser();
-    return user?.groups?.includes('admin') || false;
+    return user?.user_type === 'admin' || user?.groups?.includes('admin') || false;
+  }
+
+  /**
+   * Check if user is client type
+   */
+  isClient(): boolean {
+    const user = this.getCurrentUser();
+    return user?.user_type === 'client' || false;
+  }
+
+  /**
+   * Store token and user from magic link login
+   */
+  storeMagicLinkAuth(accessToken: string, user: User): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.tokenKey, accessToken);
+      localStorage.setItem(this.userKey, JSON.stringify(user));
+    }
   }
 
   /**

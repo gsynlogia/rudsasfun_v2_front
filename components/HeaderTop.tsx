@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { authService } from '@/lib/services/AuthService';
+import { clearMagicLinkRedirect } from '@/utils/localStorage';
 
 /**
  * Header Top Component
@@ -14,7 +17,48 @@ interface HeaderTopProps {
 }
 
 export default function HeaderTop({ fixed = false }: HeaderTopProps) {
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Check authentication status
+  useEffect(() => {
+    setIsAuthenticated(authService.isAuthenticated());
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setAccountDropdownOpen(false);
+      }
+    };
+
+    if (accountDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [accountDropdownOpen]);
+
+  const handleLogout = async () => {
+    // Clear authentication (calls backend logout endpoint)
+    await authService.logout();
+    
+    // Clear magic link redirect from localStorage
+    clearMagicLinkRedirect();
+    
+    // Update state
+    setIsAuthenticated(false);
+    setAccountDropdownOpen(false);
+    
+    // Redirect to home page
+    router.push('/');
+  };
 
   const headerClasses = fixed 
     ? "bg-white fixed top-0 left-0 right-0 z-50"
@@ -69,16 +113,65 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
                 <div className="w-5 h-5 bg-[#D62828] rounded-full flex items-center justify-center text-white text-xs font-semibold">2</div>
               </div>
 
-              {/* User account */}
-              <Link href="#" className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span className="text-sm">Moje konto</span>
-                <svg className="w-3 h-3 text-[#03adf0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </Link>
+              {/* User account dropdown */}
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+                  className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className="text-sm">Moje konto</span>
+                  <svg 
+                    className={`w-3 h-3 text-[#03adf0] transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown menu */}
+                {accountDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                    {isAuthenticated ? (
+                      <>
+                        <Link
+                          href="/profil/moje-konto"
+                          onClick={() => setAccountDropdownOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          Moje konto
+                        </Link>
+                        <Link
+                          href="/profil/aktualne-rezerwacje"
+                          onClick={() => setAccountDropdownOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          Moje rezerwacje
+                        </Link>
+                        <div className="border-t border-gray-200 my-1"></div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          Wyloguj się
+                        </button>
+                      </>
+                    ) : (
+                      <Link
+                        href="/login"
+                        onClick={() => setAccountDropdownOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        Zaloguj się
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -117,12 +210,29 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
                   </button>
                   <div className="w-5 h-5 bg-[#D62828] rounded-full flex items-center justify-center text-white text-xs font-semibold">2</div>
                 </div>
-                <Link href="#" className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1 text-sm">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <span>Moje konto</span>
-                </Link>
+                {isAuthenticated ? (
+                  <>
+                    <Link href="/profil/moje-konto" className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1 text-sm">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span>Moje konto</span>
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="text-red-600 hover:text-red-700 transition-colors text-sm"
+                    >
+                      Wyloguj się
+                    </button>
+                  </>
+                ) : (
+                  <Link href="/login" className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1 text-sm">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span>Zaloguj się</span>
+                  </Link>
+                )}
               </div>
             </div>
           </div>

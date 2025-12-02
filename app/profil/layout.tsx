@@ -1,20 +1,16 @@
-import type { Metadata } from "next";
-import ProfileLayout from '@/components/profile/ProfileLayout';
+import ProfileAuthWrapper from '@/components/ProfileAuthWrapper';
+import ProfileLayoutComponent from '@/components/profile/ProfileLayout';
 
-export const metadata: Metadata = {
-  title: "RADSASfun - Panel klienta",
-  description: "Panel klienta RADSASfun - zarządzanie rezerwacjami, fakturami i płatnościami",
-};
-
-/**
- * Profile Layout
- * Wraps all profile pages with ProfileLayout
- */
-export default function ProfilePageLayout({
+export default function ProfileLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <ProfileLayout>{children}</ProfileLayout>;
+  return (
+    <ProfileAuthWrapper>
+      <ProfileLayoutComponent>
+        {children}
+      </ProfileLayoutComponent>
+    </ProfileAuthWrapper>
+  );
 }
-
