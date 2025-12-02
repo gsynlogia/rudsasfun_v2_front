@@ -14,6 +14,7 @@ import {
   loadReservationState
 } from '@/utils/sessionStorage';
 import { useReservation } from '@/context/ReservationContext';
+import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
 
 /**
  * Step5 Component - Summary and Payment
@@ -40,6 +41,8 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
   const [formData, setFormData] = useState<Step5FormData>(getInitialState);
   const [validationError, setValidationError] = useState<string>('');
   const validationAttemptedRef = useRef(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string>('');
 
   // Load data from sessionStorage on mount
   useEffect(() => {
@@ -266,6 +269,75 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
   const handlePaymentAmountChange = (amount: 'full' | 'deposit') => {
     setFormData(prev => ({ ...prev, paymentAmount: amount }));
     setValidationError('');
+  };
+
+  // Handle payment processing
+  const handlePayment = async () => {
+    if (!formData.payNow) {
+      return;
+    }
+
+    // Validate payment options
+    if (!validatePayment()) {
+      setValidationError('Proszę wybrać sposób płatności i wielkość wpłaty.');
+      validationAttemptedRef.current = true;
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    setPaymentError('');
+
+    try {
+      // Get payment amount
+      const paymentAmount = formData.paymentAmount === 'full' ? totalPrice : depositAmount;
+
+      // Get payer email from step1 data
+      const payerEmail = firstParent?.email || '';
+      if (!payerEmail) {
+        throw new Error('Brak adresu email płatnika');
+      }
+
+      // Get payer name - only if we have valid data
+      let payerName: string | undefined = undefined;
+      if (firstParent) {
+        const firstName = getValueOrNotSet(firstParent.firstName, '');
+        const lastName = getValueOrNotSet(firstParent.lastName, '');
+        const fullName = `${firstName} ${lastName}`.trim();
+        // Only set payer_name if it's not empty and not default values
+        if (fullName && fullName !== 'Nie ustawiono Nie ustawiono' && fullName !== 'Nie ustawiono') {
+          payerName = fullName;
+        }
+      }
+
+      // Generate order ID (you can use reservation ID or generate unique ID)
+      const orderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Prepare payment request
+      const paymentRequest: CreatePaymentRequest = {
+        amount: paymentAmount,
+        description: `Rezerwacja obozu - ${formData.paymentAmount === 'full' ? 'Pełna wpłata' : 'Zaliczka'}`,
+        order_id: orderId,
+        payer_email: payerEmail,
+        payer_name: payerName,
+        channel_id: formData.paymentMethod === 'blik' ? 64 : formData.paymentMethod === 'online' ? undefined : undefined,
+        success_url: `${window.location.origin}/payment/success`,
+        error_url: `${window.location.origin}/payment/failure`,
+      };
+
+      // Create payment
+      const paymentResponse = await paymentService.createPayment(paymentRequest);
+
+      // Redirect to payment URL if available
+      if (paymentResponse.payment_url) {
+        window.location.href = paymentResponse.payment_url;
+      } else {
+        throw new Error('Nie otrzymano URL płatności');
+      }
+    } catch (error) {
+      console.error('Błąd podczas tworzenia płatności:', error);
+      setPaymentError(error instanceof Error ? error.message : 'Wystąpił błąd podczas tworzenia płatności');
+      setIsProcessingPayment(false);
+    }
   };
 
   // Get first parent data (for summary) with safe defaults
@@ -731,6 +803,26 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
           {validationError && (
             <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded">
               <p className="text-sm text-red-700">{validationError}</p>
+            </div>
+          )}
+
+          {/* Payment Error */}
+          {paymentError && (
+            <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded">
+              <p className="text-sm text-red-700">{paymentError}</p>
+            </div>
+          )}
+
+          {/* Pay Now Button */}
+          {formData.payNow && (
+            <div className="mt-6">
+              <button
+                onClick={handlePayment}
+                disabled={disabled || isProcessingPayment || !validatePayment()}
+                className="w-full sm:w-auto px-6 py-3 bg-[#03adf0] text-white font-semibold rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isProcessingPayment ? 'Przetwarzanie...' : 'Zapłać teraz'}
+              </button>
             </div>
           )}
         </section>
