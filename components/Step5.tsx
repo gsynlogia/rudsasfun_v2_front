@@ -65,11 +65,11 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
       return true; // No validation needed if pay now is unchecked
     }
     
-    if (!formData.paymentMethod || formData.paymentMethod === '') {
+    if (!formData.paymentMethod) {
       return false;
     }
     
-    if (!formData.paymentAmount || formData.paymentAmount === '') {
+    if (!formData.paymentAmount) {
       return false;
     }
     
