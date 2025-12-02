@@ -889,10 +889,10 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
             <div className="mt-6">
               <button
                 onClick={handlePayment}
-                disabled={disabled || isProcessingPayment || !validatePayment()}
+                disabled={disabled || !formData.payNow || !validatePayment() || isProcessingPayment || isCreatingReservation}
                 className="w-full sm:w-auto px-6 py-3 bg-[#03adf0] text-white font-semibold rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isProcessingPayment ? 'Przetwarzanie...' : 'Zapłać teraz'}
+                {isCreatingReservation ? 'Tworzenie rezerwacji...' : isProcessingPayment ? 'Przetwarzanie płatności...' : 'Zapłać teraz'}
               </button>
             </div>
           )}
