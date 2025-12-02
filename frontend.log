@@ -787,3 +787,79 @@
  GET /camps/1/edition/1/step/4 200 in 65ms (compile: 3ms, render: 62ms)
  GET /camps/1/edition/1/step/4 200 in 51ms (compile: 2ms, render: 49ms)
  GET /camps/1/edition/1/step/5 200 in 41ms (compile: 9ms, render: 32ms)
+ GET / 307 in 45ms (compile: 3ms, render: 43ms)
+[ReservationStepPage] Error fetching camp data: Error: Request timeout: Unable to fetch camp data within 10 seconds. Please check your connection and try again.
+    at getCampEdition (utils/api-server.ts:243:13)
+    at async ReservationStepPage (app/camps/[campId]/edition/[editionId]/step/[step]/page.tsx:53:16)
+  241 |     clearTimeout(timeoutId);
+  242 |     if (error instanceof Error && error.name === 'AbortError') {
+> 243 |       throw new Error(`Request timeout: Unable to fetch camp data within 10 seconds. Please check your connection and try again.`);
+      |             ^
+  244 |     }
+  245 |     // Only re-throw actual errors (timeout, server errors)
+  246 |     if (error instanceof Error) {
+ ⨯ Error: Request timeout: Unable to fetch camp data within 10 seconds. Please check your connection and try again.
+    at getCampEdition (utils/api-server.ts:243:13)
+    at async ReservationStepPage (app/camps/[campId]/edition/[editionId]/step/[step]/page.tsx:53:16)
+  241 |     clearTimeout(timeoutId);
+  242 |     if (error instanceof Error && error.name === 'AbortError') {
+> 243 |       throw new Error(`Request timeout: Unable to fetch camp data within 10 seconds. Please check your connection and try again.`);
+      |             ^
+  244 |     }
+  245 |     // Only re-throw actual errors (timeout, server errors)
+  246 |     if (error instanceof Error) { {
+  digest: '3862505039'
+}
+ GET /camps/1/edition/1/step/1 500 in 10.0s (compile: 4ms, render: 10.0s)
+[ReservationStepPage] Error fetching camp data: Error: Request timeout: Unable to fetch camp data within 10 seconds. Please check your connection and try again.
+    at getCampEdition (utils/api-server.ts:243:13)
+    at async ReservationStepPage (app/camps/[campId]/edition/[editionId]/step/[step]/page.tsx:53:16)
+  241 |     clearTimeout(timeoutId);
+  242 |     if (error instanceof Error && error.name === 'AbortError') {
+> 243 |       throw new Error(`Request timeout: Unable to fetch camp data within 10 seconds. Please check your connection and try again.`);
+      |             ^
+  244 |     }
+  245 |     // Only re-throw actual errors (timeout, server errors)
+  246 |     if (error instanceof Error) {
+ ⨯ Error: Request timeout: Unable to fetch camp data within 10 seconds. Please check your connection and try again.
+    at getCampEdition (utils/api-server.ts:243:13)
+    at async ReservationStepPage (app/camps/[campId]/edition/[editionId]/step/[step]/page.tsx:53:16)
+  241 |     clearTimeout(timeoutId);
+  242 |     if (error instanceof Error && error.name === 'AbortError') {
+> 243 |       throw new Error(`Request timeout: Unable to fetch camp data within 10 seconds. Please check your connection and try again.`);
+      |             ^
+  244 |     }
+  245 |     // Only re-throw actual errors (timeout, server errors)
+  246 |     if (error instanceof Error) { {
+  digest: '3668245802'
+}
+ GET /camps/1/edition/1/step/5 500 in 10.1s (compile: 7ms, render: 10.0s)
+ GET / 307 in 71ms (compile: 5ms, render: 66ms)
+ GET /camps/1/edition/1/step/1 200 in 7.8s (compile: 6ms, render: 7.8s)
+ GET /camps/1/edition/1/step/1 200 in 7.9s (compile: 2ms, render: 7.9s)
+ GET /camps/1/edition/1/step/1 200 in 157ms (compile: 2ms, render: 155ms)
+ GET / 307 in 113ms (compile: 11ms, render: 102ms)
+ GET /camps/1/edition/1/step/1 200 in 101ms (compile: 8ms, render: 93ms)
+ GET / 307 in 62ms (compile: 1297µs, render: 60ms)
+ GET /camps/1/edition/1/step/1 200 in 65ms (compile: 3ms, render: 62ms)
+ GET / 307 in 47ms (compile: 1031µs, render: 46ms)
+ GET /camps/1/edition/1/step/1 200 in 46ms (compile: 1770µs, render: 44ms)
+ GET / 307 in 62ms (compile: 1384µs, render: 60ms)
+ GET /camps/1/edition/1/step/1 200 in 60ms (compile: 2ms, render: 58ms)
+ GET / 307 in 47ms (compile: 1192µs, render: 46ms)
+ GET /camps/1/edition/1/step/1 200 in 46ms (compile: 1849µs, render: 44ms)
+ GET / 307 in 78ms (compile: 2ms, render: 76ms)
+ GET /camps/1/edition/1/step/1 200 in 76ms (compile: 6ms, render: 70ms)
+ GET / 307 in 46ms (compile: 1152µs, render: 45ms)
+ GET /camps/1/edition/1/step/1 200 in 43ms (compile: 1956µs, render: 41ms)
+ GET / 307 in 48ms (compile: 1973µs, render: 46ms)
+ GET /camps/1/edition/1/step/1 200 in 47ms (compile: 1941µs, render: 45ms)
+ GET / 307 in 61ms (compile: 1528µs, render: 60ms)
+ GET /camps/1/edition/1/step/1 200 in 63ms (compile: 2ms, render: 61ms)
+ GET / 307 in 63ms (compile: 1729µs, render: 61ms)
+ GET /camps/1/edition/1/step/1 200 in 65ms (compile: 2ms, render: 63ms)
+ GET / 307 in 44ms (compile: 1154µs, render: 43ms)
+ GET /camps/1/edition/1/step/1 200 in 47ms (compile: 1938µs, render: 45ms)
+ ✓ Compiled in 23ms
+ ✓ Compiled in 37ms
+ ✓ Compiled in 21ms

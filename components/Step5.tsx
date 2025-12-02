@@ -15,6 +15,8 @@ import {
 } from '@/utils/sessionStorage';
 import { useReservation } from '@/context/ReservationContext';
 import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
+import { reservationService, ReservationService } from '@/lib/services/ReservationService';
+import { loadStep4FormData } from '@/utils/sessionStorage';
 
 /**
  * Step5 Component - Summary and Payment
@@ -271,6 +273,23 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     setValidationError('');
   };
 
+  // Extract camp_id and property_id from URL
+  const getCampIds = (): { campId: number | null; propertyId: number | null } => {
+    const pathParts = pathname.split('/').filter(Boolean);
+    const campIdIndex = pathParts.indexOf('camps');
+    if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
+      const campId = parseInt(pathParts[campIdIndex + 1], 10);
+      const propertyId = campIdIndex + 3 < pathParts.length 
+        ? parseInt(pathParts[campIdIndex + 3], 10) 
+        : null;
+      return { 
+        campId: !isNaN(campId) ? campId : null, 
+        propertyId: propertyId && !isNaN(propertyId) ? propertyId : null 
+      };
+    }
+    return { campId: null, propertyId: null };
+  };
+
   // Handle payment processing
   const handlePayment = async () => {
     if (!formData.payNow) {
@@ -286,8 +305,43 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
 
     setIsProcessingPayment(true);
     setPaymentError('');
+    setReservationError('');
 
     try {
+      // Get camp IDs from URL
+      const { campId, propertyId } = getCampIds();
+      if (!campId || !propertyId) {
+        throw new Error('Nie można odczytać ID obozu lub turnusu z URL');
+      }
+
+      // Load all form data
+      const step1Data = loadStep1FormData();
+      const step2Data = loadStep2FormData();
+      const step3Data = loadStep3FormData();
+      const step4Data = loadStep4FormData();
+
+      if (!step1Data || !step2Data || !step3Data || !step4Data) {
+        throw new Error('Brak danych formularza. Proszę wypełnić wszystkie kroki.');
+      }
+
+      // Create reservation first
+      setIsCreatingReservation(true);
+      const reservationRequest = ReservationService.prepareReservationRequest(
+        step1Data,
+        step2Data,
+        step3Data,
+        step4Data,
+        campId,
+        propertyId,
+        totalPrice,
+        depositAmount
+      );
+
+      const reservationResponse = await reservationService.createReservation(reservationRequest);
+      setIsCreatingReservation(false);
+
+      console.log('✅ Rezerwacja utworzona:', reservationResponse);
+
       // Get payment amount
       const paymentAmount = formData.paymentAmount === 'full' ? totalPrice : depositAmount;
 
@@ -309,19 +363,19 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
         }
       }
 
-      // Generate order ID (you can use reservation ID or generate unique ID)
-      const orderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Use reservation ID for order ID
+      const orderId = `RES-${reservationResponse.id}`;
 
       // Prepare payment request
       const paymentRequest: CreatePaymentRequest = {
         amount: paymentAmount,
-        description: `Rezerwacja obozu - ${formData.paymentAmount === 'full' ? 'Pełna wpłata' : 'Zaliczka'}`,
+        description: `Rezerwacja obozu #${reservationResponse.id} - ${formData.paymentAmount === 'full' ? 'Pełna wpłata' : 'Zaliczka'}`,
         order_id: orderId,
         payer_email: payerEmail,
         payer_name: payerName,
         channel_id: formData.paymentMethod === 'blik' ? 64 : formData.paymentMethod === 'online' ? undefined : undefined,
-        success_url: `${window.location.origin}/payment/success`,
-        error_url: `${window.location.origin}/payment/failure`,
+        success_url: `${window.location.origin}/payment/success?reservation_id=${reservationResponse.id}`,
+        error_url: `${window.location.origin}/payment/failure?reservation_id=${reservationResponse.id}`,
       };
 
       // Create payment
@@ -334,8 +388,19 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
         throw new Error('Nie otrzymano URL płatności');
       }
     } catch (error) {
-      console.error('Błąd podczas tworzenia płatności:', error);
-      setPaymentError(error instanceof Error ? error.message : 'Wystąpił błąd podczas tworzenia płatności');
+      console.error('Błąd podczas przetwarzania:', error);
+      setIsCreatingReservation(false);
+      
+      if (error instanceof Error) {
+        // Check if it's a reservation error
+        if (error.message.includes('Błąd walidacji') || error.message.includes('Pole obowiązkowe')) {
+          setReservationError(error.message);
+        } else {
+          setPaymentError(error.message);
+        }
+      } else {
+        setPaymentError('Wystąpił błąd podczas przetwarzania');
+      }
       setIsProcessingPayment(false);
     }
   };
@@ -807,6 +872,12 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
           )}
 
           {/* Payment Error */}
+          {reservationError && (
+            <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded">
+              <p className="text-sm text-red-700 font-semibold mb-1">Błąd walidacji rezerwacji:</p>
+              <p className="text-sm text-red-700">{reservationError}</p>
+            </div>
+          )}
           {paymentError && (
             <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded">
               <p className="text-sm text-red-700">{paymentError}</p>
