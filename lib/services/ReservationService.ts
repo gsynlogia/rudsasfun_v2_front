@@ -3,7 +3,7 @@
  * Service for handling reservation operations with backend API
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '@/utils/api-config';
 
 // Import types from sessionStorage
 import type {
@@ -37,7 +37,7 @@ export interface CreateReservationRequest {
       city: string;
       selectedParticipant?: string;
     };
-    diet: 'standard' | 'vegetarian';
+    selectedDietId: number | null;
     accommodationRequest?: string;
     healthQuestions?: {
       chronicDiseases: string;
@@ -52,8 +52,9 @@ export interface CreateReservationRequest {
     additionalNotes?: string;
   };
   step2: {
+    selectedDiets?: number[];
     selectedAddons?: string[];
-    selectedProtection?: string;
+    selectedProtection?: string[]; // Array of protection IDs
     selectedPromotion?: string;
     transportData: {
       departureType: 'zbiorowy' | 'wlasny';
@@ -323,13 +324,14 @@ class ReservationService {
       step1: {
         parents: step1Data.parents,
         participantData: step1Data.participantData,
-        diet: step1Data.diet || 'standard',
+        selectedDietId: step1Data.selectedDietId || null,
         accommodationRequest: step1Data.accommodationRequest,
         healthQuestions: step1Data.healthQuestions,
         healthDetails: step1Data.healthDetails,
         additionalNotes: step1Data.additionalNotes,
       },
       step2: {
+        selectedDiets: step2Data.selectedDiets,
         selectedAddons: step2Data.selectedAddons,
         selectedProtection: step2Data.selectedProtection,
         selectedPromotion: step2Data.selectedPromotion,

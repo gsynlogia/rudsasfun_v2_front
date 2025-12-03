@@ -33,7 +33,7 @@ export interface Step1FormData {
     city: string;
     selectedParticipant: string;
   };
-  diet: 'standard' | 'vegetarian' | null;
+  selectedDietId: number | null; // ID of selected diet from database
   accommodationRequest: string;
   healthQuestions: {
     chronicDiseases: string;
@@ -168,8 +168,9 @@ export function clearReservationState(): void {
 }
 
 export interface Step2FormData {
+  selectedDiets?: number[]; // Array of diet IDs
   selectedAddons: string[];
-  selectedProtection: string;
+  selectedProtection: string[]; // Array of protection IDs (can select multiple)
   selectedPromotion: string;
   transportData: {
     departureType: string;

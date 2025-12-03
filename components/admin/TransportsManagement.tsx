@@ -6,6 +6,7 @@ import { Truck, Plus, MapPin, Copy, Search, Edit, Trash2, AlertCircle, ExternalL
 import UniversalModal from './UniversalModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import type { Camp, CampProperty } from '@/types/reservation';
+import { API_BASE_URL } from '@/utils/api-config';
 
 interface Transport {
   id: number;
@@ -59,8 +60,6 @@ export default function TransportsManagement() {
   const [returnType, setReturnType] = useState<'collective' | 'own'>('collective');
   const [returnCity, setReturnCity] = useState('');
   const [returnCollectivePrice, setReturnCollectivePrice] = useState<number | ''>('');
-
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   // Fetch all transports
   const fetchTransports = async () => {

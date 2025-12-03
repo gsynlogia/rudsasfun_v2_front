@@ -10,9 +10,26 @@ import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
  * Displays protection options (Tarcza, Oaza) with regulation buttons
  */
 export default function ProtectionSection() {
-  const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
-  const [selectedProtection, setSelectedProtection] = useState<string>('tarcza');
-  const prevProtectionRef = useRef<string>('tarcza');
+  const { reservation, addReservationItem, removeReservationItem } = useReservation();
+  
+  // Initialize with data from sessionStorage if available
+  const getInitialSelectedProtections = (): Set<string> => {
+    if (typeof window === 'undefined') return new Set();
+    const savedData = loadStep2FormData();
+    if (savedData && savedData.selectedProtection) {
+      // Handle both old format (string) and new format (array)
+      if (Array.isArray(savedData.selectedProtection)) {
+        return new Set(savedData.selectedProtection);
+      } else if (typeof savedData.selectedProtection === 'string') {
+        // Convert old single selection to array
+        return new Set([savedData.selectedProtection]);
+      }
+    }
+    return new Set();
+  };
+  
+  const [selectedProtections, setSelectedProtections] = useState<Set<string>>(getInitialSelectedProtections);
+  const protectionReservationIdsRef = useRef<Map<string, string>>(new Map()); // Map: protectionId -> reservationItemId
 
   const protections = [
     {
@@ -43,69 +60,145 @@ export default function ProtectionSection() {
 
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Load data from sessionStorage on mount
+  // Sync with sessionStorage on mount
   useEffect(() => {
     const savedData = loadStep2FormData();
     if (savedData && savedData.selectedProtection) {
-      setSelectedProtection(savedData.selectedProtection);
-      prevProtectionRef.current = savedData.selectedProtection;
+      // Handle both old format (string) and new format (array)
+      if (Array.isArray(savedData.selectedProtection)) {
+        const savedSet = new Set(savedData.selectedProtection);
+        setSelectedProtections(savedSet);
+      } else if (typeof savedData.selectedProtection === 'string') {
+        setSelectedProtections(new Set([savedData.selectedProtection]));
+      }
     }
     setIsInitialized(true);
   }, []);
 
-  // Restore protection to reservation when initialized
+  // Restore protection items when initialized and reservation is available
   useEffect(() => {
     if (!isInitialized) return;
 
     const savedData = loadStep2FormData();
-    if (savedData && savedData.selectedProtection) {
-      const selected = protections.find((p) => p.id === savedData.selectedProtection);
-      if (selected) {
+    const protectionsToRestore = savedData && savedData.selectedProtection
+      ? (Array.isArray(savedData.selectedProtection) 
+          ? savedData.selectedProtection 
+          : savedData.selectedProtection ? [savedData.selectedProtection] : [])
+      : [];
+
+    // Restore reservation items for protections
+    protectionsToRestore.forEach((protectionId: string) => {
+      const protection = protections.find(p => p.id === protectionId);
+      if (protection) {
+        const reservationId = `protection-${protectionId}`;
+        
         // Check if already exists in reservation
         const existing = reservation.items.find(
-          item => item.type === 'protection' && item.name === `Ochrona ${selected.name}`
+          item => item.type === 'protection' && item.id === reservationId
         );
         if (!existing) {
-          addReservationItem({
-            name: `Ochrona ${selected.name}`,
-            price: selected.price,
-            type: 'protection',
-          });
+          // Check if exists by name (for backward compatibility)
+          const existingByName = reservation.items.find(
+            item => item.type === 'protection' && item.name === `Ochrona ${protection.name}`
+          );
+          if (!existingByName) {
+            protectionReservationIdsRef.current.set(protectionId, reservationId);
+            addReservationItem({
+              name: `Ochrona ${protection.name}`,
+              price: protection.price,
+              type: 'protection',
+            }, reservationId);
+          } else {
+            // Update mapping with existing ID
+            protectionReservationIdsRef.current.set(protectionId, existingByName.id);
+          }
+        } else {
+          // Update mapping with existing ID
+          protectionReservationIdsRef.current.set(protectionId, existing.id);
         }
       }
-    }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, reservation.items.length]);
 
-  // Update reservation when protection changes
+  // Update reservation when protections change
   useEffect(() => {
-    if (prevProtectionRef.current === selectedProtection) return;
+    if (!isInitialized) return;
 
-    // Remove previous protection
-    removeReservationItemsByType('protection');
+    const currentProtectionIds = new Set(selectedProtections);
+    const previousProtectionIds = new Set(protectionReservationIdsRef.current.keys());
 
-    // Add new protection
-    const selected = protections.find((p) => p.id === selectedProtection);
-    if (selected) {
-      addReservationItem({
-        name: `Ochrona ${selected.name}`,
-        price: selected.price,
-        type: 'protection',
-      });
-    }
+    // Find added and removed protections
+    const added = Array.from(currentProtectionIds).filter(id => !previousProtectionIds.has(id));
+    const removed = Array.from(previousProtectionIds).filter(id => !currentProtectionIds.has(id));
 
-    prevProtectionRef.current = selectedProtection;
-  }, [selectedProtection, addReservationItem, removeReservationItemsByType]);
+    // Remove removed protections from reservation
+    removed.forEach(protectionId => {
+      const reservationId = protectionReservationIdsRef.current.get(protectionId);
+      if (reservationId) {
+        const item = reservation.items.find(item => item.id === reservationId);
+        if (item) {
+          removeReservationItem(item.id);
+        } else {
+          const protection = protections.find(p => p.id === protectionId);
+          if (protection) {
+            const itemByName = reservation.items.find(
+              item => item.type === 'protection' && item.name === `Ochrona ${protection.name}`
+            );
+            if (itemByName) {
+              removeReservationItem(itemByName.id);
+            }
+          }
+        }
+        protectionReservationIdsRef.current.delete(protectionId);
+      }
+    });
 
-  // Save to sessionStorage whenever protection changes
+    // Add new protections to reservation
+    added.forEach(protectionId => {
+      const protection = protections.find(p => p.id === protectionId);
+      if (protection) {
+        const reservationId = `protection-${protectionId}`;
+        
+        const existingItem = reservation.items.find(item => item.id === reservationId);
+        
+        if (!existingItem) {
+          protectionReservationIdsRef.current.set(protectionId, reservationId);
+          addReservationItem({
+            name: `Ochrona ${protection.name}`,
+            price: protection.price,
+            type: 'protection',
+          }, reservationId);
+        } else {
+          protectionReservationIdsRef.current.set(protectionId, existingItem.id);
+        }
+      }
+    });
+  }, [selectedProtections, addReservationItem, removeReservationItem, protections, reservation.items, isInitialized]);
+
+  // Save to sessionStorage whenever protections change
   useEffect(() => {
+    if (!isInitialized) return;
+    
     const savedData = loadStep2FormData();
     const formData = {
       ...savedData,
-      selectedProtection,
+      selectedProtection: Array.from(selectedProtections),
     };
     saveStep2FormData(formData as any);
-  }, [selectedProtection]);
+  }, [selectedProtections, isInitialized]);
+
+  const toggleProtection = (protectionId: string) => {
+    setSelectedProtections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(protectionId)) {
+        newSet.delete(protectionId);
+      } else {
+        newSet.add(protectionId);
+      }
+      return newSet;
+    });
+  };
 
   return (
     <div>
@@ -115,31 +208,34 @@ export default function ProtectionSection() {
       <section className="bg-white p-4 sm:p-6">
         {/* Protection tiles */}
         <div className="flex flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">
-          {protections.map((protection) => (
-            <button
-              key={protection.id}
-              onClick={() => setSelectedProtection(protection.id)}
-              className={`w-24 h-24 sm:w-28 sm:h-28 flex flex-col items-center justify-center gap-1 transition-colors ${
-                selectedProtection === protection.id
-                  ? 'bg-[#03adf0] text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              <div className={selectedProtection === protection.id ? 'text-white' : 'text-gray-600'}>
-                {protection.id === 'tarcza' ? tarczaIcon : oazaIcon}
-              </div>
-              <span className={`text-[10px] sm:text-xs text-center font-medium ${
-                selectedProtection === protection.id ? 'text-white' : 'text-gray-600'
-              }`}>
-                {protection.name}
-              </span>
-              <span className={`text-[9px] sm:text-[10px] ${
-                selectedProtection === protection.id ? 'text-white' : 'text-gray-500'
-              }`}>
-                +{protection.price} zł
-              </span>
-            </button>
-          ))}
+          {protections.map((protection) => {
+            const isSelected = selectedProtections.has(protection.id);
+            return (
+              <button
+                key={protection.id}
+                onClick={() => toggleProtection(protection.id)}
+                className={`w-24 h-24 sm:w-28 sm:h-28 flex flex-col items-center justify-center gap-1 transition-colors ${
+                  isSelected
+                    ? 'bg-[#03adf0] text-white'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                <div className={isSelected ? 'text-white' : 'text-gray-600'}>
+                  {protection.id === 'tarcza' ? tarczaIcon : oazaIcon}
+                </div>
+                <span className={`text-[10px] sm:text-xs text-center font-medium ${
+                  isSelected ? 'text-white' : 'text-gray-600'
+                }`}>
+                  {protection.name}
+                </span>
+                <span className={`text-[9px] sm:text-[10px] ${
+                  isSelected ? 'text-white' : 'text-gray-500'
+                }`}>
+                  +{protection.price} zł
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Information block */}

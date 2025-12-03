@@ -4,64 +4,108 @@ import { useState, useEffect, useRef } from 'react';
 import { Info } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
+import { API_BASE_URL } from '@/utils/api-config';
 
 /**
  * AddonsSection Component
- * Displays addons selection with tiles (Skuter wodny, Banan wodny, Quady)
+ * Displays addon description from database, addon selection tiles, and info block from database
  */
 export default function AddonsSection() {
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
   
-  // Initialize with data from sessionStorage if available, otherwise default to banan
+  // Initialize with data from sessionStorage if available
   const getInitialSelectedAddons = (): Set<string> => {
-    if (typeof window === 'undefined') return new Set(['banan']);
+    if (typeof window === 'undefined') return new Set();
     const savedData = loadStep2FormData();
     if (savedData && savedData.selectedAddons && Array.isArray(savedData.selectedAddons) && savedData.selectedAddons.length > 0) {
       return new Set(savedData.selectedAddons);
     }
-    return new Set(['banan']);
+    return new Set();
   };
   
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(getInitialSelectedAddons);
+  const [addonDescription, setAddonDescription] = useState<string>('');
+  const [infoHeader, setInfoHeader] = useState<string>('');
+  const [loadingDescription, setLoadingDescription] = useState(true);
+  const [addons, setAddons] = useState<Array<{
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    icon: React.ReactNode;
+  }>>([]);
+  const [loadingAddons, setLoadingAddons] = useState(true);
   const addonReservationIdsRef = useRef<Map<string, string>>(new Map()); // Map: addonId -> reservationItemId
 
-  const addons = [
-    {
-      id: 'skuter',
-      name: 'Skuter wodny',
-      icon: (
-        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-      description: '20 minut przejażdżki z opiekunem, cena 150 zł',
-      price: 150,
-    },
-    {
-      id: 'banan',
-      name: 'Banan wodny',
-      icon: (
-        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      description: '20 minut przejażdżki',
-      price: 0,
-    },
-    {
-      id: 'quady',
-      name: 'Quady',
-      icon: (
-        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-        </svg>
-      ),
-      description: '30 minut przejażdżki',
-      price: 150,
-    },
-  ];
-
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Fetch addon description and info header from API
+  useEffect(() => {
+    const fetchDescription = async () => {
+      try {
+        setLoadingDescription(true);
+        const response = await fetch(`${API_BASE_URL}/api/addon-description/public`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setAddonDescription(data.description || '');
+        setInfoHeader(data.info_header || '');
+      } catch (err) {
+        console.error('[AddonsSection] Error fetching addon description:', err);
+        // Fallback to empty string if API fails
+        setAddonDescription('');
+        setInfoHeader('');
+      } finally {
+        setLoadingDescription(false);
+      }
+    };
+    fetchDescription();
+  }, []);
+
+  // Fetch addons from API
+  useEffect(() => {
+    const fetchAddons = async () => {
+      try {
+        setLoadingAddons(true);
+        const response = await fetch(`${API_BASE_URL}/api/addons/public`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        const addonsFromApi = (data.addons || []).map((addon: {
+          id: number;
+          name: string;
+          description: string | null;
+          price: number;
+          icon_svg: string | null;
+        }) => ({
+          id: addon.id.toString(),
+          name: addon.name,
+          description: addon.description || '',
+          price: addon.price,
+          icon: addon.icon_svg ? (
+            <div 
+              className="w-12 h-12" 
+              dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
+            />
+          ) : (
+            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+        }));
+        setAddons(addonsFromApi);
+      } catch (err) {
+        console.error('[AddonsSection] Error fetching addons:', err);
+        // Fallback to empty array if API fails
+        setAddons([]);
+      } finally {
+        setLoadingAddons(false);
+      }
+    };
+    fetchAddons();
+  }, []);
 
   // Sync with sessionStorage on mount (in case it changed)
   useEffect(() => {
@@ -78,14 +122,14 @@ export default function AddonsSection() {
     setIsInitialized(true);
   }, []);
 
-  // Restore reservation items when initialized and reservation is available
+  // Restore reservation items when initialized, reservation is available, and addons are loaded
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || addons.length === 0) return;
 
     const savedData = loadStep2FormData();
     const addonsToRestore = savedData && savedData.selectedAddons && Array.isArray(savedData.selectedAddons)
       ? Array.from(savedData.selectedAddons)
-      : ['banan']; // Default: banan
+      : [];
 
     // Restore reservation items for addons
     addonsToRestore.forEach(addonId => {
@@ -111,10 +155,12 @@ export default function AddonsSection() {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized, reservation.items.length]);
+  }, [isInitialized, addons.length, reservation.items.length]);
 
   // Update reservation when addons change
   useEffect(() => {
+    if (!isInitialized || addons.length === 0) return;
+
     const currentAddonIds = new Set(selectedAddons);
     const previousAddonIds = new Set(addonReservationIdsRef.current.keys());
 
@@ -178,8 +224,9 @@ export default function AddonsSection() {
     
     const savedData = loadStep2FormData();
     const formData = {
+      selectedDiets: savedData?.selectedDiets || [],
       selectedAddons: Array.from(selectedAddons),
-      selectedProtection: savedData?.selectedProtection || '',
+      selectedProtection: savedData?.selectedProtection || [],
       selectedPromotion: savedData?.selectedPromotion || '',
       transportData: savedData?.transportData || {
         departureType: '',
@@ -191,7 +238,7 @@ export default function AddonsSection() {
       inneText: savedData?.inneText || '',
     };
     saveStep2FormData(formData);
-  }, [selectedAddons, isInitialized]);
+  }, [selectedAddons, isInitialized, addons.length]);
 
   const toggleAddon = (addonId: string) => {
     setSelectedAddons(prev => {
@@ -211,13 +258,30 @@ export default function AddonsSection() {
         Dodatki
       </h2>
       <section className="bg-white p-4 sm:p-6">
-        <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6">
-          Miejsce na opis dodany przez Administratora portalu lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla in risus nisi. Praesent tortor neque, pellentesque volutpat congue et, euismod aliquam sapien. Suspendisse turpis diam, iaculis imperdiet egestas vitae, porttitor luctus nulla. In at placerat odio. Donec mauris arcu, accumsan quis libero nec, maximus convallis elit.
-        </p>
+        {/* Description from database (top) */}
+        {loadingDescription ? (
+          <div className="mb-4 sm:mb-6">
+            <div className="animate-pulse bg-gray-200 h-4 rounded w-full"></div>
+          </div>
+        ) : addonDescription ? (
+          <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6 whitespace-pre-wrap">
+            {addonDescription}
+          </p>
+        ) : null}
 
-        {/* Addon tiles */}
-        <div className="flex flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">
-          {addons.map((addon) => {
+        {/* Addon tiles (selection) */}
+        {loadingAddons ? (
+          <div className="flex justify-center items-center py-4 mb-4 sm:mb-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#03adf0]"></div>
+            <p className="ml-3 text-gray-600">Ładowanie dodatków...</p>
+          </div>
+        ) : addons.length === 0 ? (
+          <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
+            Brak dostępnych dodatków.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">
+            {addons.map((addon) => {
             const isSelected = selectedAddons.has(addon.id);
             return (
               <button
@@ -245,25 +309,31 @@ export default function AddonsSection() {
               </button>
             );
           })}
-        </div>
-
-        {/* Information block */}
-        <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg">
-          <Info className="w-5 h-5 text-[#03adf0] flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-xs sm:text-sm font-medium text-gray-800 mb-2">
-              Przykładowy nagłówek wpisany przez Admina
-            </p>
-            <ul className="text-xs sm:text-sm text-gray-600 space-y-1">
-              {addons.map((addon) => (
-                <li key={addon.id}>
-                  <strong>{addon.name}:</strong> {addon.description}
-                  {addon.price > 0 && `, cena ${addon.price} zł`}
-                </li>
-              ))}
-            </ul>
           </div>
-        </div>
+        )}
+
+        {/* Information block from database (bottom) */}
+        {loadingAddons ? (
+          <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg">
+            <Info className="w-5 h-5 text-[#03adf0] flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="animate-pulse bg-gray-200 h-4 rounded w-3/4 mb-2"></div>
+              <div className="animate-pulse bg-gray-200 h-4 rounded w-full"></div>
+            </div>
+          </div>
+        ) : addons.length > 0 && (infoHeader || addons.some(a => a.description)) ? (
+          <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg">
+            <Info className="w-5 h-5 text-[#03adf0] flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              {infoHeader && (
+                <div 
+                  className="text-xs sm:text-sm font-medium text-gray-800 mb-2"
+                  dangerouslySetInnerHTML={{ __html: infoHeader }}
+                />
+              )}
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );

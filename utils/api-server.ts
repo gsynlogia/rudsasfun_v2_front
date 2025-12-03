@@ -4,8 +4,11 @@
  * This prevents hydration errors by ensuring data is available on initial render
  */
 
+import { getApiBaseUrl } from './api-config';
+
 // Use NEXT_PUBLIC_ prefix for client-side, or direct URL for server-side
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:8000';
+// For server-side, we need to check environment differently
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || getApiBaseUrl();
 
 /**
  * CampProperty interface - 1:1 with backend CampPropertyResponse

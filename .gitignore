@@ -30,10 +30,14 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-!.env.local
-!.env
+# env files
+# .env.local should NOT be committed (contains local secrets/config)
+.env.local
+.env*.local
+
+# .env can be committed if it only contains non-sensitive defaults
+# Uncomment the line below if you want to ignore .env as well
+# .env
 
 # vercel
 .vercel

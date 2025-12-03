@@ -6,6 +6,7 @@ import DashedLine from './DashedLine';
 import type { StepComponentProps } from '@/types/reservation';
 import { useReservation } from '@/context/ReservationContext';
 import { saveStep1FormData, loadStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
+import DietSection from './step1/DietSection';
 
 interface ParentData {
   id: string;
@@ -201,30 +202,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     return parentsValid && participantValid;
   };
 
-  const [diet, setDiet] = useState<'standard' | 'vegetarian' | null>('standard');
   const [accommodationRequest, setAccommodationRequest] = useState('');
-  const prevDietRef = useRef<'standard' | 'vegetarian' | null>(null);
-  const { reservation } = useReservation();
-
-  // Update reservation when diet changes
-  useEffect(() => {
-    // Only update if diet actually changed
-    if (prevDietRef.current === diet) return;
-    
-    if (diet === 'vegetarian') {
-      addReservationItem({
-        name: 'Dieta wegetariańska',
-        price: 50,
-        type: 'diet',
-      });
-    } else if (prevDietRef.current === 'vegetarian' && (diet === 'standard' || diet === null)) {
-      // Only remove if we're switching FROM vegetarian TO standard/null
-      // Use helper function to remove all diet items by type
-      removeReservationItemsByType('diet');
-    }
-    
-    prevDietRef.current = diet;
-  }, [diet, addReservationItem, removeReservationItemsByType]);
   const [healthQuestions, setHealthQuestions] = useState({
     chronicDiseases: 'Nie',
     dysfunctions: 'Nie',
@@ -273,10 +251,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       if (savedData.participantData) {
         setParticipantData(savedData.participantData);
       }
-      // Set diet to 'standard' if null or undefined (default selection)
-      if (savedData.diet !== undefined && savedData.diet !== null) {
-        setDiet(savedData.diet);
-      }
+      // Diet is now handled by DietSection component
       if (savedData.accommodationRequest !== undefined) {
         setAccommodationRequest(savedData.accommodationRequest || '');
       }
@@ -293,18 +268,20 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   }, []); // Empty deps - will run on every mount (which happens when key changes)
 
   // Save data to sessionStorage whenever any field changes
+  // Note: selectedDietId is saved by DietSection component
   useEffect(() => {
+    const savedData = loadStep1FormData();
     const formData: Step1FormData = {
       parents,
       participantData,
-      diet,
+      selectedDietId: savedData?.selectedDietId || null,
       accommodationRequest,
       healthQuestions,
       healthDetails,
       additionalNotes,
     };
     saveStep1FormData(formData);
-  }, [parents, participantData, diet, accommodationRequest, healthQuestions, healthDetails, additionalNotes]);
+  }, [parents, participantData, accommodationRequest, healthQuestions, healthDetails, additionalNotes]);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -667,45 +644,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       </div>
 
       {/* Dieta uczestnika */}
-      <div>
-        <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-800">
-          Dieta uczestnika
-        </h2>
-        <section className="bg-white p-4 sm:p-6">
-          <div className="flex flex-wrap gap-3 sm:gap-4">
-            <button
-              onClick={() => setDiet('standard')}
-              disabled={disabled}
-              className={`w-32 h-32 sm:w-36 sm:h-36 flex flex-col items-center justify-center gap-2 transition-colors ${
-                diet === 'standard'
-                  ? 'bg-[#03adf0] text-white'
-                  : 'bg-gray-100 text-gray-600'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              <span className={`text-xs sm:text-sm font-medium ${diet === 'standard' ? 'text-white' : 'text-gray-600'}`}>Standardowa</span>
-              <span className={`text-[10px] sm:text-xs ${diet === 'standard' ? 'text-white' : 'text-gray-500'}`}>(+0zł)</span>
-            </button>
-            <button
-              onClick={() => setDiet('vegetarian')}
-              disabled={disabled}
-              className={`w-32 h-32 sm:w-36 sm:h-36 flex flex-col items-center justify-center gap-2 transition-colors ${
-                diet === 'vegetarian'
-                  ? 'bg-[#03adf0] text-white'
-                  : 'bg-gray-100 text-gray-600'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              <span className={`text-xs sm:text-sm font-medium ${diet === 'vegetarian' ? 'text-white' : 'text-gray-600'}`}>Wegetariańska</span>
-              <span className={`text-[10px] sm:text-xs ${diet === 'vegetarian' ? 'text-white' : 'text-gray-500'}`}>(+50zł)</span>
-            </button>
-          </div>
-        </section>
-      </div>
+      <DietSection />
 
       {/* Wniosek o zakwaterowanie */}
       <div>

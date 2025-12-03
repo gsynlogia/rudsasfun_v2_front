@@ -197,30 +197,33 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     });
   };
 
-  // Get protection label
-  const getProtectionLabel = (): string => {
-    if (!step2Data?.selectedProtection) return '';
+  // Get protection labels (can be multiple)
+  const getProtectionLabels = (): string[] => {
+    if (!step2Data?.selectedProtection) return [];
     
-    // Get protection item from reservation
-    const protectionItem = reservation.items.find(item => item.type === 'protection');
-    if (protectionItem) {
-      // Remove "Ochrona " prefix if present
-      const name = protectionItem.name.replace(/^Ochrona /, '');
-      return `${name} (${formatPrice(protectionItem.price)}zł)`;
+    // Get all protection items from reservation
+    const protectionItems = reservation.items.filter(item => item.type === 'protection');
+    if (protectionItems.length > 0) {
+      return protectionItems.map(item => {
+        const name = item.name.replace(/^Ochrona /, '');
+        return `${name} (${formatPrice(item.price)}zł)`;
+      });
     }
     
-    // Fallback to default values
+    // Fallback to step2Data
     const protections: Record<string, { name: string; price: number }> = {
-      'tarcza': { name: 'Tarcza', price: 50 },
-      'oaza': { name: 'Oaza', price: 75 },
-      'forteca': { name: 'Forteca', price: 100 },
+      tarcza: { name: 'Tarcza', price: 50 },
+      oaza: { name: 'Oaza', price: 100 },
     };
     
-    const protection = protections[step2Data.selectedProtection];
-    if (protection) {
-      return `${protection.name} (${formatPrice(protection.price)}zł)`;
-    }
-    return '';
+    const selectedProtections = Array.isArray(step2Data.selectedProtection) 
+      ? step2Data.selectedProtection 
+      : step2Data.selectedProtection ? [step2Data.selectedProtection] : [];
+    
+    return selectedProtections
+      .map((id: string) => protections[id])
+      .filter(Boolean)
+      .map(p => `${p.name} (${formatPrice(p.price)}zł)`);
   };
 
   // Get promotion label
@@ -547,7 +550,9 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Ochrony
               </h3>
               <div className="text-xs sm:text-sm text-gray-700">
-                {getProtectionLabel() || 'Nie wybrano'}
+                {getProtectionLabels().length > 0 
+                  ? getProtectionLabels().join(', ') 
+                  : 'Nie wybrano'}
               </div>
             </div>
             

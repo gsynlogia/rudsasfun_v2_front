@@ -55,6 +55,11 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
 
   const addReservationItem = useCallback((item: Omit<ReservationItem, 'id'>, customId?: string) => {
     setReservation((prev) => {
+      // Don't add base if it already exists
+      if (item.type === 'base') {
+        return prev;
+      }
+
       // If customId is provided, check if item with that ID already exists
       if (customId) {
         const existingItemIndex = prev.items.findIndex(i => i.id === customId);
@@ -64,19 +69,24 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
         }
       }
 
-      // For addon type, allow multiple items (don't replace)
-      // For other types (diet, protection, promotion), only one can exist
-      if (item.type === 'addon') {
-        // Check if this exact addon already exists (by name)
-        const existingAddon = prev.items.find(
-          i => i.type === 'addon' && i.name === item.name
-        );
-        if (existingAddon) {
-          // Addon already exists, don't add duplicate
-          return prev;
+      // For addon and protection types, allow multiple items (don't replace)
+      // For other types (diet, promotion), only one can exist
+      if (item.type === 'addon' || item.type === 'protection') {
+        // For protection/addon with customId, we already checked above
+        // For protection/addon without customId, check by name to avoid duplicates
+        if (!customId) {
+          const existingItem = prev.items.find(
+            i => i.type === item.type && i.name === item.name
+          );
+          if (existingItem) {
+            // Item already exists, don't add duplicate
+            return prev;
+          }
         }
+        // If we get here, either customId was provided (and doesn't exist) or no duplicate by name
+        // Proceed to add the item
       } else if (item.type !== 'base') {
-        // For non-addon types, replace existing item of the same type
+        // For non-addon, non-protection types, replace existing item of the same type
         const existingItemIndex = prev.items.findIndex(
           (i) => i.type === item.type && i.type !== 'base'
         );
@@ -90,11 +100,6 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
             totalPrice,
           };
         }
-      }
-
-      if (item.type === 'base') {
-        // Don't add base if it already exists
-        return prev;
       }
 
       // Add new item with custom ID or generate one

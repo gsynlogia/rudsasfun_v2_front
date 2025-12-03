@@ -2,7 +2,7 @@
  * Authentication Service
  * Singleton service for managing JWT tokens and authentication state
  */
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '@/utils/api-config';
 
 export interface LoginRequest {
   login: string;

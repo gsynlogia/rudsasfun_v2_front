@@ -48,7 +48,7 @@ export default function Step2({ onNext, onPrevious, disabled = false }: StepComp
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Addons Section */}
+      {/* Addons Section - Only description and info block from database */}
       <AddonsSection />
       <DashedLine />
 

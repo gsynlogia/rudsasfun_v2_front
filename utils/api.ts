@@ -3,23 +3,7 @@
  * Functions for communicating with the backend API
  */
 
-/**
- * Get API base URL and ensure HTTPS for production domains
- * Prevents Mixed Content errors when deployed on HTTPS
- */
-function getApiBaseUrl(): string {
-  let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  
-  // Force HTTPS for production domains to prevent Mixed Content errors
-  // This is a safeguard in case environment variable is set to HTTP
-  if (url.includes('rejestracja.radsasfun.system-app.pl') && url.startsWith('http://')) {
-    url = url.replace('http://', 'https://');
-  }
-  
-  return url;
-}
-
-const API_BASE_URL = getApiBaseUrl();
+import { API_BASE_URL } from './api-config';
 
 export interface Camp {
   id: number;

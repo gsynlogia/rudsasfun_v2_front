@@ -3,7 +3,7 @@
  * Service for handling payment operations with Tpay integration
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '@/utils/api-config';
 import { authService } from '@/lib/services/AuthService';
 
 export interface CreatePaymentRequest {

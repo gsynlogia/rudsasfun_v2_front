@@ -8,6 +8,8 @@ import {
   CreditCard, 
   Calendar, 
   Truck,
+  UtensilsCrossed,
+  FileText,
   Settings, 
   LogOut
 } from 'lucide-react';
@@ -75,6 +77,20 @@ export default function AdminSidebar() {
       label: 'Transport',
       key: 'transports',
       section: 'transports',
+    },
+    {
+      href: '/admin-panel/diets',
+      icon: UtensilsCrossed,
+      label: 'Diet',
+      key: 'diets',
+      section: 'diets',
+    },
+    {
+      href: '/admin-panel/cms',
+      icon: FileText,
+      label: 'CMS',
+      key: 'sources',
+      section: 'sources',
     },
   ];
 

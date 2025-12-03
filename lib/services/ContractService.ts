@@ -3,7 +3,7 @@
  * Service for handling contract operations with backend API
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '@/utils/api-config';
 
 class ContractService {
   private API_URL = `${API_BASE_URL}/api/contracts`;

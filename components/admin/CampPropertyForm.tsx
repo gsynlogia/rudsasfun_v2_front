@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Calendar, MapPin } from 'lucide-react';
 import type { CampProperty } from '@/types/reservation';
+import { API_BASE_URL } from '@/utils/api-config';
 
 interface CampPropertyFormProps {
   campId: number;
@@ -28,7 +29,6 @@ export default function CampPropertyForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const isEditMode = property !== null;
   
   // Get today's date in YYYY-MM-DD format for min date

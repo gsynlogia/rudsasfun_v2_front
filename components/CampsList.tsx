@@ -6,6 +6,7 @@ import { formatDateRange } from '@/utils/api';
 import { saveMagicLinkRedirect } from '@/utils/localStorage';
 import type { Camp, CampProperty } from '@/types/reservation';
 import { Search } from 'lucide-react';
+import { API_BASE_URL } from '@/utils/api-config';
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -22,8 +23,6 @@ export default function CampsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
     loadCamps();
