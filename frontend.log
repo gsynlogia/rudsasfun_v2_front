@@ -1837,3 +1837,35 @@ Import trace:
  GET /admin-panel/payments 200 in 40ms (compile: 6ms, render: 35ms)
  GET /admin-panel/payments 200 in 38ms (compile: 4ms, render: 34ms)
  GET /admin-panel/payments 200 in 30ms (compile: 2ms, render: 28ms)
+ GET /admin-panel/transports 200 in 113ms (compile: 100ms, render: 13ms)
+ GET /admin-panel/payments 200 in 26ms (compile: 5ms, render: 21ms)
+ GET /admin-panel/camps 200 in 28ms (compile: 5ms, render: 23ms)
+ GET /admin-panel 200 in 28ms (compile: 8ms, render: 20ms)
+ GET /admin-panel/camps 200 in 28ms (compile: 5ms, render: 23ms)
+ GET /admin-panel/payments 200 in 28ms (compile: 5ms, render: 23ms)
+ GET /admin-panel/transports 200 in 29ms (compile: 4ms, render: 25ms)
+ ✓ Compiled in 24ms
+ ✓ Compiled in 26ms
+ ✓ Compiled in 27ms
+ ✓ Compiled in 25ms
+ ✓ Compiled in 25ms
+ ✓ Compiled in 27ms
+ ✓ Compiled in 25ms
+ ✓ Compiled in 29ms
+ ✓ Compiled in 24ms
+ GET /login 200 in 220ms (compile: 5ms, render: 214ms)
+ GET /login 200 in 172ms (compile: 7ms, render: 165ms)
+ GET /login 200 in 180ms (compile: 40ms, render: 139ms)
+ GET /login 200 in 180ms (compile: 4ms, render: 176ms)
+ GET /profil/aktualne-rezerwacje 200 in 269ms (compile: 89ms, render: 181ms)
+ GET /profil/aktualne-rezerwacje 200 in 272ms (compile: 72ms, render: 200ms)
+ GET /profil/aktualne-rezerwacje 200 in 125ms (compile: 5ms, render: 120ms)
+ GET /profil/aktualne-rezerwacje 200 in 125ms (compile: 16ms, render: 109ms)
+ GET /login?redirect=%2Fprofil%2Faktualne-rezerwacje 200 in 63ms (compile: 4ms, render: 59ms)
+ GET /login?redirect=%2Fprofil%2Faktualne-rezerwacje 200 in 55ms (compile: 5ms, render: 51ms)
+ GET /login?redirect=%2Fprofil%2Faktualne-rezerwacje 200 in 52ms (compile: 4ms, render: 48ms)
+ GET /login?redirect=%2Fprofil%2Faktualne-rezerwacje 200 in 51ms (compile: 10ms, render: 42ms)
+ GET /login?redirect=%2Fprofil%2Faktualne-rezerwacje 200 in 62ms (compile: 1024µs, render: 61ms)
+ GET /login?redirect=%2Fprofil%2Faktualne-rezerwacje 200 in 51ms (compile: 3ms, render: 47ms)
+ ✓ Compiled in 71ms
+ GET /profil/aktualne-rezerwacje 200 in 108ms (compile: 58ms, render: 50ms)

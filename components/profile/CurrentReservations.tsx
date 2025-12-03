@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ReservationCard from './ReservationCard';
 import { useToast } from '@/components/ToastContainer';
+import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 
 /**
  * CurrentReservations Component
@@ -32,31 +33,122 @@ export default function CurrentReservations() {
     }
   }, [searchParams, router, showSuccess, showWarning, showError]);
 
-  // TODO: Load reservations from API/sessionStorage
-  const reservations = [
-    {
-      id: '1',
-      participantName: 'Franciszek Kowalski',
-      status: 'Zarezerwowana',
-      age: '14 lat',
-      gender: 'Mężczyzna / Male',
-      city: 'Gdańsk',
-      campName: 'Laserowy Paintball',
-      dates: '12.07 – 21.07.2022 (10 dni)',
-      resort: 'Ośrodek: Beaver',
-    },
-    {
-      id: '2',
-      participantName: 'Katarzyna Guzik',
-      status: 'Zarezerwowana',
-      age: '12 lat',
-      gender: 'Kobieta / Female',
-      city: 'Warszawa',
-      campName: 'Laserowy Paintball',
-      dates: '12.07 – 21.07.2022 (10 dni)',
-      resort: 'Ośrodek: Beaver',
-    },
-  ];
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load user's reservations from API
+  useEffect(() => {
+    const loadReservations = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await reservationService.getMyReservations(0, 100);
+        
+        // Map backend data to frontend format
+        const mappedReservations = data.map((reservation: ReservationResponse) => {
+          // Format dates - use property start_date and end_date if available
+          let startDate: Date | null = null;
+          let endDate: Date | null = null;
+          let daysCount = 10; // Default
+          
+          // Try to parse property dates
+          if (reservation.property_start_date) {
+            const parsedStart = new Date(reservation.property_start_date);
+            if (!isNaN(parsedStart.getTime())) {
+              startDate = parsedStart;
+            }
+          }
+          if (reservation.property_end_date) {
+            const parsedEnd = new Date(reservation.property_end_date);
+            if (!isNaN(parsedEnd.getTime())) {
+              endDate = parsedEnd;
+            }
+          }
+          
+          // Calculate days count if both dates are valid
+          if (startDate && endDate) {
+            const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+            daysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end day
+          }
+          
+          // Fallback: if no dates from property, use created_at as approximate
+          if (!startDate && reservation.created_at) {
+            const createdDate = new Date(reservation.created_at);
+            if (!isNaN(createdDate.getTime())) {
+              startDate = createdDate;
+              endDate = new Date(startDate.getTime() + 9 * 24 * 60 * 60 * 1000); // Assume 10 days
+            }
+          }
+          
+          let datesStr = 'Brak dat';
+          if (startDate && endDate && !isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            const formatDate = (date: Date) => {
+              if (isNaN(date.getTime())) {
+                return '??.??.????';
+              }
+              const day = date.getDate().toString().padStart(2, '0');
+              const month = (date.getMonth() + 1).toString().padStart(2, '0');
+              const year = date.getFullYear();
+              return `${day}.${month}.${year}`;
+            };
+            datesStr = `${formatDate(startDate)} – ${formatDate(endDate)} (${daysCount} dni)`;
+          }
+          
+          // Get participant name
+          const participantName = reservation.participant_first_name && reservation.participant_last_name
+            ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
+            : 'Brak danych';
+          
+          // Get age
+          const age = reservation.participant_age ? `${reservation.participant_age} lat` : 'Brak danych';
+          
+          // Get gender
+          const gender = reservation.participant_gender || 'Brak danych';
+          
+          // Get city
+          const city = reservation.participant_city || reservation.property_city || 'Brak danych';
+          
+          // Get camp name
+          const campName = reservation.camp_name || 'Brak danych';
+          
+          // Get resort
+          const resort = reservation.property_name ? `Ośrodek: ${reservation.property_name}` : 'Brak danych';
+          
+          // Map status
+          const statusMap: Record<string, string> = {
+            'pending': 'Zarezerwowana',
+            'confirmed': 'Potwierdzona',
+            'cancelled': 'Anulowana',
+            'completed': 'Zakończona',
+          };
+          const status = statusMap[reservation.status] || reservation.status;
+          
+          return {
+            id: String(reservation.id),
+            participantName,
+            status,
+            age,
+            gender,
+            city,
+            campName,
+            dates: datesStr,
+            resort,
+          };
+        });
+        
+        setReservations(mappedReservations);
+      } catch (err) {
+        console.error('Error loading reservations:', err);
+        setError(err instanceof Error ? err.message : 'Nie udało się załadować rezerwacji');
+        setReservations([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadReservations();
+  }, []);
 
   return (
     <div>
@@ -64,11 +156,25 @@ export default function CurrentReservations() {
         Aktualne rezerwacje
       </h2>
 
-      <div className="space-y-4 sm:space-y-6">
-        {reservations.map((reservation) => (
-          <ReservationCard key={reservation.id} reservation={reservation} />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="text-center py-8 text-gray-500">
+          Ładowanie rezerwacji...
+        </div>
+      ) : error ? (
+        <div className="text-center py-8 text-red-500">
+          {error}
+        </div>
+      ) : reservations.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          Brak aktualnych rezerwacji
+        </div>
+      ) : (
+        <div className="space-y-4 sm:space-y-6">
+          {reservations.map((reservation) => (
+            <ReservationCard key={reservation.id} reservation={reservation} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

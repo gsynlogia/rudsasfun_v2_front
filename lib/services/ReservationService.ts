@@ -113,6 +113,8 @@ export interface ReservationResponse {
   property_name: string | null;
   property_city: string | null;
   property_period: string | null;
+  property_start_date?: string | null;
+  property_end_date?: string | null;
   participant_first_name: string | null;
   participant_last_name: string | null;
   participant_age: string | null;
@@ -245,6 +247,36 @@ class ReservationService {
    */
   async listReservations(skip: number = 0, limit: number = 100): Promise<ReservationResponse[]> {
     const response = await fetch(`${this.API_URL}/?skip=${skip}&limit=${limit}`);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get current user's reservations
+   * @param skip Number of records to skip
+   * @param limit Maximum number of records to return
+   * @returns Array of reservation responses for the logged-in user
+   */
+  async getMyReservations(skip: number = 0, limit: number = 100): Promise<ReservationResponse[]> {
+    // Import authService to get token
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/my?skip=${skip}&limit=${limit}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));

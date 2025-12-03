@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { authService, type User } from '@/lib/services/AuthService';
 
 interface ProfileSidebarProps {
   onClose?: () => void;
@@ -84,6 +86,31 @@ const menuItems: MenuItem[] = [
  */
 export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
   const pathname = usePathname();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        // Try to get user from localStorage first
+        const storedUser = authService.getCurrentUser();
+        if (storedUser) {
+          setUser(storedUser);
+          setIsLoading(false);
+        } else {
+          // If not in localStorage, verify token with backend
+          const verifiedUser = await authService.verifyToken();
+          setUser(verifiedUser);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadUser();
+  }, []);
   
   return (
     <aside className="w-[400px] h-full lg:h-auto flex-shrink-0 relative">
@@ -125,7 +152,13 @@ export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
             />
             <div>
               <h2 className="text-base font-semibold text-[#1f2937] leading-tight">
-                Witaj, <span className="text-[#00a8e8]">Andrzej</span>
+                {isLoading ? (
+                  'Witaj!'
+                ) : (
+                  <>
+                    Witaj! <span className="text-[#00a8e8]">{user?.email || user?.login || 'Użytkowniku'}</span>
+                  </>
+                )}
               </h2>
             </div>
           </div>
