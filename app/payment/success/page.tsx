@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -11,16 +11,30 @@ function PaymentSuccessContent() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
 
+  const router = useRouter();
+
   useEffect(() => {
     const orderIdParam = searchParams.get('orderId');
     const trIdParam = searchParams.get('tr_id');
+    const reservationIdParam = searchParams.get('reservation_id');
     setOrderId(orderIdParam);
     setTransactionId(trIdParam);
     
     // Clear all session storage data after successful payment
     // This is the ONLY place where we clear session storage
     clearAllSessionData();
-  }, [searchParams]);
+    
+    // Automatically redirect to current reservations page
+    // Wait a moment to show success message, then redirect
+    const redirectTimer = setTimeout(() => {
+      const redirectUrl = reservationIdParam 
+        ? `/profil/aktualne-rezerwacje?payment=success&reservation_id=${reservationIdParam}`
+        : `/profil/aktualne-rezerwacje?payment=success`;
+      router.push(redirectUrl);
+    }, 2000); // 2 second delay to show success message
+    
+    return () => clearTimeout(redirectTimer);
+  }, [searchParams, router]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

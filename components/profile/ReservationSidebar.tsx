@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { FileText, Download, Upload, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import DashedLine from '../DashedLine';
+import { contractService } from '@/lib/services/ContractService';
 
 interface ReservationSidebarProps {
   reservationId: string;
@@ -13,6 +15,24 @@ interface ReservationSidebarProps {
  * Right sidebar showing reservation progress and document status
  */
 export default function ReservationSidebar({ reservationId, isDetailsExpanded }: ReservationSidebarProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadContract = async () => {
+    try {
+      setIsDownloading(true);
+      const reservationIdNum = parseInt(reservationId);
+      if (isNaN(reservationIdNum)) {
+        throw new Error('Invalid reservation ID');
+      }
+      await contractService.downloadContract(reservationIdNum);
+    } catch (error) {
+      console.error('Error downloading contract:', error);
+      alert('Nie udało się pobrać umowy. Spróbuj ponownie.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -36,8 +56,22 @@ export default function ReservationSidebar({ reservationId, isDetailsExpanded }:
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
               <p className="text-[10px] sm:text-xs text-gray-600 text-center">W trakcie weryfikacji</p>
               <div className="flex gap-1.5 sm:gap-2 w-full">
-                <button className="flex-1 px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50">
-                  pobierz
+                <button 
+                  onClick={handleDownloadContract}
+                  disabled={isDownloading}
+                  className="flex-1 px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  {isDownloading ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      <span>Pobieranie...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3 h-3" />
+                      <span>pobierz</span>
+                    </>
+                  )}
                 </button>
                 <button className="flex-1 px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50">
                   dodaj
