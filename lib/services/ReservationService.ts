@@ -12,6 +12,7 @@ import type {
   Step3FormData,
   Step4FormData,
 } from '@/utils/sessionStorage';
+import { authService } from '@/lib/services/AuthService';
 
 export interface CreateReservationRequest {
   camp_id: number;
@@ -169,9 +170,17 @@ class ReservationService {
    * @returns Reservation response data
    */
   async createReservation(data: CreateReservationRequest): Promise<ReservationResponse> {
+    // Get auth token for authenticated request
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated. Please log in to create a reservation.');
+    }
+
     const response = await fetch(`${this.API_URL}/`, {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),

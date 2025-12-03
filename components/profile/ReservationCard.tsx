@@ -14,6 +14,17 @@ interface Reservation {
   campName: string;
   dates: string;
   resort: string;
+  parentsData?: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    phoneNumber: string;
+    street: string;
+    postalCode: string;
+    city: string;
+  }>;
 }
 
 interface ReservationCardProps {

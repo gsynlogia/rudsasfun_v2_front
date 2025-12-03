@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FileText, Download, CheckCircle, XCircle, Calendar, CreditCard, Loader2 } from 'lucide-react';
+import { FileText, Download, CheckCircle, XCircle, Calendar, Loader2 } from 'lucide-react';
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 import { contractService } from '@/lib/services/ContractService';
 
@@ -17,57 +17,68 @@ interface Document {
   status: 'available' | 'pending' | 'unavailable';
 }
 
-interface Payment {
-  id: string;
-  date: string;
-  amount: number;
-  method: string;
-  description: string;
-  invoiceNumber?: string;
-}
-
 /**
- * InvoicesAndPayments Component
- * Displays user's documents (contracts, invoices) and payment history
+ * Downloads Component
+ * Displays all downloadable documents except invoices (contracts, etc.)
  */
-export default function InvoicesAndPayments() {
+export default function Downloads() {
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
 
-  // Load user's reservations and create document list
+  // Load user's contracts from backend
   useEffect(() => {
     const loadDocuments = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        // Get user's reservations
-        const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
+        // Get user's contracts (existing contracts from output directory)
+        const contracts = await contractService.listMyContracts();
         
-        // Map reservations to documents - ONLY INVOICES
-        // For now, invoices are not implemented, so we'll have an empty list
-        // In the future, this will filter for invoice documents only
-        const documentsList: Document[] = [];
+        // Map contracts to documents
+        const documentsList: Document[] = contracts.map((contract) => {
+          const participantName = contract.participant_first_name && contract.participant_last_name
+            ? `${contract.participant_first_name} ${contract.participant_last_name}`
+            : 'Brak danych';
+          
+          const campName = contract.camp_name || 'Brak danych';
+          
+          // Format date from contract created_at
+          let dateStr = 'Brak daty';
+          if (contract.created_at) {
+            const date = new Date(contract.created_at);
+            if (!isNaN(date.getTime())) {
+              dateStr = date.toLocaleDateString('pl-PL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+              });
+            }
+          }
+          
+          return {
+            id: `contract-${contract.reservation_id}`,
+            type: 'contract' as const,
+            name: `Umowa - ${campName}`,
+            reservationId: contract.reservation_id,
+            reservationName: campName,
+            participantName: participantName,
+            date: dateStr,
+            amount: contract.total_price || 0,
+            status: 'available' as const, // Contract exists, so it's available
+          };
+        });
         
-        // TODO: When invoices are implemented, filter reservations for invoice documents
-        // const documentsList: Document[] = reservations
-        //   .filter(reservation => /* invoice exists for this reservation */)
-        //   .map((reservation) => {
-        //     return {
-        //       id: `invoice-${reservation.id}`,
-        //       type: 'invoice' as const,
-        //       // ... invoice data
-        //     };
-        //   });
+        // Sort by date (newest first)
+        documentsList.sort((a, b) => {
+          const dateA = new Date(a.date.split('.').reverse().join('-'));
+          const dateB = new Date(b.date.split('.').reverse().join('-'));
+          return dateB.getTime() - dateA.getTime();
+        });
         
         setDocuments(documentsList);
-        
-        // TODO: Load payments from API when available
-        // For now, keep empty payments array
-        setPayments([]);
       } catch (err) {
         console.error('Error loading documents:', err);
         setError(err instanceof Error ? err.message : 'Nie udało się załadować dokumentów');
@@ -96,8 +107,8 @@ export default function InvoicesAndPayments() {
         });
       }
     } else {
-      // TODO: Handle invoice download when implemented
-      alert('Pobieranie faktur będzie wkrótce dostępne.');
+      // TODO: Handle other document types when implemented
+      alert('Pobieranie tego typu dokumentu będzie wkrótce dostępne.');
     }
   };
 
@@ -146,16 +157,16 @@ export default function InvoicesAndPayments() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* Invoices Section */}
+      {/* Documents Section */}
       <div>
         <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">
-          Faktury
+          Dokumenty do pobrania
         </h3>
         
         {documents.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600">Brak faktur</p>
+            <p className="text-gray-600">Brak dostępnych dokumentów</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -164,7 +175,7 @@ export default function InvoicesAndPayments() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Numer faktury
+                      Typ dokumentu
                     </th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
                       Data
@@ -187,7 +198,10 @@ export default function InvoicesAndPayments() {
                   {documents.map((document) => (
                     <tr key={document.id} className="hover:bg-gray-50">
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900 font-medium">
-                        {document.name}
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-gray-400" />
+                          {document.type === 'contract' ? 'Umowa' : 'Inny dokument'}
+                        </div>
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
                         <div className="flex items-center gap-1.5">
@@ -234,75 +248,7 @@ export default function InvoicesAndPayments() {
           </div>
         )}
       </div>
-
-      {/* Payment History Section */}
-      {payments.length > 0 && (
-        <div>
-          <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">
-            Historia płatności
-          </h3>
-          
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Data
-                    </th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Kwota
-                    </th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Metoda płatności
-                    </th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Opis
-                    </th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Faktura
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {payments.map((payment) => (
-                    <tr key={payment.id} className="hover:bg-gray-50">
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                          {payment.date}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold text-gray-900">
-                        {payment.amount.toFixed(2)} zł
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
-                        <div className="flex items-center gap-1.5">
-                          <CreditCard className="w-3 h-3 sm:w-4 sm:h-4" />
-                          {payment.method}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
-                        {payment.description}
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
-                        {payment.invoiceNumber ? (
-                          <span className="text-[#03adf0]">{payment.invoiceNumber}</span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-
 

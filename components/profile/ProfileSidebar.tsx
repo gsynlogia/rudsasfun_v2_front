@@ -80,10 +80,40 @@ const menuItems: MenuItem[] = [
 ];
 
 /**
- * ProfileSidebar Component
- * Left sidebar navigation for user profile pages
- * Based on RADSAS_FUN_panel reference
+ * Shorten email address for display
+ * Format: first 3 letters + ... + @ + ... + domain extension
+ * Example: szymon.guzik@gmail.com -> szy...@...com
  */
+function shortenEmail(email: string | null | undefined): string {
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return email || '';
+  }
+  
+  try {
+    const [localPart, domain] = email.split('@');
+    
+    if (!localPart || !domain) {
+      return email;
+    }
+    
+    // Get first 3 characters of local part (lowercase)
+    const firstThree = localPart.substring(0, 3).toLowerCase();
+    
+    // Get domain extension (last part after last dot)
+    const domainParts = domain.split('.');
+    const extension = domainParts.length > 0 ? domainParts[domainParts.length - 1].toLowerCase() : '';
+    
+    if (!extension) {
+      return email;
+    }
+    
+    return `${firstThree}...@...${extension}`;
+  } catch (error) {
+    console.error('Error shortening email:', error);
+    return email;
+  }
+}
+
 export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
@@ -156,7 +186,9 @@ export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
                   'Witaj!'
                 ) : (
                   <>
-                    Witaj! <span className="text-[#00a8e8]">{user?.email || user?.login || 'Użytkowniku'}</span>
+                    Witaj! <span className="text-[#00a8e8]">
+                      {user?.email ? shortenEmail(user.email) : (user?.login ? shortenEmail(user.login) : 'Użytkowniku')}
+                    </span>
                   </>
                 )}
               </h2>

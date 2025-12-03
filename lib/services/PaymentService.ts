@@ -4,6 +4,7 @@
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { authService } from '@/lib/services/AuthService';
 
 export interface CreatePaymentRequest {
   amount: number;
@@ -133,7 +134,19 @@ class PaymentService {
    * Get payment status
    */
   async getPaymentStatus(transactionId: string): Promise<PaymentStatusResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/payments/${transactionId}/status`);
+    // Get auth token for authenticated request
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated. Please log in to get payment status.');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/payments/${transactionId}/status`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
@@ -163,7 +176,19 @@ class PaymentService {
    * Get available payment methods
    */
   async getPaymentMethods(): Promise<PaymentMethodsResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/payments/methods`);
+    // Get auth token for authenticated request
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated. Please log in to get payment methods.');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/payments/methods`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
@@ -194,9 +219,17 @@ class PaymentService {
    * Use this when webhook didn't work (e.g., in localhost environment)
    */
   async syncPaymentStatus(transactionId: string): Promise<PaymentResponse> {
+    // Get auth token for authenticated request
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated. Please log in to sync payment status.');
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/payments/${transactionId}/sync`, {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
@@ -226,6 +259,13 @@ class PaymentService {
    */
   async listPayments(skip: number = 0, limit: number = 100): Promise<PaymentResponse[]> {
     try {
+      // Get auth token for authenticated request
+      const token = authService.getToken();
+      
+      if (!token) {
+        throw new Error('Not authenticated. Please log in to list payments.');
+      }
+
       // Usuń trailing slash jeśli jest, aby uniknąć redirectu
       const baseUrl = API_BASE_URL.replace(/\/$/, '');
       const url = `${baseUrl}/api/payments?skip=${skip}&limit=${limit}`;
@@ -233,6 +273,7 @@ class PaymentService {
       const response = await fetch(url, {
         method: 'GET',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });

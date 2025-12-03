@@ -139,6 +139,44 @@ class ContractService {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   }
+
+  /**
+   * List all contracts for the current user
+   * @returns Array of contract information
+   */
+  async listMyContracts(): Promise<Array<{
+    reservation_id: number;
+    contract_filename: string;
+    contract_path: string;
+    created_at: string;
+    camp_name: string | null;
+    property_name: string | null;
+    participant_first_name: string | null;
+    participant_last_name: string | null;
+    total_price: number;
+  }>> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/my`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
 }
 
 export const contractService = new ContractService();

@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, User, Calendar, Home, Utensils, Gift, Users, Heart, FileText, Edit, Plus } from 'lucide-react';
+import { MapPin, User, Calendar, Home, Utensils, Gift, Users, Heart, FileText, Edit, Plus, Mail, Phone } from 'lucide-react';
 import DashedLine from '../DashedLine';
 import AdditionalServicesGrid from './AdditionalServicesGrid';
 
@@ -14,6 +14,17 @@ interface Reservation {
   campName: string;
   dates: string;
   resort: string;
+  parentsData?: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    phoneNumber: string;
+    street: string;
+    postalCode: string;
+    city: string;
+  }>;
 }
 
 interface ReservationMainProps {
@@ -57,6 +68,47 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           </div>
         </div>
       </div>
+
+      {/* Parents/Guardians Section */}
+      {reservation.parentsData && reservation.parentsData.length > 0 && (
+        <>
+          <DashedLine />
+          <div>
+            <h4 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">
+              Opiekunowie/Rodzice
+            </h4>
+            <div className="space-y-3 sm:space-y-4">
+              {reservation.parentsData.map((parent, index) => (
+                <div key={parent.id || index} className="bg-gray-50 rounded-lg p-2 sm:p-3">
+                  <div className="text-xs sm:text-sm font-medium text-gray-900 mb-1 sm:mb-2">
+                    {parent.firstName} {parent.lastName}
+                  </div>
+                  <div className="space-y-1 text-xs sm:text-sm text-gray-600">
+                    {parent.email && (
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Mail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                        <span>{parent.email}</span>
+                      </div>
+                    )}
+                    {(parent.phoneNumber || parent.phone) && (
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Phone className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                        <span>{parent.phone || '+48'} {parent.phoneNumber}</span>
+                      </div>
+                    )}
+                    {parent.street && (
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                        <span>{parent.street}, {parent.postalCode} {parent.city}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       <DashedLine />
 
