@@ -190,11 +190,47 @@ class PaymentService {
   }
 
   /**
+   * Sync payment status from Tpay API (Sandbox)
+   * Use this when webhook didn't work (e.g., in localhost environment)
+   */
+  async syncPaymentStatus(transactionId: string): Promise<PaymentResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/payments/${transactionId}/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      let errorMessage = 'Request failed';
+      if (typeof error.detail === 'string') {
+        errorMessage = error.detail;
+      } else if (Array.isArray(error.detail)) {
+        errorMessage = error.detail.map((e: any) => {
+          if (typeof e === 'string') return e;
+          if (e.msg) return `${e.loc?.join('.') || 'field'}: ${e.msg}`;
+          return JSON.stringify(e);
+        }).join(', ');
+      } else if (error.detail && typeof error.detail === 'object') {
+        errorMessage = JSON.stringify(error.detail);
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  /**
    * List all payments
    */
   async listPayments(skip: number = 0, limit: number = 100): Promise<PaymentResponse[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/payments?skip=${skip}&limit=${limit}`, {
+      // Usuń trailing slash jeśli jest, aby uniknąć redirectu
+      const baseUrl = API_BASE_URL.replace(/\/$/, '');
+      const url = `${baseUrl}/api/payments?skip=${skip}&limit=${limit}`;
+      console.log('📡 Fetching payments from:', url);
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
-import { Search, ChevronUp, ChevronDown, Check, X, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, Check, X, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw, RefreshCw } from 'lucide-react';
 import PaymentConfirmationModal from './PaymentConfirmationModal';
 import RefundConfirmationModal from './RefundConfirmationModal';
 import { reservationService } from '@/lib/services/ReservationService';
@@ -10,7 +10,7 @@ import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 /**
  * Payment Item Status
  */
-export type PaymentItemStatus = 'paid' | 'unpaid' | 'canceled' | 'returned';
+export type PaymentItemStatus = 'paid' | 'unpaid' | 'partially_paid' | 'canceled' | 'returned';
 
 /**
  * Payment Item Interface
@@ -61,101 +61,152 @@ interface ReservationPayment {
 
 /**
  * Generate payment items for a reservation based on real reservation data and payments
+ * Correctly distributes payments across items (camp, protection, diet, addons)
  */
 const generatePaymentItems = (reservation: any, payments: PaymentResponse[]): PaymentItem[] => {
   const items: PaymentItem[] = [];
   let itemId = 1;
   
-  // Find payments for this reservation (order_id should match reservation id)
-  const reservationPayments = payments.filter(p => p.order_id === String(reservation.id));
-  const totalPaid = reservationPayments
-    .filter(p => p.status === 'success')
-    .reduce((sum, p) => sum + (p.paid_amount || p.amount), 0);
+  // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}")
+  const reservationPayments = payments.filter(p => {
+    const orderId = p.order_id || '';
+    // Check if order_id matches reservation.id (with or without "RES-" prefix)
+    return orderId === String(reservation.id) || 
+           orderId === `RES-${reservation.id}` ||
+           orderId.endsWith(`-${reservation.id}`);
+  });
+  // Include payments with status 'success' or 'pending' if they have amount set
+  // For pending payments, we use 'amount' as the paid amount (assuming payment was made)
+  // For success payments, we use 'paid_amount' if available, otherwise 'amount'
+  const successfulPayments = reservationPayments.filter(p => {
+    // Include success payments
+    if (p.status === 'success') return true;
+    // Include pending payments that have an amount (payment was created)
+    if (p.status === 'pending' && p.amount && p.amount > 0) return true;
+    return false;
+  });
+  const totalPaid = successfulPayments.reduce((sum, p) => {
+    // Priority: paid_amount (from webhook) > amount (from payment creation)
+    if (p.paid_amount !== null && p.paid_amount !== undefined && p.paid_amount > 0) {
+      return sum + p.paid_amount;
+    }
+    // Otherwise, use amount (payment was created but webhook didn't update it yet)
+    return sum + (p.amount || 0);
+  }, 0);
+  
+  // Get the latest payment date and method for display
+  const latestPayment = successfulPayments.length > 0 
+    ? successfulPayments.sort((a, b) => 
+        new Date(b.paid_at || b.created_at || 0).getTime() - 
+        new Date(a.paid_at || a.created_at || 0).getTime()
+      )[0]
+    : null;
+  const paymentDate = latestPayment 
+    ? (latestPayment.paid_at || latestPayment.created_at)?.split('T')[0]
+    : undefined;
+  const paymentMethod = latestPayment
+    ? (latestPayment.channel_id === 64 ? 'BLIK' : 
+       latestPayment.channel_id === 53 ? 'Karta' : 'Online')
+    : undefined;
+  
+  // Calculate additional items amounts
+  const protectionAmount = reservation.selected_protection ? 200 : 0;
+  const dietAmount = reservation.diet === 'vegetarian' ? 50 : 0;
+  
+  // Calculate addons total
+  const addonPrices: Record<string, number> = {
+    'Skuter wodny': 150,
+    'Banan wodny': 0,
+    'Quady': 150,
+  };
+  const addonsAmount = reservation.selected_addons && Array.isArray(reservation.selected_addons)
+    ? reservation.selected_addons.reduce((sum: number, addonName: string) => {
+        return sum + (addonPrices[addonName] || 0);
+      }, 0)
+    : 0;
+  
+  // Calculate transport amount (if transport was selected)
+  // Transport is included in total_price, but we don't have direct access to transport price
+  // So we calculate camp amount as: total_price - (protection + diet + addons)
+  // Note: If transport was selected, its price is already in total_price, so campAmount will be lower
+  // This is correct because campAmount represents the base camp price without transport
+  const additionalItemsAmount = protectionAmount + dietAmount + addonsAmount;
+  const totalPriceFromReservation = reservation.total_price || 0;
+  
+  // Camp amount = total_price - additional items (protection, diet, addons)
+  // Transport is NOT subtracted here because it's a separate line item that should be shown separately
+  // But since we don't have transport price in reservation data, we'll calculate it as remainder
+  const campAmount = Math.max(0, totalPriceFromReservation - additionalItemsAmount);
+  
+  // Total amount should match reservation.total_price (this is the source of truth)
+  const totalAmount = totalPriceFromReservation;
+  
+  // Distribute payments across items in order: camp -> protection -> diet -> addons
+  let remainingPaid = totalPaid;
   
   // Camp base price (total_price from reservation)
-  const campAmount = reservation.total_price || 0;
-  const campPaid = totalPaid >= campAmount;
+  const campPaidAmount = Math.min(remainingPaid, campAmount);
+  const campPaid = campPaidAmount >= campAmount;
   items.push({
     id: `item-${itemId++}`,
     name: `Obóz: ${reservation.camp_name || 'Nieznany obóz'}`,
     type: 'camp',
     amount: campAmount,
-    status: campPaid ? 'paid' : 'unpaid',
-    paidDate: campPaid && reservationPayments.length > 0 
-      ? (reservationPayments[0].paid_at || reservationPayments[0].created_at)?.split('T')[0]
-      : undefined,
-    paymentMethod: campPaid && reservationPayments.length > 0 
-      ? (reservationPayments[0].channel_id === 64 ? 'BLIK' : 
-         reservationPayments[0].channel_id === 53 ? 'Karta' : 'Online')
-      : undefined,
+    status: campPaid ? 'paid' : (campPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+    paidDate: campPaid && paymentDate ? paymentDate : undefined,
+    paymentMethod: campPaid && paymentMethod ? paymentMethod : undefined,
   });
+  remainingPaid -= campPaidAmount;
 
   // Protection (Tarcza/Oaza) - if selected_protection exists
   if (reservation.selected_protection) {
-    const protectionAmount = 200; // Default protection price
-    const protectionPaid = totalPaid >= (campAmount + protectionAmount);
+    const protectionPaidAmount = Math.min(remainingPaid, protectionAmount);
+    const protectionPaid = protectionPaidAmount >= protectionAmount;
     items.push({
       id: `item-${itemId++}`,
       name: `Ochrona rezerwacji (${reservation.selected_protection === 'shield' ? 'Tarcza' : 'Oaza'})`,
       type: 'protection',
       amount: protectionAmount,
-      status: protectionPaid ? 'paid' : 'unpaid',
-      paidDate: protectionPaid && reservationPayments.length > 0 
-        ? (reservationPayments[0].paid_at || reservationPayments[0].created_at)?.split('T')[0]
-        : undefined,
-      paymentMethod: protectionPaid && reservationPayments.length > 0 
-        ? (reservationPayments[0].channel_id === 64 ? 'BLIK' : 
-           reservationPayments[0].channel_id === 53 ? 'Karta' : 'Online')
-        : undefined,
+      status: protectionPaid ? 'paid' : (protectionPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+      paidDate: protectionPaid && paymentDate ? paymentDate : undefined,
+      paymentMethod: protectionPaid && paymentMethod ? paymentMethod : undefined,
     });
+    remainingPaid -= protectionPaidAmount;
   }
 
   // Diet (if vegetarian)
   if (reservation.diet === 'vegetarian') {
-    const dietAmount = 50; // Default diet price
-    const dietPaid = totalPaid >= (campAmount + (reservation.selected_protection ? 200 : 0) + dietAmount);
+    const dietPaidAmount = Math.min(remainingPaid, dietAmount);
+    const dietPaid = dietPaidAmount >= dietAmount;
     items.push({
       id: `item-${itemId++}`,
       name: 'Dieta wegetariańska',
       type: 'diet',
       amount: dietAmount,
-      status: dietPaid ? 'paid' : 'unpaid',
-      paidDate: dietPaid && reservationPayments.length > 0 
-        ? (reservationPayments[0].paid_at || reservationPayments[0].created_at)?.split('T')[0]
-        : undefined,
-      paymentMethod: dietPaid && reservationPayments.length > 0 
-        ? (reservationPayments[0].channel_id === 64 ? 'BLIK' : 
-           reservationPayments[0].channel_id === 53 ? 'Karta' : 'Online')
-        : undefined,
+      status: dietPaid ? 'paid' : (dietPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+      paidDate: dietPaid && paymentDate ? paymentDate : undefined,
+      paymentMethod: dietPaid && paymentMethod ? paymentMethod : undefined,
     });
+    remainingPaid -= dietPaidAmount;
   }
 
   // Addons (if selected_addons exists)
   if (reservation.selected_addons && Array.isArray(reservation.selected_addons) && reservation.selected_addons.length > 0) {
-    const addonPrices: Record<string, number> = {
-      'Skuter wodny': 150,
-      'Banan wodny': 0,
-      'Quady': 150,
-    };
-    
     reservation.selected_addons.forEach((addonName: string) => {
       const addonAmount = addonPrices[addonName] || 0;
       if (addonAmount > 0) {
-        const addonPaid = totalPaid >= (campAmount + addonAmount);
+        const addonPaidAmount = Math.min(remainingPaid, addonAmount);
+        const addonPaid = addonPaidAmount >= addonAmount;
         items.push({
           id: `item-${itemId++}`,
           name: addonName,
           type: 'addon',
           amount: addonAmount,
-          status: addonPaid ? 'paid' : 'unpaid',
-          paidDate: addonPaid && reservationPayments.length > 0 
-            ? (reservationPayments[0].paid_at || reservationPayments[0].created_at)?.split('T')[0]
-            : undefined,
-          paymentMethod: addonPaid && reservationPayments.length > 0 
-            ? (reservationPayments[0].channel_id === 64 ? 'BLIK' : 
-               reservationPayments[0].channel_id === 53 ? 'Karta' : 'Online')
-            : undefined,
+          status: addonPaid ? 'paid' : (addonPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+          paidDate: addonPaid && paymentDate ? paymentDate : undefined,
+          paymentMethod: addonPaid && paymentMethod ? paymentMethod : undefined,
         });
+        remainingPaid -= addonPaidAmount;
       }
     });
   }
@@ -165,31 +216,71 @@ const generatePaymentItems = (reservation: any, payments: PaymentResponse[]): Pa
 
 /**
  * Generate payment details for a reservation based on real data
+ * Uses actual payment amounts from database (paid_amount from Payment records)
  */
 const generatePaymentDetails = (reservation: any, payments: PaymentResponse[]): PaymentDetails => {
   const items = generatePaymentItems(reservation, payments);
+  
+  // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}")
+  const reservationPayments = payments.filter(p => {
+    const orderId = p.order_id || '';
+    // Check if order_id matches reservation.id (with or without "RES-" prefix)
+    return orderId === String(reservation.id) || 
+           orderId === `RES-${reservation.id}` ||
+           orderId.endsWith(`-${reservation.id}`);
+  });
+  // Include payments with status 'success' or 'pending' if they have amount set
+  // For pending payments, we use 'amount' as the paid amount (assuming payment was made)
+  // For success payments, we use 'paid_amount' if available, otherwise 'amount'
+  const successfulPayments = reservationPayments.filter(p => {
+    // Include success payments
+    if (p.status === 'success') return true;
+    // Include pending payments that have an amount (payment was created)
+    if (p.status === 'pending' && p.amount && p.amount > 0) return true;
+    return false;
+  });
+  
+  // Calculate actual paid amount from database
+  // Priority: paid_amount (from webhook) > amount (from payment creation)
+  const actualPaidAmount = successfulPayments.reduce((sum, p) => {
+    // If paid_amount is set (from webhook), use it
+    if (p.paid_amount !== null && p.paid_amount !== undefined && p.paid_amount > 0) {
+      return sum + p.paid_amount;
+    }
+    // Otherwise, use amount (payment was created but webhook didn't update it yet)
+    return sum + (p.amount || 0);
+  }, 0);
+  
   // Only count non-canceled and non-returned items in total amount
   const activeItems = items.filter(item => item.status !== 'canceled' && item.status !== 'returned');
-  const totalAmount = activeItems.reduce((sum, item) => sum + item.amount, 0);
-  const paidAmount = activeItems.filter(item => item.status === 'paid').reduce((sum, item) => sum + item.amount, 0);
-  const remainingAmount = totalAmount - paidAmount;
+  
+  // Total amount should be from reservation.total_price (this is the source of truth)
+  // Don't recalculate from items to avoid rounding errors or missing transport costs
+  const totalAmount = reservation.total_price || activeItems.reduce((sum, item) => sum + item.amount, 0);
+  
+  // Use actual paid amount from database (this is the source of truth for payments)
+  // Don't calculate from items status - use actual payment records from Payment table
+  const paidAmount = Math.min(actualPaidAmount, totalAmount);
+  const remainingAmount = Math.max(0, totalAmount - paidAmount);
+  
   // All active items must be paid (canceled and returned items don't count)
   const allActiveItemsPaid = activeItems.length > 0 && activeItems.every(item => item.status === 'paid');
   const hasCanceledItems = items.some(item => item.status === 'canceled');
+  const hasSuccessfulPayment = successfulPayments.length > 0;
   
-  // Find payments for this reservation
-  const reservationPayments = payments.filter(p => p.order_id === String(reservation.id));
-  const hasSuccessfulPayment = reservationPayments.some(p => p.status === 'success');
+  // Determine if payment is full or partial
+  const isFullPayment = paidAmount >= totalAmount && allActiveItemsPaid;
+  const isPartialPayment = paidAmount > 0 && paidAmount < totalAmount;
 
   return {
     reservationId: reservation.id,
-    totalAmount: reservation.total_price || totalAmount,
-    paidAmount: reservation.deposit_amount || paidAmount,
-    remainingAmount: (reservation.total_price || totalAmount) - (reservation.deposit_amount || paidAmount),
+    totalAmount: totalAmount,
+    paidAmount: paidAmount,
+    remainingAmount: remainingAmount,
     items,
     invoiceNumber: `FV-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(4, '0')}`,
     invoiceLink: `/invoices/FV-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(4, '0')}.pdf`,
-    invoicePaid: allActiveItemsPaid && !hasCanceledItems && hasSuccessfulPayment,
+    invoicePaid: isFullPayment && !hasCanceledItems && hasSuccessfulPayment,
     orderDate: reservation.created_at.split('T')[0],
   };
 };
@@ -252,6 +343,9 @@ export default function PaymentsManagement() {
   const [refundFinalModalOpen, setRefundFinalModalOpen] = useState(false);
   const [selectedItemForRefund, setSelectedItemForRefund] = useState<{ reservationId: number; item: PaymentItem } | null>(null);
 
+  // State for manual sync
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Load reservations and payments from API
   useEffect(() => {
     const fetchData = async () => {
@@ -275,6 +369,30 @@ export default function PaymentsManagement() {
           console.warn('Warning: Could not fetch payments, continuing with empty array:', err);
           // Continue with empty payments array - reservations will still work
         }
+        
+        // Automatyczna synchronizacja statusu płatności ze statusem 'pending'
+        // Webhook nie działa w środowisku lokalnym (localhost), więc synchronizujemy ręcznie
+        console.log('🔄 Synchronizacja statusu płatności z API Tpay (sandbox)...');
+        const pendingPayments = paymentsData.filter(p => p.status === 'pending' && p.transaction_id);
+        const syncPromises = pendingPayments.map(async (payment) => {
+          try {
+            console.log(`Synchronizacja płatności ${payment.transaction_id}...`);
+            const syncedPayment = await paymentService.syncPaymentStatus(payment.transaction_id);
+            // Zaktualizuj płatność w tablicy
+            const index = paymentsData.findIndex(p => p.id === payment.id);
+            if (index !== -1) {
+              paymentsData[index] = syncedPayment;
+            }
+            console.log(`✅ Zsynchronizowano płatność ${payment.transaction_id} - status: ${syncedPayment.status}`);
+          } catch (err) {
+            console.warn(`⚠️ Nie można zsynchronizować płatności ${payment.transaction_id}:`, err);
+            // Nie przerywaj procesu - kontynuuj z pozostałymi płatnościami
+          }
+        });
+        
+        // Wykonaj synchronizację równolegle (ale nie blokuj UI)
+        await Promise.allSettled(syncPromises);
+        console.log(`✅ Zsynchronizowano ${pendingPayments.length} płatności`);
         
         console.log(`Fetched ${reservationsData.length} reservations and ${paymentsData.length} payments`);
         
@@ -600,6 +718,67 @@ export default function PaymentsManagement() {
     setSelectedReservationForPayment(null);
   };
 
+  // Handle manual sync of all payments
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      console.log('🔄 Ręczna synchronizacja wszystkich płatności...');
+      
+      // Fetch payments again
+      let paymentsData: PaymentResponse[] = [];
+      try {
+        paymentsData = await paymentService.listPayments(0, 1000);
+      } catch (err) {
+        console.error('Błąd pobierania płatności:', err);
+        alert('Nie można pobrać płatności. Sprawdź czy backend działa.');
+        setIsSyncing(false);
+        return;
+      }
+      
+      // Find all pending payments
+      const pendingPayments = paymentsData.filter(p => p.status === 'pending' && p.transaction_id);
+      console.log(`Znaleziono ${pendingPayments.length} płatności do synchronizacji`);
+      
+      if (pendingPayments.length === 0) {
+        alert('Brak płatności do synchronizacji. Wszystkie płatności są już zsynchronizowane.');
+        setIsSyncing(false);
+        return;
+      }
+      
+      // Sync all pending payments
+      const syncPromises = pendingPayments.map(async (payment) => {
+        try {
+          console.log(`Synchronizacja płatności ${payment.transaction_id}...`);
+          const syncedPayment = await paymentService.syncPaymentStatus(payment.transaction_id);
+          console.log(`✅ Zsynchronizowano płatność ${payment.transaction_id} - status: ${syncedPayment.status}`);
+          return syncedPayment;
+        } catch (err) {
+          console.warn(`⚠️ Nie można zsynchronizować płatności ${payment.transaction_id}:`, err);
+          return null;
+        }
+      });
+      
+      const syncedPayments = await Promise.allSettled(syncPromises);
+      const successful = syncedPayments.filter(p => p.status === 'fulfilled' && p.value !== null).length;
+      console.log(`✅ Zsynchronizowano ${successful} z ${pendingPayments.length} płatności`);
+      
+      // Refresh data
+      const reservationsData = await reservationService.listReservations(0, 1000);
+      const updatedPayments = await paymentService.listPayments(0, 1000);
+      const mappedReservations = reservationsData.map(reservation => 
+        mapReservationToPaymentFormat(reservation, updatedPayments)
+      );
+      setReservations(mappedReservations);
+      
+      alert(`Zsynchronizowano ${successful} z ${pendingPayments.length} płatności.`);
+    } catch (err) {
+      console.error('Błąd synchronizacji:', err);
+      alert('Błąd podczas synchronizacji płatności.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Handle view invoice
   const handleViewInvoice = (reservation: ReservationPayment, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -764,6 +943,14 @@ export default function PaymentsManagement() {
       {/* Header */}
       <div className="mb-2 flex items-center justify-between" style={{ marginTop: 0, paddingTop: 0, marginRight: '16px' }}>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Płatności</h1>
+        <button
+          onClick={handleManualSync}
+          disabled={isSyncing}
+          className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white rounded-lg hover:bg-[#0288c7] transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          {isSyncing ? 'Synchronizacja...' : 'Zweryfikuj płatności'}
+        </button>
       </div>
 
       {/* Search Bar */}
@@ -875,9 +1062,12 @@ export default function PaymentsManagement() {
                   const isExpanded = expandedRows.has(reservation.id);
                   const activeItemsForReservation = reservation.paymentDetails.items.filter(item => item.status !== 'canceled' && item.status !== 'returned');
                   const allPaid = activeItemsForReservation.length > 0 && activeItemsForReservation.every(item => item.status === 'paid');
+                  const hasPartiallyPaid = activeItemsForReservation.some(item => item.status === 'partially_paid');
                   const hasRemaining = reservation.paymentDetails.remainingAmount > 0;
                   const hasCanceledItems = reservation.paymentDetails.items.some(item => item.status === 'canceled');
                   const hasReturnedItems = reservation.paymentDetails.items.some(item => item.status === 'returned');
+                  const isFullPayment = reservation.paymentDetails.paidAmount >= reservation.paymentDetails.totalAmount && allPaid;
+                  const isPartialPayment = reservation.paymentDetails.paidAmount > 0 && reservation.paymentDetails.paidAmount < reservation.paymentDetails.totalAmount;
 
                   return (
                     <Fragment key={reservation.id}>
@@ -916,13 +1106,13 @@ export default function PaymentsManagement() {
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                               Zwrócone
                             </span>
-                          ) : allPaid ? (
+                          ) : allPaid && isFullPayment ? (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Opłacone
+                              Opłacone w całości
                             </span>
-                          ) : hasRemaining ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                              Częściowo
+                          ) : isPartialPayment || hasPartiallyPaid ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Częściowo opłacone
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -949,6 +1139,12 @@ export default function PaymentsManagement() {
                                     <p className="text-lg font-bold text-green-600">
                                       {formatCurrency(reservation.paymentDetails.paidAmount)}
                                     </p>
+                                    {isFullPayment && (
+                                      <p className="text-xs text-green-600 mt-1">✓ Płatność w całości</p>
+                                    )}
+                                    {isPartialPayment && (
+                                      <p className="text-xs text-blue-600 mt-1">⚠ Płatność częściowa</p>
+                                    )}
                                   </div>
                                   <div>
                                     <p className="text-xs text-gray-500 mb-1">Pozostało</p>
@@ -981,6 +1177,7 @@ export default function PaymentsManagement() {
                                   {reservation.paymentDetails.items.map((item) => {
                                     const isCanceled = item.status === 'canceled';
                                     const isPaid = item.status === 'paid';
+                                    const isPartiallyPaid = item.status === 'partially_paid';
                                     const isUnpaid = item.status === 'unpaid';
                                     const isReturned = item.status === 'returned';
                                     
@@ -994,6 +1191,8 @@ export default function PaymentsManagement() {
                                             ? 'bg-purple-50 border-purple-200'
                                             : isPaid
                                             ? 'bg-green-50 border-green-200'
+                                            : isPartiallyPaid
+                                            ? 'bg-blue-50 border-blue-200'
                                             : 'bg-yellow-50 border-yellow-200'
                                         }`}
                                       >
@@ -1014,7 +1213,7 @@ export default function PaymentsManagement() {
                                                 ? `Anulowane: ${formatDate(item.canceledDate)}`
                                                 : isReturned && item.paidDate
                                                 ? `Zwrócone: ${formatDate(item.paidDate)}${item.paymentMethod ? ` (${item.paymentMethod})` : ''}`
-                                                : isPaid && item.paidDate
+                                                : (isPaid || isPartiallyPaid) && item.paidDate
                                                 ? `Data płatności: ${formatDate(item.paidDate)}${item.paymentMethod ? ` (${item.paymentMethod})` : ''}`
                                                 : `Data zamówienia: ${formatDate(reservation.paymentDetails.orderDate)}`}
                                             </p>
@@ -1044,6 +1243,11 @@ export default function PaymentsManagement() {
                                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                                 <Check className="w-3 h-3 mr-1" />
                                                 Opłacone
+                                              </span>
+                                            ) : isPartiallyPaid ? (
+                                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                <Check className="w-3 h-3 mr-1" />
+                                                Częściowo opłacone
                                               </span>
                                             ) : (
                                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
