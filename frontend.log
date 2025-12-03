@@ -2873,3 +2873,48 @@ Import traces:
  GET /camps/1/edition/1/step/4 200 in 13ms (compile: 971µs, render: 12ms)
  GET /camps/1/edition/1/step/4 200 in 13ms (compile: 1101µs, render: 12ms)
  GET /camps/1/edition/1/step/4 200 in 15ms (compile: 1043µs, render: 14ms)
+ GET /admin-panel/cms/documents 200 in 318ms (compile: 309ms, render: 9ms)
+ GET /admin-panel/cms/documents 200 in 125ms (compile: 38ms, render: 87ms)
+ GET / 200 in 130ms (compile: 58ms, render: 71ms)
+ ✓ Compiled in 20ms
+ ✓ Compiled in 59ms
+ ✓ Compiled in 19ms
+ ✓ Compiled in 22ms
+ ✓ Compiled in 18ms
+ ✓ Compiled in 22ms
+ ✓ Compiled in 19ms
+ ✓ Compiled in 22ms
+ ✓ Compiled in 24ms
+ ✓ Compiled in 61ms
+ ✓ Compiled in 21ms
+ ✓ Compiled in 20ms
+ ✓ Compiled in 55ms
+ ✓ Compiled in 20ms
+ ✓ Compiled in 22ms
+ ✓ Compiled in 18ms
+ ✓ Compiled in 19ms
+ ✓ Compiled in 21ms
+ ✓ Compiled in 18ms
+ ✓ Compiled in 21ms
+ ✓ Compiled in 21ms
+ GET /login?redirect=%2Fcamps%2F1%2Fedition%2F1%2Fstep%2F2 200 in 210ms (compile: 8ms, render: 202ms)
+ GET /admin-panel/cms/documents 200 in 180ms (compile: 61ms, render: 119ms)
+ GET /camps/1/edition/1/step/4 200 in 110ms (compile: 66ms, render: 44ms)
+ ✓ Compiled in 49ms
+ ✓ Compiled in 21ms
+ ✓ Compiled in 68ms
+ GET /camps/1/edition/1/step/1 200 in 68ms (compile: 39ms, render: 30ms)
+ GET /camps/1/edition/1/step/1 200 in 38ms (compile: 10ms, render: 28ms)
+ GET /camps/1/edition/1/step/1 200 in 58ms (compile: 10ms, render: 49ms)
+ GET /camps/1/edition/1/step/4 200 in 234ms (compile: 8ms, render: 226ms)
+ GET /camps/1/edition/1/step/1 200 in 32ms (compile: 7ms, render: 25ms)
+ GET /camps/1/edition/1/step/2 200 in 38ms (compile: 7ms, render: 31ms)
+ GET /admin-panel/transports 200 in 122ms (compile: 86ms, render: 36ms)
+ GET /admin-panel/camps 200 in 60ms (compile: 51ms, render: 10ms)
+ GET /admin-panel/camps 200 in 76ms (compile: 2ms, render: 73ms)
+ GET /admin-panel/camps/new 200 in 137ms (compile: 123ms, render: 14ms)
+ GET /admin-panel/camps 200 in 23ms (compile: 3ms, render: 20ms)
+ GET /admin-panel/camps/2/turnus/3/edit 200 in 81ms (compile: 63ms, render: 18ms)
+ GET /admin-panel/transports 200 in 29ms (compile: 5ms, render: 24ms)
+ GET /admin-panel/transports/1/edit 200 in 324ms (compile: 313ms, render: 11ms)
+ GET /admin-panel/transports 200 in 36ms (compile: 9ms, render: 28ms)
