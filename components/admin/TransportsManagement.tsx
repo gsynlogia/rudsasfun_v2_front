@@ -8,22 +8,27 @@ import DeleteConfirmationModal from './DeleteConfirmationModal';
 import type { Camp, CampProperty } from '@/types/reservation';
 import { API_BASE_URL } from '@/utils/api-config';
 
+interface TransportCity {
+  id: number;
+  city: string;
+  departure_price?: number | null;
+  return_price?: number | null;
+  display_order?: number;
+}
+
 interface Transport {
   id: number;
   name?: string | null;  // Optional transport name
   property_id?: number | null;  // Optional - can be independent transport
-  camp_id?: number | null;
+  camp_ids?: number[];  // Array of camp IDs (many-to-many)
   camp_name?: string | null;
   turnus_period?: string | null;
   turnus_city?: string | null;
   turnus_start_date?: string | null;
   turnus_end_date?: string | null;
   departure_type: 'collective' | 'own';
-  departure_city?: string | null;
-  departure_collective_price?: number | null;
   return_type: 'collective' | 'own';
-  return_city?: string | null;
-  return_collective_price?: number | null;
+  cities?: TransportCity[];  // Array of cities with prices
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -54,12 +59,18 @@ export default function TransportsManagement() {
 
   // Form state
   const [transportName, setTransportName] = useState('');
+  const [campId, setCampId] = useState<number | ''>('');
   const [departureType, setDepartureType] = useState<'collective' | 'own'>('collective');
-  const [departureCity, setDepartureCity] = useState('');
-  const [departureCollectivePrice, setDepartureCollectivePrice] = useState<number | ''>('');
   const [returnType, setReturnType] = useState<'collective' | 'own'>('collective');
-  const [returnCity, setReturnCity] = useState('');
-  const [returnCollectivePrice, setReturnCollectivePrice] = useState<number | ''>('');
+  
+  // Cities state - array of {city: string, departure_price: number | '', return_price: number | ''}
+  interface CityFormData {
+    id: string; // Temporary ID for React keys
+    city: string;
+    departure_price: number | '';
+    return_price: number | '';
+  }
+  const [cities, setCities] = useState<CityFormData[]>([]);
 
   // Fetch all transports
   const fetchTransports = async () => {
@@ -100,38 +111,80 @@ export default function TransportsManagement() {
       transport.camp_name?.toLowerCase().includes(query) ||
       transport.turnus_city?.toLowerCase().includes(query) ||
       transport.turnus_period?.toLowerCase().includes(query) ||
-      transport.departure_city?.toLowerCase().includes(query) ||
-      transport.return_city?.toLowerCase().includes(query)
+      transport.cities?.some(city => city.city.toLowerCase().includes(query)) ||
+      false
     );
   });
 
+  // Add new city field
+  const addCity = () => {
+    setCities([...cities, {
+      id: Date.now().toString(),
+      city: '',
+      departure_price: '',
+      return_price: '',
+    }]);
+  };
+
+  // Remove city field
+  const removeCity = (id: string) => {
+    setCities(cities.filter(c => c.id !== id));
+  };
+
+  // Update city field
+  const updateCity = (id: string, field: 'city' | 'departure_price' | 'return_price', value: string | number) => {
+    setCities(cities.map(c => 
+      c.id === id ? { ...c, [field]: value } : c
+    ));
+  };
+
   // Handle create transport
   const handleCreateTransport = async () => {
-    if (departureType === 'collective' && (!departureCity.trim() || departureCollectivePrice === '')) {
-      setError('Wypełnij wszystkie wymagane pola dla transportu zbiorowego wyjazdu');
+    // Validate cities if transport is collective
+    if (departureType === 'collective' && cities.length === 0) {
+      setError('Dodaj przynajmniej jedno miasto dla transportu zbiorowego wyjazdu');
       return;
     }
 
-    if (returnType === 'collective' && (!returnCity.trim() || returnCollectivePrice === '')) {
-      setError('Wypełnij wszystkie wymagane pola dla transportu zbiorowego powrotu');
+    if (returnType === 'collective' && cities.length === 0) {
+      setError('Dodaj przynajmniej jedno miasto dla transportu zbiorowego powrotu');
       return;
+    }
+
+    // Validate all cities have required fields
+    for (const city of cities) {
+      if (!city.city.trim()) {
+        setError('Wszystkie miasta muszą mieć nazwę');
+        return;
+      }
+      if (departureType === 'collective' && city.departure_price === '') {
+        setError(`Miasto "${city.city}" musi mieć cenę wyjazdu`);
+        return;
+      }
+      if (returnType === 'collective' && city.return_price === '') {
+        setError(`Miasto "${city.city}" musi mieć cenę powrotu`);
+        return;
+      }
     }
 
     try {
       setSaving(true);
       setError(null);
 
+      // Prepare cities data
+      const citiesData = cities.map(city => ({
+        city: city.city.trim(),
+        departure_price: departureType === 'collective' && city.departure_price !== '' ? Number(city.departure_price) : null,
+        return_price: returnType === 'collective' && city.return_price !== '' ? Number(city.return_price) : null,
+      }));
+
       const transportData = {
-        name: transportName.trim() || null,  // Optional name
-        property_id: null,  // Independent transport - not assigned to any turnus
+        name: transportName.trim() || null,
+        property_id: null,  // Independent transport
+        camp_id: campId !== '' ? Number(campId) : null,
         departure_type: departureType,
-        departure_city: departureType === 'collective' ? departureCity : null,
-        departure_collective_price: departureType === 'collective' && departureCollectivePrice !== '' ? Number(departureCollectivePrice) : null,
-        departure_own_price: null,
         return_type: returnType,
-        return_city: returnType === 'collective' ? returnCity : null,
-        return_collective_price: returnType === 'collective' && returnCollectivePrice !== '' ? Number(returnCollectivePrice) : null,
-        return_own_price: null,
+        cities: citiesData,
       };
 
       const response = await fetch(
@@ -152,12 +205,10 @@ export default function TransportsManagement() {
 
       // Reset form
       setTransportName('');
+      setCampId('');
       setDepartureType('collective');
-      setDepartureCity('');
-      setDepartureCollectivePrice('');
       setReturnType('collective');
-      setReturnCity('');
-      setReturnCollectivePrice('');
+      setCities([]);
       setShowCreateModal(false);
 
       // Refresh transports list
@@ -314,11 +365,12 @@ export default function TransportsManagement() {
             body: JSON.stringify({
               name: newName.trim() || null,
               departure_type: currentTransport.departure_type,
-              departure_city: currentTransport.departure_city,
-              departure_collective_price: currentTransport.departure_collective_price,
               return_type: currentTransport.return_type,
-              return_city: currentTransport.return_city,
-              return_collective_price: currentTransport.return_collective_price,
+              cities: currentTransport.cities?.map(city => ({
+                city: city.city,
+                departure_price: city.departure_price,
+                return_price: city.return_price,
+              })) || [],
             }),
           }
         );
@@ -475,15 +527,21 @@ export default function TransportsManagement() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {transport.departure_type === 'collective' ? (
-                      <div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-gray-400" />
-                          <span>{transport.departure_city || '-'}</span>
-                        </div>
-                        {transport.departure_collective_price && (
-                          <span className="text-xs text-gray-500">
-                            {transport.departure_collective_price.toFixed(2)} PLN
-                          </span>
+                      <div className="space-y-1">
+                        {transport.cities && transport.cities.length > 0 ? (
+                          transport.cities.map((city, idx) => (
+                            <div key={city.id || idx} className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-gray-400" />
+                              <span>{city.city}</span>
+                              {city.departure_price && (
+                                <span className="text-xs text-gray-500 ml-1">
+                                  ({city.departure_price.toFixed(2)} PLN)
+                                </span>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-gray-400">-</span>
                         )}
                       </div>
                     ) : (
@@ -492,15 +550,21 @@ export default function TransportsManagement() {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {transport.return_type === 'collective' ? (
-                      <div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-gray-400" />
-                          <span>{transport.return_city || '-'}</span>
-                        </div>
-                        {transport.return_collective_price && (
-                          <span className="text-xs text-gray-500">
-                            {transport.return_collective_price.toFixed(2)} PLN
-                          </span>
+                      <div className="space-y-1">
+                        {transport.cities && transport.cities.length > 0 ? (
+                          transport.cities.map((city, idx) => (
+                            <div key={city.id || idx} className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-gray-400" />
+                              <span>{city.city}</span>
+                              {city.return_price && (
+                                <span className="text-xs text-gray-500 ml-1">
+                                  ({city.return_price.toFixed(2)} PLN)
+                                </span>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-gray-400">-</span>
                         )}
                       </div>
                     ) : (
@@ -549,12 +613,10 @@ export default function TransportsManagement() {
           setShowCreateModal(false);
           setError(null);
           setTransportName('');
+          setCampId('');
           setDepartureType('collective');
-          setDepartureCity('');
-          setDepartureCollectivePrice('');
           setReturnType('collective');
-          setReturnCity('');
-          setReturnCollectivePrice('');
+          setCities([]);
         }}
         maxWidth="2xl"
         className="max-h-[90vh] flex flex-col"
@@ -580,146 +642,188 @@ export default function TransportsManagement() {
             </p>
           </div>
 
-          {/* Transport Form - Two columns */}
-          <div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Departure */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                  Wyjazd do obozu
-                </h3>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label htmlFor="departure-type" className="block text-xs font-medium text-gray-700 mb-1.5">
-                      Sposób transportu <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="departure-type"
-                      value={departureType}
-                      onChange={(e) => setDepartureType(e.target.value as 'collective' | 'own')}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
-                      style={{ borderRadius: 0, cursor: 'pointer' }}
-                      disabled={saving}
-                    >
-                      <option value="collective">Transport zbiorowy</option>
-                      <option value="own">Własny transport</option>
-                    </select>
-                  </div>
+          {/* Camp ID (Optional) */}
+          <div className="mb-6">
+            <label htmlFor="camp-id" className="block text-sm font-medium text-gray-700 mb-2">
+              ID obozu <span className="text-xs text-gray-500">(opcjonalne)</span>
+            </label>
+            <input
+              id="camp-id"
+              type="number"
+              value={campId}
+              onChange={(e) => setCampId(e.target.value === '' ? '' : Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+              style={{ borderRadius: 0 }}
+              placeholder="np. 1"
+              disabled={saving}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Możesz przypisać transport do obozu (wszystkie turnusy tego obozu będą mogły używać tego transportu)
+            </p>
+          </div>
 
-                  {departureType === 'collective' && (
-                    <>
-                      <div>
-                        <label htmlFor="departure-city" className="block text-xs font-medium text-gray-700 mb-1.5">
-                          <MapPin className="w-3 h-3 inline mr-1" />
-                          Miasto wyjazdu <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          id="departure-city"
-                          type="text"
-                          value={departureCity}
-                          onChange={(e) => setDepartureCity(e.target.value)}
-                          required
-                          className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
-                          style={{ borderRadius: 0 }}
-                          placeholder="np. Warszawa"
-                          disabled={saving}
-                        />
-                      </div>
-                      <div>
-                          <label htmlFor="departure-collective-price" className="block text-xs font-medium text-gray-700 mb-1.5">
-                            Cena (PLN) <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            id="departure-collective-price"
-                            type="number"
-                            value={departureCollectivePrice}
-                            onChange={(e) => setDepartureCollectivePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                            required
-                            min="0"
-                            step="0.01"
-                            className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
-                            style={{ borderRadius: 0 }}
-                            placeholder="500.00"
-                            disabled={saving}
-                          />
-                      </div>
-                    </>
-                  )}
-                </div>
+          {/* Transport Type Selection */}
+          <div className="mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Departure Type */}
+              <div>
+                <label htmlFor="departure-type" className="block text-sm font-medium text-gray-700 mb-2">
+                  Typ transportu wyjazdu <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="departure-type"
+                  value={departureType}
+                  onChange={(e) => {
+                    setDepartureType(e.target.value as 'collective' | 'own');
+                    if (e.target.value === 'own') {
+                      // Clear cities if switching to own transport
+                      setCities([]);
+                    } else if (cities.length === 0) {
+                      // Add first city if switching to collective
+                      addCity();
+                    }
+                  }}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+                  style={{ borderRadius: 0, cursor: 'pointer' }}
+                  disabled={saving}
+                >
+                  <option value="collective">Transport zbiorowy</option>
+                  <option value="own">Własny transport</option>
+                </select>
               </div>
 
-              {/* Return */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  Powrót z obozu
-                </h3>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label htmlFor="return-type" className="block text-xs font-medium text-gray-700 mb-1.5">
-                      Sposób transportu <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="return-type"
-                      value={returnType}
-                      onChange={(e) => setReturnType(e.target.value as 'collective' | 'own')}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
-                      style={{ borderRadius: 0, cursor: 'pointer' }}
-                      disabled={saving}
-                    >
-                      <option value="collective">Transport zbiorowy</option>
-                      <option value="own">Własny transport</option>
-                    </select>
-                  </div>
-
-                  {returnType === 'collective' && (
-                    <>
-                      <div>
-                        <label htmlFor="return-city" className="block text-xs font-medium text-gray-700 mb-1.5">
-                          <MapPin className="w-3 h-3 inline mr-1" />
-                          Miasto powrotu <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          id="return-city"
-                          type="text"
-                          value={returnCity}
-                          onChange={(e) => setReturnCity(e.target.value)}
-                          required
-                          className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
-                          style={{ borderRadius: 0 }}
-                          placeholder="np. Warszawa"
-                          disabled={saving}
-                        />
-                      </div>
-                      <div>
-                          <label htmlFor="return-collective-price" className="block text-xs font-medium text-gray-700 mb-1.5">
-                            Cena (PLN) <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            id="return-collective-price"
-                            type="number"
-                            value={returnCollectivePrice}
-                            onChange={(e) => setReturnCollectivePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                            required
-                            min="0"
-                            step="0.01"
-                            className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
-                            style={{ borderRadius: 0 }}
-                            placeholder="500.00"
-                            disabled={saving}
-                          />
-                      </div>
-                    </>
-                  )}
-                </div>
+              {/* Return Type */}
+              <div>
+                <label htmlFor="return-type" className="block text-sm font-medium text-gray-700 mb-2">
+                  Typ transportu powrotu <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="return-type"
+                  value={returnType}
+                  onChange={(e) => {
+                    setReturnType(e.target.value as 'collective' | 'own');
+                    if (e.target.value === 'own' && departureType === 'own') {
+                      // Clear cities if both are own
+                      setCities([]);
+                    } else if (cities.length === 0 && (departureType === 'collective' || e.target.value === 'collective')) {
+                      // Add first city if switching to collective
+                      addCity();
+                    }
+                  }}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+                  style={{ borderRadius: 0, cursor: 'pointer' }}
+                  disabled={saving}
+                >
+                  <option value="collective">Transport zbiorowy</option>
+                  <option value="own">Własny transport</option>
+                </select>
               </div>
             </div>
           </div>
+
+          {/* Cities List - Only show if at least one transport type is collective */}
+          {(departureType === 'collective' || returnType === 'collective') && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Miasta z cenami <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={addCity}
+                  disabled={saving}
+                  className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-[#03adf0] hover:bg-[#0288c7] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ borderRadius: 0 }}
+                >
+                  <Plus className="w-3 h-3" />
+                  Dodaj miasto
+                </button>
+              </div>
+
+              {cities.length === 0 ? (
+                <div className="text-center py-4 text-sm text-gray-500 border border-gray-200" style={{ borderRadius: 0 }}>
+                  Kliknij "Dodaj miasto" aby dodać pierwsze miasto
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cities.map((city, index) => (
+                    <div key={city.id} className="border border-gray-200 p-4" style={{ borderRadius: 0 }}>
+                      <div className="flex items-start justify-between mb-3">
+                        <h4 className="text-sm font-medium text-gray-700">Miasto {index + 1}</h4>
+                        {cities.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeCity(city.id)}
+                            disabled={saving}
+                            className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50"
+                          >
+                            Usuń
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Nazwa miasta <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={city.city}
+                            onChange={(e) => updateCity(city.id, 'city', e.target.value)}
+                            required
+                            className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+                            style={{ borderRadius: 0 }}
+                            placeholder="np. Warszawa"
+                            disabled={saving}
+                          />
+                        </div>
+                        {departureType === 'collective' && (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Cena wyjazdu (PLN) <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              value={city.departure_price}
+                              onChange={(e) => updateCity(city.id, 'departure_price', e.target.value === '' ? '' : Number(e.target.value))}
+                              required
+                              min="0"
+                              step="0.01"
+                              className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+                              style={{ borderRadius: 0 }}
+                              placeholder="500.00"
+                              disabled={saving}
+                            />
+                          </div>
+                        )}
+                        {returnType === 'collective' && (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Cena powrotu (PLN) <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              value={city.return_price}
+                              onChange={(e) => updateCity(city.id, 'return_price', e.target.value === '' ? '' : Number(e.target.value))}
+                              required
+                              min="0"
+                              step="0.01"
+                              className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+                              style={{ borderRadius: 0 }}
+                              placeholder="500.00"
+                              disabled={saving}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
@@ -728,12 +832,10 @@ export default function TransportsManagement() {
                 setShowCreateModal(false);
                 setError(null);
                 setTransportName('');
+                setCampId('');
                 setDepartureType('collective');
-                setDepartureCity('');
-                setDepartureCollectivePrice('');
                 setReturnType('collective');
-                setReturnCity('');
-                setReturnCollectivePrice('');
+                setCities([]);
               }}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-all duration-200"
               style={{ borderRadius: 0, cursor: 'pointer' }}

@@ -2918,3 +2918,269 @@ Import traces:
  GET /admin-panel/transports 200 in 29ms (compile: 5ms, render: 24ms)
  GET /admin-panel/transports/1/edit 200 in 324ms (compile: 313ms, render: 11ms)
  GET /admin-panel/transports 200 in 36ms (compile: 9ms, render: 28ms)
+ ✓ Compiled in 22ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 28ms
+ GET /admin-panel/transports 200 in 163ms (compile: 79ms, render: 84ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 26ms
+ GET /admin-panel/transports 200 in 115ms (compile: 59ms, render: 56ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 22ms
+ GET /admin-panel/transports 200 in 82ms (compile: 39ms, render: 42ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 28ms
+ GET /admin-panel/transports 200 in 79ms (compile: 38ms, render: 41ms)
+ ✓ Compiled in 21ms
+ GET /camps/1/edition/1/step/2 200 in 126ms (compile: 8ms, render: 118ms)
+ GET /admin-panel/transports/1/edit 200 in 28ms (compile: 10ms, render: 18ms)
+ GET /admin-panel/transports/1/edit 200 in 59ms (compile: 4ms, render: 55ms)
+ GET /admin-panel/transports/1/edit 200 in 55ms (compile: 6ms, render: 49ms)
+ GET /admin-panel/transports/1/edit 200 in 86ms (compile: 12ms, render: 74ms)
+ GET /admin-panel/transports/1/edit 200 in 58ms (compile: 5ms, render: 53ms)
+ ✓ Compiled in 22ms
+ ✓ Compiled in 20ms
+ ✓ Compiled in 22ms
+ ✓ Compiled in 23ms
+ ✓ Compiled in 19ms
+ GET /admin-panel/transports/1/edit 200 in 144ms (compile: 69ms, render: 75ms)
+ GET /admin-panel/transports/1/edit 200 in 23ms (compile: 3ms, render: 20ms)
+ GET /admin-panel/transports/1/edit 200 in 32ms (compile: 4ms, render: 29ms)
+ GET /admin-panel/transports/1/edit 200 in 28ms (compile: 4ms, render: 25ms)
+ GET /admin-panel/diets 200 in 63ms (compile: 47ms, render: 15ms)
+ GET /admin-panel/transports 200 in 56ms (compile: 45ms, render: 11ms)
+ GET /admin-panel/transports 200 in 71ms (compile: 3ms, render: 68ms)
+ GET /admin-panel/transports 200 in 45ms (compile: 4ms, render: 41ms)
+ GET /camps/1/edition/1/step/2 200 in 58ms (compile: 2ms, render: 55ms)
+ ✓ Compiled in 27ms
+ ✓ Compiled in 23ms
+ ✓ Compiled in 21ms
+ ✓ Compiled in 26ms
+ GET /admin-panel/transports 200 in 128ms (compile: 68ms, render: 60ms)
+ GET /admin-panel/transports/5/edit 200 in 30ms (compile: 10ms, render: 20ms)
+ GET /admin-panel/transports 200 in 32ms (compile: 9ms, render: 24ms)
+ GET /admin-panel/transports 200 in 47ms (compile: 3ms, render: 45ms)
+ GET /admin-panel/transports/1/edit 200 in 52ms (compile: 6ms, render: 45ms)
+ GET /admin-panel/camps 200 in 31ms (compile: 6ms, render: 25ms)
+ GET /admin-panel/camps/2/turnus/3/edit 200 in 34ms (compile: 9ms, render: 25ms)
+ GET /admin-panel/transports 200 in 34ms (compile: 3ms, render: 30ms)
+ GET /admin-panel/transports/1/edit 200 in 35ms (compile: 8ms, render: 27ms)
+ ✓ Compiled in 25ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 23ms
+ GET /admin-panel/transports/1/edit 200 in 179ms (compile: 50ms, render: 130ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 21ms
+ GET /admin-panel/transports/1/edit 200 in 86ms (compile: 36ms, render: 50ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 22ms
+ GET /admin-panel/transports/1/edit 200 in 79ms (compile: 28ms, render: 52ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 29ms
+ GET /admin-panel/transports/1/edit 200 in 75ms (compile: 22ms, render: 52ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 50ms
+ GET /admin-panel/transports/1/edit 200 in 143ms (compile: 79ms, render: 64ms)
+ GET /admin-panel/transports 200 in 23ms (compile: 5ms, render: 17ms)
+ GET /camps/1/edition/1/step/2 200 in 93ms (compile: 10ms, render: 84ms)
+ GET /admin-panel/transports 200 in 23ms (compile: 4ms, render: 18ms)
+ GET /admin-panel/camps 200 in 33ms (compile: 11ms, render: 21ms)
+ GET /admin-panel/camps 200 in 51ms (compile: 3ms, render: 47ms)
+ GET /admin-panel/transports 200 in 16ms (compile: 3ms, render: 13ms)
+ GET /admin-panel/camps 200 in 35ms (compile: 5ms, render: 29ms)
+ GET /admin-panel/camps 200 in 44ms (compile: 3ms, render: 41ms)
+ GET /admin-panel/camps/new 200 in 27ms (compile: 9ms, render: 18ms)
+ GET /admin-panel/camps 200 in 18ms (compile: 2ms, render: 15ms)
+ GET /admin-panel/camps/new 200 in 29ms (compile: 3ms, render: 26ms)
+ GET /admin-panel/camps 200 in 24ms (compile: 4ms, render: 20ms)
+ GET /admin-panel/transports 200 in 69ms (compile: 2ms, render: 67ms)
+ GET /admin-panel/transports 200 in 26ms (compile: 3ms, render: 23ms)
+ GET /admin-panel/payments 200 in 85ms (compile: 69ms, render: 16ms)
+ GET /admin-panel/camps 200 in 19ms (compile: 3ms, render: 16ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 30ms (compile: 12ms, render: 18ms)
+ ✓ Compiled in 25ms
+ ✓ Compiled in 25ms
+ ✓ Compiled in 28ms
+ ✓ Compiled in 129ms
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 140ms (compile: 71ms, render: 70ms)
+ GET /admin-panel/transports 200 in 22ms (compile: 3ms, render: 18ms)
+ GET /admin-panel/camps 200 in 19ms (compile: 4ms, render: 15ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 40ms (compile: 10ms, render: 30ms)
+ GET /admin-panel/camps/1/turnus/1/edit 200 in 38ms (compile: 11ms, render: 28ms)
+ GET /admin-panel/transports 200 in 22ms (compile: 3ms, render: 19ms)
+ GET /admin-panel/camps 200 in 23ms (compile: 4ms, render: 19ms)
+ GET /admin-panel/camps/1/turnus/1/edit 200 in 45ms (compile: 7ms, render: 38ms)
+ GET /admin-panel/camps 200 in 12ms (compile: 1873µs, render: 11ms)
+ GET /admin-panel/transports 200 in 21ms (compile: 2ms, render: 19ms)
+ GET /admin-panel/camps 200 in 31ms (compile: 3ms, render: 28ms)
+ GET /admin-panel/transports 200 in 23ms (compile: 3ms, render: 20ms)
+ GET /admin-panel/camps/1/turnus/1/edit 200 in 36ms (compile: 9ms, render: 27ms)
+ GET /admin-panel/camps 200 in 55ms (compile: 8ms, render: 48ms)
+ GET /admin-panel/transports 200 in 27ms (compile: 4ms, render: 23ms)
+ GET /admin-panel/transports 200 in 38ms (compile: 2ms, render: 36ms)
+ GET /admin-panel/camps 200 in 24ms (compile: 4ms, render: 20ms)
+ GET /admin-panel/camps 200 in 24ms (compile: 3ms, render: 21ms)
+ GET /admin-panel/camps 200 in 19ms (compile: 2ms, render: 17ms)
+ GET /admin-panel/camps 200 in 81ms (compile: 2ms, render: 78ms)
+ GET / 200 in 121ms (compile: 6ms, render: 115ms)
+ GET /admin-panel/camps 200 in 55ms (compile: 3ms, render: 52ms)
+ GET /admin-panel/camps 200 in 42ms (compile: 1444µs, render: 41ms)
+ GET / 200 in 89ms (compile: 5ms, render: 84ms)
+ GET /admin-panel/camps/3/edit 200 in 385ms (compile: 374ms, render: 11ms)
+ GET /admin-panel/camps 200 in 29ms (compile: 5ms, render: 24ms)
+ GET /admin-panel/camps 200 in 45ms (compile: 3ms, render: 42ms)
+ GET /admin-panel/camps/3/edit 200 in 30ms (compile: 6ms, render: 23ms)
+ GET /admin-panel/camps 200 in 64ms (compile: 6ms, render: 58ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 25ms (compile: 4ms, render: 22ms)
+ ✓ Compiled in 24ms
+ ✓ Compiled in 22ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 45ms
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 186ms (compile: 81ms, render: 105ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 77ms
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 126ms (compile: 52ms, render: 74ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 24ms
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 96ms (compile: 45ms, render: 50ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 22ms
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 86ms (compile: 40ms, render: 46ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 31ms
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 159ms (compile: 60ms, render: 99ms)
+ ✓ Compiled in 24ms
+ ✓ Compiled in 27ms
+ ✓ Compiled in 149ms
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 203ms (compile: 96ms, render: 107ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 26ms
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 92ms (compile: 35ms, render: 57ms)
+ GET /admin-panel/transports 200 in 30ms (compile: 7ms, render: 23ms)
+ GET /admin-panel/camps 200 in 37ms (compile: 10ms, render: 27ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 34ms (compile: 5ms, render: 29ms)
+ GET /admin-panel/camps 200 in 20ms (compile: 3ms, render: 17ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 39ms (compile: 8ms, render: 31ms)
+ GET /admin-panel/transports 200 in 26ms (compile: 4ms, render: 22ms)
+ GET /admin-panel/transports 200 in 34ms (compile: 1553µs, render: 32ms)
+ GET /admin-panel/camps 200 in 18ms (compile: 4ms, render: 14ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 23ms (compile: 5ms, render: 18ms)
+ GET /admin-panel/transports 200 in 67ms (compile: 4ms, render: 63ms)
+ GET /admin-panel 200 in 77ms (compile: 61ms, render: 16ms)
+ GET /admin-panel/camps 200 in 18ms (compile: 1893µs, render: 16ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 25ms (compile: 6ms, render: 19ms)
+ GET / 200 in 143ms (compile: 5ms, render: 137ms)
+ GET /login?redirect=%2Fcamps%2F3%2Fedition%2F4%2Fstep%2F1 200 in 28ms (compile: 10ms, render: 18ms)
+ GET /camps/3/edition/4/step/1 200 in 136ms (compile: 5ms, render: 131ms)
+ GET /camps/3/edition/4/step/1 200 in 96ms (compile: 11ms, render: 85ms)
+ GET /camps/3/edition/4/step/2 200 in 31ms (compile: 5ms, render: 26ms)
+ ✓ Compiled in 24ms
+ ✓ Compiled in 59ms
+ ✓ Compiled in 25ms
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 213ms (compile: 104ms, render: 109ms)
+ GET /admin-panel/transports 200 in 25ms (compile: 4ms, render: 21ms)
+ GET /admin-panel/camps 200 in 26ms (compile: 3ms, render: 22ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 38ms (compile: 7ms, render: 31ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 253ms (compile: 14ms, render: 239ms)
+ GET /admin-panel/camps 200 in 22ms (compile: 6ms, render: 16ms)
+ GET /admin-panel/camps/3/turnus/4/edit 200 in 30ms (compile: 6ms, render: 25ms)
+ GET /admin-panel/transports 200 in 25ms (compile: 5ms, render: 20ms)
+ GET /admin-panel/transports/2/edit 200 in 77ms (compile: 12ms, render: 64ms)
+ GET /admin-panel/camps 200 in 22ms (compile: 2ms, render: 20ms)
+ GET /admin-panel/transports 200 in 29ms (compile: 5ms, render: 24ms)
+ GET /admin-panel/camps 200 in 27ms (compile: 3ms, render: 23ms)
+ GET /admin-panel/camps/new 200 in 27ms (compile: 4ms, render: 22ms)
+ GET /admin-panel/camps 200 in 39ms (compile: 3ms, render: 36ms)
+ GET /admin-panel/transports 200 in 24ms (compile: 3ms, render: 21ms)
+ GET /admin-panel/transports/2/edit 200 in 39ms (compile: 10ms, render: 28ms)
+ GET /admin-panel/transports 200 in 17ms (compile: 3ms, render: 14ms)
+ GET /admin-panel/transports 200 in 57ms (compile: 4ms, render: 54ms)
+ GET /admin-panel/transports/2/edit 200 in 30ms (compile: 5ms, render: 25ms)
+ GET /admin-panel/transports 200 in 22ms (compile: 3ms, render: 19ms)
+ GET /admin-panel/camps 200 in 39ms (compile: 6ms, render: 33ms)
+ GET /admin-panel/transports 200 in 27ms (compile: 7ms, render: 21ms)
+ GET /admin-panel/camps 200 in 21ms (compile: 2ms, render: 19ms)
+ GET /admin-panel/transports 200 in 24ms (compile: 3ms, render: 21ms)
+ GET /admin-panel/transports/2/edit 200 in 31ms (compile: 8ms, render: 23ms)
+ GET /admin-panel/transports 200 in 20ms (compile: 1767µs, render: 18ms)
+ GET /admin-panel/camps 200 in 25ms (compile: 3ms, render: 21ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 28ms (compile: 5ms, render: 22ms)
+ GET /admin-panel/camps 200 in 25ms (compile: 8ms, render: 17ms)
+ GET /admin-panel/transports 200 in 28ms (compile: 3ms, render: 24ms)
+ GET /admin-panel/transports/2/edit 200 in 36ms (compile: 7ms, render: 28ms)
+ GET /admin-panel/camps 200 in 21ms (compile: 3ms, render: 18ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 33ms (compile: 5ms, render: 29ms)
+ GET /admin-panel/transports 200 in 24ms (compile: 3ms, render: 21ms)
+ GET /admin-panel/camps 200 in 28ms (compile: 8ms, render: 21ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 59ms (compile: 10ms, render: 49ms)
+ GET /admin-panel/camps 200 in 19ms (compile: 3ms, render: 17ms)
+ GET /admin-panel/camps 200 in 58ms (compile: 5ms, render: 52ms)
+ GET /admin-panel/camps/new 200 in 28ms (compile: 3ms, render: 25ms)
+ GET /admin-panel/camps 200 in 21ms (compile: 2ms, render: 19ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 37ms (compile: 8ms, render: 29ms)
+ GET /admin-panel/transports 200 in 28ms (compile: 3ms, render: 25ms)
+ GET /admin-panel/camps 200 in 24ms (compile: 3ms, render: 21ms)
+ GET /admin-panel/camps/4/edit 200 in 33ms (compile: 9ms, render: 24ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 42ms (compile: 9ms, render: 33ms)
+ GET /admin-panel/camps 200 in 15ms (compile: 2ms, render: 13ms)
+ GET /admin-panel/transports 200 in 28ms (compile: 5ms, render: 23ms)
+ GET /admin-panel/camps 200 in 24ms (compile: 3ms, render: 21ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 29ms (compile: 6ms, render: 24ms)
+ GET /admin-panel/transports 200 in 21ms (compile: 3ms, render: 18ms)
+ GET /admin-panel/camps 200 in 60ms (compile: 30ms, render: 30ms)
+ GET /admin-panel/diets 200 in 166ms (compile: 13ms, render: 154ms)
+ GET /admin-panel/camps 200 in 44ms (compile: 2ms, render: 42ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 25ms (compile: 6ms, render: 19ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 35ms (compile: 5ms, render: 30ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 48ms (compile: 8ms, render: 40ms)
+ GET /admin-panel/camps 200 in 23ms (compile: 5ms, render: 17ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 30ms (compile: 8ms, render: 22ms)
+ GET /admin-panel/camps 200 in 25ms (compile: 3ms, render: 22ms)
+ GET /admin-panel/payments 200 in 16ms (compile: 2ms, render: 13ms)
+ GET /admin-panel/transports 200 in 28ms (compile: 5ms, render: 24ms)
+ GET /admin-panel/diets 200 in 26ms (compile: 4ms, render: 22ms)
+ ✓ Compiled in 25ms
+ ✓ Compiled in 28ms
+ GET /admin-panel/camps 200 in 28ms (compile: 7ms, render: 21ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 87ms (compile: 69ms, render: 18ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 70ms (compile: 3ms, render: 67ms)
+ GET /admin-panel/camps 200 in 17ms (compile: 3ms, render: 15ms)
+ GET /admin-panel/transports 200 in 18ms (compile: 3ms, render: 15ms)
+ GET /admin-panel/camps 200 in 9ms (compile: 1039µs, render: 8ms)
+ GET /admin-panel/payments 200 in 14ms (compile: 3ms, render: 11ms)
+ GET /admin-panel/camps 200 in 15ms (compile: 1146µs, render: 14ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 32ms (compile: 6ms, render: 26ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 34ms (compile: 5ms, render: 29ms)
+ GET /admin-panel/camps 200 in 18ms (compile: 1859µs, render: 16ms)
+ GET /admin-panel/transports 200 in 16ms (compile: 3ms, render: 13ms)
+ GET /admin-panel/camps 200 in 13ms (compile: 1464µs, render: 11ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 34ms (compile: 6ms, render: 28ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 14ms (compile: 2ms, render: 12ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 53ms (compile: 4ms, render: 48ms)
+ GET /admin-panel/transports 200 in 11ms (compile: 1919µs, render: 9ms)
+ GET /admin-panel/camps 200 in 12ms (compile: 1062µs, render: 11ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 17ms (compile: 3ms, render: 14ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 19ms (compile: 4ms, render: 15ms)
+ GET /admin-panel/camps 200 in 16ms (compile: 1816µs, render: 14ms)
+ GET /admin-panel/transports 200 in 30ms (compile: 9ms, render: 21ms)
+ GET /admin-panel/camps 200 in 24ms (compile: 3ms, render: 22ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 29ms (compile: 5ms, render: 25ms)
+ ✓ Compiled in 71ms
+ ✓ Compiled in 23ms
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 226ms (compile: 92ms, render: 133ms)
+ GET /admin-panel/payments 200 in 19ms (compile: 4ms, render: 15ms)
+ GET /admin-panel/camps 200 in 18ms (compile: 4ms, render: 14ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 20ms (compile: 5ms, render: 15ms)
+ GET /admin-panel/camps 200 in 21ms (compile: 4ms, render: 18ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 22ms (compile: 6ms, render: 16ms)
+ GET /admin-panel/camps 200 in 16ms (compile: 3ms, render: 13ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 30ms (compile: 5ms, render: 25ms)
+ GET /admin-panel/camps 200 in 20ms (compile: 3ms, render: 18ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 24ms (compile: 6ms, render: 19ms)
+ GET /admin-panel/camps 200 in 13ms (compile: 1699µs, render: 11ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 27ms (compile: 10ms, render: 17ms)
+ GET /admin-panel/camps 200 in 9ms (compile: 1867µs, render: 7ms)
+ GET /admin-panel/camps/4/turnus/5/edit 200 in 97ms (compile: 7ms, render: 90ms)
+ GET /admin-panel/camps/5/turnus/6/edit 200 in 21ms (compile: 6ms, render: 16ms)
+ GET /admin-panel/transports 200 in 18ms (compile: 3ms, render: 15ms)
+ GET /admin-panel/transports 200 in 36ms (compile: 3ms, render: 33ms)
