@@ -202,6 +202,17 @@ export default function CampTurnusEditPage({
     }
   }, [campId, turnusId]);
 
+  // Get today's date in YYYY-MM-DD format for min date
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Calculate minimum end date (start date + 1 day)
+  const getMinEndDate = () => {
+    if (!startDate) return today;
+    const start = new Date(startDate);
+    start.setDate(start.getDate() + 1);
+    return start.toISOString().split('T')[0];
+  };
+
   const handleSave = async () => {
     if (!city.trim() || !startDate || !endDate) {
       setError('Wszystkie pola są wymagane');
@@ -211,9 +222,20 @@ export default function CampTurnusEditPage({
     // Validate dates
     const start = new Date(startDate);
     const end = new Date(endDate);
+    const todayDate = new Date(today);
+    todayDate.setHours(0, 0, 0, 0);
 
-    if (start >= end) {
-      setError('Data rozpoczęcia musi być wcześniejsza niż data zakończenia');
+    // Check if start date is not in the past
+    if (start < todayDate) {
+      setError('Data rozpoczęcia nie może być w przeszłości');
+      return;
+    }
+
+    // Check if end date is at least 1 day after start date
+    const minEndDate = new Date(startDate);
+    minEndDate.setDate(minEndDate.getDate() + 1);
+    if (end < minEndDate) {
+      setError('Data zakończenia musi być co najmniej 1 dzień po dacie rozpoczęcia');
       return;
     }
 
@@ -235,7 +257,7 @@ export default function CampTurnusEditPage({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          period,
+          period: 'lato', // Always "lato"
           city: city.trim(),
           start_date: startDate,
           end_date: endDate,
@@ -560,24 +582,12 @@ export default function CampTurnusEditPage({
               </div>
             )}
 
-            {/* Period */}
-            <div>
-              <label htmlFor="period" className="block text-sm font-medium text-gray-700 mb-2">
-                Okres <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="period"
-                value={period}
-                onChange={(e) => setPeriod(e.target.value as 'lato' | 'zima')}
-                required
-                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
-                style={{ borderRadius: 0 }}
-                disabled={saving}
-              >
-                <option value="lato">Lato</option>
-                <option value="zima">Zima</option>
-              </select>
-            </div>
+            {/* Period - hidden, always set to "lato" */}
+            <input
+              type="hidden"
+              id="period"
+              value="lato"
+            />
 
             {/* City */}
             <div>
@@ -611,6 +621,7 @@ export default function CampTurnusEditPage({
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   required
+                  min={today}
                   className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
                   style={{ borderRadius: 0 }}
                   disabled={saving}
@@ -628,7 +639,7 @@ export default function CampTurnusEditPage({
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   required
-                  min={startDate}
+                  min={getMinEndDate()}
                   className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
                   style={{ borderRadius: 0 }}
                   disabled={saving}

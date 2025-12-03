@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatDateRange } from '@/utils/api';
 import { saveMagicLinkRedirect } from '@/utils/localStorage';
 import type { Camp, CampProperty } from '@/types/reservation';
+import { Search } from 'lucide-react';
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -20,6 +21,7 @@ export default function CampsList() {
   const [camps, setCamps] = useState<CampWithProperties[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -59,6 +61,42 @@ export default function CampsList() {
   const formatPeriod = (period: string) => {
     return period === 'lato' ? 'Lato' : 'Zima';
   };
+
+  // Filter camps and properties based on search query
+  const filteredCamps = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return camps;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    
+    return camps
+      .map((camp) => {
+        // Check if camp name matches
+        const campNameMatches = camp.name.toLowerCase().includes(query);
+        
+        // Filter properties that match the search
+        const matchingProperties = camp.properties.filter((property) => {
+          const periodLabel = formatPeriod(property.period).toLowerCase();
+          const cityMatches = property.city.toLowerCase().includes(query);
+          const periodMatches = periodLabel.includes(query);
+          const campMatches = campNameMatches;
+          
+          return campMatches || cityMatches || periodMatches;
+        });
+
+        // Only include camp if it has matching properties or camp name matches
+        if (campNameMatches || matchingProperties.length > 0) {
+          return {
+            ...camp,
+            properties: matchingProperties.length > 0 ? matchingProperties : camp.properties,
+          };
+        }
+        
+        return null;
+      })
+      .filter((camp): camp is CampWithProperties => camp !== null);
+  }, [camps, searchQuery]);
 
   if (loading) {
     return (
@@ -104,14 +142,63 @@ export default function CampsList() {
         <h1 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-2 leading-snug">
           Wybierz obóz i turnus
         </h1>
-        <p className="text-xs sm:text-sm text-gray-500">
-          Kliknij na wybrany turnus, aby rozpocząć rezerwację
-        </p>
+      </div>
+
+      {/* Search Bar */}
+      <div className="mb-4 sm:mb-6">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Szukaj obozu, turnusu, miasta lub okresu (np. Lato, Zima)..."
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm sm:text-base transition-all duration-200"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Wyczyść wyszukiwanie"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="mt-2 text-xs sm:text-sm text-gray-500">
+            Znaleziono {filteredCamps.reduce((sum, camp) => sum + camp.properties.length, 0)} turnus{filteredCamps.reduce((sum, camp) => sum + camp.properties.length, 0) !== 1 ? 'ów' : ''} w {filteredCamps.length} oboz{filteredCamps.length !== 1 ? 'ach' : 'ie'}
+          </p>
+        )}
       </div>
 
       {/* Camps List */}
       <div className="space-y-4 sm:space-y-6">
-        {camps.map((camp) => (
+        {filteredCamps.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8 border border-gray-200 text-center">
+            <p className="text-sm sm:text-base text-gray-600 mb-2">
+              {searchQuery ? 'Nie znaleziono obozów pasujących do wyszukiwania' : 'Brak dostępnych obozów'}
+            </p>
+            {searchQuery && (
+              <p className="text-xs sm:text-sm text-gray-500 mb-4">
+                Spróbuj zmienić zapytanie wyszukiwania
+              </p>
+            )}
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="px-4 py-2 bg-[#03adf0] text-white rounded-lg hover:bg-[#0288c7] transition-colors text-xs sm:text-sm"
+              >
+                Wyczyść wyszukiwanie
+              </button>
+            )}
+          </div>
+        ) : (
+          filteredCamps.map((camp) => (
           <div
             key={camp.id}
             className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
@@ -178,7 +265,8 @@ export default function CampsList() {
               </div>
             )}
           </div>
-        ))}
+        ))
+        )}
       </div>
     </div>
   );
