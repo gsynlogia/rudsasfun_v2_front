@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Upload, Check, X, Eye, EyeOff } from 'lucide-react';
+import { FileText, Upload, Check, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface Document {
@@ -20,6 +20,7 @@ export default function DocumentsManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploadingFiles, setUploadingFiles] = useState<Map<string, boolean>>(new Map());
+  const [deletingFiles, setDeletingFiles] = useState<Map<number, boolean>>(new Map());
   const [saving, setSaving] = useState(false);
 
   // Fetch all documents
@@ -107,6 +108,37 @@ export default function DocumentsManagement() {
     }
   };
 
+  // Handle file deletion
+  const handleDeleteFile = async (document: Document) => {
+    if (!document.file_path) {
+      return;
+    }
+
+    if (!confirm(`Czy na pewno chcesz usunąć plik dla dokumentu "${document.display_name}"?`)) {
+      return;
+    }
+
+    try {
+      setDeletingFiles(prev => new Map(prev).set(document.id, true));
+      setError(null);
+
+      await authenticatedApiCall<Document>(`/api/documents/${document.id}/delete-file`, {
+        method: 'DELETE',
+      });
+
+      await fetchDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Błąd podczas usuwania pliku');
+      console.error('[DocumentsManagement] Error deleting file:', err);
+    } finally {
+      setDeletingFiles(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(document.id);
+        return newMap;
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -133,6 +165,7 @@ export default function DocumentsManagement() {
       <div className="space-y-4">
         {documents.map((document) => {
           const isUploading = uploadingFiles.get(document.name) || false;
+          const isDeleting = deletingFiles.get(document.id) || false;
           const hasFile = !!document.file_path;
 
           return (
@@ -175,7 +208,7 @@ export default function DocumentsManagement() {
                       )}
                     </div>
                     {hasFile && document.file_url && (
-                      <div className="mt-2">
+                      <div className="mt-2 flex items-center gap-4">
                         <a
                           href={document.file_url}
                           target="_blank"
@@ -185,6 +218,24 @@ export default function DocumentsManagement() {
                           <FileText className="w-4 h-4" />
                           Otwórz dokument
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteFile(document)}
+                          disabled={isDeleting || saving}
+                          className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isDeleting ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                              <span>Usuwanie...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="w-4 h-4" />
+                              <span>Usuń plik</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     )}
                   </div>
