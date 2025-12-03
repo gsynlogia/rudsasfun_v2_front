@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import DashedLine from './DashedLine';
 import type { StepComponentProps } from '@/types/reservation';
@@ -26,6 +27,7 @@ interface ParentData {
  */
 export default function Step1({ onNext, onPrevious, disabled = false }: StepComponentProps) {
   const { addReservationItem, removeReservationItemsByType } = useReservation();
+  const pathname = usePathname();
   
   const [parents, setParents] = useState<ParentData[]>([
     {
@@ -46,6 +48,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   // Validation errors for participant fields
   const [participantErrors, setParticipantErrors] = useState<Record<string, string>>({});
   const validationAttemptedRef = useRef(false);
+  // Flag to prevent saving empty data before loading from sessionStorage
+  const isDataLoadedRef = useRef(false);
 
   const addParent = () => {
     if (parents.length >= 2) return;
@@ -239,10 +243,13 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     };
   }, [validateAllMemoized]);
 
-  // Load data from sessionStorage on mount
-  // Since we use key prop in parent component, this will run every time user navigates to Step1
-  useLayoutEffect(() => {
+  // Function to load data from sessionStorage
+  const loadDataFromStorage = useCallback(() => {
+    // Reset flag before loading
+    isDataLoadedRef.current = false;
+    
     const savedData = loadStep1FormData();
+    
     if (savedData) {
       // Only update if data exists in sessionStorage
       if (savedData.parents && savedData.parents.length > 0) {
@@ -265,11 +272,39 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
         setAdditionalNotes(savedData.additionalNotes || '');
       }
     }
+    
+    // Mark data as loaded after state updates are scheduled
+    // Use requestAnimationFrame to ensure state updates are processed
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        isDataLoadedRef.current = true;
+      });
+    });
+  }, []);
+
+  // Load data from sessionStorage on mount
+  // Since we use key prop in parent component, this will run every time user navigates to Step1
+  useLayoutEffect(() => {
+    loadDataFromStorage();
   }, []); // Empty deps - will run on every mount (which happens when key changes)
+
+  // Also load data when pathname changes to Step1 (handles case when component doesn't remount)
+  useEffect(() => {
+    if (pathname && pathname.includes('/step/1')) {
+      // Reload data when navigating back to Step1
+      loadDataFromStorage();
+    }
+  }, [pathname, loadDataFromStorage]);
 
   // Save data to sessionStorage whenever any field changes
   // Note: selectedDietId is saved by DietSection component
+  // Only save after data has been loaded from sessionStorage to prevent overwriting with empty values
   useEffect(() => {
+    // Don't save if data hasn't been loaded yet (prevents overwriting sessionStorage with empty initial values)
+    if (!isDataLoadedRef.current) {
+      return;
+    }
+    
     const savedData = loadStep1FormData();
     const formData: Step1FormData = {
       parents,

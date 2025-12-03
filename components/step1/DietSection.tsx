@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { Info } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep1FormData, saveStep1FormData } from '@/utils/sessionStorage';
@@ -22,12 +23,38 @@ interface Diet {
  */
 export default function DietSection() {
   const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
+  const pathname = usePathname();
   
   const [selectedDietId, setSelectedDietId] = useState<number | null>(null);
   const [diets, setDiets] = useState<Diet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const prevDietIdRef = useRef<number | null>(null);
+  const hasLoadedFromStorageRef = useRef(false);
+
+  // Load selectedDietId from sessionStorage first
+  const loadDietFromStorage = useCallback(() => {
+    const savedData = loadStep1FormData();
+    if (savedData && savedData.selectedDietId !== undefined && savedData.selectedDietId !== null) {
+      setSelectedDietId(savedData.selectedDietId);
+      prevDietIdRef.current = savedData.selectedDietId;
+      hasLoadedFromStorageRef.current = true;
+      return savedData.selectedDietId;
+    }
+    return null;
+  }, []);
+
+  // Load from sessionStorage on mount
+  useEffect(() => {
+    loadDietFromStorage();
+  }, []);
+
+  // Also load when pathname changes to Step1 (handles case when component doesn't remount)
+  useEffect(() => {
+    if (pathname && pathname.includes('/step/1')) {
+      loadDietFromStorage();
+    }
+  }, [pathname, loadDietFromStorage]);
 
   // Fetch diets from API
   useEffect(() => {
@@ -43,12 +70,30 @@ export default function DietSection() {
         const data = await response.json();
         setDiets(data.diets || []);
         
-        // Set default diet (first one or Standardowa if exists)
-        if (data.diets && data.diets.length > 0) {
+        // Check sessionStorage directly to get the most up-to-date value
+        const savedData = loadStep1FormData();
+        const savedDietId = savedData?.selectedDietId;
+        
+        // Only set default diet if we haven't loaded from sessionStorage
+        if (!hasLoadedFromStorageRef.current && data.diets && data.diets.length > 0) {
           const standardDiet = data.diets.find((d: Diet) => d.name === 'Standardowa');
           const defaultDiet = standardDiet || data.diets[0];
           setSelectedDietId(defaultDiet.id);
           prevDietIdRef.current = defaultDiet.id;
+        } else if (savedDietId !== undefined && savedDietId !== null) {
+          // Verify that the selected diet from storage exists in the fetched diets
+          const dietExists = data.diets.some((d: Diet) => d.id === savedDietId);
+          if (dietExists) {
+            // Set the saved diet
+            setSelectedDietId(savedDietId);
+            prevDietIdRef.current = savedDietId;
+          } else if (data.diets.length > 0) {
+            // If saved diet doesn't exist, fall back to default
+            const standardDiet = data.diets.find((d: Diet) => d.name === 'Standardowa');
+            const defaultDiet = standardDiet || data.diets[0];
+            setSelectedDietId(defaultDiet.id);
+            prevDietIdRef.current = defaultDiet.id;
+          }
         }
       } catch (err) {
         console.error('[DietSection] Error fetching diets:', err);
@@ -60,16 +105,8 @@ export default function DietSection() {
     };
 
     fetchDiets();
-  }, []);
-
-  // Load from sessionStorage on mount
-  useEffect(() => {
-    const savedData = loadStep1FormData();
-    if (savedData && savedData.selectedDietId !== undefined) {
-      setSelectedDietId(savedData.selectedDietId);
-      prevDietIdRef.current = savedData.selectedDietId;
-    }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Update reservation when diet changes
   useEffect(() => {
