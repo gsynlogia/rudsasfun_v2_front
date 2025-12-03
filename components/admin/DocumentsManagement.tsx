@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FileText, Upload, Check, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { authenticatedApiCall } from '@/utils/api-auth';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 interface Document {
   id: number;
@@ -22,6 +23,8 @@ export default function DocumentsManagement() {
   const [uploadingFiles, setUploadingFiles] = useState<Map<string, boolean>>(new Map());
   const [deletingFiles, setDeletingFiles] = useState<Map<number, boolean>>(new Map());
   const [saving, setSaving] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
 
   // Fetch all documents
   const fetchDocuments = useCallback(async () => {
@@ -108,35 +111,50 @@ export default function DocumentsManagement() {
     }
   };
 
-  // Handle file deletion
-  const handleDeleteFile = async (document: Document) => {
+  // Handle delete file button click - open modal
+  const handleDeleteFileClick = (document: Document) => {
     if (!document.file_path) {
       return;
     }
+    setDocumentToDelete(document);
+    setShowDeleteModal(true);
+  };
 
-    if (!confirm(`Czy na pewno chcesz usunąć plik dla dokumentu "${document.display_name}"?`)) {
+  // Handle file deletion confirmation
+  const handleDeleteFileConfirm = async () => {
+    if (!documentToDelete || !documentToDelete.file_path) {
+      setShowDeleteModal(false);
+      setDocumentToDelete(null);
       return;
     }
 
     try {
-      setDeletingFiles(prev => new Map(prev).set(document.id, true));
+      setDeletingFiles(prev => new Map(prev).set(documentToDelete.id, true));
       setError(null);
 
-      await authenticatedApiCall<Document>(`/api/documents/${document.id}/delete-file`, {
+      await authenticatedApiCall<Document>(`/api/documents/${documentToDelete.id}/delete-file`, {
         method: 'DELETE',
       });
 
       await fetchDocuments();
+      setShowDeleteModal(false);
+      setDocumentToDelete(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Błąd podczas usuwania pliku');
       console.error('[DocumentsManagement] Error deleting file:', err);
     } finally {
       setDeletingFiles(prev => {
         const newMap = new Map(prev);
-        newMap.delete(document.id);
+        newMap.delete(documentToDelete.id);
         return newMap;
       });
     }
+  };
+
+  // Handle delete modal cancel
+  const handleDeleteFileCancel = () => {
+    setShowDeleteModal(false);
+    setDocumentToDelete(null);
   };
 
   if (loading) {
@@ -220,21 +238,12 @@ export default function DocumentsManagement() {
                         </a>
                         <button
                           type="button"
-                          onClick={() => handleDeleteFile(document)}
+                          onClick={() => handleDeleteFileClick(document)}
                           disabled={isDeleting || saving}
                           className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isDeleting ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                              <span>Usuwanie...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Trash2 className="w-4 h-4" />
-                              <span>Usuń plik</span>
-                            </>
-                          )}
+                          <Trash2 className="w-4 h-4" />
+                          <span>Usuń plik</span>
                         </button>
                       </div>
                     )}
@@ -282,6 +291,18 @@ export default function DocumentsManagement() {
           <p>Brak dokumentów w systemie.</p>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        itemType="other"
+        itemName={documentToDelete?.display_name || ''}
+        itemId={documentToDelete?.id || 0}
+        additionalInfo="Plik zostanie usunięty z dysku, ale rekord dokumentu pozostanie w bazie danych."
+        onConfirm={handleDeleteFileConfirm}
+        onCancel={handleDeleteFileCancel}
+        isLoading={documentToDelete ? deletingFiles.get(documentToDelete.id) || false : false}
+      />
     </div>
   );
 }
