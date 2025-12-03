@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Info, Download } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
+import { API_BASE_URL } from '@/utils/api-config';
 
 /**
  * ProtectionSection Component
@@ -30,6 +31,7 @@ export default function ProtectionSection() {
   
   const [selectedProtections, setSelectedProtections] = useState<Set<string>>(getInitialSelectedProtections);
   const protectionReservationIdsRef = useRef<Map<string, string>>(new Map()); // Map: protectionId -> reservationItemId
+  const [documents, setDocuments] = useState<Map<string, string>>(new Map()); // Map: document name -> file_url
 
   const protections = [
     {
@@ -59,6 +61,27 @@ export default function ProtectionSection() {
   );
 
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Fetch public documents
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/documents/public`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const docsMap = new Map<string, string>();
+        (data.documents || []).forEach((doc: { name: string; file_url: string | null }) => {
+          if (doc.file_url) {
+            docsMap.set(doc.name, doc.file_url);
+          }
+        });
+        setDocuments(docsMap);
+      } catch (err) {
+        console.error('[ProtectionSection] Error fetching documents:', err);
+      }
+    };
+    fetchDocuments();
+  }, []);
 
   // Sync with sessionStorage on mount
   useEffect(() => {
@@ -254,14 +277,24 @@ export default function ProtectionSection() {
 
         {/* Regulation buttons */}
         <div className="flex flex-wrap gap-3 sm:gap-4">
-          <button className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium">
-            <Download className="w-4 h-4" />
-            Regulamin Ochrony TARCZA
-          </button>
-          <button className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium">
-            <Download className="w-4 h-4" />
-            Regulamin Ochrony OAZA
-          </button>
+          {documents.has('shield_protection') && (
+            <button
+              onClick={() => window.open(documents.get('shield_protection'), '_blank')}
+              className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Regulamin Ochrony TARCZA
+            </button>
+          )}
+          {documents.has('oasa_protection') && (
+            <button
+              onClick={() => window.open(documents.get('oasa_protection'), '_blank')}
+              className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Regulamin Ochrony OAZA
+            </button>
+          )}
         </div>
       </section>
     </div>

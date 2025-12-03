@@ -47,6 +47,28 @@ export default function TransportSection() {
   const [showDifferentCitiesModal, setShowDifferentCitiesModal] = useState(false);
   const [departurePrice, setDeparturePrice] = useState<number | null>(null);
   const [returnPrice, setReturnPrice] = useState<number | null>(null);
+  const [transportDocuments, setTransportDocuments] = useState<Map<string, string>>(new Map()); // Map: document name -> file_url
+
+  // Fetch public documents
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/documents/public`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const docsMap = new Map<string, string>();
+        (data.documents || []).forEach((doc: { name: string; file_url: string | null }) => {
+          if (doc.file_url && (doc.name === 'transport_regulations' || doc.name === 'transport_list')) {
+            docsMap.set(doc.name, doc.file_url);
+          }
+        });
+        setTransportDocuments(docsMap);
+      } catch (err) {
+        console.error('[TransportSection] Error fetching documents:', err);
+      }
+    };
+    fetchDocuments();
+  }, []);
 
   const [transportModalConfirmed, setTransportModalConfirmed] = useState(false);
   const [transportErrors, setTransportErrors] = useState<Record<string, string>>({});
@@ -298,14 +320,24 @@ export default function TransportSection() {
 
         {/* Regulation buttons */}
         <div className="flex flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <button className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium">
-            <Download className="w-4 h-4" />
-            Regulamin transportu
-          </button>
-          <button className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium">
-            <FileText className="w-4 h-4" />
-            Lista transportów
-          </button>
+          {transportDocuments.has('transport_regulations') && (
+            <button
+              onClick={() => window.open(transportDocuments.get('transport_regulations'), '_blank')}
+              className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Regulamin transportu
+            </button>
+          )}
+          {transportDocuments.has('transport_list') && (
+            <button
+              onClick={() => window.open(transportDocuments.get('transport_list'), '_blank')}
+              className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium"
+            >
+              <FileText className="w-4 h-4" />
+              Lista transportów
+            </button>
+          )}
         </div>
 
         {/* Transport form */}

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Info, Download } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
+import { API_BASE_URL } from '@/utils/api-config';
 
 /**
  * PromotionsSection Component
@@ -28,6 +29,25 @@ export default function PromotionsSection() {
   };
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [promotionDocumentUrl, setPromotionDocumentUrl] = useState<string | null>(null);
+
+  // Fetch public documents
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/documents/public`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const doc = (data.documents || []).find((d: { name: string }) => d.name === 'promotion_regulation');
+        if (doc && doc.file_url) {
+          setPromotionDocumentUrl(doc.file_url);
+        }
+      } catch (err) {
+        console.error('[PromotionsSection] Error fetching documents:', err);
+      }
+    };
+    fetchDocuments();
+  }, []);
 
   // Load data from sessionStorage on mount
   useEffect(() => {
@@ -127,10 +147,15 @@ export default function PromotionsSection() {
         </div>
 
         {/* Regulation button */}
-        <button className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium">
-          <Download className="w-4 h-4" />
-          Regulamin promocji
-        </button>
+        {promotionDocumentUrl && (
+          <button
+            onClick={() => window.open(promotionDocumentUrl, '_blank')}
+            className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium"
+          >
+            <Download className="w-4 h-4" />
+            Regulamin promocji
+          </button>
+        )}
       </section>
     </div>
   );

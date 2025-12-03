@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import DashedLine from './DashedLine';
 import type { StepComponentProps } from '@/types/reservation';
 import { saveStep4FormData, loadStep4FormData, type Step4FormData } from '@/utils/sessionStorage';
+import { API_BASE_URL } from '@/utils/api-config';
 
 /**
  * Step4 Component - Consents and Regulations
@@ -33,6 +34,28 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
   const [validationError, setValidationError] = useState<string>('');
   const [consentErrors, setConsentErrors] = useState<Record<string, string>>({});
   const validationAttemptedRef = useRef(false);
+  const [documents, setDocuments] = useState<Map<string, { display_name: string; file_url: string }>>(new Map());
+
+  // Fetch public documents
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/documents/public`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const docsMap = new Map<string, { display_name: string; file_url: string }>();
+        (data.documents || []).forEach((doc: { name: string; display_name: string; file_url: string | null }) => {
+          if (doc.file_url) {
+            docsMap.set(doc.name, { display_name: doc.display_name, file_url: doc.file_url });
+          }
+        });
+        setDocuments(docsMap);
+      } catch (err) {
+        console.error('[Step4] Error fetching documents:', err);
+      }
+    };
+    fetchDocuments();
+  }, []);
 
   // Load data from sessionStorage on mount
   useEffect(() => {
@@ -151,32 +174,29 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
 
   // Handle document download
   const handleDocumentDownload = (documentName: string) => {
-    // For now, we'll use placeholder links
-    // In production, these should point to actual document files
-    const documentLinks: Record<string, string> = {
-      'Regulamin portalu Radsas Fun': '#',
-      'Polityka prywatności': '#',
-      'Szczegółowy regulamin Imprez turystycznych oraz warunki uczestnictwa w imprezach turystycznych RADSAS FUN': '#',
-      'Regulamin Usług Turystycznych i Ubezpieczeń': '#',
-      'Przykładowy regulamin': '#',
-    };
-
-    const link = documentLinks[documentName];
-    if (link && link !== '#') {
-      window.open(link, '_blank');
-    } else {
-      // Placeholder - in production, this should download actual file
-      console.log(`Downloading: ${documentName}`);
+    const doc = documents.get(documentName);
+    if (doc && doc.file_url) {
+      window.open(doc.file_url, '_blank');
     }
   };
 
-  const documents = [
-    'Regulamin portalu Radsas Fun',
-    'Polityka prywatności',
-    'Szczegółowy regulamin Imprez turystycznych oraz warunki uczestnictwa w imprezach turystycznych RADSAS FUN',
-    'Regulamin Usług Turystycznych i Ubezpieczeń',
-    'Przykładowy regulamin',
-  ];
+  // Get document URL by name
+  const getDocumentUrl = (documentName: string): string | null => {
+    const doc = documents.get(documentName);
+    return doc?.file_url || null;
+  };
+
+  // Get list of documents to display (only public ones)
+  const getDocumentsList = () => {
+    const docNames = ['portal_regulation', 'privacy_policy', 'tourist_events_regulations', 'tourist_regulations_insurance', 'watt_input_regulation'];
+    return docNames
+      .filter(name => documents.has(name))
+      .map(name => ({
+        name,
+        display_name: documents.get(name)!.display_name,
+        file_url: documents.get(name)!.file_url,
+      }));
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -225,27 +245,35 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                   }`}
                 >
                   Zapoznałem się z{' '}
-                  <a
-                    href="#"
-                    className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleDocumentDownload('Regulamin portalu Radsas Fun');
-                    }}
-                  >
-                    Regulaminem portalu
-                  </a>{' '}
+                  {getDocumentUrl('portal_regulation') ? (
+                    <a
+                      href="#"
+                      className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleDocumentDownload('portal_regulation');
+                      }}
+                    >
+                      Regulaminem portalu
+                    </a>
+                  ) : (
+                    <span className="text-gray-500">Regulaminem portalu</span>
+                  )}{' '}
                   oraz{' '}
-                  <a
-                    href="#"
-                    className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleDocumentDownload('Polityka prywatności');
-                    }}
-                  >
-                    Polityką prywatności
-                  </a>{' '}
+                  {getDocumentUrl('privacy_policy') ? (
+                    <a
+                      href="#"
+                      className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleDocumentDownload('privacy_policy');
+                      }}
+                    >
+                      Polityką prywatności
+                    </a>
+                  ) : (
+                    <span className="text-gray-500">Polityką prywatności</span>
+                  )}{' '}
                   i akceptuję ich postanowienia.
                   <span className="text-red-500 ml-1">*</span>
                 </label>
@@ -275,16 +303,20 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                   }`}
                 >
                   Zapoznałem się z{' '}
-                  <a
-                    href="#"
-                    className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleDocumentDownload('Szczegółowy regulamin Imprez turystycznych oraz warunki uczestnictwa w imprezach turystycznych RADSAS FUN');
-                    }}
-                  >
-                    Warunkami uczestnictwa
-                  </a>{' '}
+                  {getDocumentUrl('tourist_events_regulations') ? (
+                    <a
+                      href="#"
+                      className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleDocumentDownload('tourist_events_regulations');
+                      }}
+                    >
+                      Warunkami uczestnictwa
+                    </a>
+                  ) : (
+                    <span className="text-gray-500">Warunkami uczestnictwa</span>
+                  )}{' '}
                   i akceptuję ich postanowienia.
                   <span className="text-red-500 ml-1">*</span>
                 </label>
@@ -388,23 +420,23 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
 
             {/* Documents List */}
             <div className="space-y-0 pl-4 sm:pl-6 md:pl-8">
-              {documents.map((docName, index) => (
-                <div key={index}>
+              {getDocumentsList().map((doc, index) => (
+                <div key={doc.name}>
                   <div
                     className="flex items-center justify-between py-3 sm:py-4 px-0 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => handleDocumentDownload(docName)}
+                    onClick={() => handleDocumentDownload(doc.name)}
                   >
                     <span className="text-xs sm:text-sm text-gray-700 flex-1">
-                      {docName}
+                      {doc.display_name}
                     </span>
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDocumentDownload(docName);
+                        handleDocumentDownload(doc.name);
                       }}
                       className="ml-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#EAF6FE] hover:bg-[#D0ECFD] flex items-center justify-center transition-colors flex-shrink-0"
-                      aria-label={`Pobierz ${docName}`}
+                      aria-label={`Pobierz ${doc.display_name}`}
                     >
                       <svg
                         className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0]"
@@ -421,7 +453,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                       </svg>
                     </button>
                   </div>
-                  {index < documents.length - 1 && (
+                  {index < getDocumentsList().length - 1 && (
                     <hr className="border-gray-200" />
                   )}
                 </div>
