@@ -1018,13 +1018,15 @@ export default function DietsManagement() {
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
         isOpen={showDeleteModal}
-        onClose={() => {
+        onCancel={() => {
           setShowDeleteModal(false);
           setSelectedDiet(null);
         }}
         onConfirm={handleDeleteConfirm}
-        title="Usuń dietę"
-        message={`Czy na pewno chcesz usunąć dietę "${selectedDiet?.name}"? Ta operacja jest nieodwracalna.`}
+        itemType="other"
+        itemName={selectedDiet?.name || 'Dietę'}
+        itemId={selectedDiet?.id || 0}
+        additionalInfo="Ta operacja jest nieodwracalna."
         isLoading={saving}
       />
     </div>
