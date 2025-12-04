@@ -54,6 +54,21 @@ export interface Camp {
 }
 
 /**
+ * TransportCity interface - 1:1 with backend TransportCityResponse
+ * All fields match exactly with backend JSON response
+ */
+export interface TransportCity {
+  id: number;
+  transport_id: number;
+  city: string;
+  departure_price?: number | null; // Price for departure from this city in PLN
+  return_price?: number | null; // Price for return to this city in PLN
+  display_order?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/**
  * CampPropertyTransport interface - 1:1 with backend CampPropertyTransportResponse
  * All fields match exactly with backend JSON response
  */
@@ -61,14 +76,16 @@ export interface CampPropertyTransport {
   id: number;
   name?: string | null; // Optional transport name
   property_id?: number | null; // Optional - transport can be independent
+  camp_ids?: number[]; // Array of camp IDs (many-to-many relationship)
   departure_type: 'collective' | 'own';
-  departure_city?: string | null;
-  departure_collective_price?: number | null; // Price for collective transport in PLN
+  departure_city?: string | null; // Legacy field - use cities array instead
+  departure_collective_price?: number | null; // Legacy field - use cities array instead
   departure_own_price?: number | null; // Not used for own transport
   return_type: 'collective' | 'own';
-  return_city?: string | null;
-  return_collective_price?: number | null; // Price for collective transport in PLN
+  return_city?: string | null; // Legacy field - use cities array instead
+  return_collective_price?: number | null; // Legacy field - use cities array instead
   return_own_price?: number | null; // Not used for own transport
+  cities?: TransportCity[]; // Array of cities with prices
   created_at?: string | null;
   updated_at?: string | null;
 }
