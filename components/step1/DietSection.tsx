@@ -62,8 +62,22 @@ export default function DietSection() {
       try {
         setLoading(true);
         setError(null);
+        
+        // Extract property_id from URL
+        // URL format: /camps/[campId]/edition/[editionId]/step/1
+        const pathParts = pathname.split('/').filter(Boolean);
+        const editionIndex = pathParts.indexOf('edition');
+        const propertyId = editionIndex !== -1 && editionIndex + 1 < pathParts.length 
+          ? parseInt(pathParts[editionIndex + 1], 10) 
+          : null;
+        
         // Public endpoint - no authentication required
-        const response = await fetch(`${API_BASE_URL}/api/diets/public`);
+        // If property_id is available, pass it to get turnus-specific diets
+        const url = propertyId 
+          ? `${API_BASE_URL}/api/diets/public?property_id=${propertyId}`
+          : `${API_BASE_URL}/api/diets/public`;
+        
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

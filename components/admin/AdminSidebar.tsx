@@ -81,7 +81,7 @@ export default function AdminSidebar() {
     {
       href: '/admin-panel/diets',
       icon: UtensilsCrossed,
-      label: 'Diet',
+      label: 'Diety',
       key: 'diets',
       section: 'diets',
     },

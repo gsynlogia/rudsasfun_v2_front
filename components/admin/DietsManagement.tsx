@@ -1,10 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { UtensilsCrossed, Plus, Search, Edit, Trash2, Power, PowerOff, Save, DollarSign, FileText } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { UtensilsCrossed, Plus, Search, Edit, Trash2, Power, PowerOff, Save, DollarSign, FileText, ChevronDown, Check, X } from 'lucide-react';
 import UniversalModal from './UniversalModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { authenticatedApiCall } from '@/utils/api-auth';
+
+interface TurnusInfo {
+  turnus_id: number;
+  camp_id: number;
+  camp_name: string | null;
+  city: string;
+  start_date: string | null;
+  end_date: string | null;
+}
 
 interface Diet {
   id: number;
@@ -16,18 +25,53 @@ interface Diet {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  turnus_info?: TurnusInfo[] | null;
 }
 
 export default function DietsManagement() {
   const [diets, setDiets] = useState<Diet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDiet, setSelectedDiet] = useState<Diet | null>(null);
   const [saving, setSaving] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  
+  // Filter state
+  const [nameFilters, setNameFilters] = useState<string[]>([]); // Multi-select for names
+  const [priceMinFilter, setPriceMinFilter] = useState<number | ''>('');
+  const [priceMaxFilter, setPriceMaxFilter] = useState<number | ''>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'active', 'inactive'
+  
+  // Multi-select state for names
+  const [isNameSelectOpen, setIsNameSelectOpen] = useState(false);
+  const [nameSearchQuery, setNameSearchQuery] = useState('');
+  const nameSelectRef = useRef<HTMLDivElement>(null);
+  
+  // Store all available diet names (for multi-select)
+  const [allDietNames, setAllDietNames] = useState<string[]>([]);
+  
+  // Also update names from currently loaded diets as a backup
+  // This ensures names are available even if initial fetch fails
+  useEffect(() => {
+    if (diets.length > 0 && allDietNames.length === 0) {
+      // Only update if we don't have names yet (fallback scenario)
+      const namesFromCurrentDiets = Array.from(new Set(
+        diets.map(d => d?.name).filter(Boolean)
+      )).sort();
+      
+      if (namesFromCurrentDiets.length > 0) {
+        setAllDietNames(namesFromCurrentDiets);
+        console.log('[DietsManagement] Using names from table as fallback:', namesFromCurrentDiets.length);
+      }
+    }
+  }, [diets, allDietNames.length]);
 
   // Form state
   const [dietName, setDietName] = useState('');
@@ -38,20 +82,85 @@ export default function DietsManagement() {
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [uploadingIcon, setUploadingIcon] = useState(false);
 
-  // Fetch all diets
+  // Fetch all unique diet names for multi-select (once on mount)
+  useEffect(() => {
+    const fetchAllDietNames = async () => {
+      try {
+        // Use dedicated endpoint that returns all unique names without pagination
+        const names = await authenticatedApiCall<string[]>(
+          '/api/diets/names'
+        );
+        
+        console.log('[DietsManagement] Loaded diet names from API:', names.length, 'unique names');
+        setAllDietNames(names || []);
+      } catch (err) {
+        console.error('[DietsManagement] Error fetching diet names:', err);
+        // Fallback: try to extract names from currently loaded diets
+        if (diets.length > 0) {
+          const namesFromDiets = Array.from(new Set(
+            diets.map(d => d.name).filter(Boolean)
+          )).sort();
+          setAllDietNames(namesFromDiets);
+        }
+      }
+    };
+    fetchAllDietNames();
+  }, []); // Only run once on mount
+
+  // Filter available names based on search query
+  const filteredAvailableNames = useMemo(() => {
+    if (!nameSearchQuery.trim()) {
+      return allDietNames;
+    }
+    const query = nameSearchQuery.toLowerCase();
+    return allDietNames.filter(name => name.toLowerCase().includes(query));
+  }, [allDietNames, nameSearchQuery]);
+
+  // Build query params for filters and pagination
+  const buildQueryParams = () => {
+    const params = new URLSearchParams();
+    params.append('page', currentPage.toString());
+    params.append('limit', itemsPerPage.toString());
+    
+    if (nameFilters.length > 0) {
+      params.append('names', nameFilters.join(','));
+    }
+    
+    if (priceMinFilter !== '') {
+      params.append('price_min', priceMinFilter.toString());
+    }
+    
+    if (priceMaxFilter !== '') {
+      params.append('price_max', priceMaxFilter.toString());
+    }
+    
+    if (statusFilter === 'active') {
+      params.append('is_active', 'true');
+    } else if (statusFilter === 'inactive') {
+      params.append('is_active', 'false');
+    }
+    // 'all' means no is_active parameter
+    
+    return params.toString();
+  };
+
+  // Fetch diets with filters and pagination
   const fetchDiets = async () => {
     try {
       setLoading(true);
       setError(null);
+      const queryParams = buildQueryParams();
       const data = await authenticatedApiCall<{ diets: Diet[]; total: number }>(
-        '/api/diets/?include_inactive=true'
+        `/api/diets/?${queryParams}`
       );
       setDiets(data.diets || []);
+      setTotalCount(data.total || 0);
     } catch (err) {
       console.error('[DietsManagement] Error fetching diets:', err);
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas ładowania diet';
       setError(errorMessage);
       setDiets([]);
+      setTotalCount(0);
       
       // If it's an authentication error, the SectionGuard should handle redirect
       if (errorMessage.includes('Not authenticated') || errorMessage.includes('Session expired')) {
@@ -65,18 +174,80 @@ export default function DietsManagement() {
 
   useEffect(() => {
     fetchDiets();
+  }, [currentPage, itemsPerPage, nameFilters, priceMinFilter, priceMaxFilter, statusFilter]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (nameSelectRef.current && !nameSelectRef.current.contains(event.target as Node)) {
+        setIsNameSelectOpen(false);
+        setNameSearchQuery('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
-  // Filter diets by search query
-  const filteredDiets = diets.filter((diet) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      diet.name.toLowerCase().includes(query) ||
-      (diet.description && diet.description.toLowerCase().includes(query)) ||
-      (diet.icon_name && diet.icon_name.toLowerCase().includes(query))
-    );
-  });
+  // Handle name filter (multi-select)
+  const handleNameFilterChange = (name: string) => {
+    setNameFilters(prev => {
+      if (prev.includes(name)) {
+        return prev.filter(n => n !== name);
+      } else {
+        return [...prev, name];
+      }
+    });
+    setCurrentPage(1);
+  };
+
+  // Remove single name filter
+  const removeNameFilter = (name: string) => {
+    setNameFilters(prev => prev.filter(n => n !== name));
+    setCurrentPage(1);
+  };
+
+  // Format diet name with turnus info
+  const formatDietName = (diet: Diet): string => {
+    if (!diet.turnus_info || diet.turnus_info.length === 0) {
+      return diet.name;
+    }
+    
+    // If diet is assigned to turnuses, show turnus info
+    if (diet.turnus_info.length === 1) {
+      const turnus = diet.turnus_info[0];
+      const startDate = turnus.start_date ? new Date(turnus.start_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+      const endDate = turnus.end_date ? new Date(turnus.end_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+      const dateRange = startDate && endDate ? `${startDate} - ${endDate}` : '';
+      return `${diet.name} (${turnus.city}${dateRange ? `, ${dateRange}` : ''})`;
+    } else {
+      // Multiple turnuses - show first turnus info in name, details in subtitle
+      const firstTurnus = diet.turnus_info[0];
+      const startDate = firstTurnus.start_date ? new Date(firstTurnus.start_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+      const endDate = firstTurnus.end_date ? new Date(firstTurnus.end_date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+      const dateRange = startDate && endDate ? `${startDate} - ${endDate}` : '';
+      return `${diet.name} (${firstTurnus.city}${dateRange ? `, ${dateRange}` : ''}, +${diet.turnus_info.length - 1} więcej)`;
+    }
+  };
+
+  // Calculate pagination
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
+
+  // Handle filter changes - reset to page 1
+  const handleFilterChange = () => {
+    setCurrentPage(1);
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setNameFilters([]);
+    setPriceMinFilter('');
+    setPriceMaxFilter('');
+    setStatusFilter('all');
+    setCurrentPage(1);
+  };
 
   // Reset form
   const resetForm = () => {
@@ -309,25 +480,210 @@ export default function DietsManagement() {
         </div>
       )}
 
-      {/* Search Bar */}
-      <div className="mb-6">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
+      {/* Filters */}
+      <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Name Filter - Multi-select */}
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Nazwa</label>
+            <div className="relative" ref={nameSelectRef}>
+              <button
+                type="button"
+                onClick={() => setIsNameSelectOpen(!isNameSelectOpen)}
+                className={`w-full px-3 py-2 text-sm font-medium border-2 border-[#03adf0] bg-white text-[#03adf0] focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-left flex items-center justify-between gap-2 rounded-lg ${
+                  isNameSelectOpen ? 'bg-[#03adf0] text-white' : ''
+                }`}
+              >
+                <span className="flex-1 truncate">
+                  {nameFilters.length === 0
+                    ? 'Wybierz nazwy diet'
+                    : nameFilters.length === 1
+                    ? nameFilters[0]
+                    : `Wybrano: ${nameFilters.length}`}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 transition-transform ${isNameSelectOpen ? 'transform rotate-180' : ''}`}
+                />
+              </button>
+
+              {/* Dropdown */}
+              {isNameSelectOpen && (
+                <div className="absolute z-50 mt-1 w-full bg-white border-2 border-[#03adf0] shadow-lg max-h-64 overflow-hidden flex flex-col rounded-lg">
+                  {/* Search input */}
+                  <div className="p-2 border-b border-gray-200">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Szukaj nazwy diety..."
+                        value={nameSearchQuery}
+                        onChange={(e) => setNameSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] rounded-lg"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {/* Options list */}
+                  <div className="overflow-y-auto flex-1 max-h-48">
+                    {filteredAvailableNames.length > 0 ? (
+                      filteredAvailableNames.map((name) => {
+                        const isSelected = nameFilters.includes(name);
+                        return (
+                          <label
+                            key={name}
+                            className={`flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors cursor-pointer ${
+                              isSelected ? 'bg-blue-50' : ''
+                            }`}
+                          >
+                            <div className="relative flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleNameFilterChange(name)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0] rounded"
+                              />
+                              {isSelected && (
+                                <Check className="absolute left-0 w-4 h-4 text-[#03adf0] pointer-events-none" />
+                              )}
+                            </div>
+                            <span className="text-sm text-gray-900 flex-1">{name}</span>
+                          </label>
+                        );
+                      })
+                    ) : (
+                      <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                        Brak wyników
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected items as chips */}
+              {nameFilters.length > 0 && !isNameSelectOpen && (
+                <div className="absolute top-full left-0 mt-1 flex flex-wrap gap-1 max-w-full z-10">
+                  {nameFilters.slice(0, 3).map((name) => (
+                    <span
+                      key={name}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-[#03adf0] text-white rounded-lg"
+                    >
+                      {name.length > 20 ? `${name.substring(0, 20)}...` : name}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeNameFilter(name);
+                        }}
+                        className="hover:bg-[#0288c7] rounded transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {nameFilters.length > 3 && (
+                    <span className="inline-flex items-center px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded-lg">
+                      +{nameFilters.length - 3} więcej
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Szukaj diety po nazwie, opisie lub ikonie..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
-          />
+
+          {/* Price Min Filter */}
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Cena min (PLN)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={priceMinFilter}
+              onChange={(e) => {
+                setPriceMinFilter(e.target.value === '' ? '' : parseFloat(e.target.value));
+                handleFilterChange();
+              }}
+              placeholder="0.00"
+              className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+            />
+          </div>
+
+          {/* Price Max Filter */}
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Cena max (PLN)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={priceMaxFilter}
+              onChange={(e) => {
+                setPriceMaxFilter(e.target.value === '' ? '' : parseFloat(e.target.value));
+                handleFilterChange();
+              }}
+              placeholder="9999.99"
+              className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+            />
+          </div>
+
+          {/* Status Filter */}
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                handleFilterChange();
+              }}
+              className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+            >
+              <option value="all">Wszystkie</option>
+              <option value="active">Aktywne</option>
+              <option value="inactive">Nieaktywne</option>
+            </select>
+          </div>
+
+          {/* Clear Filters Button */}
+          <div className="flex items-end">
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Wyczyść
+            </button>
+          </div>
+        </div>
+
+        {/* Results count */}
+        <div className="mt-4 text-xs text-gray-600">
+          Znaleziono: {totalCount} {totalCount === 1 ? 'dieta' : totalCount < 5 ? 'diety' : 'diet'}
+        </div>
+      </div>
+
+      {/* Items per page selector */}
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600">Na stronie:</span>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] transition-all duration-200"
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
         </div>
       </div>
 
       {/* Diets Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {filteredDiets.length === 0 ? (
+        {diets.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-gray-500">Brak diet do wyświetlenia</p>
           </div>
@@ -345,7 +701,7 @@ export default function DietsManagement() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredDiets.map((diet) => {
+                {diets.map((diet) => {
                   return (
                     <tr key={diet.id} className={!diet.is_active ? 'opacity-50' : ''}>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -372,7 +728,15 @@ export default function DietsManagement() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-gray-900">{diet.name}</div>
+                        <div className="text-sm font-medium text-gray-900">{formatDietName(diet)}</div>
+                        {diet.turnus_info && diet.turnus_info.length > 0 && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            {diet.turnus_info.length === 1 
+                              ? `Turnus: ${diet.turnus_info[0].camp_name || 'N/A'}`
+                              : `Przypisana do ${diet.turnus_info.length} turnusów`
+                            }
+                          </div>
+                        )}
                         {diet.icon_name && !diet.icon_url && (
                           <div className="text-xs text-gray-500">{diet.icon_name}</div>
                         )}
@@ -431,6 +795,55 @@ export default function DietsManagement() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+            <div className="text-xs text-gray-600">
+              Strona {currentPage} z {totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-lg"
+              >
+                Poprzednia
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1.5 text-xs font-medium transition-colors rounded-lg ${
+                        currentPage === page
+                          ? 'bg-[#03adf0] text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                } else if (page === currentPage - 2 || page === currentPage + 2) {
+                  return <span key={page} className="px-2 text-gray-500">...</span>;
+                }
+                return null;
+              })}
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-lg"
+              >
+                Następna
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -27,6 +27,7 @@ export default function CampPropertyForm({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number>(50);
+  const [useDefaultDiet, setUseDefaultDiet] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +52,7 @@ export default function CampPropertyForm({
       setStartDate(property.start_date.split('T')[0]);
       setEndDate(property.end_date.split('T')[0]);
       setMaxParticipants(property.max_participants || 50);
+      setUseDefaultDiet(property.use_default_diet !== undefined ? property.use_default_diet : false);
     }
   }, [property]);
 
@@ -95,6 +97,7 @@ export default function CampPropertyForm({
             start_date: startDate,
             end_date: endDate,
             max_participants: maxParticipants,
+            use_default_diet: useDefaultDiet,
           })
         : JSON.stringify({
             camp_id: campId,
@@ -103,6 +106,7 @@ export default function CampPropertyForm({
             start_date: startDate,
             end_date: endDate,
             max_participants: maxParticipants,
+            use_default_diet: useDefaultDiet,
           });
 
       const response = await fetch(url, {
@@ -228,6 +232,24 @@ export default function CampPropertyForm({
               Maks. liczba uczestników
             </p>
           </div>
+        </div>
+
+        <div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useDefaultDiet}
+              onChange={(e) => setUseDefaultDiet(e.target.checked)}
+              className="w-4 h-4 text-[#03adf0] border-gray-300 rounded focus:ring-[#03adf0]"
+              disabled={loading}
+            />
+            <span className="text-sm font-medium text-gray-700">
+              Użyj domyślnych diet dla tego turnusu
+            </span>
+          </label>
+          <p className="mt-1 text-xs text-gray-500 ml-6">
+            Jeśli zaznaczone, turnus będzie używał domyślnych diet z systemu. Jeśli odznaczone, możesz dodać indywidualne diety dla tego turnusu.
+          </p>
         </div>
 
         {startDate && endDate && (

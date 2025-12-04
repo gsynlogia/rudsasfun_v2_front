@@ -3,10 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
-import { ArrowLeft, Save, Calendar, MapPin, Truck, Copy, Search, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, MapPin, Truck, Copy, Search, Plus, Trash2, UtensilsCrossed, DollarSign, FileText } from 'lucide-react';
 import type { Camp, CampProperty, CampPropertyTransport } from '@/types/reservation';
 import UniversalModal from '@/components/admin/UniversalModal';
 import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 /**
  * Fetch camp by ID
@@ -116,6 +117,7 @@ export default function CampTurnusEditPage({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number>(50);
+  const [useDefaultDiet, setUseDefaultDiet] = useState<boolean>(false);
 
   // Transport state
   const [transport, setTransport] = useState<CampPropertyTransport | null>(null);
@@ -130,6 +132,23 @@ export default function CampTurnusEditPage({
   const [showDeleteTransportModal, setShowDeleteTransportModal] = useState(false);
   const [isDeletingTransport, setIsDeletingTransport] = useState(false);
   const [searchTransportQuery, setSearchTransportQuery] = useState('');
+
+  // Turnus diets state
+  const [turnusDiets, setTurnusDiets] = useState<any[]>([]);
+  const [loadingDiets, setLoadingDiets] = useState(false);
+  const [showAddDietModal, setShowAddDietModal] = useState(false);
+  const [showDeleteDietModal, setShowDeleteDietModal] = useState(false);
+  const [dietToDelete, setDietToDelete] = useState<number | null>(null);
+  const [isDeletingDiet, setIsDeletingDiet] = useState(false);
+  
+  // Add diet form state
+  const [newDietName, setNewDietName] = useState('');
+  const [newDietPrice, setNewDietPrice] = useState<number | ''>(0);
+  const [newDietDescription, setNewDietDescription] = useState('');
+  const [newDietIconUrl, setNewDietIconUrl] = useState<string | null>(null);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const [isAddingDiet, setIsAddingDiet] = useState(false);
 
   // Resolve params (handle both Promise and direct params)
   useEffect(() => {
@@ -184,6 +203,7 @@ export default function CampTurnusEditPage({
             setStartDate(propertyData.start_date.split('T')[0]);
             setEndDate(propertyData.end_date.split('T')[0]);
             setMaxParticipants(propertyData.max_participants || 50);
+            setUseDefaultDiet(propertyData.use_default_diet !== undefined ? propertyData.use_default_diet : false);
             
             // Populate transport data if exists - map cities to transport fields
             if (transportData) {
@@ -216,6 +236,43 @@ export default function CampTurnusEditPage({
           setError(err instanceof Error ? err.message : 'Błąd podczas ładowania danych');
           setLoading(false);
         });
+    }
+  }, [campId, turnusId]);
+
+  // Fetch turnus diets
+  const fetchTurnusDiets = async () => {
+    if (!campId || !turnusId) return;
+
+    try {
+      setLoadingDiets(true);
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${turnusId}/diets`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.warn('[CampTurnusEditPage] Error fetching turnus diets:', response.status);
+        setTurnusDiets([]);
+        return;
+      }
+
+      const data = await response.json();
+      setTurnusDiets(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('[CampTurnusEditPage] Error fetching turnus diets:', err);
+      setTurnusDiets([]);
+    } finally {
+      setLoadingDiets(false);
+    }
+  };
+
+  // Load turnus diets when component mounts or turnusId changes
+  useEffect(() => {
+    if (campId && turnusId) {
+      fetchTurnusDiets();
     }
   }, [campId, turnusId]);
 
@@ -279,6 +336,7 @@ export default function CampTurnusEditPage({
           start_date: startDate,
           end_date: endDate,
           max_participants: maxParticipants,
+          use_default_diet: useDefaultDiet,
         }),
       });
 
@@ -525,6 +583,161 @@ export default function CampTurnusEditPage({
       // Error already set in assignTransportToTurnus
     } finally {
       setLoadingTransport(false);
+    }
+  };
+
+  // Handle icon upload
+  const handleIconUpload = async (file: File): Promise<string | null> => {
+    if (!file.name.endsWith('.svg')) {
+      setError('Tylko pliki SVG są dozwolone');
+      return null;
+    }
+
+    try {
+      setUploadingIcon(true);
+      setError(null);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await authenticatedApiCall<{ url: string; filename: string; relative_path: string }>(
+        '/api/diets/upload-icon',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      // Return the full URL for display
+      return response.url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Błąd podczas przesyłania ikony');
+      console.error('[CampTurnusEditPage] Error uploading icon:', err);
+      return null;
+    } finally {
+      setUploadingIcon(false);
+    }
+  };
+
+  // Handle file input change
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIconFile(file);
+    const uploadedUrl = await handleIconUpload(file);
+    if (uploadedUrl) {
+      setNewDietIconUrl(uploadedUrl);
+    }
+  };
+
+  // Add diet to turnus
+  const handleAddDiet = async () => {
+    if (!campId || !turnusId || !newDietName.trim()) {
+      setError('Nazwa diety jest wymagana');
+      return;
+    }
+
+    if (newDietPrice === '' || newDietPrice < 0) {
+      setError('Cena musi być większa lub równa 0');
+      return;
+    }
+
+    // Upload icon if file is selected but not yet uploaded
+    let finalIconUrl = newDietIconUrl;
+    if (iconFile && !newDietIconUrl) {
+      const uploadResult = await handleIconUpload(iconFile);
+      if (!uploadResult) {
+        return; // Error already set in handleIconUpload
+      }
+      finalIconUrl = uploadResult;
+      setNewDietIconUrl(finalIconUrl);
+    }
+
+    try {
+      setIsAddingDiet(true);
+      setError(null);
+
+      // Convert full URL to relative path for storage (if needed)
+      let iconUrlToStore = finalIconUrl;
+      if (iconUrlToStore && iconUrlToStore.startsWith('http')) {
+        try {
+          const url = new URL(iconUrlToStore);
+          iconUrlToStore = url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
+        } catch {
+          // Keep original if URL parsing fails
+        }
+      }
+
+      // For turnus diets, we send icon_svg as the SVG code or icon_url
+      // Since we're uploading a file, we'll send the relative path
+      const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${turnusId}/diets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newDietName.trim(),
+          price: Number(newDietPrice),
+          description: newDietDescription.trim() || null,
+          icon_svg: null, // We're using file upload instead
+          icon_url: iconUrlToStore || null, // Send the uploaded icon URL
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      const newDiet = await response.json();
+      setTurnusDiets([...turnusDiets, newDiet]);
+      
+      // Reset form
+      setNewDietName('');
+      setNewDietPrice(0);
+      setNewDietDescription('');
+      setNewDietIconUrl(null);
+      setIconFile(null);
+      setShowAddDietModal(false);
+    } catch (err) {
+      console.error('[CampTurnusEditPage] Error adding diet:', err);
+      setError(err instanceof Error ? err.message : 'Błąd podczas dodawania diety');
+    } finally {
+      setIsAddingDiet(false);
+    }
+  };
+
+  // Remove diet from turnus
+  const handleRemoveDiet = async () => {
+    if (!campId || !turnusId || !dietToDelete) {
+      return;
+    }
+
+    try {
+      setIsDeletingDiet(true);
+      setError(null);
+
+      const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${turnusId}/diets/${dietToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      setTurnusDiets(turnusDiets.filter(d => d.id !== dietToDelete));
+      setShowDeleteDietModal(false);
+      setDietToDelete(null);
+    } catch (err) {
+      console.error('[CampTurnusEditPage] Error removing diet:', err);
+      setError(err instanceof Error ? err.message : 'Błąd podczas usuwania diety');
+    } finally {
+      setIsDeletingDiet(false);
     }
   };
 
@@ -786,6 +999,109 @@ export default function CampTurnusEditPage({
               )}
             </div>
 
+            {/* Diets Section */}
+            <div className="pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <UtensilsCrossed className="w-5 h-5 text-gray-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">Diety turnusu</h2>
+                </div>
+                {!useDefaultDiet && (
+                  <button
+                    onClick={() => setShowAddDietModal(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-[#03adf0] hover:bg-[#0288c7] transition-all duration-200"
+                    style={{ borderRadius: 0, cursor: 'pointer' }}
+                    disabled={saving || loading || isAddingDiet}
+                    title="Dodaj dietę dla tego turnusu"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Dodaj dietę
+                  </button>
+                )}
+              </div>
+
+              {/* Use Default Diet Checkbox */}
+              <div className="mb-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useDefaultDiet}
+                    onChange={(e) => setUseDefaultDiet(e.target.checked)}
+                    className="w-4 h-4 text-[#03adf0] border-gray-300 rounded focus:ring-[#03adf0]"
+                    disabled={saving}
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Użyj domyślnych diet dla tego turnusu
+                  </span>
+                </label>
+                <p className="mt-1 text-xs text-gray-500 ml-6">
+                  Jeśli zaznaczone, turnus będzie używał domyślnych diet z systemu. Jeśli odznaczone, możesz dodać indywidualne diety dla tego turnusu.
+                </p>
+              </div>
+
+              {useDefaultDiet ? (
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                  <p className="text-sm text-blue-700">
+                    Turnus używa domyślnych diet z systemu. Odznacz checkbox "Użyj domyślnych diet", aby dodać indywidualne diety dla tego turnusu.
+                  </p>
+                </div>
+              ) : loadingDiets ? (
+                <div className="text-center text-gray-500 py-4">Ładowanie diet turnusu...</div>
+              ) : turnusDiets.length === 0 ? (
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center text-sm text-gray-500">
+                  Brak diet przypisanych do tego turnusu. Kliknij "Dodaj dietę", aby dodać dietę specyficzną dla tego turnusu.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {turnusDiets.map((diet) => (
+                    <div
+                      key={diet.id}
+                      className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-start justify-between"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          {diet.icon_url && (
+                            <div className="w-10 h-10 flex items-center justify-center bg-white border border-gray-200 rounded">
+                              <img
+                                src={diet.icon_url}
+                                alt={diet.name}
+                                className="w-8 h-8 object-contain"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
+                          <div>
+                            <h3 className="text-sm font-semibold text-gray-900">{diet.name}</h3>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Cena: {diet.price.toFixed(2)} PLN
+                            </p>
+                            {diet.description && (
+                              <p className="text-xs text-gray-500 mt-1">{diet.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setDietToDelete(diet.id);
+                          setShowDeleteDietModal(true);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-300 hover:bg-red-50 transition-all duration-200"
+                        style={{ borderRadius: 0, cursor: 'pointer' }}
+                        disabled={saving || loading || isDeletingDiet}
+                        title="Usuń dietę z turnusu"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Usuń
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Property Info */}
             {property && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
@@ -859,11 +1175,10 @@ export default function CampTurnusEditPage({
                         <div
                           key={transport.id}
                           onClick={() => handleSelectTransport(transport)}
-                          className="p-4 border border-gray-200 hover:border-[#03adf0] hover:bg-[#E0F2FF] transition-all duration-200 cursor-pointer"
+                          className="p-4 border border-gray-200 hover:border-[#03adf0] hover:bg-[#E0F2FF] transition-all duration-200 cursor-pointer flex items-start justify-between"
                           style={{ borderRadius: 0 }}
                         >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
+                          <div className="flex-1">
                               {/* Transport name or turnus info */}
                               {transport.name ? (
                                 <div className="mb-2">
@@ -906,73 +1221,72 @@ export default function CampTurnusEditPage({
                                   )}
                                 </div>
                               )}
-                          <div className="grid grid-cols-2 gap-3 text-xs">
-                            <div>
-                              <span className="font-medium text-gray-700">Wyjazd:</span>
-                              <span className="ml-1 text-gray-600">
-                                {transport.departure_type === 'collective' ? 'Zbiorowy' : 'Własny'}
-                                {transport.departure_type === 'collective' && (
-                                  <>
-                                    {transport.cities && transport.cities.length > 0 ? (
-                                      <span className="ml-1">
-                                        {transport.cities.map((c: any, idx: number) => (
-                                          <span key={idx}>
-                                            {c.city}
-                                            {c.departure_price && ` (${c.departure_price.toFixed(2)} PLN)`}
-                                            {idx < transport.cities.length - 1 && ', '}
-                                          </span>
-                                        ))}
-                                      </span>
-                                    ) : (
-                                      <>
-                                        {transport.departure_city && ` - ${transport.departure_city}`}
-                                        {transport.departure_collective_price && (
-                                          <span className="ml-1 text-gray-500">
-                                            ({transport.departure_collective_price.toFixed(2)} PLN)
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </>
-                                )}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">Powrót:</span>
-                              <span className="ml-1 text-gray-600">
-                                {transport.return_type === 'collective' ? 'Zbiorowy' : 'Własny'}
-                                {transport.return_type === 'collective' && (
-                                  <>
-                                    {transport.cities && transport.cities.length > 0 ? (
-                                      <span className="ml-1">
-                                        {transport.cities.map((c: any, idx: number) => (
-                                          <span key={idx}>
-                                            {c.city}
-                                            {c.return_price && ` (${c.return_price.toFixed(2)} PLN)`}
-                                            {idx < transport.cities.length - 1 && ', '}
-                                          </span>
-                                        ))}
-                                      </span>
-                                    ) : (
-                                      <>
-                                        {transport.return_city && ` - ${transport.return_city}`}
-                                        {transport.return_collective_price && (
-                                          <span className="ml-1 text-gray-500">
-                                            ({transport.return_collective_price.toFixed(2)} PLN)
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </>
-                                )}
-                              </span>
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <span className="font-medium text-gray-700">Wyjazd:</span>
+                                <span className="ml-1 text-gray-600">
+                                  {transport.departure_type === 'collective' ? 'Zbiorowy' : 'Własny'}
+                                  {transport.departure_type === 'collective' && (
+                                    <>
+                                      {transport.cities && transport.cities.length > 0 ? (
+                                        <span className="ml-1">
+                                          {transport.cities.map((c: any, idx: number) => (
+                                            <span key={idx}>
+                                              {c.city}
+                                              {c.departure_price && ` (${c.departure_price.toFixed(2)} PLN)`}
+                                              {idx < transport.cities.length - 1 && ', '}
+                                            </span>
+                                          ))}
+                                        </span>
+                                      ) : (
+                                        <>
+                                          {transport.departure_city && ` - ${transport.departure_city}`}
+                                          {transport.departure_collective_price && (
+                                            <span className="ml-1 text-gray-500">
+                                              ({transport.departure_collective_price.toFixed(2)} PLN)
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </>
+                                  )}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Powrót:</span>
+                                <span className="ml-1 text-gray-600">
+                                  {transport.return_type === 'collective' ? 'Zbiorowy' : 'Własny'}
+                                  {transport.return_type === 'collective' && (
+                                    <>
+                                      {transport.cities && transport.cities.length > 0 ? (
+                                        <span className="ml-1">
+                                          {transport.cities.map((c: any, idx: number) => (
+                                            <span key={idx}>
+                                              {c.city}
+                                              {c.return_price && ` (${c.return_price.toFixed(2)} PLN)`}
+                                              {idx < transport.cities.length - 1 && ', '}
+                                            </span>
+                                          ))}
+                                        </span>
+                                      ) : (
+                                        <>
+                                          {transport.return_city && ` - ${transport.return_city}`}
+                                          {transport.return_collective_price && (
+                                            <span className="ml-1 text-gray-500">
+                                              ({transport.return_collective_price.toFixed(2)} PLN)
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </>
+                                  )}
+                                </span>
+                              </div>
                             </div>
                           </div>
+                          <Copy className="w-4 h-4 text-[#03adf0] flex-shrink-0 ml-2" />
                         </div>
-                        <Copy className="w-4 h-4 text-[#03adf0] flex-shrink-0 ml-2" />
-                      </div>
-                    </div>
-                  ))}
+                      ))}
                 </div>
               )}
             </div>
@@ -1010,6 +1324,194 @@ export default function CampTurnusEditPage({
         itemId={transport?.id}
         additionalInfo="Przypisanie transportu do tego turnusu zostanie usunięte. Transport pozostanie w systemie i będzie dostępny do przypisania do innych turnusów."
         isLoading={isDeletingTransport}
+      />
+
+      {/* Add Diet Modal */}
+      <UniversalModal
+        isOpen={showAddDietModal}
+        title="Dodaj dietę dla turnusu"
+        onClose={() => {
+          setShowAddDietModal(false);
+          setNewDietName('');
+          setNewDietPrice(0);
+          setNewDietDescription('');
+          setNewDietIconUrl(null);
+          setIconFile(null);
+        }}
+        maxWidth="lg"
+      >
+        <div className="p-6">
+          {error && (
+            <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4 rounded">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAddDiet();
+            }}
+            className="space-y-5"
+          >
+            {/* Name */}
+            <div>
+              <label htmlFor="diet-name" className="block text-sm font-medium text-gray-700 mb-2">
+                <UtensilsCrossed className="w-4 h-4 inline mr-1.5 text-[#03adf0]" />
+                Nazwa diety <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="diet-name"
+                type="text"
+                value={newDietName}
+                onChange={(e) => setNewDietName(e.target.value)}
+                required
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent transition-all"
+                placeholder="np. Dieta wegetariańska"
+                disabled={isAddingDiet}
+              />
+            </div>
+
+            {/* Price */}
+            <div>
+              <label htmlFor="diet-price" className="block text-sm font-medium text-gray-700 mb-2">
+                <DollarSign className="w-4 h-4 inline mr-1.5 text-[#03adf0]" />
+                Cena (PLN) <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="diet-price"
+                  type="number"
+                  value={newDietPrice}
+                  onChange={(e) => setNewDietPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  required
+                  min="0"
+                  step="0.01"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent transition-all"
+                  placeholder="0.00"
+                  disabled={isAddingDiet}
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">PLN</span>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label htmlFor="diet-description" className="block text-sm font-medium text-gray-700 mb-2">
+                <FileText className="w-4 h-4 inline mr-1.5 text-[#03adf0]" />
+                Opis diety <span className="text-gray-500 text-xs">(opcjonalny)</span>
+              </label>
+              <textarea
+                id="diet-description"
+                value={newDietDescription}
+                onChange={(e) => setNewDietDescription(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent transition-all resize-none"
+                placeholder="Krótki opis diety, np. dieta bezglutenowa, wegańska, itp."
+                disabled={isAddingDiet}
+              />
+            </div>
+
+            {/* Icon Upload (Optional) */}
+            <div>
+              <label htmlFor="icon-file" className="block text-sm font-medium text-gray-700 mb-2">
+                <FileText className="w-4 h-4 inline mr-1.5 text-[#03adf0]" />
+                Ikona SVG (opcjonalnie)
+              </label>
+              <div className="space-y-3">
+                {newDietIconUrl && (
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 border-2 border-[#03adf0] rounded-lg">
+                    <div className="flex items-center justify-center w-12 h-12 bg-white rounded-lg border border-[#03adf0]">
+                      <img 
+                        src={newDietIconUrl} 
+                        alt="Preview"
+                        className="w-8 h-8 object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">Wybrana ikona:</p>
+                      <p className="text-xs font-mono text-gray-600 truncate">{newDietIconUrl}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewDietIconUrl(null);
+                        setIconFile(null);
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                      disabled={isAddingDiet || uploadingIcon}
+                    >
+                      Usuń
+                    </button>
+                  </div>
+                )}
+                <div>
+                  <input
+                    id="icon-file"
+                    type="file"
+                    accept=".svg"
+                    onChange={handleFileChange}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#03adf0] file:text-white hover:file:bg-[#0288c7] file:cursor-pointer"
+                    disabled={isAddingDiet || uploadingIcon}
+                  />
+                  {uploadingIcon && (
+                    <p className="mt-1.5 text-xs text-blue-600">Przesyłanie ikony...</p>
+                  )}
+                </div>
+              </div>
+              <p className="mt-1.5 text-xs text-gray-500">
+                Wybierz plik SVG jako ikonę diety. Jeśli nie wybierzesz ikony, dieta będzie wyświetlana bez ikony.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddDietModal(false);
+                  setNewDietName('');
+                  setNewDietPrice(0);
+                  setNewDietDescription('');
+                  setNewDietIconUrl(null);
+                  setIconFile(null);
+                }}
+                disabled={isAddingDiet}
+                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                style={{ cursor: isAddingDiet ? 'not-allowed' : 'pointer' }}
+              >
+                Anuluj
+              </button>
+              <button
+                type="submit"
+                disabled={isAddingDiet || !newDietName.trim()}
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-[#03adf0] rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 shadow-sm"
+                style={{ cursor: (isAddingDiet || !newDietName.trim()) ? 'not-allowed' : 'pointer' }}
+              >
+                <Save className="w-4 h-4" />
+                {isAddingDiet ? 'Dodawanie...' : 'Dodaj dietę'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </UniversalModal>
+
+      {/* Delete Diet Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteDietModal}
+        onClose={() => {
+          setShowDeleteDietModal(false);
+          setDietToDelete(null);
+        }}
+        onConfirm={handleRemoveDiet}
+        itemType="diet"
+        itemName={turnusDiets.find(d => d.id === dietToDelete)?.name || 'Dieta'}
+        itemId={dietToDelete}
+        additionalInfo="Dieta zostanie usunięta z tego turnusu. Dieta pozostanie w systemie i będzie dostępna do przypisania do innych turnusów."
+        isLoading={isDeletingDiet}
       />
     </AdminLayout>
   );
