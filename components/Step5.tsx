@@ -152,11 +152,19 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     return cities[cityValue] || getValueOrNotSet(cityValue, 'Nie wybrano');
   };
 
-  // Get diet label
-  const getDietLabel = (diet: string | null | undefined): string => {
-    if (diet === 'standard') return 'Standardowa (0,00zł)';
-    if (diet === 'vegetarian') return 'Wegetariańska (50,00zł)';
-    return 'Nie wybrano';
+  // Get diet label from selectedDietId or reservation items
+  const getDietLabel = (dietId: number | null | undefined): string => {
+    if (!dietId) return 'Nie wybrano';
+    
+    // First, try to find diet in reservation items (for paid diets)
+    const dietItem = reservation.items.find(item => item.type === 'diet');
+    if (dietItem) {
+      return `${dietItem.name} (${formatPrice(dietItem.price)}zł)`;
+    }
+    
+    // If not in reservation items, it's likely a free diet (standard)
+    // We could fetch from API, but for now return a generic label
+    return 'Standardowa (0,00zł)';
   };
 
   // Get gender label
@@ -570,7 +578,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Dieta uczestnika
               </h3>
               <div className="text-xs sm:text-sm text-gray-700">
-                {step1Data ? getDietLabel(step1Data.diet) : 'Nie wybrano'}
+                {step1Data ? getDietLabel(step1Data.selectedDietId) : 'Nie wybrano'}
               </div>
             </div>
           </div>
