@@ -2,8 +2,10 @@
 
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, Clock, AlertCircle, Download } from 'lucide-react';
 import { reservationService } from '@/lib/services/ReservationService';
+import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
+import { certificateService, CertificateResponse } from '@/lib/services/CertificateService';
 
 /**
  * Reservations Management Component
@@ -42,6 +44,8 @@ interface Reservation {
   status: string;
   createdAt: string;
   details: ReservationDetails;
+  hasQualificationCard?: boolean;
+  qualificationCard?: QualificationCardResponse | null;
 }
 
 // Backend reservation response interface
@@ -181,6 +185,60 @@ export default function ReservationsManagement() {
   // State for delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  
+  // State for qualification cards
+  const [qualificationCards, setQualificationCards] = useState<Map<number, QualificationCardResponse | null>>(new Map());
+  const [loadingCards, setLoadingCards] = useState<Set<number>>(new Set());
+  
+  // State for certificates
+  const [certificates, setCertificates] = useState<Map<number, CertificateResponse[]>>(new Map());
+  const [loadingCertificates, setLoadingCertificates] = useState<Set<number>>(new Set());
+
+  // Fetch qualification card for a reservation
+  const fetchQualificationCard = async (reservationId: number) => {
+    if (loadingCards.has(reservationId)) return;
+    
+    try {
+      setLoadingCards(prev => new Set(prev).add(reservationId));
+      const card = await qualificationCardService.getQualificationCard(reservationId);
+      setQualificationCards(prev => new Map(prev).set(reservationId, card));
+    } catch (error: any) {
+      // 404 is expected if card doesn't exist
+      if (error.message && !error.message.includes('404')) {
+        console.error(`Error loading qualification card for reservation ${reservationId}:`, error);
+      }
+      setQualificationCards(prev => new Map(prev).set(reservationId, null));
+    } finally {
+      setLoadingCards(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reservationId);
+        return newSet;
+      });
+    }
+  };
+
+  // Fetch certificates for a reservation
+  const fetchCertificates = async (reservationId: number) => {
+    if (loadingCertificates.has(reservationId)) return;
+    
+    try {
+      setLoadingCertificates(prev => new Set(prev).add(reservationId));
+      const response = await certificateService.getCertificates(reservationId);
+      setCertificates(prev => new Map(prev).set(reservationId, response.certificates));
+    } catch (error: any) {
+      // 404 is expected if certificates don't exist
+      if (error.message && !error.message.includes('404')) {
+        console.error(`Error loading certificates for reservation ${reservationId}:`, error);
+      }
+      setCertificates(prev => new Map(prev).set(reservationId, []));
+    } finally {
+      setLoadingCertificates(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reservationId);
+        return newSet;
+      });
+    }
+  };
 
   // Fetch reservations from API
   useEffect(() => {
@@ -191,6 +249,12 @@ export default function ReservationsManagement() {
         const backendReservations = await reservationService.listReservations(0, 1000);
         const mappedReservations = backendReservations.map(mapBackendToFrontend);
         setAllReservations(mappedReservations);
+        
+        // Fetch qualification cards and certificates for all reservations
+        for (const reservation of mappedReservations) {
+          fetchQualificationCard(reservation.id);
+          fetchCertificates(reservation.id);
+        }
       } catch (err) {
         console.error('Error fetching reservations:', err);
         setError(err instanceof Error ? err.message : 'Błąd podczas ładowania rezerwacji');
@@ -226,6 +290,71 @@ export default function ReservationsManagement() {
     e.stopPropagation();
     setSelectedReservation(reservation);
     setDeleteModalOpen(true);
+  };
+  
+  // Handle certificate download
+  const handleDownloadCertificate = async (certificate: CertificateResponse, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      const blob = await certificateService.downloadCertificate(certificate.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = certificate.file_name;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        if (document.body.contains(a)) {
+          document.body.removeChild(a);
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Error downloading certificate:', error);
+      alert('Nie udało się pobrać zaświadczenia. Spróbuj ponownie.');
+    }
+  };
+
+  // Handle qualification card download
+  const handleDownloadQualificationCard = async (reservation: Reservation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    let card = qualificationCards.get(reservation.id);
+    
+    // If card not loaded yet, try to fetch it
+    if (!card && !qualificationCards.has(reservation.id)) {
+      await fetchQualificationCard(reservation.id);
+      // Wait a bit for state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      card = qualificationCards.get(reservation.id);
+    }
+    
+    if (!card) {
+      alert('Karta kwalifikacyjna nie została znaleziona');
+      return;
+    }
+    
+    try {
+      const blob = await qualificationCardService.downloadQualificationCard(card.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = card.file_name;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        if (document.body.contains(a)) {
+          document.body.removeChild(a);
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Error downloading qualification card:', error);
+      alert('Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
+    }
   };
   
   // Handle delete confirmation (without actual deletion)
@@ -811,10 +940,17 @@ export default function ReservationsManagement() {
               {paginatedReservations.length > 0 ? (
                 paginatedReservations.map((reservation) => {
                   const isExpanded = expandedRows.has(reservation.id);
+                  const hasQualificationCard = qualificationCards.has(reservation.id) && qualificationCards.get(reservation.id) !== null;
+                  const qualificationCard = qualificationCards.get(reservation.id);
+                  
                   return (
                     <Fragment key={reservation.id}>
                       <tr 
-                        className={`hover:bg-gray-50 transition-all duration-200 ${isExpanded ? 'bg-blue-50' : ''}`}
+                        className={`hover:bg-gray-50 transition-all duration-200 ${
+                          isExpanded ? 'bg-blue-50' : ''
+                        } ${
+                          hasQualificationCard ? 'bg-green-50 hover:bg-green-100' : ''
+                        }`}
                         onClick={() => toggleRowExpansion(reservation.id)}
                         style={{ cursor: 'pointer' }}
                       >
@@ -872,6 +1008,16 @@ export default function ReservationsManagement() {
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            {hasQualificationCard && (
+                              <button
+                                onClick={(e) => handleDownloadQualificationCard(reservation, e)}
+                                className="p-1.5 text-green-600 hover:bg-green-50 transition-colors"
+                                title="Pobierz kartę kwalifikacyjną"
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               onClick={(e) => handleEditClick(reservation, e)}
                               className="p-1.5 text-[#03adf0] hover:bg-blue-50 transition-colors"
@@ -962,6 +1108,66 @@ export default function ReservationsManagement() {
                                   </div>
                                 </div>
                               </div>
+                              
+                              {/* Qualification Card */}
+                              {(() => {
+                                const expandedCard = qualificationCards.get(reservation.id);
+                                return expandedCard ? (
+                                  <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                                    <h4 className="font-semibold text-sm text-gray-900 mb-2">Karta kwalifikacyjna</h4>
+                                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded">
+                                      <FileText className="w-4 h-4 text-green-600" />
+                                      <span className="text-sm text-gray-900">{expandedCard.file_name}</span>
+                                      <span className="text-xs text-gray-500 ml-auto">
+                                        Przesłano: {formatDate(expandedCard.uploaded_at)}
+                                      </span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDownloadQualificationCard(reservation, e);
+                                        }}
+                                        className="ml-2 px-2 py-1 text-xs text-green-700 bg-green-100 hover:bg-green-200 transition-colors flex items-center gap-1"
+                                        style={{ borderRadius: 0 }}
+                                      >
+                                        <Download className="w-3 h-3" />
+                                        Pobierz
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : null;
+                              })()}
+                              
+                              {/* Certificates */}
+                              {(() => {
+                                const reservationCertificates = certificates.get(reservation.id) || [];
+                                return reservationCertificates.length > 0 ? (
+                                  <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                                    <h4 className="font-semibold text-sm text-gray-900 mb-2">Zaświadczenia</h4>
+                                    <div className="space-y-2">
+                                      {reservationCertificates.map((cert) => (
+                                        <div key={cert.id} className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                                          <FileText className="w-4 h-4 text-blue-600" />
+                                          <span className="text-sm text-gray-900 flex-1">{cert.file_name}</span>
+                                          <span className="text-xs text-gray-500">
+                                            {formatDate(cert.uploaded_at)}
+                                          </span>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDownloadCertificate(cert, e);
+                                            }}
+                                            className="ml-2 px-2 py-1 text-xs text-blue-700 bg-blue-100 hover:bg-blue-200 transition-colors flex items-center gap-1"
+                                            style={{ borderRadius: 0 }}
+                                          >
+                                            <Download className="w-3 h-3" />
+                                            Pobierz
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : null;
+                              })()}
                               
                               {/* Additional Info */}
                               <div className="space-y-2 md:col-span-2 lg:col-span-3">

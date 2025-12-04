@@ -40,8 +40,51 @@ export default function LayoutClient({
   });
 
   // Navigate to specific step using URL
+  // Only allow navigation to adjacent steps (forward/backward one step at a time)
   const handleStepNavigation = async (step: StepNumber) => {
     if (!campData) return;
+    
+    // Check if step is adjacent (only allow forward/backward one step)
+    const stepDiff = step - currentStep;
+    if (Math.abs(stepDiff) !== 1) {
+      // Not adjacent step - validate current step and move forward if valid
+      if (step > currentStep) {
+        // Trying to go forward - validate current step first
+        let isValid = true;
+        
+        // For step 2, use combined validation function
+        if (currentStep === 2) {
+          const validateStep2Combined = (window as any).validateStep2Combined;
+          if (validateStep2Combined && typeof validateStep2Combined === 'function') {
+            isValid = validateStep2Combined();
+          }
+        } else if (currentStep === 3) {
+          // For step 3, use combined validation function
+          const validateStep3Combined = (window as any).validateStep3Combined;
+          if (validateStep3Combined && typeof validateStep3Combined === 'function') {
+            isValid = validateStep3Combined();
+          }
+        } else {
+          // Check if validation function exists for current step
+          const validateFunction = (window as any)[`validateStep${currentStep}`];
+          if (validateFunction && typeof validateFunction === 'function') {
+            isValid = validateFunction();
+          }
+        }
+        
+        if (!isValid) {
+          // Validation failed - scroll to top to show errors
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        
+        // Valid - move to next step
+        step = (currentStep + 1) as StepNumber;
+      } else {
+        // Trying to go backward - always allow
+        step = (currentStep - 1) as StepNumber;
+      }
+    }
     
     // Extract campId and editionId from current path
     const pathParts = pathname.split('/').filter(Boolean);

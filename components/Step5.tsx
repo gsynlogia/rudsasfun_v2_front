@@ -11,12 +11,14 @@ import {
   loadStep1FormData,
   loadStep2FormData,
   loadStep3FormData,
-  loadReservationState
+  loadReservationState,
+  clearAllSessionData
 } from '@/utils/sessionStorage';
 import { useReservation } from '@/context/ReservationContext';
 import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { reservationService, ReservationService } from '@/lib/services/ReservationService';
 import { loadStep4FormData } from '@/utils/sessionStorage';
+import UniversalModal from '@/components/admin/UniversalModal';
 
 /**
  * Step5 Component - Summary and Payment
@@ -47,6 +49,9 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
   const [paymentError, setPaymentError] = useState<string>('');
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [reservationError, setReservationError] = useState<string>('');
+  const [showPaymentLaterModal, setShowPaymentLaterModal] = useState(false);
+  const [createdReservationId, setCreatedReservationId] = useState<number | null>(null);
+  const [paymentInstallments, setPaymentInstallments] = useState<'full' | '2' | '3'>('full');
 
   // Load data from sessionStorage on mount
   useEffect(() => {
@@ -295,9 +300,11 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     return { campId: null, propertyId: null };
   };
 
-  // Handle payment processing
+  // Handle payment processing (when payNow is checked)
   const handlePayment = async () => {
     if (!formData.payNow) {
+      // If pay later, create reservation without payment
+      await handleReservationWithoutPayment();
       return;
     }
 
@@ -386,6 +393,9 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
       // Create payment
       const paymentResponse = await paymentService.createPayment(paymentRequest);
 
+      // Clear session storage after successful payment creation
+      clearAllSessionData();
+
       // Redirect to payment URL if available
       if (paymentResponse.payment_url) {
         window.location.href = paymentResponse.payment_url;
@@ -409,6 +419,64 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
       setIsProcessingPayment(false);
     }
   };
+
+  // Handle reservation creation without payment (pay later)
+  const handleReservationWithoutPayment = async () => {
+    setIsCreatingReservation(true);
+    setReservationError('');
+
+    try {
+      // Get camp IDs from URL
+      const { campId, propertyId } = getCampIds();
+      if (!campId || !propertyId) {
+        throw new Error('Nie można odczytać ID obozu lub turnusu z URL');
+      }
+
+      // Load all form data
+      const step1Data = loadStep1FormData();
+      const step2Data = loadStep2FormData();
+      const step3Data = loadStep3FormData();
+      const step4Data = loadStep4FormData();
+
+      if (!step1Data || !step2Data || !step3Data || !step4Data) {
+        throw new Error('Brak danych formularza. Proszę wypełnić wszystkie kroki.');
+      }
+
+      // Create reservation
+      const reservationRequest = ReservationService.prepareReservationRequest(
+        step1Data,
+        step2Data,
+        step3Data,
+        step4Data,
+        campId,
+        propertyId,
+        totalPrice,
+        depositAmount
+      );
+
+      const reservationResponse = await reservationService.createReservation(reservationRequest);
+      setIsCreatingReservation(false);
+
+      console.log('✅ Rezerwacja utworzona (płatność później):', reservationResponse);
+
+      // Clear session storage
+      clearAllSessionData();
+
+      // Show modal and redirect
+      setCreatedReservationId(reservationResponse.id);
+      setShowPaymentLaterModal(true);
+    } catch (error) {
+      console.error('Błąd podczas tworzenia rezerwacji:', error);
+      setIsCreatingReservation(false);
+      
+      if (error instanceof Error) {
+        setReservationError(error.message);
+      } else {
+        setReservationError('Wystąpił błąd podczas tworzenia rezerwacji');
+      }
+    }
+  };
+
 
   // Get first parent data (for summary) with safe defaults
   const firstParent = step1Data?.parents?.[0];
@@ -760,116 +828,118 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
           
           <DashedLine />
           
-          {/* Payment Options - Disabled when payNow is false */}
-          <div className={`mt-4 sm:mt-6 ${!formData.payNow ? 'opacity-50 pointer-events-none' : ''}`}>
-            {/* Section 1: Payment Method */}
-            <div className="mb-4 sm:mb-6">
-              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
-                Wybierz sposób płatności
-              </h3>
-              <div className="space-y-3 sm:space-y-4">
-                {/* Online Payment */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="radio"
-                      id="paymentOnline"
-                      name="paymentMethod"
-                      value="online"
-                      checked={formData.paymentMethod === 'online'}
-                      onChange={() => handlePaymentMethodChange('online')}
-                      disabled={disabled || !formData.payNow}
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                    <label
-                      htmlFor="paymentOnline"
-                      className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                    >
-                      Płatność online (bezpłatnie)
-                    </label>
-                  </div>
-                  <div className="w-16 h-10 sm:w-20 sm:h-12 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-xs font-bold">Pay</span>
-                  </div>
-                </div>
-                
-                {/* BLIK Payment */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="radio"
-                      id="paymentBlik"
-                      name="paymentMethod"
-                      value="blik"
-                      checked={formData.paymentMethod === 'blik'}
-                      onChange={() => handlePaymentMethodChange('blik')}
-                      disabled={disabled || !formData.payNow}
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                    <label
-                      htmlFor="paymentBlik"
-                      className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                    >
-                      BLIK (bezpłatnie)
-                    </label>
-                  </div>
-                  <div className="w-16 h-10 sm:w-20 sm:h-12 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-xs font-bold">BLIK</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <DashedLine />
-            
-            {/* Section 2: Payment Amount */}
+          {/* Payment Options - Only shown when payNow is checked */}
+          {formData.payNow && (
             <div className="mt-4 sm:mt-6">
-              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
-                Wybierz wielkość wpłaty
-              </h3>
-              <div className="space-y-3 sm:space-y-4">
-                {/* Full Payment */}
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <input
-                    type="radio"
-                    id="paymentFull"
-                    name="paymentAmount"
-                    value="full"
-                    checked={formData.paymentAmount === 'full'}
-                    onChange={() => handlePaymentAmountChange('full')}
-                    disabled={disabled || !formData.payNow}
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                  <label
-                    htmlFor="paymentFull"
-                    className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                  >
-                    Pełna wpłata
-                  </label>
+              {/* Section 1: Payment Method */}
+              <div className="mb-4 sm:mb-6">
+                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
+                  Wybierz sposób płatności
+                </h3>
+                <div className="space-y-3 sm:space-y-4">
+                  {/* Online Payment */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <input
+                        type="radio"
+                        id="paymentOnline"
+                        name="paymentMethod"
+                        value="online"
+                        checked={formData.paymentMethod === 'online'}
+                        onChange={() => handlePaymentMethodChange('online')}
+                        disabled={disabled || !formData.payNow}
+                        className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                      <label
+                        htmlFor="paymentOnline"
+                        className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                      >
+                        Płatność online (bezpłatnie)
+                      </label>
+                    </div>
+                    <div className="w-16 h-10 sm:w-20 sm:h-12 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-xs font-bold">Pay</span>
+                    </div>
+                  </div>
+                  
+                  {/* BLIK Payment */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <input
+                        type="radio"
+                        id="paymentBlik"
+                        name="paymentMethod"
+                        value="blik"
+                        checked={formData.paymentMethod === 'blik'}
+                        onChange={() => handlePaymentMethodChange('blik')}
+                        disabled={disabled || !formData.payNow}
+                        className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                      <label
+                        htmlFor="paymentBlik"
+                        className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                      >
+                        BLIK (bezpłatnie)
+                      </label>
+                    </div>
+                    <div className="w-16 h-10 sm:w-20 sm:h-12 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-xs font-bold">BLIK</span>
+                    </div>
+                  </div>
                 </div>
-                
-                {/* Deposit Payment */}
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <input
-                    type="radio"
-                    id="paymentDeposit"
-                    name="paymentAmount"
-                    value="deposit"
-                    checked={formData.paymentAmount === 'deposit'}
-                    onChange={() => handlePaymentAmountChange('deposit')}
-                    disabled={disabled || !formData.payNow}
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                  <label
-                    htmlFor="paymentDeposit"
-                    className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                  >
-                    Zaliczka
-                  </label>
+              </div>
+              
+              <DashedLine />
+              
+              {/* Section 2: Payment Amount */}
+              <div className="mt-4 sm:mt-6">
+                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
+                  Wybierz wielkość wpłaty
+                </h3>
+                <div className="space-y-3 sm:space-y-4">
+                  {/* Full Payment */}
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <input
+                      type="radio"
+                      id="paymentFull"
+                      name="paymentAmount"
+                      value="full"
+                      checked={formData.paymentAmount === 'full'}
+                      onChange={() => handlePaymentAmountChange('full')}
+                      disabled={disabled || !formData.payNow}
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor="paymentFull"
+                      className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                    >
+                      Pełna wpłata
+                    </label>
+                  </div>
+                  
+                  {/* Deposit Payment */}
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <input
+                      type="radio"
+                      id="paymentDeposit"
+                      name="paymentAmount"
+                      value="deposit"
+                      checked={formData.paymentAmount === 'deposit'}
+                      onChange={() => handlePaymentAmountChange('deposit')}
+                      disabled={disabled || !formData.payNow}
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor="paymentDeposit"
+                      className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                    >
+                      Zaliczka
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Validation Error */}
           {validationError && (
@@ -891,7 +961,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
             </div>
           )}
 
-          {/* Pay Now Button */}
+          {/* Pay Now Button - shown when payNow is checked */}
           {formData.payNow && (
             <div className="mt-6">
               <button
@@ -903,8 +973,66 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
               </button>
             </div>
           )}
+
+          {/* Go Further Button - shown when payNow is unchecked */}
+          {!formData.payNow && (
+            <div className="mt-6">
+              <button
+                onClick={handleReservationWithoutPayment}
+                disabled={disabled || isCreatingReservation}
+                className="w-full sm:w-auto px-6 py-3 bg-[#03adf0] text-white font-semibold rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreatingReservation ? 'Tworzenie rezerwacji...' : 'Dalej'}
+              </button>
+            </div>
+          )}
         </section>
       </div>
+
+      {/* Payment Later Modal */}
+      <UniversalModal
+        isOpen={showPaymentLaterModal}
+        onClose={() => {
+          setShowPaymentLaterModal(false);
+          if (createdReservationId) {
+            router.push(`/profil/aktualne-rezerwacje?reservation_id=${createdReservationId}`);
+          } else {
+            router.push('/profil/aktualne-rezerwacje');
+          }
+        }}
+        title="Rezerwacja utworzona"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-700">
+            Twoja rezerwacja została utworzona pomyślnie.
+          </p>
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
+            <p className="text-sm text-blue-800 font-semibold mb-2">
+              Masz 3 dni na dokonanie płatności
+            </p>
+            <p className="text-sm text-blue-700">
+              Proszę dokonać płatności w ciągu 3 dni od daty utworzenia rezerwacji, 
+              w przeciwnym razie rezerwacja może zostać anulowana.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              onClick={() => {
+                setShowPaymentLaterModal(false);
+                if (createdReservationId) {
+                  router.push(`/profil/aktualne-rezerwacje?reservation_id=${createdReservationId}`);
+                } else {
+                  router.push('/profil/aktualne-rezerwacje');
+                }
+              }}
+              className="px-6 py-2 bg-[#03adf0] text-white font-medium rounded-lg hover:bg-[#0288c7] transition-colors"
+            >
+              Przejdź do rezerwacji
+            </button>
+          </div>
+        </div>
+      </UniversalModal>
     </div>
   );
 }

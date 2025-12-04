@@ -3,32 +3,10 @@
 import { useState } from 'react';
 import ReservationMain from './ReservationMain';
 import ReservationSidebar from './ReservationSidebar';
-
-interface Reservation {
-  id: string;
-  participantName: string;
-  status: string;
-  age: string;
-  gender: string;
-  city: string;
-  campName: string;
-  dates: string;
-  resort: string;
-  parentsData?: Array<{
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    phoneNumber: string;
-    street: string;
-    postalCode: string;
-    city: string;
-  }>;
-}
+import { ReservationResponse } from '@/lib/services/ReservationService';
 
 interface ReservationCardProps {
-  reservation: Reservation;
+  reservation: ReservationResponse;
 }
 
 /**
@@ -57,7 +35,8 @@ export default function ReservationCard({ reservation }: ReservationCardProps) {
         {/* Right: Sidebar */}
         <div className="lg:w-80 border-t lg:border-t-0 lg:border-l border-gray-200 p-3 sm:p-4 md:p-6 bg-gray-50">
           <ReservationSidebar 
-            reservationId={reservation.id}
+            reservationId={String(reservation.id)}
+            reservation={reservation}
             isDetailsExpanded={isDetailsExpanded}
           />
         </div>

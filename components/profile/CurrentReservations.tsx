@@ -127,18 +127,8 @@ export default function CurrentReservations() {
           // Get parents/guardians data
           const parentsData = reservation.parents_data || [];
           
-          return {
-            id: String(reservation.id),
-            participantName,
-            status,
-            age,
-            gender,
-            city,
-            campName,
-            dates: datesStr,
-            resort,
-            parentsData, // Add parents data
-          };
+          // Return full reservation data
+          return reservation;
         });
         
         // Filter: Only show current/upcoming reservations
@@ -148,7 +138,7 @@ export default function CurrentReservations() {
         const now = new Date();
         now.setHours(0, 0, 0, 0); // Set to start of day for comparison
         
-        const currentReservations = mappedReservations.filter((reservation) => {
+        const currentReservations = data.filter((reservation) => {
           // Exclude cancelled reservations
           if (reservation.status === 'Anulowana' || reservation.status === 'cancelled') {
             return false;
@@ -160,9 +150,8 @@ export default function CurrentReservations() {
           }
           
           // Check end date - if available, only show if end date is today or in the future
-          const originalReservation = data.find(r => String(r.id) === reservation.id);
-          if (originalReservation?.property_end_date) {
-            const endDate = new Date(originalReservation.property_end_date);
+          if (reservation.property_end_date) {
+            const endDate = new Date(reservation.property_end_date);
             endDate.setHours(0, 0, 0, 0);
             // If end date is in the past, it's a past reservation
             if (endDate < now) {
@@ -173,16 +162,11 @@ export default function CurrentReservations() {
           return true;
         });
         
-        // Sort by created_at descending (newest first) - backup sort in case backend doesn't sort
+        // Sort by created_at descending (newest first)
         const sortedReservations = currentReservations.sort((a, b) => {
-          // Try to get created_at from original reservation data
-          const aDate = data.find(r => String(r.id) === a.id)?.created_at;
-          const bDate = data.find(r => String(r.id) === b.id)?.created_at;
-          
-          if (aDate && bDate) {
-            return new Date(bDate).getTime() - new Date(aDate).getTime();
+          if (a.created_at && b.created_at) {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           }
-          // If no dates, keep original order (backend should sort)
           return 0;
         });
         
