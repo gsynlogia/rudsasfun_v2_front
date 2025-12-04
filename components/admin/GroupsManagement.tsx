@@ -30,7 +30,7 @@ interface GroupWithUsers extends Group {
  */
 export default function GroupsManagement() {
   const router = useRouter();
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 
   // State for groups data
   const [groups, setGroups] = useState<Group[]>([]);

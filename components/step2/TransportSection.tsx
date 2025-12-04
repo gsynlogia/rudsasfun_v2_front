@@ -8,7 +8,7 @@ import { authenticatedApiCall } from '@/utils/api-auth';
 import { useReservation } from '@/context/ReservationContext';
 import UniversalModal from '@/components/admin/UniversalModal';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 
 interface TransportCity {
   city: string;

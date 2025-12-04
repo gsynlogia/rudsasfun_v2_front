@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://rejestracja.radsasfun.system-app.pl';
 
 /**
  * Backend Validation API Tests

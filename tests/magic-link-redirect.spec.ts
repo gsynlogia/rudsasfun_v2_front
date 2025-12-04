@@ -53,7 +53,7 @@ test.describe('Magic Link Redirect Flow', () => {
       // In real scenario, user would click link from email
       // For test, we'll get token from backend
       const token = await page.evaluate(async () => {
-        const response = await fetch('http://localhost:8000/api/auth/magic-link/request', {
+        const response = await fetch('https://rejestracja.radsasfun.system-app.pl/api/auth/magic-link/request', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: 'szymon.guzik@gmail.com' }),
@@ -61,7 +61,7 @@ test.describe('Magic Link Redirect Flow', () => {
         // Wait a bit for token to be created
         await new Promise(resolve => setTimeout(resolve, 1000));
         // Get token from backend (in real scenario, this comes from email)
-        const dbResponse = await fetch('http://localhost:8000/api/auth/magic-link/verify?token=test', {
+        const dbResponse = await fetch('https://rejestracja.radsasfun.system-app.pl/api/auth/magic-link/verify?token=test', {
           method: 'GET',
         });
         return 'test-token'; // Simplified for test
@@ -71,7 +71,7 @@ test.describe('Magic Link Redirect Flow', () => {
       // Get actual token from backend
       const actualToken = await page.evaluate(async () => {
         // Request new magic link to get fresh token
-        await fetch('http://localhost:8000/api/auth/magic-link/request', {
+        await fetch('https://rejestracja.radsasfun.system-app.pl/api/auth/magic-link/request', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: 'szymon.guzik@gmail.com' }),

@@ -11,22 +11,22 @@
  * 1. If NEXT_PUBLIC_API_URL is set in environment, use it (highest priority)
  *    - .env.local overrides .env for local development
  *    - .env contains production defaults
- * 2. If running on localhost (client-side), use http://localhost:8000
+ * 2. If running on localhost (client-side), use https://rejestracja.radsasfun.system-app.pl
  * 3. If running on production domain, use production API URL
- * 4. Fallback to localhost:8000 for development
+ * 4. Fallback to https://rejestracja.radsasfun.system-app.pl for development
  */
 
 /**
  * Get API base URL based on current environment
- * - Localhost: uses http://localhost:8000 (from .env.local)
+ * - Localhost: uses https://rejestracja.radsasfun.system-app.pl (from .env.local)
  * - Production: uses https://rejestracja.radsasfun.system-app.pl (from .env)
  */
 export function getApiBaseUrl(): string {
   // If NEXT_PUBLIC_API_URL is explicitly set, use it (highest priority)
   // This respects Next.js .env file priority:
   // - .env.local (local development) will override .env (production)
-  // - .env.local should contain: NEXT_PUBLIC_API_URL=http://localhost:8000
-  // - .env should contain: NEXT_PUBLIC_API_URL=https://rejestracja.radsasfun.system-app.pl
+    // - .env.local should contain: NEXT_PUBLIC_API_URL=https://rejestracja.radsasfun.system-app.pl
+    // - .env should contain: NEXT_PUBLIC_API_URL=https://rejestracja.radsasfun.system-app.pl
   if (process.env.NEXT_PUBLIC_API_URL) {
     let url = process.env.NEXT_PUBLIC_API_URL;
     
@@ -42,9 +42,9 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     
-    // Localhost detection - always use localhost:8000 for backend
+    // Localhost detection - use production API
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8000';
+      return 'https://rejestracja.radsasfun.system-app.pl';
     }
     
     // Production domains - use production API
@@ -66,8 +66,8 @@ export function getApiBaseUrl(): string {
     return 'https://rejestracja.radsasfun.system-app.pl';
   }
 
-  // Development fallback: use localhost
-  return 'http://localhost:8000';
+  // Development fallback: use production API
+  return 'https://rejestracja.radsasfun.system-app.pl';
 }
 
 /**
@@ -87,5 +87,5 @@ export function getApiBaseUrlRuntime(): string {
  */
 export const API_BASE_URL = typeof window !== 'undefined' 
   ? getApiBaseUrl() // Client-side: calculate at runtime
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'); // Server-side: use env var
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl'); // Server-side: use env var
 

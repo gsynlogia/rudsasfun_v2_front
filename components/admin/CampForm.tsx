@@ -20,7 +20,7 @@ export default function CampForm({ camp, onSuccess, onCancel }: CampFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
   const isEditMode = camp !== null;
 
   useEffect(() => {

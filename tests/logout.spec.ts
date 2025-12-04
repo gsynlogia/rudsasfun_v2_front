@@ -47,7 +47,7 @@ test.describe('Logout Functionality', () => {
     // Get token from backend (simulating email click)
     const token = await page.evaluate(async () => {
       // Request new magic link to get fresh token
-      await fetch('http://localhost:8000/api/auth/magic-link/request', {
+      await fetch('https://rejestracja.radsasfun.system-app.pl/api/auth/magic-link/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 'szymon.guzik@gmail.com' }),
@@ -55,7 +55,7 @@ test.describe('Logout Functionality', () => {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Get actual token from backend
-      const response = await fetch('http://localhost:8000/api/auth/magic-link/verify?token=test', {
+      const response = await fetch('https://rejestracja.radsasfun.system-app.pl/api/auth/magic-link/verify?token=test', {
         method: 'GET',
       });
       return 'mock-token';

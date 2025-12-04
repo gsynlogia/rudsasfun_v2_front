@@ -13,7 +13,7 @@ import { authenticatedApiCall } from '@/utils/api-auth';
  * Fetch camp by ID
  */
 const fetchCampById = (id: number): Promise<Camp | null> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
   return fetch(`${API_BASE_URL}/api/camps/${id}`)
     .then(response => {
       if (!response.ok) {
@@ -35,7 +35,7 @@ const fetchCampById = (id: number): Promise<Camp | null> => {
  * Uses GET /api/camps/{camp_id}/editions endpoint (backend still uses 'editions')
  */
 const fetchCampProperty = (campId: number, propertyId: number): Promise<CampProperty | null> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
   return fetch(`${API_BASE_URL}/api/camps/${campId}/editions`)
     .then(response => {
       if (!response.ok) {
@@ -60,7 +60,7 @@ const fetchCampProperty = (campId: number, propertyId: number): Promise<CampProp
  * Fetch transport settings for a camp property/turnus
  */
 const fetchTransport = (campId: number, propertyId: number): Promise<CampPropertyTransport | null> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
   return fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/transport`, {
     method: 'GET',
     headers: {
@@ -103,7 +103,7 @@ export default function CampTurnusEditPage({
   // Handle both Promise and direct params (Next.js 13+ compatibility)
   const [campId, setCampId] = useState<number | null>(null);
   const [turnusId, setTurnusId] = useState<number | null>(null);
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 
   const [camp, setCamp] = useState<Camp | null>(null);
   const [property, setProperty] = useState<CampProperty | null>(null);
@@ -312,7 +312,7 @@ export default function CampTurnusEditPage({
       setLoadingTransport(true);
       setError(null);
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 
       // First, get current transport to check existing camp_ids
       const getResponse = await fetch(`${API_BASE_URL}/api/camps/transports/${transportId}`, {
@@ -391,7 +391,7 @@ export default function CampTurnusEditPage({
       setIsDeletingTransport(true);
       setError(null);
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 
       // First, get current transport to check existing camp_ids
       const getResponse = await fetch(`${API_BASE_URL}/api/camps/transports/${transport.id}`, {
@@ -449,7 +449,7 @@ export default function CampTurnusEditPage({
 
     try {
       setLoadingAvailableTransports(true);
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
       const response = await fetch(
         `${API_BASE_URL}/api/camps/${campId}/properties/${turnusId}/transport/available`,
         {

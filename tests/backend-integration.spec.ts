@@ -52,7 +52,7 @@ test.describe('Backend Integration - Camp Data', () => {
 
   test('should handle API errors gracefully', async ({ page }) => {
     // Intercept API call and return error
-    await page.route('http://localhost:8000/api/camps/current/active', route => {
+    await page.route('https://rejestracja.radsasfun.system-app.pl/api/camps/current/active', route => {
       route.fulfill({
         status: 500,
         body: JSON.stringify({ error: 'Internal server error' }),

@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  * Run in HEADED mode to see Chromium browser
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
 
 test.describe('Authentication System', () => {
