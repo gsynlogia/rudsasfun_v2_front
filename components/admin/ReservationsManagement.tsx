@@ -92,9 +92,13 @@ interface BackendReservation {
   departure_city: string | null;
   return_type: string | null;
   return_city: string | null;
-  diet: string | null;
+  diet: number | null;
+  diet_name?: string | null;
   accommodation_request: string | null;
   selected_source: string | null;
+  source_name?: string | null;
+  selected_addons?: string[] | null;
+  selected_protection?: string[] | null;
 }
 
 // Map backend reservation to frontend format
