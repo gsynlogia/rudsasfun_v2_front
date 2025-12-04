@@ -72,6 +72,7 @@ export default async function ReservationStepPage({ params }: PageProps) {
           start_date: "1970-01-01",
           end_date: "1970-01-01",
           days_count: 0,
+          max_participants: 0,
           created_at: null,
           updated_at: null
         }
@@ -114,6 +115,11 @@ export default async function ReservationStepPage({ params }: PageProps) {
     throw error;
   }
 
+  // Check if turnus is full or ended (only if camp and property exist)
+  const isTurnusFull = campData?.property?.is_full === true;
+  const isTurnusEnded = campData?.property?.is_ended === true;
+  const isTurnusUnavailable = isTurnusFull || isTurnusEnded;
+
   // Calculate completed steps (all previous steps)
   const completedSteps: StepNumber[] = [];
   for (let i = 1; i < stepNumber; i++) {
@@ -153,8 +159,35 @@ export default async function ReservationStepPage({ params }: PageProps) {
       currentStep={currentStep}
       completedSteps={completedSteps}
       campData={campData}
+      isDisabled={isTurnusUnavailable || campData?.camp?.id === 0 || campData?.property?.id === 0}
     >
-      {renderStep()}
+      {isTurnusUnavailable && campData?.camp?.id !== 0 && campData?.property?.id !== 0 ? (
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <div className="bg-red-50 border-l-4 border-red-400 p-6 rounded-lg">
+            <h2 className="text-xl font-bold text-red-800 mb-2">
+              {isTurnusFull ? 'Turnus wyprzedany' : 'Turnus zakończony'}
+            </h2>
+            <p className="text-red-700 mb-4">
+              {isTurnusFull 
+                ? 'Przepraszamy, wszystkie miejsca na ten turnus zostały zarezerwowane.'
+                : 'Przepraszamy, ten turnus się już zakończył. Nie można dokonać rezerwacji.'}
+            </p>
+            {campData?.property?.registered_count !== undefined && campData?.property?.max_participants !== undefined && (
+              <p className="text-sm text-red-600">
+                Zarejestrowanych uczestników: {campData.property.registered_count}/{campData.property.max_participants}
+              </p>
+            )}
+            <a
+              href="/"
+              className="inline-block mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Powrót do listy obozów
+            </a>
+          </div>
+        </div>
+      ) : (
+        renderStep()
+      )}
     </LayoutClient>
   );
 }

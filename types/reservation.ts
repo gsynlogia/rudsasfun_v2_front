@@ -32,6 +32,10 @@ export interface CampProperty {
   start_date: string; // ISO date string
   end_date: string; // ISO date string
   days_count: number;
+  max_participants: number; // Maximum number of participants for this turnus
+  registered_count?: number; // Number of registered participants (calculated dynamically)
+  is_full?: boolean; // Whether turnus is full (registered_count >= max_participants)
+  is_ended?: boolean; // Whether turnus has ended (end_date < today)
   created_at?: string | null; // ISO datetime string or null
   updated_at?: string | null; // ISO datetime string or null
 }

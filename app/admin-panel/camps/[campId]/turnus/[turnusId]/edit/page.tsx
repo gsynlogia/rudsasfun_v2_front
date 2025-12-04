@@ -115,6 +115,7 @@ export default function CampTurnusEditPage({
   const [city, setCity] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [maxParticipants, setMaxParticipants] = useState<number>(50);
 
   // Transport state
   const [transport, setTransport] = useState<CampPropertyTransport | null>(null);
@@ -182,6 +183,7 @@ export default function CampTurnusEditPage({
             // Convert ISO date to YYYY-MM-DD format for input
             setStartDate(propertyData.start_date.split('T')[0]);
             setEndDate(propertyData.end_date.split('T')[0]);
+            setMaxParticipants(propertyData.max_participants || 50);
             
             // Populate transport data if exists - map cities to transport fields
             if (transportData) {
@@ -229,7 +231,7 @@ export default function CampTurnusEditPage({
   };
 
   const handleSave = async () => {
-    if (!city.trim() || !startDate || !endDate) {
+    if (!city.trim() || !startDate || !endDate || maxParticipants < 1) {
       setError('Wszystkie pola są wymagane');
       return;
     }
@@ -276,6 +278,7 @@ export default function CampTurnusEditPage({
           city: city.trim(),
           start_date: startDate,
           end_date: endDate,
+          max_participants: maxParticipants,
         }),
       });
 
@@ -639,8 +642,8 @@ export default function CampTurnusEditPage({
               />
             </div>
 
-            {/* Dates */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Dates and Max Participants */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-2">
                   <Calendar className="w-4 h-4 inline mr-1" />
@@ -675,6 +678,27 @@ export default function CampTurnusEditPage({
                   style={{ borderRadius: 0 }}
                   disabled={saving}
                 />
+              </div>
+
+              <div>
+                <label htmlFor="max-participants" className="block text-sm font-medium text-gray-700 mb-2">
+                  Maksymalna liczba uczestników <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="max-participants"
+                  type="number"
+                  min="1"
+                  value={maxParticipants}
+                  onChange={(e) => setMaxParticipants(parseInt(e.target.value) || 1)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+                  style={{ borderRadius: 0 }}
+                  placeholder="np. 50"
+                  disabled={saving}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Maks. liczba uczestników
+                </p>
               </div>
             </div>
 

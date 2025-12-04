@@ -26,6 +26,7 @@ export default function CampPropertyForm({
   const [city, setCity] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [maxParticipants, setMaxParticipants] = useState<number>(50);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +50,7 @@ export default function CampPropertyForm({
       // Convert ISO date to YYYY-MM-DD format for input
       setStartDate(property.start_date.split('T')[0]);
       setEndDate(property.end_date.split('T')[0]);
+      setMaxParticipants(property.max_participants || 50);
     }
   }, [property]);
 
@@ -76,6 +78,11 @@ export default function CampPropertyForm({
         throw new Error('Data zakończenia musi być co najmniej 1 dzień po dacie rozpoczęcia');
       }
 
+      // Validate max_participants
+      if (maxParticipants < 1) {
+        throw new Error('Maksymalna liczba uczestników musi być większa od 0');
+      }
+
       const url = isEditMode
         ? `${API_BASE_URL}/api/camps/${campId}/properties/${property.id}`
         : `${API_BASE_URL}/api/camps/${campId}/properties`;
@@ -87,6 +94,7 @@ export default function CampPropertyForm({
             city: city.trim(),
             start_date: startDate,
             end_date: endDate,
+            max_participants: maxParticipants,
           })
         : JSON.stringify({
             camp_id: campId,
@@ -94,6 +102,7 @@ export default function CampPropertyForm({
             city: city.trim(),
             start_date: startDate,
             end_date: endDate,
+            max_participants: maxParticipants,
           });
 
       const response = await fetch(url, {
@@ -165,7 +174,7 @@ export default function CampPropertyForm({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-2">
               <Calendar className="w-4 h-4 inline mr-1" />
@@ -199,6 +208,26 @@ export default function CampPropertyForm({
               disabled={loading}
             />
           </div>
+
+          <div>
+            <label htmlFor="max-participants" className="block text-sm font-medium text-gray-700 mb-2">
+              Maksymalna liczba uczestników <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="max-participants"
+              type="number"
+              min="1"
+              value={maxParticipants}
+              onChange={(e) => setMaxParticipants(parseInt(e.target.value) || 1)}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+              placeholder="np. 50"
+              disabled={loading}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Maks. liczba uczestników
+            </p>
+          </div>
         </div>
 
         {startDate && endDate && (
@@ -227,9 +256,9 @@ export default function CampPropertyForm({
           </button>
           <button
             type="submit"
-            disabled={loading || !city.trim() || !startDate || !endDate}
+            disabled={loading || !city.trim() || !startDate || !endDate || maxParticipants < 1}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#03adf0] rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50"
-            style={{ cursor: (loading || !city.trim() || !startDate || !endDate) ? 'not-allowed' : 'pointer' }}
+            style={{ cursor: (loading || !city.trim() || !startDate || !endDate || maxParticipants < 1) ? 'not-allowed' : 'pointer' }}
           >
             <Save className="w-4 h-4" />
             {loading ? 'Zapisywanie...' : isEditMode ? 'Zapisz zmiany' : 'Dodaj edycję'}

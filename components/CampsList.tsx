@@ -213,47 +213,85 @@ export default function CampsList() {
             {camp.properties && camp.properties.length > 0 ? (
               <div className="p-3 sm:p-4 md:p-6">
                 <div className="space-y-2 sm:space-y-3">
-                  {camp.properties.map((property) => (
-                    <button
-                      key={property.id}
-                      onClick={() => handleSelectCamp(camp.id, property.id)}
-                      className="w-full text-left p-3 sm:p-4 bg-gray-50 hover:bg-[#03adf0] hover:text-white rounded-lg border border-gray-300 hover:border-[#03adf0] transition-all duration-200 group"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#03adf0] text-white group-hover:bg-white group-hover:text-[#03adf0] transition-colors whitespace-nowrap">
-                              {formatPeriod(property.period)}
-                            </span>
-                            <span className="text-xs sm:text-sm text-gray-500 group-hover:text-white transition-colors whitespace-nowrap">
-                              {property.city}
-                            </span>
+                  {camp.properties.map((property) => {
+                    const isFull = property.is_full === true;
+                    const isEnded = property.is_ended === true;
+                    const isDisabled = isFull || isEnded;
+                    
+                    return (
+                      <button
+                        key={property.id}
+                        onClick={() => !isDisabled && handleSelectCamp(camp.id, property.id)}
+                        disabled={isDisabled}
+                        className={`w-full text-left p-3 sm:p-4 rounded-lg border transition-all duration-200 group ${
+                          isDisabled
+                            ? 'bg-gray-100 border-gray-300 cursor-not-allowed opacity-60'
+                            : 'bg-gray-50 hover:bg-[#03adf0] hover:text-white border-gray-300 hover:border-[#03adf0]'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                                isDisabled
+                                  ? 'bg-gray-400 text-white'
+                                  : 'bg-[#03adf0] text-white group-hover:bg-white group-hover:text-[#03adf0]'
+                              }`}>
+                                {formatPeriod(property.period)}
+                              </span>
+                              <span className={`text-xs sm:text-sm transition-colors whitespace-nowrap ${
+                                isDisabled ? 'text-gray-400' : 'text-gray-500 group-hover:text-white'
+                              }`}>
+                                {property.city}
+                              </span>
+                              {isFull && (
+                                <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white">
+                                  WYPRZEDANE
+                                </span>
+                              )}
+                              {isEnded && !isFull && (
+                                <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-500 text-white">
+                                  ZAKOŃCZONY
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-xs sm:text-sm md:text-base font-semibold transition-colors mb-1 ${
+                              isDisabled ? 'text-gray-500' : 'text-gray-900 group-hover:text-white'
+                            }`}>
+                              {formatDateRange(property.start_date, property.end_date)}
+                            </p>
+                            <p className={`text-xs sm:text-sm transition-colors ${
+                              isDisabled ? 'text-gray-400' : 'text-gray-600 group-hover:text-white/90'
+                            }`}>
+                              {property.days_count} {property.days_count === 1 ? 'dzień' : property.days_count < 5 ? 'dni' : 'dni'}
+                              {property.registered_count !== undefined && property.max_participants !== undefined && (
+                                <span className="ml-2">
+                                  ({property.registered_count}/{property.max_participants} miejsc)
+                                </span>
+                              )}
+                            </p>
                           </div>
-                          <p className="text-xs sm:text-sm md:text-base font-semibold text-gray-900 group-hover:text-white transition-colors mb-1">
-                            {formatDateRange(property.start_date, property.end_date)}
-                          </p>
-                          <p className="text-xs sm:text-sm text-gray-600 group-hover:text-white/90 transition-colors">
-                            {property.days_count} {property.days_count === 1 ? 'dzień' : property.days_count < 5 ? 'dni' : 'dni'}
-                          </p>
+                          {!isDisabled && (
+                            <div className="flex-shrink-0 self-start sm:self-center">
+                              <svg
+                                className="w-4 h-4 sm:w-5 sm:h-6 text-gray-400 group-hover:text-white transition-colors"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 5l7 7-7 7"
+                                />
+                              </svg>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex-shrink-0 self-start sm:self-center">
-                          <svg
-                            className="w-4 h-4 sm:w-5 sm:h-6 text-gray-400 group-hover:text-white transition-colors"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 5l7 7-7 7"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
