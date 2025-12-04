@@ -85,10 +85,10 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
         }
         // If we get here, either customId was provided (and doesn't exist) or no duplicate by name
         // Proceed to add the item
-      } else if (item.type !== 'base') {
+      } else {
         // For non-addon, non-protection types, replace existing item of the same type
         const existingItemIndex = prev.items.findIndex(
-          (i) => i.type === item.type && i.type !== 'base'
+          (i) => i.type === item.type
         );
         if (existingItemIndex !== -1) {
           const newItems = [...prev.items];

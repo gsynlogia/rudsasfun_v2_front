@@ -32,7 +32,7 @@ interface Reservation {
  * Displays completed/past reservations and cancelled reservations
  */
 export default function ReservationHistory() {
-  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,8 +44,8 @@ export default function ReservationHistory() {
         setError(null);
         const data = await reservationService.getMyReservations(0, 100);
         
-        // Map backend data to frontend format
-        const mappedReservations = data.map((reservation: ReservationResponse) => {
+        // Filter and process reservations for history view
+        const processedReservations = data.map((reservation: ReservationResponse) => {
           // Format dates - use property start_date and end_date if available
           let startDate: Date | null = null;
           let endDate: Date | null = null;
@@ -114,32 +114,8 @@ export default function ReservationHistory() {
           // Get resort
           const resort = reservation.property_name ? `Ośrodek: ${reservation.property_name}` : 'Brak danych';
           
-          // Map status
-          const statusMap: Record<string, string> = {
-            'pending': 'Zarezerwowana',
-            'confirmed': 'Potwierdzona',
-            'cancelled': 'Anulowana',
-            'completed': 'Zakończona',
-          };
-          const status = statusMap[reservation.status] || reservation.status;
-          
-          // Get parents/guardians data
-          const parentsData = reservation.parents_data || [];
-          
-          return {
-            id: String(reservation.id),
-            participantName,
-            status,
-            age,
-            gender,
-            city,
-            campName,
-            dates: datesStr,
-            resort,
-            parentsData,
-            // Store original data for filtering
-            _original: reservation,
-          };
+          // Return original reservation data (ReservationResponse)
+          return reservation;
         });
         
         // Filter: Only show past/completed/cancelled reservations
@@ -149,21 +125,20 @@ export default function ReservationHistory() {
         const now = new Date();
         now.setHours(0, 0, 0, 0); // Set to start of day for comparison
         
-        const historyReservations = mappedReservations.filter((reservation: any) => {
+        const historyReservations = processedReservations.filter((reservation: ReservationResponse) => {
           // Include cancelled reservations
-          if (reservation.status === 'Anulowana' || reservation.status === 'cancelled') {
+          if (reservation.status === 'cancelled') {
             return true;
           }
           
           // Include completed reservations
-          if (reservation.status === 'Zakończona' || reservation.status === 'completed') {
+          if (reservation.status === 'completed') {
             return true;
           }
           
           // Check end date - if available, only show if end date is in the past
-          const originalReservation = reservation._original;
-          if (originalReservation?.property_end_date) {
-            const endDate = new Date(originalReservation.property_end_date);
+          if (reservation.property_end_date) {
+            const endDate = new Date(reservation.property_end_date);
             endDate.setHours(0, 0, 0, 0);
             // If end date is in the past, it's a past reservation
             if (endDate < now) {
@@ -174,16 +149,10 @@ export default function ReservationHistory() {
           return false;
         });
         
-        // Remove _original from final data
-        const cleanedReservations = historyReservations.map(({ _original, ...rest }) => rest);
-        
         // Sort by created_at descending (newest first)
-        const sortedReservations = cleanedReservations.sort((a, b) => {
-          const aDate = historyReservations.find(r => r.id === a.id)?._original?.created_at;
-          const bDate = historyReservations.find(r => r.id === b.id)?._original?.created_at;
-          
-          if (aDate && bDate) {
-            return new Date(bDate).getTime() - new Date(aDate).getTime();
+        const sortedReservations = historyReservations.sort((a, b) => {
+          if (a.created_at && b.created_at) {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           }
           return 0;
         });

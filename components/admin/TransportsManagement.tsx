@@ -336,10 +336,31 @@ export default function TransportsManagement() {
       }
 
       // If transport is assigned to a turnus, update via turnus endpoint
-      if (transport.property_id && transport.camp_id) {
+      // Get camp_id from camp_ids array (first one) or fetch from turnus
+      let campId: number | null = null;
+      if (transport.camp_ids && transport.camp_ids.length > 0) {
+        campId = transport.camp_ids[0];
+      } else if (transport.property_id) {
+        // Fetch turnus to get camp_id
+        const turnusResponse = await fetch(
+          `${API_BASE_URL}/api/camps/properties/${transport.property_id}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        if (turnusResponse.ok) {
+          const turnusData = await turnusResponse.json();
+          campId = turnusData.camp_id;
+        }
+      }
+
+      if (transport.property_id && campId) {
         // First get current transport data
         const getResponse = await fetch(
-          `${API_BASE_URL}/api/camps/${transport.camp_id}/properties/${transport.property_id}/transport`,
+          `${API_BASE_URL}/api/camps/${campId}/properties/${transport.property_id}/transport`,
           {
             method: 'GET',
             headers: {
@@ -356,7 +377,7 @@ export default function TransportsManagement() {
 
         // Update with new name
         const updateResponse = await fetch(
-          `${API_BASE_URL}/api/camps/${transport.camp_id}/properties/${transport.property_id}/transport`,
+          `${API_BASE_URL}/api/camps/${campId}/properties/${transport.property_id}/transport`,
           {
             method: 'PUT',
             headers: {
@@ -366,7 +387,7 @@ export default function TransportsManagement() {
               name: newName.trim() || null,
               departure_type: currentTransport.departure_type,
               return_type: currentTransport.return_type,
-              cities: currentTransport.cities?.map(city => ({
+              cities: currentTransport.cities?.map((city: TransportCity) => ({
                 city: city.city,
                 departure_price: city.departure_price,
                 return_price: city.return_price,

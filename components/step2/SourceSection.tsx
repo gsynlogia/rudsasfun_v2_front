@@ -65,7 +65,9 @@ export default function SourceSection() {
     const savedData = loadStep2FormData();
     const formData = {
       selectedAddons: savedData?.selectedAddons || [],
-      selectedProtection: savedData?.selectedProtection || '',
+      selectedProtection: Array.isArray(savedData?.selectedProtection) 
+        ? savedData.selectedProtection 
+        : (savedData?.selectedProtection ? [savedData.selectedProtection] : []),
       selectedPromotion: savedData?.selectedPromotion || '',
       transportData: savedData?.transportData || {
         departureType: '',

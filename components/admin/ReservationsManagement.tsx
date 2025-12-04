@@ -169,7 +169,7 @@ const mapBackendToFrontend = (backendReservation: BackendReservation): Reservati
       paidAmount: paidAmount,
       notes: backendReservation.accommodation_request || 'Brak uwag',
       specialRequests: backendReservation.accommodation_request || 'Brak',
-      dietaryRestrictions: backendReservation.diet === 'vegetarian' ? 'Wegetariańska' : 'Standardowa',
+      dietaryRestrictions: backendReservation.diet_name || (backendReservation.diet !== null ? 'Dieta ID: ' + backendReservation.diet : 'Standardowa'),
       medicalInfo: 'Brak informacji', // Could be enhanced with health_questions data
     },
   };

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { Info } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep1FormData, saveStep1FormData } from '@/utils/sessionStorage';
+import { loadStep1FormData, saveStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL } from '@/utils/api-config';
 
 interface Diet {
@@ -139,11 +139,14 @@ export default function DietSection() {
     if (selectedDietId === null) return;
     
     const savedData = loadStep1FormData();
-    const formData = {
-      ...savedData,
-      selectedDietId,
-    };
-    saveStep1FormData(formData);
+    if (savedData) {
+      const formData: Step1FormData = {
+        ...savedData,
+        selectedDietId,
+        parents: savedData.parents || [],
+      };
+      saveStep1FormData(formData);
+    }
   }, [selectedDietId]);
 
   const handleDietSelect = (dietId: number) => {

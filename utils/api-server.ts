@@ -161,6 +161,7 @@ export async function getCampEdition(
           start_date: "1970-01-01",
           end_date: "1970-01-01",
           days_count: 0,
+          max_participants: 0,
           created_at: null,
           updated_at: null
         }
@@ -192,6 +193,7 @@ export async function getCampEdition(
           start_date: "1970-01-01",
           end_date: "1970-01-01",
           days_count: 0,
+          max_participants: 0,
           created_at: null,
           updated_at: null
         }
@@ -217,6 +219,7 @@ export async function getCampEdition(
           start_date: "1970-01-01",
           end_date: "1970-01-01",
           days_count: 0,
+          max_participants: 0,
           created_at: null,
           updated_at: null
         }
@@ -240,6 +243,7 @@ export async function getCampEdition(
           start_date: "1970-01-01",
           end_date: "1970-01-01",
           days_count: 0,
+          max_participants: 0,
           created_at: null,
           updated_at: null
         }

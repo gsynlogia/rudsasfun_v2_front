@@ -131,8 +131,8 @@ export default function AdditionalServicesTiles({
       }
 
       const payerEmail = firstParent.email;
-      const payerName = firstParent.first_name && firstParent.last_name
-        ? `${firstParent.first_name} ${firstParent.last_name}`.trim()
+      const payerName = firstParent.firstName && firstParent.lastName
+        ? `${firstParent.firstName} ${firstParent.lastName}`.trim()
         : undefined;
 
       // Create order ID based on service type
