@@ -1006,7 +1006,7 @@ export default function CampTurnusEditPage({
         onConfirm={handleRemoveTransport}
         itemType="transport"
         itemName={transport?.name || 'Transport'}
-        itemId={transport?.id}
+        itemId={transport?.id || 0}
         additionalInfo="Przypisanie transportu do tego turnusu zostanie usunięte. Transport pozostanie w systemie i będzie dostępny do przypisania do innych turnusów."
         isLoading={isDeletingTransport}
       />
