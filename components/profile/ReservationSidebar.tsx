@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FileText, Download, Upload, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import DashedLine from '../DashedLine';
 import { contractService } from '@/lib/services/ContractService';
@@ -15,21 +16,28 @@ interface ReservationSidebarProps {
  * Right sidebar showing reservation progress and document status
  */
 export default function ReservationSidebar({ reservationId, isDetailsExpanded }: ReservationSidebarProps) {
-  const [isDownloading, setIsDownloading] = useState(false);
+  const router = useRouter();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleDownloadContract = async () => {
     try {
-      setIsDownloading(true);
+      setIsGenerating(true);
       const reservationIdNum = parseInt(reservationId);
       if (isNaN(reservationIdNum)) {
         throw new Error('Invalid reservation ID');
       }
+      
+      // Generate contract if it doesn't exist, then download
+      // The backend endpoint will generate it automatically if needed
       await contractService.downloadContract(reservationIdNum);
+      
+      // After successful generation and download, redirect to downloads tab
+      router.push('/profil/do-pobrania');
     } catch (error) {
-      console.error('Error downloading contract:', error);
-      alert('Nie udało się pobrać umowy. Spróbuj ponownie.');
+      console.error('Error generating/downloading contract:', error);
+      alert('Nie udało się wygenerować/pobrać umowy. Spróbuj ponownie.');
     } finally {
-      setIsDownloading(false);
+      setIsGenerating(false);
     }
   };
 
@@ -54,29 +62,24 @@ export default function ReservationSidebar({ reservationId, isDetailsExpanded }:
             </div>
             <div className="flex flex-col items-center gap-2 sm:gap-3">
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
-              <p className="text-[10px] sm:text-xs text-gray-600 text-center">W trakcie weryfikacji</p>
-              <div className="flex gap-1.5 sm:gap-2 w-full">
-                <button 
-                  onClick={handleDownloadContract}
-                  disabled={isDownloading}
-                  className="flex-1 px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                >
-                  {isDownloading ? (
-                    <>
-                      <span className="animate-spin">⏳</span>
-                      <span>Pobieranie...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-3 h-3" />
-                      <span>pobierz</span>
-                    </>
-                  )}
-                </button>
-                <button className="flex-1 px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50">
-                  dodaj
-                </button>
-              </div>
+              <p className="text-[10px] sm:text-xs text-gray-600 text-center">Umowa</p>
+              <button 
+                onClick={handleDownloadContract}
+                disabled={isGenerating}
+                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+              >
+                {isGenerating ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    <span>Generowanie...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3 h-3" />
+                    <span>Pobierz umowę</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

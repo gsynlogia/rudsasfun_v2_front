@@ -58,6 +58,7 @@ class ContractService {
 
   /**
    * Download contract PDF
+   * Generates contract if it doesn't exist, then downloads it
    * @param reservationId Reservation ID
    */
   async downloadContract(reservationId: number): Promise<void> {
@@ -69,8 +70,16 @@ class ContractService {
       throw new Error('Not authenticated');
     }
 
-    // First, try to get the contract (it will generate if doesn't exist)
-    // But we need to handle the case where generation takes too long
+    // First, generate contract (it will be created if doesn't exist)
+    // This ensures contract is always generated on first click
+    try {
+      await this.generateContract(reservationId);
+    } catch (error: any) {
+      // If generation fails, try to download existing contract
+      console.log('Contract generation failed, trying to download existing contract...');
+    }
+
+    // Now download the contract
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
@@ -86,30 +95,6 @@ class ContractService {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        // If 404, try to generate first
-        if (response.status === 404) {
-          console.log('Contract not found, generating...');
-          // Generate contract first
-          await this.generateContract(reservationId);
-          // Try again
-          const retryResponse = await fetch(`${this.API_URL}/${reservationId}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          });
-          
-          if (!retryResponse.ok) {
-            const error = await retryResponse.json().catch(() => ({ detail: 'Request failed' }));
-            throw new Error(error.detail || `HTTP error! status: ${retryResponse.status}`);
-          }
-          
-          // Get blob from retry response
-          const blob = await retryResponse.blob();
-          this._downloadBlob(blob, reservationId);
-          return;
-        }
-        
         const error = await response.json().catch(() => ({ detail: 'Request failed' }));
         throw new Error(error.detail || `HTTP error! status: ${response.status}`);
       }
