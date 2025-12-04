@@ -4,17 +4,19 @@ import { useEffect, useState } from 'react';
 import { FileText, Download, CheckCircle, XCircle, Calendar, CreditCard, Loader2 } from 'lucide-react';
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 import { contractService } from '@/lib/services/ContractService';
+import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 
 interface Document {
   id: string;
   type: 'contract' | 'invoice';
   name: string;
   reservationId: number;
-  reservationName: string;
-  participantName: string;
+  reservationName?: string;
+  participantName?: string;
   date: string;
-  amount: number;
+  amount?: number;
   status: 'available' | 'pending' | 'unavailable';
+  downloadUrl?: string;
 }
 
 interface Payment {
@@ -37,40 +39,47 @@ export default function InvoicesAndPayments() {
   const [error, setError] = useState<string | null>(null);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
 
-  // Load user's reservations and create document list
+  // Load user's invoices and payments
   useEffect(() => {
     const loadDocuments = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        // Get user's reservations
+        // Get user's invoices
+        const invoicesResponse = await invoiceService.getMyInvoices();
+        
+        // Get reservations to match with invoices
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
+        const reservationsMap = new Map(reservations.map(r => [r.id, r]));
         
-        // Map reservations to documents - ONLY INVOICES
-        // For now, invoices are not implemented, so we'll have an empty list
-        // In the future, this will filter for invoice documents only
-        const documentsList: Document[] = [];
-        
-        // TODO: When invoices are implemented, filter reservations for invoice documents
-        // const documentsList: Document[] = reservations
-        //   .filter(reservation => /* invoice exists for this reservation */)
-        //   .map((reservation) => {
-        //     return {
-        //       id: `invoice-${reservation.id}`,
-        //       type: 'invoice' as const,
-        //       // ... invoice data
-        //     };
-        //   });
+        // Map invoices to documents
+        const documentsList: Document[] = invoicesResponse.invoices.map((invoice: InvoiceResponse) => {
+          const reservation = reservationsMap.get(invoice.reservation_id);
+          const participantName = reservation 
+            ? `${reservation.participant_first_name || ''} ${reservation.participant_last_name || ''}`.trim()
+            : '';
+          
+          return {
+            id: `invoice-${invoice.id}`,
+            type: 'invoice' as const,
+            name: `Faktura ${invoice.invoice_number}`,
+            reservationId: invoice.reservation_id,
+            reservationName: reservation ? `REZ-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(3, '0')}` : undefined,
+            participantName: participantName || undefined,
+            date: invoice.issue_date,
+            amount: invoice.total_amount,
+            status: 'available' as const, // Invoices are always available
+          };
+        });
         
         setDocuments(documentsList);
         
-        // TODO: Load payments from API when available
-        // For now, keep empty payments array
+        // Load payments from reservations (for now, keep empty - payments are shown separately)
         setPayments([]);
       } catch (err) {
-        console.error('Error loading documents:', err);
-        setError(err instanceof Error ? err.message : 'Nie udało się załadować dokumentów');
+        console.error('Error loading invoices:', err);
+        setError(err instanceof Error ? err.message : 'Nie udało się załadować faktur');
         setDocuments([]);
       } finally {
         setIsLoading(false);
@@ -80,24 +89,53 @@ export default function InvoicesAndPayments() {
     loadDocuments();
   }, []);
 
-  const handleDownloadDocument = async (document: Document) => {
-    if (document.type === 'contract') {
+  const handleDownloadDocument = async (doc: Document) => {
+    if (doc.type === 'contract') {
       try {
-        setDownloadingIds(prev => new Set(prev).add(document.id));
-        await contractService.downloadContract(document.reservationId);
+        setDownloadingIds(prev => new Set(prev).add(doc.id));
+        await contractService.downloadContract(doc.reservationId);
       } catch (error) {
         console.error('Error downloading contract:', error);
         alert('Nie udało się pobrać dokumentu. Spróbuj ponownie.');
       } finally {
         setDownloadingIds(prev => {
           const newSet = new Set(prev);
-          newSet.delete(document.id);
+          newSet.delete(doc.id);
           return newSet;
         });
       }
-    } else {
-      // TODO: Handle invoice download when implemented
-      alert('Pobieranie faktur będzie wkrótce dostępne.');
+    } else if (doc.type === 'invoice') {
+      try {
+        setDownloadingIds(prev => new Set(prev).add(doc.id));
+        // Extract invoice ID from doc.id (format: "invoice-{id}")
+        const invoiceId = parseInt(doc.id.replace('invoice-', ''));
+        const blob = await invoiceService.downloadInvoice(invoiceId);
+        
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${doc.name || 'faktura'}.pdf`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        // Clean up after a short delay
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+          if (document.body.contains(a)) {
+            document.body.removeChild(a);
+          }
+        }, 100);
+      } catch (error) {
+        console.error('Error downloading invoice:', error);
+        alert('Nie udało się pobrać faktury. Spróbuj ponownie.');
+      } finally {
+        setDownloadingIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(doc.id);
+          return newSet;
+        });
+      }
     }
   };
 
@@ -184,36 +222,36 @@ export default function InvoicesAndPayments() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {documents.map((document) => (
-                    <tr key={document.id} className="hover:bg-gray-50">
+                  {documents.map((doc) => (
+                    <tr key={doc.id} className="hover:bg-gray-50">
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900 font-medium">
-                        {document.name}
+                        {doc.name}
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                          {document.date}
+                          {doc.date}
                         </div>
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
                         <div>
-                          <div className="font-medium text-gray-900">{document.reservationName}</div>
-                          <div className="text-[10px] sm:text-xs text-gray-500">{document.participantName}</div>
+                          <div className="font-medium text-gray-900">{doc.reservationName}</div>
+                          <div className="text-[10px] sm:text-xs text-gray-500">{doc.participantName}</div>
                         </div>
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold text-gray-900">
-                        {document.amount.toFixed(2)} zł
+                        {doc.amount ? `${doc.amount.toFixed(2)} zł` : '-'}
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        {getStatusBadge(document.status)}
+                        {getStatusBadge(doc.status)}
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3">
                         <button
-                          onClick={() => handleDownloadDocument(document)}
-                          disabled={document.status !== 'available' || downloadingIds.has(document.id)}
+                          onClick={() => handleDownloadDocument(doc)}
+                          disabled={doc.status !== 'available' || downloadingIds.has(doc.id)}
                           className="flex items-center gap-1 text-[#03adf0] text-[10px] sm:text-xs hover:text-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {downloadingIds.has(document.id) ? (
+                          {downloadingIds.has(doc.id) ? (
                             <>
                               <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
                               Pobieranie...

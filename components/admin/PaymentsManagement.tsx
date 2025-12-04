@@ -6,6 +6,7 @@ import PaymentConfirmationModal from './PaymentConfirmationModal';
 import RefundConfirmationModal from './RefundConfirmationModal';
 import { reservationService } from '@/lib/services/ReservationService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
+import { invoiceService } from '@/lib/services/InvoiceService';
 
 /**
  * Payment Item Status
@@ -346,6 +347,10 @@ export default function PaymentsManagement() {
   // State for manual sync
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // State for invoice generation
+  const [selectedItems, setSelectedItems] = useState<Map<number, Set<string>>>(new Map()); // reservationId -> Set of item IDs
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState<number | null>(null); // reservation ID being processed
+
   // Load reservations and payments from API
   useEffect(() => {
     const fetchData = async () => {
@@ -501,6 +506,101 @@ export default function PaymentsManagement() {
       }
       return newSet;
     });
+  };
+
+  // Toggle item selection for invoice generation
+  const toggleItemSelection = (reservationId: number, itemId: string) => {
+    setSelectedItems(prev => {
+      const newMap = new Map(prev);
+      // Create a new Set to ensure React detects the change
+      const reservationItems = new Set(newMap.get(reservationId) || []);
+      
+      if (reservationItems.has(itemId)) {
+        reservationItems.delete(itemId);
+      } else {
+        reservationItems.add(itemId);
+      }
+      
+      if (reservationItems.size === 0) {
+        newMap.delete(reservationId);
+      } else {
+        newMap.set(reservationId, reservationItems);
+      }
+      
+      return newMap;
+    });
+  };
+
+  // Check if item is selected
+  const isItemSelected = (reservationId: number, itemId: string): boolean => {
+    return selectedItems.get(reservationId)?.has(itemId) || false;
+  };
+
+  // Get selected items count for reservation
+  const getSelectedItemsCount = (reservationId: number): number => {
+    return selectedItems.get(reservationId)?.size || 0;
+  };
+
+  // Handle invoice generation
+  const handleGenerateInvoice = async (reservation: ReservationPayment, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const selected = selectedItems.get(reservation.id);
+    if (!selected || selected.size === 0) {
+      alert('Proszę zaznaczyć przynajmniej jeden element płatności do faktury');
+      return;
+    }
+
+    try {
+      setIsGeneratingInvoice(reservation.id);
+      
+      // Get buyer tax number if available (from reservation invoice data)
+      const buyerTaxNo = undefined; // TODO: Get from reservation if available
+      
+      const invoice = await invoiceService.generateInvoice({
+        reservation_id: reservation.id,
+        selected_items: Array.from(selected),
+        buyer_tax_no: buyerTaxNo
+      });
+
+      // Clear selected items for this reservation
+      setSelectedItems(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(reservation.id);
+        return newMap;
+      });
+
+      // Refresh reservations to show new invoice
+      const reservationsData = await reservationService.listReservations(0, 1000);
+      const paymentsData = await paymentService.listPayments(0, 1000);
+      const mappedReservations = reservationsData.map(r => 
+        mapReservationToPaymentFormat(r, paymentsData)
+      );
+      setReservations(mappedReservations);
+
+      // Download the invoice PDF
+      try {
+        const blob = await invoiceService.downloadInvoice(invoice.id);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${invoice.invoice_number}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } catch (pdfError) {
+        console.error('Error downloading invoice PDF:', pdfError);
+        // Still show success message even if PDF download fails
+      }
+      
+      alert(`Faktura ${invoice.invoice_number} została wygenerowana pomyślnie!`);
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      alert(`Błąd podczas generowania faktury: ${error instanceof Error ? error.message : 'Nieznany błąd'}`);
+    } finally {
+      setIsGeneratingInvoice(null);
+    }
   };
 
   // Toggle payment item status (paid/unpaid, cannot toggle canceled)
@@ -1175,6 +1275,7 @@ export default function PaymentsManagement() {
                                 <div className="space-y-2">
                                   <h4 className="text-sm font-semibold text-gray-900 mb-3">Elementy płatności</h4>
                                   {reservation.paymentDetails.items.map((item) => {
+                                    const isItemChecked = isItemSelected(reservation.id, item.id);
                                     const isCanceled = item.status === 'canceled';
                                     const isPaid = item.status === 'paid';
                                     const isPartiallyPaid = item.status === 'partially_paid';
@@ -1197,6 +1298,26 @@ export default function PaymentsManagement() {
                                         }`}
                                       >
                                         <div className="flex items-center gap-3 flex-1">
+                                          {/* Checkbox for invoice generation (left side) */}
+                                          {!isCanceled && !isReturned && (
+                                            <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                                              <input
+                                                type="checkbox"
+                                                name={`invoice-item-${reservation.id}-${item.id}`}
+                                                id={`invoice-item-${reservation.id}-${item.id}`}
+                                                checked={isItemChecked}
+                                                onChange={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleItemSelection(reservation.id, item.id);
+                                                }}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                }}
+                                                className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0] cursor-pointer"
+                                                style={{ borderRadius: 0 }}
+                                              />
+                                            </div>
+                                          )}
                                           <div className="flex items-center gap-2 text-gray-600">
                                             {getItemTypeIcon(item.type)}
                                           </div>
@@ -1279,19 +1400,6 @@ export default function PaymentsManagement() {
                                               </button>
                                             )}
                                             
-                                            {/* Checkbox (only for unpaid items) */}
-                                            {isUnpaid && (
-                                              <label className="flex items-center cursor-pointer">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={false}
-                                                  onChange={() => togglePaymentItem(reservation.id, item.id)}
-                                                  onClick={(e) => e.stopPropagation()}
-                                                  className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0]"
-                                                  style={{ borderRadius: 0, cursor: 'pointer' }}
-                                                />
-                                              </label>
-                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -1327,6 +1435,28 @@ export default function PaymentsManagement() {
 
                                   {/* Action Buttons */}
                                   <div className="flex items-center gap-2 flex-wrap">
+                                    {/* Generate Invoice Button */}
+                                    {getSelectedItemsCount(reservation.id) > 0 && (
+                                      <button
+                                        onClick={(e) => handleGenerateInvoice(reservation, e)}
+                                        disabled={isGeneratingInvoice === reservation.id}
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-xs font-medium"
+                                        style={{ borderRadius: 0, cursor: isGeneratingInvoice === reservation.id ? 'not-allowed' : 'pointer' }}
+                                      >
+                                        {isGeneratingInvoice === reservation.id ? (
+                                          <>
+                                            <RefreshCw className="w-3 h-3 animate-spin" />
+                                            Generowanie...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <FileText className="w-3 h-3" />
+                                            Wystaw fakturę ({getSelectedItemsCount(reservation.id)})
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+                                    
                                     {/* View Invoice Button */}
                                     {reservation.paymentDetails.invoiceLink && (
                                       <button
