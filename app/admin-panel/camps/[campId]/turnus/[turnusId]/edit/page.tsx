@@ -1002,7 +1002,7 @@ export default function CampTurnusEditPage({
       {/* Delete Transport Confirmation Modal */}
       <DeleteConfirmationModal
         isOpen={showDeleteTransportModal}
-        onClose={() => setShowDeleteTransportModal(false)}
+        onCancel={() => setShowDeleteTransportModal(false)}
         onConfirm={handleRemoveTransport}
         itemType="transport"
         itemName={transport?.name || 'Transport'}
