@@ -57,44 +57,87 @@ export default function DietSection() {
   }, [pathname, loadDietFromStorage]);
 
   // Fetch diets from API
+  // Logic: If camp has center diets, use them; otherwise use general diets
   useEffect(() => {
     const fetchDiets = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Public endpoint - no authentication required
-        // Returns all active global diets from admin panel
-        const url = `${API_BASE_URL}/api/diets/public`;
+        // Get property_id from reservation context
+        const propertyId = reservation.camp?.properties?.id;
         
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        let dietsData: Diet[] = [];
+        
+        if (propertyId) {
+          // First, try to get center diets for this property
+          try {
+            const centerDietsResponse = await fetch(`${API_BASE_URL}/api/center-diets/property/${propertyId}/public`);
+            if (centerDietsResponse.ok) {
+              const centerDiets = await centerDietsResponse.json();
+              if (centerDiets && centerDiets.length > 0) {
+                // Use center diets
+                dietsData = centerDiets.map((cd: any) => ({
+                  id: cd.id,
+                  name: cd.display_name,
+                  price: cd.price,
+                  description: cd.description,
+                  icon_url: cd.icon_url,
+                  is_active: cd.is_active
+                }));
+              }
+            }
+          } catch (err) {
+            console.warn('[DietSection] Error fetching center diets, falling back to general diets:', err);
+          }
         }
-        const data = await response.json();
-        setDiets(data.diets || []);
+        
+        // If no center diets, use general diets
+        if (dietsData.length === 0) {
+          const generalDietsResponse = await fetch(`${API_BASE_URL}/api/center-diets/general/public`);
+          if (generalDietsResponse.ok) {
+            const generalDiets = await generalDietsResponse.json();
+            dietsData = generalDiets.map((gd: any) => ({
+              id: gd.id,
+              name: gd.display_name,
+              price: gd.price,
+              description: gd.description,
+              icon_url: gd.icon_url,
+              is_active: gd.is_active
+            }));
+          } else {
+            // Fallback to old endpoint
+            const response = await fetch(`${API_BASE_URL}/api/diets/public`);
+            if (response.ok) {
+              const data = await response.json();
+              dietsData = data.diets || [];
+            }
+          }
+        }
+        
+        setDiets(dietsData);
         
         // Check sessionStorage directly to get the most up-to-date value
         const savedData = loadStep1FormData();
         const savedDietId = savedData?.selectedDietId;
         
         // Only set default diet if we haven't loaded from sessionStorage
-        if (!hasLoadedFromStorageRef.current && data.diets && data.diets.length > 0) {
-          const standardDiet = data.diets.find((d: Diet) => d.name === 'Standardowa');
-          const defaultDiet = standardDiet || data.diets[0];
+        if (!hasLoadedFromStorageRef.current && dietsData && dietsData.length > 0) {
+          const standardDiet = dietsData.find((d: Diet) => d.name?.includes('Standardowa') || d.name?.includes('standard'));
+          const defaultDiet = standardDiet || dietsData[0];
           setSelectedDietId(defaultDiet.id);
           prevDietIdRef.current = defaultDiet.id;
         } else if (savedDietId !== undefined && savedDietId !== null) {
           // Verify that the selected diet from storage exists in the fetched diets
-          const dietExists = data.diets.some((d: Diet) => d.id === savedDietId);
+          const dietExists = dietsData.some((d: Diet) => d.id === savedDietId);
           if (dietExists) {
             // Set the saved diet
             setSelectedDietId(savedDietId);
             prevDietIdRef.current = savedDietId;
-          } else if (data.diets.length > 0) {
+          } else if (dietsData.length > 0) {
             // If saved diet doesn't exist, fall back to default
-            const standardDiet = data.diets.find((d: Diet) => d.name === 'Standardowa');
-            const defaultDiet = standardDiet || data.diets[0];
+            const standardDiet = dietsData.find((d: Diet) => d.name?.includes('Standardowa') || d.name?.includes('standard'));
+            const defaultDiet = standardDiet || dietsData[0];
             setSelectedDietId(defaultDiet.id);
             prevDietIdRef.current = defaultDiet.id;
           }
@@ -110,7 +153,7 @@ export default function DietSection() {
 
     fetchDiets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, [reservation.camp?.properties?.id]); // Re-fetch when property changes
 
   // Update reservation when diet changes
   useEffect(() => {

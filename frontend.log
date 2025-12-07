@@ -37,3 +37,22 @@
  GET /login?redirect=%2Fcamps%2F1%2Fedition%2F1%2Fstep%2F1 200 in 89ms (compile: 7ms, render: 82ms)
  GET /login?redirect=%2Fcamps%2F1%2Fedition%2F1%2Fstep%2F1 200 in 75ms (compile: 15ms, render: 60ms)
  GET /login?redirect=%2Fcamps%2F1%2Fedition%2F1%2Fstep%2F1 200 in 69ms (compile: 5ms, render: 64ms)
+ GET / 200 in 40ms (compile: 3ms, render: 37ms)
+ ⚠ Fast Refresh had to perform a full reload when ./node_modules/next/dist/client/image-component.js changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 200 in 63ms (compile: 32ms, render: 31ms)
+ GET / 200 in 71ms (compile: 15ms, render: 56ms)
+ GET / 200 in 113ms (compile: 35ms, render: 77ms)
+ ✓ Compiled in 20ms
+ ⚠ Fast Refresh had to perform a full reload when ./node_modules/next/dist/client/image-component.js changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 200 in 101ms (compile: 37ms, render: 64ms)
+ GET / 200 in 82ms (compile: 1634µs, render: 80ms)
+ ✓ Compiled in 31ms
+ ✓ Compiled in 35ms
+ GET /login 200 in 416ms (compile: 103ms, render: 313ms)
+ GET /login 200 in 423ms (compile: 125ms, render: 297ms)
+ GET /camps/1/edition/1/step/1 200 in 497ms (compile: 220ms, render: 277ms)
+ GET /camps/1/edition/1/step/1 200 in 232ms (compile: 5ms, render: 227ms)
+ GET /login?redirect=%2Fcamps%2F1%2Fedition%2F1%2Fstep%2F1 200 in 65ms (compile: 10ms, render: 55ms)
+ GET /login?redirect=%2Fcamps%2F1%2Fedition%2F1%2Fstep%2F1 200 in 35ms (compile: 8ms, render: 26ms)
+ GET /camps/1/edition/1/step/1 200 in 55ms (compile: 4ms, render: 51ms)
+ GET /login?redirect=%2Fcamps%2F1%2Fedition%2F1%2Fstep%2F1 200 in 12ms (compile: 1394µs, render: 11ms)
