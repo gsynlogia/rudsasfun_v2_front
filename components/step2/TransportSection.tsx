@@ -276,7 +276,13 @@ export default function TransportSection() {
     }
     
     const options = [{ value: '', label: 'Wybierz miasto' }];
-    cities.forEach(city => {
+    
+    // Sort cities alphabetically by city name
+    const sortedCities = [...cities].sort((a, b) => {
+      return a.city.localeCompare(b.city, 'pl', { sensitivity: 'base' });
+    });
+    
+    sortedCities.forEach(city => {
       options.push({ value: city.city, label: city.city });
     });
     
