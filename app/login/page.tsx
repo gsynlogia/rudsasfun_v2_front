@@ -85,7 +85,7 @@ function LoginContent() {
               Logowanie
             </h1>
             <p className="text-sm sm:text-base text-gray-600 mb-6 text-center">
-              Wprowadź swój adres email, aby otrzymać magic link do logowania
+              Wprowadź swój adres email, aby otrzymać link do logowania
             </p>
 
             {success ? (
