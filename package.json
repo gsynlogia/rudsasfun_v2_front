@@ -10,7 +10,13 @@
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "test:all": "playwright test --headed",
+    "test:reservation": "playwright test --headed tests/full-reservation-flow.spec.ts",
+    "test:payment": "playwright test --headed tests/payment-and-invoice.spec.ts",
+    "test:admin": "playwright test --headed tests/admin-panel-full.spec.ts",
+    "test:validation": "playwright test --headed tests/step*-validation.spec.ts",
+    "test:unit": "echo 'Unit tests are in backend/tests/'"
   },
   "dependencies": {
     "lucide-react": "^0.555.0",
