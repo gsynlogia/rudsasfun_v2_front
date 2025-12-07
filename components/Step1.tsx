@@ -104,9 +104,13 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   };
 
   // Validate parent fields
-  const validateParent = (parent: ParentData): Record<string, string> => {
+  // First guardian (index 0): firstName, lastName, email, phoneNumber - required
+  // Second guardian (index 1): firstName, lastName, phoneNumber - required; email optional
+  const validateParent = (parent: ParentData, index: number): Record<string, string> => {
     const errors: Record<string, string> = {};
+    const isFirstGuardian = index === 0;
     
+    // Always required for both guardians
     if (!parent.firstName || parent.firstName.trim() === '') {
       errors.firstName = 'Pole obowiązkowe';
     }
@@ -115,27 +119,25 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       errors.lastName = 'Pole obowiązkowe';
     }
     
-    if (!parent.email || parent.email.trim() === '') {
-      errors.email = 'Pole obowiązkowe';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parent.email)) {
-      errors.email = 'Nieprawidłowy adres e-mail';
-    }
-    
     if (!parent.phoneNumber || parent.phoneNumber.trim() === '') {
       errors.phoneNumber = 'Pole obowiązkowe';
     }
     
-    if (!parent.street || parent.street.trim() === '') {
-      errors.street = 'Pole obowiązkowe';
+    // Email required only for first guardian
+    if (isFirstGuardian) {
+      if (!parent.email || parent.email.trim() === '') {
+        errors.email = 'Pole obowiązkowe';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parent.email)) {
+        errors.email = 'Nieprawidłowy adres e-mail';
+      }
+    } else {
+      // For second guardian, email is optional but if provided, must be valid
+      if (parent.email && parent.email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parent.email)) {
+        errors.email = 'Nieprawidłowy adres e-mail';
+      }
     }
     
-    if (!parent.postalCode || parent.postalCode.trim() === '') {
-      errors.postalCode = 'Pole obowiązkowe';
-    }
-    
-    if (!parent.city || parent.city.trim() === '') {
-      errors.city = 'Pole obowiązkowe';
-    }
+    // Street, postalCode, city are optional for both guardians (no validation)
     
     return errors;
   };
@@ -145,8 +147,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     const allErrors: Record<string, Record<string, string>> = {};
     let isValid = true;
     
-    parents.forEach((parent) => {
-      const errors = validateParent(parent);
+    parents.forEach((parent, index) => {
+      const errors = validateParent(parent, index);
       if (Object.keys(errors).length > 0) {
         allErrors[parent.id] = errors;
         isValid = false;
@@ -381,7 +383,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Adres e-mail *
+                    Adres e-mail {index === 0 ? <span className="text-red-500">*</span> : ''}
                   </label>
                   <input
                     type="email"
@@ -428,7 +430,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Ulica i numer *
+                    Ulica i numer
                   </label>
                   <input
                     type="text"
@@ -445,7 +447,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Kod pocztowy *
+                    Kod pocztowy
                   </label>
                   <input
                     type="text"
@@ -462,7 +464,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Miejscowość *
+                    Miejscowość
                   </label>
                   <input
                     type="text"
