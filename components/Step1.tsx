@@ -26,8 +26,53 @@ interface ParentData {
  * Contains: Parent/Guardian data, Participant data, Diet, Accommodation request, Health status
  */
 export default function Step1({ onNext, onPrevious, disabled = false }: StepComponentProps) {
-  const { addReservationItem, removeReservationItemsByType } = useReservation();
+  const { addReservationItem, removeReservationItemsByType, reservation } = useReservation();
   const pathname = usePathname();
+  
+  // Calculate available birth years based on camp start date
+  // Age must be 7-17 years old on camp start date
+  // Logic: if camp starts on July 1, 2025:
+  // - Age 7: born between July 2, 2017 and July 1, 2018 (rocznik 2017 or 2018)
+  // - Age 17: born between July 2, 2007 and July 1, 2008 (rocznik 2007 or 2008)
+  // To include all valid cases, we use: (startYear - 17) to (startYear - 7)
+  // But we need to account for edge cases where birthday hasn't passed yet
+  const getAvailableBirthYears = (): number[] => {
+    const birthYears: number[] = [];
+    
+    // Get camp start date from reservation context
+    const startDateStr = reservation.camp?.properties?.start_date;
+    if (!startDateStr) {
+      // If no camp data, return empty array (will show placeholder)
+      return [];
+    }
+    
+    try {
+      const startDate = new Date(startDateStr);
+      const startYear = startDate.getFullYear();
+      
+      // Calculate birth years for ages 7-17 on camp start date
+      // For age 7: person born in (startYear - 7) or (startYear - 8) depending on exact birthday
+      // For age 17: person born in (startYear - 17) or (startYear - 18) depending on exact birthday
+      // To include all valid cases, we use range: (startYear - 17) to (startYear - 7)
+      // This ensures that anyone born in these years will be 7-17 years old on the camp start date
+      // (accounting for birthday edge cases)
+      
+      const minBirthYear = startYear - 17; // Oldest participant (17 years old)
+      const maxBirthYear = startYear - 7;  // Youngest participant (7 years old)
+      
+      // Generate birth years from youngest to oldest (most recent first)
+      for (let year = maxBirthYear; year >= minBirthYear; year--) {
+        birthYears.push(year);
+      }
+      
+      return birthYears;
+    } catch (error) {
+      console.error('Error calculating birth years:', error);
+      return [];
+    }
+  };
+  
+  const availableBirthYears = getAvailableBirthYears();
   
   const [parents, setParents] = useState<ParentData[]>([
     {
@@ -162,7 +207,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   const [participantData, setParticipantData] = useState({
     firstName: '',
     lastName: '',
-    age: '',
+    age: '', // Will store birth year as string
     gender: '',
     city: '',
     selectedParticipant: '',
@@ -182,6 +227,34 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     
     if (!participantData.age || participantData.age.trim() === '' || participantData.age === 'Wybierz z listy') {
       errors.age = 'Pole obowiązkowe';
+    } else {
+      // Validate that selected birth year gives age 7-17 on camp start date
+      const startDateStr = reservation.camp?.properties?.start_date;
+      if (startDateStr) {
+        try {
+          const startDate = new Date(startDateStr);
+          const startYear = startDate.getFullYear();
+          const birthYear = parseInt(participantData.age, 10);
+          
+          if (isNaN(birthYear)) {
+            errors.age = 'Nieprawidłowy rocznik';
+          } else {
+            // Calculate age on camp start date
+            // Age = startYear - birthYear (if birthday has passed) or startYear - birthYear - 1 (if not)
+            // For validation, we check if birthYear is in the valid range
+            // Valid range: (startYear - 17) to (startYear - 7)
+            const minBirthYear = startYear - 17;
+            const maxBirthYear = startYear - 7;
+            
+            if (birthYear < minBirthYear || birthYear > maxBirthYear) {
+              errors.age = 'Uczestnik musi mieć 7-17 lat w dniu rozpoczęcia obozu';
+            }
+          }
+        } catch (error) {
+          console.error('Error validating birth year:', error);
+          // Don't add error if date parsing fails - let it pass
+        }
+      }
     }
     
     if (!participantData.gender || participantData.gender.trim() === '' || participantData.gender === 'Wybierz z listy') {
@@ -584,7 +657,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
             </div>
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                Wiek <span className="text-red-500">*</span>
+                Rocznik <span className="text-red-500">*</span>
               </label>
               <select
                 value={participantData.age}
@@ -598,26 +671,27 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     });
                   }
                 }}
-                disabled={disabled}
+                disabled={disabled || availableBirthYears.length === 0}
                 className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed ${
                   participantErrors.age ? 'border-red-500' : 'border-gray-400'
                 }`}
               >
                 <option>Wybierz z listy</option>
-                <option value="7">7</option>
-                <option value="8">8</option>
-                <option value="9">9</option>
-                <option value="10">10</option>
-                <option value="11">11</option>
-                <option value="12">12</option>
-                <option value="13">13</option>
-                <option value="14">14</option>
-                <option value="15">15</option>
-                <option value="16">16</option>
-                <option value="17">17</option>
+                {availableBirthYears.length > 0 ? (
+                  availableBirthYears.map((year) => (
+                    <option key={year} value={year.toString()}>
+                      {year}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>Brak dostępnych roczników (brak danych obozu)</option>
+                )}
               </select>
               {participantErrors.age && (
                 <p className="mt-1 text-xs text-red-600">{participantErrors.age}</p>
+              )}
+              {availableBirthYears.length === 0 && !participantErrors.age && (
+                <p className="mt-1 text-xs text-gray-500">Wybierz obóz, aby zobaczyć dostępne roczniki</p>
               )}
             </div>
             <div>
