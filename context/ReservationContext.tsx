@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import type { ReservationState, ReservationContextType, ReservationItem, ReservationCamp } from '@/types/reservation';
 import { saveReservationState, loadReservationState } from '@/utils/sessionStorage';
 

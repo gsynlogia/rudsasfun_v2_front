@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { ArrowLeft, Save, MapPin, Truck, Plus, X } from 'lucide-react';
 import type { CampPropertyTransport } from '@/types/reservation';
@@ -54,15 +54,8 @@ export default function TransportEditPage({
 
   // Form state
   const [transportName, setTransportName] = useState('');
-  const [selectedCampIds, setSelectedCampIds] = useState<number[]>([]);
   const [departureType, setDepartureType] = useState<'collective' | 'own'>('collective');
   const [returnType, setReturnType] = useState<'collective' | 'own'>('collective');
-  
-  // Multi-select state for camps
-  const [isCampSelectOpen, setIsCampSelectOpen] = useState(false);
-  const [campSearchQuery, setCampSearchQuery] = useState('');
-  const [availableCamps, setAvailableCamps] = useState<Array<{id: number, name: string}>>([]);
-  const campSelectRef = useRef<HTMLDivElement>(null);
   
   // Cities state - array of {city: string, departure_price: number | '', return_price: number | ''}
   interface CityFormData {
@@ -131,7 +124,6 @@ export default function TransportEditPage({
           } else {
             // Populate form with transport data
             setTransportName(transportData.name || '');
-            setSelectedCampIds((transportData as any).camp_ids || []);
             setDepartureType(transportData.departure_type);
             setReturnType(transportData.return_type);
             
@@ -162,68 +154,6 @@ export default function TransportEditPage({
         });
     }
   }, [transportId]);
-
-  // Fetch available camps
-  useEffect(() => {
-    const fetchCamps = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/camps/`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setAvailableCamps(data.camps?.map((camp: any) => ({ id: camp.id, name: camp.name })) || []);
-        }
-      } catch (err) {
-        console.error('[TransportEditPage] Error fetching camps:', err);
-      }
-    };
-    fetchCamps();
-  }, []);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (campSelectRef.current && !campSelectRef.current.contains(event.target as Node)) {
-        setIsCampSelectOpen(false);
-        setCampSearchQuery('');
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // Filter camps based on search query
-  const filteredCamps = useMemo(() => {
-    if (!campSearchQuery) {
-      return availableCamps;
-    }
-    return availableCamps.filter(camp =>
-      camp.name.toLowerCase().includes(campSearchQuery.toLowerCase())
-    );
-  }, [availableCamps, campSearchQuery]);
-
-  // Handle camp selection
-  const handleCampToggle = (campId: number) => {
-    setSelectedCampIds(prev => {
-      if (prev.includes(campId)) {
-        return prev.filter(id => id !== campId);
-      } else {
-        return [...prev, campId];
-      }
-    });
-  };
-
-  // Remove camp from selection
-  const removeCamp = (campId: number) => {
-    setSelectedCampIds(prev => prev.filter(id => id !== campId));
-  };
 
   const handleSave = async () => {
     // Validate cities if transport is collective
@@ -272,7 +202,7 @@ export default function TransportEditPage({
 
       const transportData = {
         name: transportName.trim() || null,
-        camp_ids: selectedCampIds,
+        // camp_ids removed - transport can only be assigned to camps during turnus editing
         departure_type: departureType,
         return_type: returnType,
         cities: citiesData,
@@ -382,97 +312,11 @@ export default function TransportEditPage({
               </p>
             </div>
 
-            {/* Camp IDs (Multi-select) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Obozy <span className="text-gray-500 text-xs">(opcjonalne)</span>
-              </label>
-              <div className="relative" ref={campSelectRef}>
-                {/* Selected camps display */}
-                <div
-                  onClick={() => setIsCampSelectOpen(!isCampSelectOpen)}
-                  className="w-full min-h-[42px] px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200 cursor-pointer flex flex-wrap gap-2 items-center"
-                  style={{ borderRadius: 0 }}
-                >
-                  {selectedCampIds.length === 0 ? (
-                    <span className="text-gray-400">Wybierz obozy...</span>
-                  ) : (
-                    selectedCampIds.map(campId => {
-                      const camp = availableCamps.find(c => c.id === campId);
-                      return (
-                        <span
-                          key={campId}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-[#03adf0] text-white text-xs"
-                          style={{ borderRadius: 0 }}
-                        >
-                          {camp?.name || `ID: ${campId}`}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeCamp(campId);
-                            }}
-                            className="hover:bg-[#0288c7] transition-colors"
-                            disabled={saving}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Dropdown */}
-                {isCampSelectOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 shadow-lg max-h-60 overflow-auto" style={{ borderRadius: 0 }}>
-                    {/* Search input */}
-                    <div className="p-2 border-b border-gray-200">
-                      <input
-                        type="text"
-                        value={campSearchQuery}
-                        onChange={(e) => setCampSearchQuery(e.target.value)}
-                        placeholder="Szukaj obozu..."
-                        className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
-                        style={{ borderRadius: 0 }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-
-                    {/* Camp list */}
-                    <div className="max-h-48 overflow-auto">
-                      {filteredCamps.length === 0 ? (
-                        <div className="px-4 py-2 text-sm text-gray-500">Brak obozów</div>
-                      ) : (
-                        filteredCamps.map(camp => (
-                          <div
-                            key={camp.id}
-                            onClick={() => {
-                              handleCampToggle(camp.id);
-                              setCampSearchQuery('');
-                            }}
-                            className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 transition-colors ${
-                              selectedCampIds.includes(camp.id) ? 'bg-blue-50' : ''
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={selectedCampIds.includes(camp.id)}
-                                onChange={() => {}}
-                                className="cursor-pointer"
-                              />
-                              <span>{camp.name}</span>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Możesz przypisać transport do wielu obozów. Obozy, które już mają przypisany transport, nie będą dostępne.
+            {/* Note: Camp assignment removed - transport can only be assigned to camps during turnus editing */}
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+              <p className="text-sm text-blue-700">
+                <strong>Uwaga:</strong> Transport może być przypisany do obozu tylko podczas edycji turnusu. 
+                Aby przypisać transport do obozu, edytuj turnus i wybierz transport z listy dostępnych transportów.
               </p>
             </div>
 

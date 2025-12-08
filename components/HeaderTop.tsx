@@ -71,15 +71,17 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
         <div className="max-w-container px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between">
           {/* Logo on the left */}
           <div className="flex items-center">
-            <Image
-              src="/logo.png"
-              alt="Radsas Fun Logo"
-              width={150}
-              height={60}
-              className="h-5 sm:h-7 md:h-10 lg:max-h-[60px] w-auto"
-              style={{ maxHeight: '60px', height: 'auto', width: 'auto' }}
-              priority
-            />
+            <Link href="/" className="cursor-pointer">
+              <Image
+                src="/logo.png"
+                alt="Radsas Fun Logo"
+                width={150}
+                height={60}
+                className="h-5 sm:h-7 md:h-10 lg:max-h-[60px] w-auto"
+                style={{ maxHeight: '60px', height: 'auto', width: 'auto', cursor: 'pointer' }}
+                priority
+              />
+            </Link>
           </div>
 
           {/* Utility links and icons on the right - hidden on mobile/tablet */}

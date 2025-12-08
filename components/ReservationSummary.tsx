@@ -3,22 +3,78 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter, usePathname } from 'next/navigation';
 import { useReservation } from '@/context/ReservationContext';
+import type { StepNumber } from '@/types/reservation';
 
 const BASE_PRICE = 2200;
+const TOTAL_STEPS = 5;
+
+interface ReservationSummaryProps {
+  currentStep?: StepNumber;
+  onNext?: () => void;
+}
 
 /**
  * ReservationSummary Component
  * Displays reservation summary with dynamic pricing based on selected options
+ * Button "przejdź dalej" navigates to next step or payment on last step
  */
-export default function ReservationSummary() {
+export default function ReservationSummary({ currentStep, onNext }: ReservationSummaryProps = {}) {
   const { reservation } = useReservation();
   const [isMounted, setIsMounted] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Prevent hydration mismatch by only rendering after mount
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Handle button click - navigate to next step or payment
+  const handleNextClick = () => {
+    if (onNext) {
+      // Use provided onNext handler if available
+      onNext();
+      return;
+    }
+
+    // Default navigation logic
+    if (!currentStep) {
+      // If currentStep is not provided, try to extract from pathname
+      const pathParts = pathname.split('/').filter(Boolean);
+      const stepIndex = pathParts.indexOf('step');
+      if (stepIndex !== -1 && stepIndex + 1 < pathParts.length) {
+        const step = parseInt(pathParts[stepIndex + 1], 10);
+        if (!isNaN(step) && step >= 1 && step <= TOTAL_STEPS) {
+          navigateToStep(step as StepNumber);
+          return;
+        }
+      }
+      return;
+    }
+
+    navigateToStep(currentStep);
+  };
+
+  const navigateToStep = (step: StepNumber) => {
+    if (step < TOTAL_STEPS) {
+      // Navigate to next step
+      const pathParts = pathname.split('/').filter(Boolean);
+      const campIdIndex = pathParts.indexOf('camps');
+      if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
+        const campId = pathParts[campIdIndex + 1];
+        const editionId = pathParts[campIdIndex + 3]; // edition/[editionId]
+        const nextStep = (step + 1) as StepNumber;
+        const newPath = `/camps/${campId}/edition/${editionId}/step/${nextStep}`;
+        router.push(newPath);
+      }
+    } else {
+      // Last step - navigate to payment/finalization
+      // This should already be handled by Step5 component, but we can navigate to profile
+      router.push('/profil/aktualne-rezerwacje');
+    }
+  };
 
   // Separate base price from other items
   const baseItem = reservation.items.find((item) => item.type === 'base');
@@ -50,7 +106,10 @@ export default function ReservationSummary() {
             {BASE_PRICE.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
           </div>
         </div>
-        <button className="w-1/2 bg-[#03adf0] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-2 mt-4 sm:mt-6 text-sm sm:text-base">
+        <button 
+          onClick={handleNextClick}
+          className="w-1/2 bg-[#03adf0] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-2 mt-4 sm:mt-6 text-sm sm:text-base"
+        >
           przejdź dalej
           <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -115,8 +174,11 @@ export default function ReservationSummary() {
         </div>
       </div>
       
-      <button className="w-1/2 bg-[#03adf0] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-2 mt-4 sm:mt-6 text-sm sm:text-base">
-        przejdź dalej
+      <button 
+        onClick={handleNextClick}
+        className="w-1/2 bg-[#03adf0] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-2 mt-4 sm:mt-6 text-sm sm:text-base"
+      >
+        {currentStep === TOTAL_STEPS ? 'Przejdź do płatności' : 'przejdź dalej'}
         <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>

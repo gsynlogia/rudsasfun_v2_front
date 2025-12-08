@@ -23,6 +23,17 @@ interface ReservationDetails {
   parentName: string;
   parentEmail: string;
   parentPhone: string;
+  parents: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone: string;
+    phoneNumber: string;
+    street?: string;
+    postalCode?: string;
+    city?: string;
+  }>;
   paymentStatus: string;
   paymentMethod: string;
   totalAmount: number;
@@ -138,6 +149,9 @@ const mapBackendToFrontend = (backendReservation: BackendReservation): Reservati
   const parentEmail = firstParent?.email || backendReservation.invoice_email || '';
   const parentPhone = firstParent?.phoneNumber || backendReservation.invoice_phone || '';
   
+  // Get all parents data
+  const allParents = backendReservation.parents_data || [];
+  
   // Calculate age from participant_age string
   const age = backendReservation.participant_age ? parseInt(backendReservation.participant_age) : 0;
   const currentYear = new Date().getFullYear();
@@ -163,6 +177,17 @@ const mapBackendToFrontend = (backendReservation: BackendReservation): Reservati
       parentName: parentName || 'Brak danych',
       parentEmail: parentEmail,
       parentPhone: parentPhone,
+      parents: allParents.map(parent => ({
+        id: parent.id || '',
+        firstName: parent.firstName || '',
+        lastName: parent.lastName || '',
+        email: parent.email || undefined,
+        phone: parent.phone || '+48',
+        phoneNumber: parent.phoneNumber || '',
+        street: parent.street || undefined,
+        postalCode: parent.postalCode || undefined,
+        city: parent.city || undefined,
+      })),
       paymentStatus: paymentStatus,
       paymentMethod: 'Online', // Default, could be enhanced with payment data
       totalAmount: totalAmount,
@@ -1069,26 +1094,73 @@ export default function ReservationsManagement() {
                                 </div>
                               </div>
                               
-                              {/* Parent Details */}
+                              {/* Parents Details */}
                               <div className="space-y-2">
-                                <h4 className="font-semibold text-sm text-gray-900 mb-2">Dane opiekuna</h4>
-                                <div className="space-y-1 text-xs">
-                                  <div className="flex items-center gap-2">
-                                    <User className="w-3 h-3 text-gray-400" />
-                                    <span className="text-gray-600">Imię i nazwisko:</span>
-                                    <span className="text-gray-900">{reservation.details.parentName}</span>
+                                <h4 className="font-semibold text-sm text-gray-900 mb-2">
+                                  {reservation.details.parents && reservation.details.parents.length > 1 
+                                    ? 'Dane opiekunów' 
+                                    : 'Dane opiekuna'}
+                                </h4>
+                                {reservation.details.parents && reservation.details.parents.length > 0 ? (
+                                  <div className="space-y-3">
+                                    {reservation.details.parents.map((parent, index) => (
+                                      <div key={parent.id || index} className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                                        <div className="text-xs font-medium text-gray-700 mb-1.5">
+                                          {reservation.details.parents.length > 1 
+                                            ? `Opiekun ${index + 1}` 
+                                            : 'Opiekun'}
+                                        </div>
+                                        <div className="space-y-1 text-xs">
+                                          <div className="flex items-center gap-2">
+                                            <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                            <span className="text-gray-600">Imię i nazwisko:</span>
+                                            <span className="text-gray-900">{parent.firstName} {parent.lastName}</span>
+                                          </div>
+                                          {parent.email && (
+                                            <div className="flex items-center gap-2">
+                                              <Mail className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                              <span className="text-gray-600">Email:</span>
+                                              <span className="text-gray-900">{parent.email}</span>
+                                            </div>
+                                          )}
+                                          <div className="flex items-center gap-2">
+                                            <Phone className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                            <span className="text-gray-600">Telefon:</span>
+                                            <span className="text-gray-900">{parent.phone || '+48'} {parent.phoneNumber}</span>
+                                          </div>
+                                          {parent.street && (
+                                            <div className="flex items-center gap-2">
+                                              <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                              <span className="text-gray-600">Adres:</span>
+                                              <span className="text-gray-900">
+                                                {parent.street}
+                                                {parent.postalCode && parent.city && `, ${parent.postalCode} ${parent.city}`}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <Mail className="w-3 h-3 text-gray-400" />
-                                    <span className="text-gray-600">Email:</span>
-                                    <span className="text-gray-900">{reservation.details.parentEmail}</span>
+                                ) : (
+                                  <div className="space-y-1 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <User className="w-3 h-3 text-gray-400" />
+                                      <span className="text-gray-600">Imię i nazwisko:</span>
+                                      <span className="text-gray-900">{reservation.details.parentName}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Mail className="w-3 h-3 text-gray-400" />
+                                      <span className="text-gray-600">Email:</span>
+                                      <span className="text-gray-900">{reservation.details.parentEmail}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Phone className="w-3 h-3 text-gray-400" />
+                                      <span className="text-gray-600">Telefon:</span>
+                                      <span className="text-gray-900">{reservation.details.parentPhone}</span>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <Phone className="w-3 h-3 text-gray-400" />
-                                    <span className="text-gray-600">Telefon:</span>
-                                    <span className="text-gray-900">{reservation.details.parentPhone}</span>
-                                  </div>
-                                </div>
+                                )}
                               </div>
                               
                               {/* Payment Details */}

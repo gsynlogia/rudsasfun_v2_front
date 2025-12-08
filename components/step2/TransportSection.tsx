@@ -44,6 +44,7 @@ export default function TransportSection() {
 
   const [cities, setCities] = useState<TransportCity[]>([]);
   const [loadingCities, setLoadingCities] = useState(false);
+  const [hasTransport, setHasTransport] = useState<boolean | null>(null); // null = checking, true = has transport, false = no transport
   const [showDifferentCitiesModal, setShowDifferentCitiesModal] = useState(false);
   const [departurePrice, setDeparturePrice] = useState<number | null>(null);
   const [returnPrice, setReturnPrice] = useState<number | null>(null);
@@ -105,30 +106,51 @@ export default function TransportSection() {
     }
   }, []);
 
-  // Fetch cities from API when collective transport is selected
+  // Check if transport exists for this turnus and fetch cities
   useEffect(() => {
-    const fetchCities = async () => {
+    const checkTransportAndFetchCities = async () => {
       if (!campId || !editionId) return;
       
-      if (transportData.departureType === 'zbiorowy' || transportData.returnType === 'zbiorowy') {
-        setLoadingCities(true);
-        try {
-          const response = await authenticatedApiCall<TransportCity[]>(
-            `${API_BASE_URL}/api/camps/${campId}/properties/${editionId}/transport/cities`
-          );
-          setCities(response || []);
-        } catch (error) {
-          console.error('Error fetching transport cities:', error);
+      // First, check if transport exists for this turnus
+      try {
+        const transportResponse = await authenticatedApiCall<any>(
+          `${API_BASE_URL}/api/camps/${campId}/properties/${editionId}/transport`
+        );
+        
+        if (transportResponse && transportResponse.id) {
+          setHasTransport(true);
+          
+          // If collective transport is selected, fetch cities
+          if (transportData.departureType === 'zbiorowy' || transportData.returnType === 'zbiorowy') {
+            setLoadingCities(true);
+            try {
+              const citiesResponse = await authenticatedApiCall<TransportCity[]>(
+                `${API_BASE_URL}/api/camps/${campId}/properties/${editionId}/transport/cities`
+              );
+              setCities(citiesResponse || []);
+            } catch (error) {
+              console.error('Error fetching transport cities:', error);
+              setCities([]);
+            } finally {
+              setLoadingCities(false);
+            }
+          } else {
+            setCities([]);
+          }
+        } else {
+          // No transport assigned to this turnus
+          setHasTransport(false);
           setCities([]);
-        } finally {
-          setLoadingCities(false);
         }
-      } else {
+      } catch (error) {
+        // If error (404 or other), assume no transport
+        console.error('Error checking transport:', error);
+        setHasTransport(false);
         setCities([]);
       }
     };
 
-    fetchCities();
+    checkTransportAndFetchCities();
   }, [campId, editionId, transportData.departureType, transportData.returnType]);
 
   // Calculate prices
@@ -308,21 +330,38 @@ export default function TransportSection() {
         Transport
       </h2>
       <section className="bg-white p-4 sm:p-6">
-        {/* Warning block */}
-        <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-red-50 rounded-lg mb-4 sm:mb-6">
-          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-xs sm:text-sm font-bold text-red-600 mb-1">
-              Uwaga!
-            </p>
-            <p className="text-xs sm:text-sm text-gray-700 mb-2">
-              Przed wypełnieniem tego formularza sprawdź informacje transportowe.
-            </p>
-            <p className="text-xs sm:text-sm text-red-600">
-              Przy zmianie po 30 dniach obowiązuje dopłata 30 zł.
-            </p>
+        {/* Warning if no transport assigned to turnus */}
+        {hasTransport === false && (
+          <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-red-50 border-2 border-red-300 rounded-lg mb-4 sm:mb-6">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs sm:text-sm font-bold text-red-600 mb-1">
+                Brak transportu dla tego turnusu
+              </p>
+              <p className="text-xs sm:text-sm text-red-700">
+                Ten turnus nie ma przypisanego transportu. Skontaktuj się z organizatorem w sprawie transportu.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
+        
+        {/* Warning block */}
+        {hasTransport !== false && (
+          <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-red-50 rounded-lg mb-4 sm:mb-6">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs sm:text-sm font-bold text-red-600 mb-1">
+                Uwaga!
+              </p>
+              <p className="text-xs sm:text-sm text-gray-700 mb-2">
+                Przed wypełnieniem tego formularza sprawdź informacje transportowe.
+              </p>
+              <p className="text-xs sm:text-sm text-red-600">
+                Przy zmianie po 30 dniach obowiązuje dopłata 30 zł.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Regulation buttons */}
         <div className="flex flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">

@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useParams } from 'next/navigation';
 import { Info } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep1FormData, saveStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL } from '@/utils/api-config';
+import { fetchWithDefaults } from '@/utils/api-fetch';
+import { DEFAULT_DIET } from '@/types/defaults';
+import { BackendUnavailableError } from '@/utils/api-auth';
 
 interface Diet {
   id: number;
@@ -13,6 +16,7 @@ interface Diet {
   price: number;
   description?: string | null;
   icon_url?: string | null;
+  icon_svg?: string | null;
   is_active: boolean;
 }
 
@@ -24,6 +28,7 @@ interface Diet {
 export default function DietSection() {
   const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
+  const params = useParams();
   
   const [selectedDietId, setSelectedDietId] = useState<number | null>(null);
   const [diets, setDiets] = useState<Diet[]>([]);
@@ -64,53 +69,133 @@ export default function DietSection() {
         setLoading(true);
         setError(null);
         
-        // Get property_id from reservation context
-        const propertyId = reservation.camp?.properties?.id;
+        // Get property_id from URL params (editionId is the property_id)
+        const editionId = params?.editionId as string | undefined;
+        const propertyId = editionId ? parseInt(editionId, 10) : undefined;
+        
+        // Extract campId from pathname
+        const pathParts = pathname.split('/').filter(Boolean);
+        const campIdIndex = pathParts.indexOf('camps');
+        const campId = campIdIndex !== -1 && campIdIndex + 1 < pathParts.length 
+          ? parseInt(pathParts[campIdIndex + 1], 10) 
+          : undefined;
         
         let dietsData: Diet[] = [];
         
-        if (propertyId) {
-          // First, try to get center diets for this property
+        // First, try to get diets assigned to this turnus (property_id)
+        // This endpoint returns:
+        // - Diets from turnus_diets table (many-to-many)
+        // - General diets from CenterDietGeneralDiet relations (expanded from center diets assigned to this turnus)
+        // If turnus has no assigned diets, this returns empty array
+        if (propertyId && campId) {
           try {
-            const centerDietsResponse = await fetch(`${API_BASE_URL}/api/center-diets/property/${propertyId}/public`);
-            if (centerDietsResponse.ok) {
-              const centerDiets = await centerDietsResponse.json();
-              if (centerDiets && centerDiets.length > 0) {
-                // Use center diets
-                dietsData = centerDiets.map((cd: any) => ({
-                  id: cd.id,
-                  name: cd.display_name,
-                  price: cd.price,
-                  description: cd.description,
-                  icon_url: cd.icon_url,
-                  is_active: cd.is_active
-                }));
+            const turnusDietsResponse = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/diets`);
+            if (turnusDietsResponse.ok) {
+              const turnusDiets = await turnusDietsResponse.json();
+              if (turnusDiets && Array.isArray(turnusDiets) && turnusDiets.length > 0) {
+                console.log('[DietSection] Raw turnus diets from API:', turnusDiets);
+                
+                // Check if all diets are center diets without relations (has_no_relations flag)
+                const hasOnlyCenterDietsWithoutRelations = turnusDiets.every((td: any) => td.has_no_relations === true);
+                
+                if (hasOnlyCenterDietsWithoutRelations) {
+                  // Center diet is assigned but has no relations - use general diets as fallback
+                  console.log('[DietSection] Center diet assigned but no relations - using general diets as fallback');
+                  // Don't set dietsData here - let it fall through to general diets logic below
+                } else {
+                  // Use diets assigned to this turnus (general diets from relations)
+                  // Backend now returns general diets from CenterDietGeneralDiet relations as separate items
+                  // Each item has:
+                  // - id: relation_id (for deletion)
+                  // - general_diet_id: ID of the general diet (for selection)
+                  // - name: from general_diet
+                  // - price: from CenterDietGeneralDiet relation (center-specific price)
+                  // - icon_url, icon_svg: from general_diet
+                  dietsData = turnusDiets
+                    .filter((td: any) => !td.has_no_relations) // Filter out center diets without relations
+                    .map((td: any) => {
+                      const mappedDiet = {
+                        id: td.general_diet_id || td.id, // Use general_diet_id for selection (this is the actual diet ID)
+                        relation_id: td.relation_id || td.id, // Keep relation_id for reference (for deletion if needed)
+                        name: td.name, // Name from general_diet
+                        price: td.price, // Price from CenterDietGeneralDiet relation (center-specific)
+                        description: td.description, // Description from general_diet
+                        icon_url: td.icon_url, // Icon from general_diet
+                        icon_svg: td.icon_svg, // Icon SVG from general_diet
+                        is_active: td.is_active,
+                        is_center_diet_relation: td.is_center_diet_relation || false // Mark if from center diet relation
+                      };
+                      console.log('[DietSection] Mapped diet:', { original: td, mapped: mappedDiet });
+                      return mappedDiet;
+                    });
+                  console.log('[DietSection] Using turnus-specific diets (including general diets from center diet relations):', dietsData.length);
+                }
+              } else {
+                console.log('[DietSection] No diets assigned to turnus, will use general diets');
               }
             }
           } catch (err) {
-            console.warn('[DietSection] Error fetching center diets, falling back to general diets:', err);
+            console.warn('[DietSection] Error fetching turnus diets, falling back to general diets:', err);
           }
         }
         
-        // If no center diets, use general diets
-        if (dietsData.length === 0) {
-          const generalDietsResponse = await fetch(`${API_BASE_URL}/api/center-diets/general/public`);
-          if (generalDietsResponse.ok) {
-            const generalDiets = await generalDietsResponse.json();
-            dietsData = generalDiets.map((gd: any) => ({
-              id: gd.id,
-              name: gd.display_name,
-              price: gd.price,
-              description: gd.description,
-              icon_url: gd.icon_url,
-              is_active: gd.is_active
-            }));
-          } else {
+        // If no turnus diets, use general diets (fallback to "dieta ogólna")
+        // DO NOT use center-diets/property endpoint here - it returns center diets with legacy property_id
+        // which may not be assigned to this turnus. Only use diets explicitly assigned via get_turnus_diets.
+        const isUsingGeneralDiets = dietsData.length === 0;
+        if (isUsingGeneralDiets) {
+          try {
+            // Try new general diets endpoint first
+            const generalDietsResponse = await fetch(`${API_BASE_URL}/api/general-diets/public`);
+            if (generalDietsResponse.ok) {
+              const generalDiets = await generalDietsResponse.json();
+              dietsData = generalDiets.map((gd: any) => ({
+                id: gd.id,
+                name: gd.display_name || gd.name,
+                price: gd.price,
+                description: gd.description,
+                icon_url: gd.icon_url,
+                icon_svg: gd.icon_svg,
+                is_active: gd.is_active
+              }));
+              console.log('[DietSection] Using general diets (no turnus diets assigned):', dietsData.length);
+            } else {
+              // Fallback to center-diets/general/public
+              const centerGeneralResponse = await fetch(`${API_BASE_URL}/api/center-diets/general/public`);
+              if (centerGeneralResponse.ok) {
+                const generalDiets = await centerGeneralResponse.json();
+                dietsData = generalDiets.map((gd: any) => ({
+                  id: gd.id,
+                  name: gd.display_name || gd.name,
+                  price: gd.price,
+                  description: gd.description,
+                  icon_url: gd.icon_url,
+                  icon_svg: gd.icon_svg,
+                  is_active: gd.is_active
+                }));
+                console.log('[DietSection] Using general diets from center-diets/general/public:', dietsData.length);
+              } else {
+                // Fallback to old endpoint
+                const response = await fetch(`${API_BASE_URL}/api/diets/public`);
+                if (response.ok) {
+                  const data = await response.json();
+                  dietsData = data.diets || [];
+                  console.log('[DietSection] Using diets from old endpoint:', dietsData.length);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('[DietSection] Error fetching general diets, trying fallback:', err);
             // Fallback to old endpoint
-            const response = await fetch(`${API_BASE_URL}/api/diets/public`);
-            if (response.ok) {
-              const data = await response.json();
-              dietsData = data.diets || [];
+            try {
+              const response = await fetch(`${API_BASE_URL}/api/diets/public`);
+              if (response.ok) {
+                const data = await response.json();
+                dietsData = data.diets || [];
+                console.log('[DietSection] Using diets from fallback endpoint:', dietsData.length);
+              }
+            } catch (fallbackErr) {
+              console.error('[DietSection] All diet endpoints failed:', fallbackErr);
             }
           }
         }
@@ -123,8 +208,25 @@ export default function DietSection() {
         
         // Only set default diet if we haven't loaded from sessionStorage
         if (!hasLoadedFromStorageRef.current && dietsData && dietsData.length > 0) {
-          const standardDiet = dietsData.find((d: Diet) => d.name?.includes('Standardowa') || d.name?.includes('standard'));
-          const defaultDiet = standardDiet || dietsData[0];
+          // When using general diets (no turnus diets), always use the first general diet
+          // Otherwise, try to find "dieta ogólna" or "standardowa" first
+          let defaultDiet: Diet;
+          if (isUsingGeneralDiets) {
+            // When no turnus diets, use first general diet as default
+            defaultDiet = dietsData[0];
+            console.log('[DietSection] No turnus diets - using first general diet as default:', defaultDiet.name);
+          } else {
+            // When turnus has specific diets, try to find "ogólna" or "standardowa"
+            const generalDiet = dietsData.find((d: Diet) => 
+              d.name?.toLowerCase().includes('ogólna') || 
+              d.name?.toLowerCase().includes('ogolna') ||
+              d.name?.toLowerCase().includes('standardowa') || 
+              d.name?.toLowerCase().includes('standard') ||
+              d.name?.toLowerCase().includes('general')
+            );
+            defaultDiet = generalDiet || dietsData[0];
+            console.log('[DietSection] Turnus has specific diets - default diet selected:', defaultDiet.name);
+          }
           setSelectedDietId(defaultDiet.id);
           prevDietIdRef.current = defaultDiet.id;
         } else if (savedDietId !== undefined && savedDietId !== null) {
@@ -136,16 +238,42 @@ export default function DietSection() {
             prevDietIdRef.current = savedDietId;
           } else if (dietsData.length > 0) {
             // If saved diet doesn't exist, fall back to default
-            const standardDiet = dietsData.find((d: Diet) => d.name?.includes('Standardowa') || d.name?.includes('standard'));
-            const defaultDiet = standardDiet || dietsData[0];
+            let defaultDiet: Diet;
+            if (isUsingGeneralDiets) {
+              // When no turnus diets, use first general diet as default
+              defaultDiet = dietsData[0];
+              console.log('[DietSection] Saved diet not found - using first general diet as fallback:', defaultDiet.name);
+            } else {
+              // When turnus has specific diets, try to find "ogólna" or "standardowa"
+              const generalDiet = dietsData.find((d: Diet) => 
+                d.name?.toLowerCase().includes('ogólna') || 
+                d.name?.toLowerCase().includes('ogolna') ||
+                d.name?.toLowerCase().includes('standardowa') || 
+                d.name?.toLowerCase().includes('standard') ||
+                d.name?.toLowerCase().includes('general')
+              );
+              defaultDiet = generalDiet || dietsData[0];
+              console.log('[DietSection] Saved diet not found - fallback diet selected:', defaultDiet.name);
+            }
             setSelectedDietId(defaultDiet.id);
             prevDietIdRef.current = defaultDiet.id;
           }
         }
       } catch (err) {
         console.error('[DietSection] Error fetching diets:', err);
-        setError('Nie udało się załadować diet');
-        setDiets([]);
+        if (err instanceof BackendUnavailableError) {
+          setError('Zapraszamy ponownie później.');
+        } else {
+          setError('Nie udało się załadować diet');
+        }
+        // Use default diet when backend is unavailable
+        setDiets([{
+          ...DEFAULT_DIET,
+          id: 1,
+          name: 'Standardowa',
+          price: 0,
+          is_active: true,
+        }]);
       } finally {
         setLoading(false);
       }
@@ -153,7 +281,7 @@ export default function DietSection() {
 
     fetchDiets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reservation.camp?.properties?.id]); // Re-fetch when property changes
+  }, [params?.editionId]); // Re-fetch when property changes
 
   // Update reservation when diet changes
   useEffect(() => {
@@ -240,7 +368,7 @@ export default function DietSection() {
                 <button
                   key={diet.id}
                   onClick={() => handleDietSelect(diet.id)}
-                  className={`w-32 h-32 sm:w-36 sm:h-36 flex flex-col items-center justify-center gap-2 transition-colors ${
+                  className={`w-32 h-32 sm:w-36 sm:h-36 flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-[#03adf0] text-white'
                       : 'bg-gray-100 text-gray-600'
@@ -248,14 +376,63 @@ export default function DietSection() {
                 >
                   {diet.icon_url ? (
                     <>
-                      {/* Icon */}
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
+                      {/* Icon URL (uploaded icon) - highest priority */}
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 flex items-center justify-center flex-shrink-0">
                         <img
                           src={diet.icon_url}
                           alt={diet.name}
-                          className={`w-full h-full object-contain ${
+                          className={`w-full h-full object-contain max-w-full max-h-full ${
                             isSelected ? 'brightness-0 invert' : ''
                           }`}
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'contain',
+                            maxWidth: '100%',
+                            maxHeight: '100%'
+                          }}
+                        />
+                      </div>
+                      <span className={`text-xs sm:text-sm font-medium ${
+                        isSelected ? 'text-white' : 'text-gray-600'
+                      }`}>
+                        {diet.name}
+                      </span>
+                      <span className={`text-[10px] sm:text-xs ${
+                        isSelected ? 'text-white' : 'text-gray-500'
+                      }`}>
+                        {diet.price > 0 ? `+${diet.price} zł` : '0 zł'}
+                      </span>
+                    </>
+                  ) : diet.icon_svg ? (
+                    <>
+                      {/* SVG icon (pasted SVG code) - second priority */}
+                      <div 
+                        className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 flex items-center justify-center flex-shrink-0 overflow-hidden"
+                        style={{ 
+                          filter: isSelected ? 'brightness(0) invert(1)' : 'none'
+                        }}
+                      >
+                        <div
+                          className="w-full h-full flex items-center justify-center"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          dangerouslySetInnerHTML={{ 
+                            __html: diet.icon_svg.replace(
+                              /<svg([^>]*?)>/i,
+                              (match, attrs) => {
+                                // Remove existing width/height/style attributes
+                                attrs = attrs.replace(/\s*(width|height|style)=["'][^"']*["']/gi, '');
+                                // Add fixed size and contain behavior
+                                return `<svg${attrs} style="width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain;">`;
+                              }
+                            )
+                          }}
                         />
                       </div>
                       <span className={`text-xs sm:text-sm font-medium ${

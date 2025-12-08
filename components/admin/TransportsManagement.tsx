@@ -59,7 +59,6 @@ export default function TransportsManagement() {
 
   // Form state
   const [transportName, setTransportName] = useState('');
-  const [campId, setCampId] = useState<number | ''>('');
   const [departureType, setDepartureType] = useState<'collective' | 'own'>('collective');
   const [returnType, setReturnType] = useState<'collective' | 'own'>('collective');
   
@@ -181,7 +180,7 @@ export default function TransportsManagement() {
       const transportData = {
         name: transportName.trim() || null,
         property_id: null,  // Independent transport
-        camp_id: campId !== '' ? Number(campId) : null,
+        // camp_ids removed - transport can only be assigned to camps during turnus editing
         departure_type: departureType,
         return_type: returnType,
         cities: citiesData,
@@ -205,7 +204,6 @@ export default function TransportsManagement() {
 
       // Reset form
       setTransportName('');
-      setCampId('');
       setDepartureType('collective');
       setReturnType('collective');
       setCities([]);
@@ -634,7 +632,6 @@ export default function TransportsManagement() {
           setShowCreateModal(false);
           setError(null);
           setTransportName('');
-          setCampId('');
           setDepartureType('collective');
           setReturnType('collective');
           setCities([]);
@@ -663,23 +660,11 @@ export default function TransportsManagement() {
             </p>
           </div>
 
-          {/* Camp ID (Optional) */}
-          <div className="mb-6">
-            <label htmlFor="camp-id" className="block text-sm font-medium text-gray-700 mb-2">
-              ID obozu <span className="text-xs text-gray-500">(opcjonalne)</span>
-            </label>
-            <input
-              id="camp-id"
-              type="number"
-              value={campId}
-              onChange={(e) => setCampId(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
-              style={{ borderRadius: 0 }}
-              placeholder="np. 1"
-              disabled={saving}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Możesz przypisać transport do obozu (wszystkie turnusy tego obozu będą mogły używać tego transportu)
+          {/* Note: Camp assignment removed - transport can only be assigned to camps during turnus editing */}
+          <div className="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+            <p className="text-sm text-blue-700">
+              <strong>Uwaga:</strong> Transport może być przypisany do obozu tylko podczas edycji turnusu. 
+              Aby przypisać transport do obozu, edytuj turnus i wybierz transport z listy dostępnych transportów.
             </p>
           </div>
 
@@ -853,7 +838,6 @@ export default function TransportsManagement() {
                 setShowCreateModal(false);
                 setError(null);
                 setTransportName('');
-                setCampId('');
                 setDepartureType('collective');
                 setReturnType('collective');
                 setCities([]);

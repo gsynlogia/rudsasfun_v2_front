@@ -12,7 +12,7 @@ function VerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Weryfikowanie magic link...');
+  const [message, setMessage] = useState('Weryfikowanie linku logowania...');
 
   useEffect(() => {
     const verifyToken = async () => {
@@ -53,7 +53,7 @@ function VerifyContent() {
         // Even if verification fails, don't prevent login if token is valid
         // But show error and redirect to login
         setStatus('error');
-        setMessage(err instanceof Error ? err.message : 'Błąd podczas weryfikacji magic link');
+        setMessage(err instanceof Error ? err.message : 'Błąd podczas weryfikacji linku logowania');
         setTimeout(() => router.push('/login'), 3000);
       }
     };
@@ -71,7 +71,7 @@ function VerifyContent() {
             {status === 'loading' && (
               <>
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#03adf0] mb-4"></div>
-                <p className="text-sm sm:text-base text-gray-600">Weryfikowanie magic link...</p>
+                <p className="text-sm sm:text-base text-gray-600">Weryfikowanie linku logowania...</p>
               </>
             )}
             
@@ -93,7 +93,7 @@ function VerifyContent() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </div>
-                <p className="text-sm sm:text-base text-red-800 font-medium mb-4">Błąd podczas weryfikacji magic link</p>
+                <p className="text-sm sm:text-base text-red-800 font-medium mb-4">Błąd podczas weryfikacji linku logowania</p>
                 <p className="text-xs text-gray-500">Przekierowywanie do strony logowania...</p>
               </>
             )}

@@ -291,7 +291,7 @@ export default function LayoutClient({
                   alignSelf: 'flex-start'
                 }}
               >
-                <ReservationSummary />
+                <ReservationSummary currentStep={currentStep} onNext={handleNext} />
               </aside>
             </div>
           </>

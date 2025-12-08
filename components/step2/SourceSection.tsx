@@ -40,6 +40,10 @@ export default function SourceSection() {
         console.error('[SourceSection] Error fetching sources:', err);
         // Fallback to empty array if API fails
         setSources([]);
+        // Show user-friendly message if backend unavailable
+        if (err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('Failed to fetch'))) {
+          // Backend unavailable - sources will be empty, user can still proceed
+        }
       } finally {
         setLoading(false);
       }

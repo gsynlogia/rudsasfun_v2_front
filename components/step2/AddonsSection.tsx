@@ -56,6 +56,7 @@ export default function AddonsSection() {
         // Fallback to empty string if API fails
         setAddonDescription('');
         setInfoHeader('');
+        // Backend unavailable - description will be empty, user can still proceed
       } finally {
         setLoadingDescription(false);
       }
@@ -78,13 +79,33 @@ export default function AddonsSection() {
           name: string;
           description: string | null;
           price: number;
+          icon_url: string | null;
           icon_svg: string | null;
         }) => ({
           id: addon.id.toString(),
           name: addon.name,
           description: addon.description || '',
           price: addon.price,
-          icon: addon.icon_svg ? (
+          icon: addon.icon_url ? (
+            <img 
+              src={addon.icon_url} 
+              alt={addon.name}
+              className="w-12 h-12 object-contain"
+              onError={(e) => {
+                // Fallback to SVG if image fails
+                const target = e.target as HTMLImageElement;
+                if (addon.icon_svg) {
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = addon.icon_svg;
+                  }
+                } else {
+                  target.style.display = 'none';
+                }
+              }}
+            />
+          ) : addon.icon_svg ? (
             <div 
               className="w-12 h-12" 
               dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
@@ -100,6 +121,7 @@ export default function AddonsSection() {
         console.error('[AddonsSection] Error fetching addons:', err);
         // Fallback to empty array if API fails
         setAddons([]);
+        // Backend unavailable - addons will be empty, user can still proceed
       } finally {
         setLoadingAddons(false);
       }
@@ -287,7 +309,7 @@ export default function AddonsSection() {
               <button
                 key={addon.id}
                 onClick={() => toggleAddon(addon.id)}
-                className={`w-28 h-28 sm:w-32 sm:h-32 flex flex-col items-center justify-center gap-2 transition-colors ${
+                className={`w-28 h-28 sm:w-32 sm:h-32 flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer ${
                   isSelected
                     ? 'bg-[#03adf0] text-white'
                     : 'bg-gray-100 text-gray-600'

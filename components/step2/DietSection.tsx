@@ -253,7 +253,7 @@ export default function DietSection() {
                 <button
                   key={diet.id}
                   onClick={() => toggleDiet(diet.id)}
-                  className={`w-28 h-28 sm:w-32 sm:h-32 flex flex-col items-center justify-center gap-2 transition-colors ${
+                  className={`w-28 h-28 sm:w-32 sm:h-32 flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-[#03adf0] text-white'
                       : 'bg-gray-100 text-gray-600'

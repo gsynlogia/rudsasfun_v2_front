@@ -57,6 +57,32 @@ const fetchCampProperty = (campId: number, propertyId: number): Promise<CampProp
 };
 
 /**
+ * Fetch diets assigned to a turnus
+ */
+const fetchTurnusDiets = async (campId: number, propertyId: number): Promise<any[]> => {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/diets`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) {
+      if (response.status === 404) {
+        return [];
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data || [];
+  } catch (err) {
+    console.warn('[CampTurnusEditPage] Error fetching turnus diets:', err);
+    return [];
+  }
+};
+
+/**
  * Fetch transport settings for a camp property/turnus
  */
 const fetchTransport = (campId: number, propertyId: number): Promise<CampPropertyTransport | null> => {
@@ -132,6 +158,17 @@ export default function CampTurnusEditPage({
   const [isDeletingTransport, setIsDeletingTransport] = useState(false);
   const [searchTransportQuery, setSearchTransportQuery] = useState('');
 
+  // Diets state
+  const [turnusDiets, setTurnusDiets] = useState<any[]>([]);
+  const [loadingDiets, setLoadingDiets] = useState(false);
+  const [showAvailableDietsModal, setShowAvailableDietsModal] = useState(false);
+  const [availableDiets, setAvailableDiets] = useState<any[]>([]);
+  const [loadingAvailableDiets, setLoadingAvailableDiets] = useState(false);
+  const [searchDietQuery, setSearchDietQuery] = useState('');
+  const [showDeleteDietModal, setShowDeleteDietModal] = useState(false);
+  const [dietToDelete, setDietToDelete] = useState<number | null>(null);
+  const [isDeletingDiet, setIsDeletingDiet] = useState(false);
+
   // Resolve params (handle both Promise and direct params)
   useEffect(() => {
     const resolveParams = async () => {
@@ -162,14 +199,22 @@ export default function CampTurnusEditPage({
   // Load camp, property and transport data
   useEffect(() => {
     if (campId && turnusId) {
-      Promise.all([
-        fetchCampById(campId),
-        fetchCampProperty(campId, turnusId),
-        fetchTransport(campId, turnusId)
-      ])
-        .then(([campData, propertyData, transportData]) => {
+        Promise.all([
+          fetchCampById(campId),
+          fetchCampProperty(campId, turnusId),
+          fetchTransport(campId, turnusId),
+          fetchTurnusDiets(campId, turnusId)
+        ])
+          .then(([campData, propertyData, transportData, dietsData]) => {
           setCamp(campData);
           setProperty(propertyData);
+          
+          console.log('[CampTurnusEditPage] Fetched diets data:', dietsData);
+          console.log('[CampTurnusEditPage] Diets data length:', dietsData?.length || 0);
+          
+          // Set turnus diets immediately after fetching
+          setTurnusDiets(dietsData || []);
+          console.log('[CampTurnusEditPage] Set turnusDiets to:', dietsData || []);
           
           if (!campData) {
             console.error(`[CampTurnusEditPage] Camp ${campId} not found`);
@@ -208,7 +253,7 @@ export default function CampTurnusEditPage({
               setTransport(null);
             }
             
-            console.log('[CampTurnusEditPage] Data loaded successfully:', { campId, turnusId, transportData });
+            console.log('[CampTurnusEditPage] Data loaded successfully:', { campId, turnusId, transportData, dietsData });
           }
           setLoading(false);
         })
@@ -314,61 +359,84 @@ export default function CampTurnusEditPage({
 
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 
-      // First, get current transport to check existing camp_ids
-      const getResponse = await fetch(`${API_BASE_URL}/api/camps/transports/${transportId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!getResponse.ok) {
-        throw new Error('Failed to fetch transport data');
+      // First, check if this turnus already has a transport assigned
+      // If yes, unassign it before assigning the new one
+      if (transport && transport.id && transport.id !== transportId) {
+        console.log('[CampTurnusEditPage] Unassigning previous transport:', transport.id);
+        try {
+          await authenticatedApiCall<CampPropertyTransport>(
+            `/api/camps/transports/${transport.id}`,
+            {
+              method: 'PUT',
+              body: JSON.stringify({
+                property_id: null, // Unassign previous transport from this turnus
+              }),
+            }
+          );
+          console.log('[CampTurnusEditPage] Previous transport unassigned');
+        } catch (err) {
+          console.warn('[CampTurnusEditPage] Error unassigning previous transport (continuing anyway):', err);
+        }
       }
 
-      const currentTransport = await getResponse.json();
-      const currentCampIds = currentTransport.camp_ids || [];
+      // Assign transport to this turnus by setting property_id
+      // Backend will automatically assign transport to the camp of this turnus
+      const updatedTransport = await authenticatedApiCall<CampPropertyTransport>(
+        `/api/camps/transports/${transportId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            property_id: turnusId, // Assign transport to this turnus
+            // Backend automatically assigns transport to camp of this turnus
+          }),
+        }
+      );
       
-      // Add current camp to camp_ids if not already present (many-to-many relationship)
-      // This allows the same transport to be assigned to multiple camps
-      const updatedCampIds = currentCampIds.includes(campId) 
-        ? currentCampIds 
-        : [...currentCampIds, campId];
-
-      // Update transport to assign it to this camp (via camp_ids, not property_id)
-      // property_id should remain NULL or unchanged to allow multiple camps
-      const response = await fetch(`${API_BASE_URL}/api/camps/transports/${transportId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          camp_ids: updatedCampIds, // Assign to this camp via many-to-many
-          // Don't set property_id - keep it as is to allow multiple camps
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      // Reload transport data for this turnus to get the updated transport
+      // This ensures we have the correct transport after assignment
+      let mappedTransport: CampPropertyTransport | null = null;
+      try {
+        const transportData = await authenticatedApiCall<CampPropertyTransport>(
+          `/api/camps/${campId}/properties/${turnusId}/transport`
+        );
+        
+        if (transportData) {
+          // Map cities array to transport fields for display
+          mappedTransport = {
+            id: transportData.id,
+            name: transportData.name || null,
+            property_id: transportData.property_id || null,
+            departure_type: transportData.departure_type,
+            departure_city: transportData.cities?.[0]?.city || null,
+            departure_collective_price: transportData.cities?.[0]?.departure_price || null,
+            departure_own_price: null,
+            return_type: transportData.return_type,
+            return_city: transportData.cities?.[0]?.city || null,
+            return_collective_price: transportData.cities?.[0]?.return_price || null,
+            return_own_price: null,
+          };
+        }
+      } catch (err) {
+        console.warn('[CampTurnusEditPage] Error reloading transport (using updated transport):', err);
       }
-
-      const updatedTransport = await response.json();
       
-      // Map cities array to transport fields for display
-      const mappedTransport: CampPropertyTransport = {
-        id: updatedTransport.id,
-        name: updatedTransport.name || null,
-        property_id: updatedTransport.property_id || null,
-        departure_type: updatedTransport.departure_type,
-        departure_city: updatedTransport.cities?.[0]?.city || null,
-        departure_collective_price: updatedTransport.cities?.[0]?.departure_price || null,
-        departure_own_price: null,
-        return_type: updatedTransport.return_type,
-        return_city: updatedTransport.cities?.[0]?.city || null,
-        return_collective_price: updatedTransport.cities?.[0]?.return_price || null,
-        return_own_price: null,
-      };
+      // Fallback to updatedTransport if reload failed
+      if (!mappedTransport) {
+        mappedTransport = {
+          id: updatedTransport.id,
+          name: updatedTransport.name || null,
+          property_id: updatedTransport.property_id || null,
+          departure_type: updatedTransport.departure_type,
+          departure_city: updatedTransport.cities?.[0]?.city || null,
+          departure_collective_price: updatedTransport.cities?.[0]?.departure_price || null,
+          departure_own_price: null,
+          return_type: updatedTransport.return_type,
+          return_city: updatedTransport.cities?.[0]?.city || null,
+          return_collective_price: updatedTransport.cities?.[0]?.return_price || null,
+          return_own_price: null,
+        };
+      }
+      
       setTransport(mappedTransport);
       
       console.log('[CampTurnusEditPage] Transport assigned successfully:', mappedTransport);
@@ -391,49 +459,82 @@ export default function CampTurnusEditPage({
       setIsDeletingTransport(true);
       setError(null);
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+      console.log('[CampTurnusEditPage] Removing transport:', { transportId: transport.id, campId });
 
       // First, get current transport to check existing camp_ids
-      const getResponse = await fetch(`${API_BASE_URL}/api/camps/transports/${transport.id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const currentTransport = await authenticatedApiCall<CampPropertyTransport>(
+        `/api/camps/transports/${transport.id}`,
+        {
+          method: 'GET',
+        }
+      );
 
-      if (!getResponse.ok) {
-        throw new Error('Failed to fetch transport data');
+      console.log('[CampTurnusEditPage] Current transport:', currentTransport);
+
+      // Unassign transport from this turnus by setting property_id to null
+      // This will remove the transport from this turnus, but keep camp associations if transport is used by other turnuses
+      const updatedTransport = await authenticatedApiCall<CampPropertyTransport>(
+        `/api/camps/transports/${transport.id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            property_id: null, // Unassign transport from this turnus
+            // Note: Camp associations remain if transport is used by other turnuses
+          }),
+        }
+      );
+
+      console.log('[CampTurnusEditPage] Transport updated:', updatedTransport);
+
+      // Reload transport data to ensure UI reflects the latest state
+      // After unassigning, transport should not be returned by the API
+      try {
+        const reloadedTransport = await fetchTransport(campId, turnusId);
+        if (reloadedTransport) {
+          // If transport is still returned, map it
+          const mappedTransport: CampPropertyTransport = {
+            id: reloadedTransport.id,
+            name: reloadedTransport.name || null,
+            property_id: reloadedTransport.property_id || null,
+            departure_type: reloadedTransport.departure_type,
+            departure_city: reloadedTransport.cities?.[0]?.city || null,
+            departure_collective_price: reloadedTransport.cities?.[0]?.departure_price || null,
+            departure_own_price: null,
+            return_type: reloadedTransport.return_type,
+            return_city: reloadedTransport.cities?.[0]?.city || null,
+            return_collective_price: reloadedTransport.cities?.[0]?.return_price || null,
+            return_own_price: null,
+          };
+          setTransport(mappedTransport);
+          console.warn('[CampTurnusEditPage] Transport still exists after unassignment:', mappedTransport);
+        } else {
+          // Transport was successfully removed
+          setTransport(null);
+          console.log('[CampTurnusEditPage] Transport successfully removed (not returned by API)');
+        }
+      } catch (reloadErr) {
+        console.warn('[CampTurnusEditPage] Error reloading transport after removal:', reloadErr);
+        // Assume transport was removed if reload fails
+        setTransport(null);
       }
-
-      const currentTransport = await getResponse.json();
-      const currentCampIds = currentTransport.camp_ids || [];
       
-      // Remove current camp from camp_ids (many-to-many relationship)
-      const updatedCampIds = currentCampIds.filter((id: number) => id !== campId);
-
-      // Update transport to remove this camp from camp_ids
-      const response = await fetch(`${API_BASE_URL}/api/camps/transports/${transport.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          camp_ids: updatedCampIds, // Remove this camp from the list
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-      }
-
-      setTransport(null);
       setShowDeleteTransportModal(false);
       
       console.log('[CampTurnusEditPage] Transport unassigned successfully');
     } catch (err) {
       console.error('[CampTurnusEditPage] Error removing transport:', err);
-      setError(err instanceof Error ? err.message : 'Błąd podczas usuwania przypisania transportu');
+      const errorMessage = err instanceof Error ? err.message : 'Błąd podczas usuwania przypisania transportu';
+      setError(errorMessage);
+      
+      // Log additional details for debugging
+      if (err instanceof Error) {
+        console.error('[CampTurnusEditPage] Error details:', {
+          message: err.message,
+          stack: err.stack,
+          transportId: transport?.id,
+          campId: campId
+        });
+      }
     } finally {
       setIsDeletingTransport(false);
     }
@@ -442,6 +543,134 @@ export default function CampTurnusEditPage({
   const getPeriodLabel = (period: string) => {
     return period === 'lato' ? 'Lato' : 'Zima';
   };
+
+  // Fetch available diets (all center diets from the system)
+  const fetchAvailableDiets = async () => {
+    if (!campId || !turnusId) return;
+
+    try {
+      setLoadingAvailableDiets(true);
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+      // Use regular fetch for public endpoint (no authentication required)
+      // Fetch center diets (not general diets or diets table)
+      const response = await fetch(`${API_BASE_URL}/api/center-diets/public`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      // Response is List[CenterDietResponse] - array of center diets
+      const diets = Array.isArray(data) ? data : [];
+      console.log('[CampTurnusEditPage] Fetched available center diets:', diets.length);
+      setAvailableDiets(diets);
+    } catch (err) {
+      console.error('[CampTurnusEditPage] Error fetching available center diets:', err);
+      setAvailableDiets([]);
+    } finally {
+      setLoadingAvailableDiets(false);
+    }
+  };
+
+  const handleOpenAvailableDiets = async () => {
+    setSearchDietQuery('');
+    await fetchAvailableDiets();
+    setShowAvailableDietsModal(true);
+  };
+
+  const handleSelectDiet = async (diet: any) => {
+    console.log('[CampTurnusEditPage] handleSelectDiet called with:', { diet, campId, turnusId });
+    
+    if (!campId || !turnusId) {
+      console.error('[CampTurnusEditPage] Missing campId or turnusId:', { campId, turnusId });
+      setError('Brak ID obozu lub turnusu');
+      return;
+    }
+    
+    if (!diet || !diet.id) {
+      console.error('[CampTurnusEditPage] Missing diet or diet.id:', diet);
+      setError('Brak ID diety do przypisania');
+      return;
+    }
+
+    try {
+      setLoadingDiets(true);
+      setError(null);
+      console.log('[CampTurnusEditPage] Assigning diet to turnus:', { dietId: diet.id, campId, turnusId });
+
+      // Assign diet to turnus
+      const response = await authenticatedApiCall(
+        `/api/camps/${campId}/properties/${turnusId}/diets/${diet.id}`,
+        {
+          method: 'POST',
+        }
+      );
+
+      console.log('[CampTurnusEditPage] Diet assignment API call successful, response:', response);
+
+      // Reload diets
+      const updatedDiets = await fetchTurnusDiets(campId, turnusId);
+      console.log('[CampTurnusEditPage] Reloaded diets:', updatedDiets);
+      setTurnusDiets(updatedDiets);
+
+      setShowAvailableDietsModal(false);
+      setSearchDietQuery('');
+      console.log('[CampTurnusEditPage] Diet assigned successfully');
+    } catch (err) {
+      console.error('[CampTurnusEditPage] Error assigning diet:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Błąd podczas przypisywania diety';
+      setError(errorMessage);
+      // Don't close modal on error so user can see the error and try again
+    } finally {
+      setLoadingDiets(false);
+    }
+  };
+
+  const handleRemoveDiet = async () => {
+    if (!dietToDelete || !campId || !turnusId) return;
+
+    try {
+      setIsDeletingDiet(true);
+      setError(null);
+
+      await authenticatedApiCall(
+        `/api/camps/${campId}/properties/${turnusId}/diets/${dietToDelete}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      // Reload diets
+      const updatedDiets = await fetchTurnusDiets(campId, turnusId);
+      setTurnusDiets(updatedDiets);
+
+      setShowDeleteDietModal(false);
+      setDietToDelete(null);
+      console.log('[CampTurnusEditPage] Diet removed successfully');
+    } catch (err) {
+      console.error('[CampTurnusEditPage] Error removing diet:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Błąd podczas usuwania przypisania diety';
+      setError(errorMessage);
+    } finally {
+      setIsDeletingDiet(false);
+    }
+  };
+
+  // Filter diets based on search query
+  const filteredDiets = availableDiets.filter((diet) => {
+    if (!searchDietQuery.trim()) return true;
+    const query = searchDietQuery.toLowerCase();
+    return (
+      diet.display_name?.toLowerCase().includes(query) ||
+      diet.name?.toLowerCase().includes(query) ||
+      diet.description?.toLowerCase().includes(query)
+    );
+  });
 
   // Fetch available transports from other turnusy
   const fetchAvailableTransports = async () => {
@@ -787,6 +1016,119 @@ export default function CampTurnusEditPage({
               )}
             </div>
 
+            {/* Dietary Prescriptions Section */}
+            <div className="pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <UtensilsCrossed className="w-5 h-5 text-gray-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">Dietary prescriptions</h2>
+                </div>
+                <button
+                  onClick={handleOpenAvailableDiets}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[#03adf0] border border-[#03adf0] hover:bg-[#E0F2FF] transition-all duration-200"
+                  style={{ borderRadius: 0, cursor: 'pointer' }}
+                  disabled={saving || loading || loadingDiets}
+                  title="Wybierz z dostępnych diet"
+                >
+                  <Copy className="w-3 h-3" />
+                  Wybierz dietę
+                </button>
+              </div>
+
+              {/* Selected Diets Display */}
+              {turnusDiets.length > 0 ? (
+                <div className="space-y-3">
+                  {turnusDiets.map((diet) => (
+                    <div key={diet.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="mb-2">
+                            {/* Display general diet name (not "Dieta dla ośrodka") */}
+                            <h3 className="text-sm font-semibold text-gray-900">
+                              {diet.name || 'Dieta bez nazwy'}
+                            </h3>
+                            {diet.has_no_relations && (
+                              <p className="text-xs text-yellow-700 mt-1 font-medium bg-yellow-50 p-2 rounded">
+                                ⚠️ Center diet przypisany, ale nie ma relacji z general diets.{' '}
+                                <a
+                                  href={`/admin-panel/diets/center`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#03adf0] hover:text-[#0299d6] underline font-semibold"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                >
+                                  Dodaj relacje w edycji center diet
+                                </a>
+                                , aby diety były widoczne w rezerwacji.
+                              </p>
+                            )}
+                            {diet.description && (
+                              <p className="text-xs text-gray-600 mt-1">{diet.description}</p>
+                            )}
+                            {/* Display price from relation (center-specific price) */}
+                            {diet.price !== undefined && (
+                              <p className="text-xs text-gray-700 mt-1 font-medium">
+                                Cena: {diet.price.toFixed(2)} PLN
+                                {diet.is_center_diet_relation && (
+                                  <span className="text-gray-500 ml-1">(cena dla ośrodka)</span>
+                                )}
+                              </p>
+                            )}
+                            {/* Show icon if available */}
+                            {diet.icon_url && (
+                              <div className="mt-2">
+                                <img 
+                                  src={diet.icon_url} 
+                                  alt={diet.name || 'Dieta'} 
+                                  className="w-8 h-8 object-contain"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            // Use relation_id if available (for center diet relations), otherwise use diet.id
+                            const dietIdToDelete = diet.relation_id || diet.id;
+                            setDietToDelete(dietIdToDelete);
+                            setShowDeleteDietModal(true);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-300 hover:bg-red-50 transition-all duration-200"
+                          style={{ borderRadius: 0, cursor: 'pointer' }}
+                          disabled={saving || loading || isDeletingDiet}
+                          title={diet.is_center_diet_relation ? "Usuń relację z center diet" : "Usuń przypisanie diety"}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Usuń
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+        ) : (
+          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-center text-sm">
+            <p className="text-yellow-800 font-medium mb-1">
+              Brak przypisanych diet do wyświetlenia
+            </p>
+            <p className="text-yellow-700 text-xs">
+              Center diet może być przypisany do turnusu, ale nie ma relacji z general diets.
+              <br />
+              Aby diety były widoczne w rezerwacji, dodaj relacje z general diets w edycji center diet.
+            </p>
+            <button
+              onClick={handleOpenAvailableDiets}
+              className="mt-3 px-4 py-2 bg-[#03adf0] text-white text-sm font-medium hover:bg-[#0299d6] transition-all duration-200"
+              style={{ borderRadius: 0 }}
+              disabled={loading || saving || loadingDiets}
+            >
+              Wybierz dietę
+            </button>
+          </div>
+        )}
+            </div>
+
             {/* Property Info */}
             {property && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
@@ -1009,6 +1351,108 @@ export default function CampTurnusEditPage({
         itemId={transport?.id || 0}
         additionalInfo="Przypisanie transportu do tego turnusu zostanie usunięte. Transport pozostanie w systemie i będzie dostępny do przypisania do innych turnusów."
         isLoading={isDeletingTransport}
+      />
+
+      {/* Available Diets Modal */}
+      <UniversalModal
+        isOpen={showAvailableDietsModal}
+        title="Wybierz z dostępnych diet"
+        onClose={() => {
+          setShowAvailableDietsModal(false);
+          setSearchDietQuery('');
+        }}
+        maxWidth="2xl"
+        className="max-h-[80vh] flex flex-col"
+      >
+        {/* Search */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchDietQuery}
+              onChange={(e) => setSearchDietQuery(e.target.value)}
+              placeholder="Szukaj po nazwie diety..."
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+              style={{ borderRadius: 0 }}
+            />
+          </div>
+        </div>
+
+        {/* Modal Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {loadingAvailableDiets ? (
+            <div className="text-center text-gray-500 py-8">Ładowanie dostępnych diet...</div>
+          ) : filteredDiets.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              {availableDiets.length === 0 ? (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Brak dostępnych diet</p>
+                  <p className="text-xs text-gray-500">Nie znaleziono żadnych dostępnych diet w systemie.</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Brak wyników wyszukiwania</p>
+                  <p className="text-xs text-gray-500">Spróbuj zmienić kryteria wyszukiwania.</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredDiets.map((diet) => (
+                <div
+                  key={diet.id}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('[CampTurnusEditPage] Diet clicked in modal:', diet);
+                    handleSelectDiet(diet);
+                  }}
+                  className={`p-4 border border-gray-200 hover:border-[#03adf0] hover:bg-[#E0F2FF] transition-all duration-200 cursor-pointer ${
+                    loadingDiets ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  style={{ borderRadius: 0 }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">
+                        {diet.display_name || diet.name || 'Dieta bez nazwy'}
+                      </h3>
+                      {diet.description && (
+                        <p className="text-xs text-gray-600 mb-1">{diet.description}</p>
+                      )}
+                      {diet.property_city && (
+                        <p className="text-xs text-gray-500 mb-1">
+                          Miejscowość: {diet.property_city}
+                        </p>
+                      )}
+                      {diet.general_diets && diet.general_diets.length > 0 && (
+                        <p className="text-xs text-gray-600 mb-1">
+                          Powiązane diety: {diet.general_diets.map((gd: any) => gd.general_diet_name).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </UniversalModal>
+
+      {/* Delete Diet Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteDietModal}
+        onCancel={() => {
+          setShowDeleteDietModal(false);
+          setDietToDelete(null);
+        }}
+        onConfirm={handleRemoveDiet}
+        itemType="diet"
+        itemName={turnusDiets.find(d => d.id === dietToDelete)?.name || 'Dieta'}
+        itemId={dietToDelete || 0}
+        additionalInfo="Przypisanie diety do tego turnusu zostanie usunięte. Dieta pozostanie w systemie i będzie dostępna do przypisania do innych turnusów."
+        isLoading={isDeletingDiet}
       />
 
     </AdminLayout>

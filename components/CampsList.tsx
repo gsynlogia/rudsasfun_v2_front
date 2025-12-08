@@ -7,6 +7,9 @@ import { saveMagicLinkRedirect } from '@/utils/localStorage';
 import type { Camp, CampProperty } from '@/types/reservation';
 import { Search } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/api-config';
+import { fetchWithDefaults } from '@/utils/api-fetch';
+import { DEFAULT_CAMP, DEFAULT_CAMP_PROPERTY } from '@/types/defaults';
+import { BackendUnavailableError } from '@/utils/api-auth';
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -32,15 +35,33 @@ export default function CampsList() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/api/camps/`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setCamps(data.camps || []);
+      
+      const data = await fetchWithDefaults<{ camps: CampWithProperties[] }>(
+        '/api/camps/',
+        { camps: [] },
+        { method: 'GET' }
+      );
+      
+      // Use defaults for each camp if needed
+      const campsWithDefaults = (data.camps || []).map(camp => ({
+        ...DEFAULT_CAMP,
+        ...camp,
+        properties: (camp.properties || []).map(prop => ({
+          ...DEFAULT_CAMP_PROPERTY,
+          ...prop,
+        })),
+      }));
+      
+      setCamps(campsWithDefaults);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nie udało się załadować obozów');
+      if (err instanceof BackendUnavailableError) {
+        setError('Zapraszamy ponownie później.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Nie udało się załadować obozów');
+      }
       console.error('Error loading camps:', err);
+      // Set empty camps on error
+      setCamps([]);
     } finally {
       setLoading(false);
     }
@@ -111,15 +132,17 @@ export default function CampsList() {
   if (error) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-200">
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-          <p className="text-sm sm:text-base text-red-700 font-semibold mb-1">Błąd</p>
-          <p className="text-xs sm:text-sm text-red-600">{error}</p>
-          <button
-            onClick={loadCamps}
-            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs sm:text-sm"
-          >
-            Spróbuj ponownie
-          </button>
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+          <p className="text-sm sm:text-base text-blue-700 font-semibold mb-1">Informacja</p>
+          <p className="text-xs sm:text-sm text-blue-600">{error}</p>
+          {error !== 'Zapraszamy ponownie później.' && (
+            <button
+              onClick={loadCamps}
+              className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+            >
+              Spróbuj ponownie
+            </button>
+          )}
         </div>
       </div>
     );

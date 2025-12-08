@@ -237,7 +237,7 @@ export default function ProtectionSection() {
               <button
                 key={protection.id}
                 onClick={() => toggleProtection(protection.id)}
-                className={`w-24 h-24 sm:w-28 sm:h-28 flex flex-col items-center justify-center gap-1 transition-colors ${
+                className={`w-24 h-24 sm:w-28 sm:h-28 flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
                   isSelected
                     ? 'bg-[#03adf0] text-white'
                     : 'bg-gray-100 text-gray-600'
@@ -280,7 +280,7 @@ export default function ProtectionSection() {
           {documents.has('shield_protection') && (
             <button
               onClick={() => window.open(documents.get('shield_protection'), '_blank')}
-              className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium"
+              className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium cursor-pointer"
             >
               <Download className="w-4 h-4" />
               Regulamin Ochrony TARCZA
@@ -289,7 +289,7 @@ export default function ProtectionSection() {
           {documents.has('oasa_protection') && (
             <button
               onClick={() => window.open(documents.get('oasa_protection'), '_blank')}
-              className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium"
+              className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium cursor-pointer"
             >
               <Download className="w-4 h-4" />
               Regulamin Ochrony OAZA

@@ -68,7 +68,7 @@ function LoginContent() {
       setSuccess(true);
       setEmail(''); // Clear email for security
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Błąd podczas wysyłania magic link');
+      setError(err instanceof Error ? err.message : 'Błąd podczas wysyłania linku logowania');
     } finally {
       setLoading(false);
     }

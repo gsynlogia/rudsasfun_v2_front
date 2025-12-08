@@ -43,8 +43,8 @@ class MagicLinkService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas wysyłania magic link' }));
-      throw new Error(error.detail || 'Błąd podczas wysyłania magic link');
+      const error = await response.json().catch(() => ({ detail: 'Błąd podczas wysyłania linku logowania' }));
+      throw new Error(error.detail || 'Błąd podczas wysyłania linku logowania');
     }
 
     return response.json();
@@ -62,8 +62,8 @@ class MagicLinkService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Nieprawidłowy lub wygasły magic link' }));
-      throw new Error(error.detail || 'Nieprawidłowy lub wygasły magic link');
+      const error = await response.json().catch(() => ({ detail: 'Nieprawidłowy lub wygasły link logowania' }));
+      throw new Error(error.detail || 'Nieprawidłowy lub wygasły link logowania');
     }
 
     return response.json();

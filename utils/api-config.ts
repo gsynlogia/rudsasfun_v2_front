@@ -42,9 +42,9 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     
-    // Localhost detection - use production API
+    // Localhost detection - use local API
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'https://rejestracja.radsasfun.system-app.pl';
+      return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     }
     
     // Production domains - use production API
@@ -66,8 +66,8 @@ export function getApiBaseUrl(): string {
     return 'https://rejestracja.radsasfun.system-app.pl';
   }
 
-  // Development fallback: use production API
-  return 'https://rejestracja.radsasfun.system-app.pl';
+  // Development fallback: use local API if no env var set
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 }
 
 /**

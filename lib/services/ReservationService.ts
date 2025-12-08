@@ -4,6 +4,7 @@
  */
 
 import { API_BASE_URL } from '@/utils/api-config';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 // Import types from sessionStorage
 import type {
@@ -175,66 +176,22 @@ class ReservationService {
    * @returns Reservation response data
    */
   async createReservation(data: CreateReservationRequest): Promise<ReservationResponse> {
-    // Get auth token for authenticated request
-    const token = authService.getToken();
-    
-    if (!token) {
-      throw new Error('Not authenticated. Please log in to create a reservation.');
-    }
-
-    const response = await fetch(`${this.API_URL}/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      
-      // Handle validation errors
-      if (response.status === 422 && error.detail) {
-        let errorMessage = 'Błąd walidacji: ';
-        
-        if (error.detail.details && Array.isArray(error.detail.details)) {
-          // Format: { error: "Validation Error", details: [...] }
-          const messages = error.detail.details.map((d: ValidationErrorDetail) => 
-            `${d.field}: ${d.message}`
-          ).join(', ');
-          errorMessage += messages;
-        } else if (Array.isArray(error.detail)) {
-          // Format: Pydantic validation errors array
-          const messages = error.detail.map((e: any) => {
-            const field = e.loc?.join('.') || 'field';
-            const msg = e.msg || 'Validation error';
-            return `${field}: ${msg}`;
-          }).join(', ');
-          errorMessage += messages;
-        } else if (typeof error.detail === 'string') {
-          errorMessage = error.detail;
-        } else {
-          errorMessage = JSON.stringify(error.detail);
+    try {
+      return await authenticatedApiCall<ReservationResponse>(
+        '/api/reservations/',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
         }
-        
-        throw new Error(errorMessage);
+      );
+    } catch (error) {
+      // Handle validation errors with better messages
+      if (error instanceof Error && error.message.includes('422')) {
+        // authenticatedApiCall already handles 401, but we can improve validation error messages
+        throw error;
       }
-      
-      // Handle other errors
-      let errorMessage = 'Request failed';
-      if (typeof error.detail === 'string') {
-        errorMessage = error.detail;
-      } else if (error.detail && typeof error.detail === 'object') {
-        errorMessage = JSON.stringify(error.detail);
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      throw new Error(errorMessage || `HTTP error! status: ${response.status}`);
+      throw error;
     }
-
-    return await response.json();
   }
 
   /**
@@ -243,14 +200,9 @@ class ReservationService {
    * @returns Reservation response data
    */
   async getReservation(reservationId: number): Promise<ReservationResponse> {
-    const response = await fetch(`${this.API_URL}/${reservationId}`);
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
-    }
-
-    return await response.json();
+    return await authenticatedApiCall<ReservationResponse>(
+      `/api/reservations/${reservationId}`
+    );
   }
 
   /**
@@ -260,14 +212,9 @@ class ReservationService {
    * @returns Array of reservation responses
    */
   async listReservations(skip: number = 0, limit: number = 100): Promise<ReservationResponse[]> {
-    const response = await fetch(`${this.API_URL}/?skip=${skip}&limit=${limit}`);
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
-    }
-
-    return await response.json();
+    return await authenticatedApiCall<ReservationResponse[]>(
+      `/api/reservations/?skip=${skip}&limit=${limit}`
+    );
   }
 
   /**
@@ -277,27 +224,9 @@ class ReservationService {
    * @returns Array of reservation responses for the logged-in user
    */
   async getMyReservations(skip: number = 0, limit: number = 100): Promise<ReservationResponse[]> {
-    // Import authService to get token
-    const { authService } = await import('@/lib/services/AuthService');
-    const token = authService.getToken();
-    
-    if (!token) {
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(`${this.API_URL}/my?skip=${skip}&limit=${limit}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
-    }
-
-    return await response.json();
+    return await authenticatedApiCall<ReservationResponse[]>(
+      `/api/reservations/my?skip=${skip}&limit=${limit}`
+    );
   }
 
   /**

@@ -4,18 +4,24 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
+interface GeneralDietRelation {
+  id: number;
+  general_diet_id: number;
+  general_diet_name: string;
+  general_diet_price: number;
+  price: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface CenterDiet {
   id: number;
-  property_id: number;
-  general_diet_id?: number | null;
-  name?: string | null;
-  price: number;
+  property_id: number | null;
+  name: string;
   description?: string | null;
-  start_date: string;
-  end_date: string;
   is_active: boolean;
   display_name: string;
-  general_diet_name?: string | null;
+  general_diets: GeneralDietRelation[];
   property_city?: string | null;
   property_period?: string | null;
 }
@@ -39,7 +45,6 @@ interface CampProperty {
 export default function CenterDietsManagement() {
   const [diets, setDiets] = useState<CenterDiet[]>([]);
   const [generalDiets, setGeneralDiets] = useState<GeneralDiet[]>([]);
-  const [properties, setProperties] = useState<CampProperty[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -48,19 +53,14 @@ export default function CenterDietsManagement() {
   const [saving, setSaving] = useState(false);
   
   // Form state
-  const [propertyId, setPropertyId] = useState<number | ''>('');
-  const [selectedGeneralDietIds, setSelectedGeneralDietIds] = useState<number[]>([]);
   const [dietName, setDietName] = useState('');
-  const [dietPrice, setDietPrice] = useState<number | ''>(0);
+  const [selectedGeneralDietIds, setSelectedGeneralDietIds] = useState<number[]>([]);
+  const [generalDietPrices, setGeneralDietPrices] = useState<Record<number, number>>({}); // general_diet_id -> price
   const [dietDescription, setDietDescription] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [isCustomDiet, setIsCustomDiet] = useState(false);
 
   useEffect(() => {
     fetchDiets();
     fetchGeneralDiets();
-    fetchProperties();
   }, []);
 
   const fetchDiets = async () => {
@@ -86,30 +86,16 @@ export default function CenterDietsManagement() {
     }
   };
 
+  // Properties are no longer needed - will be set elsewhere
   const fetchProperties = async () => {
-    try {
-      const campsData = await authenticatedApiCall<{ camps: Array<{ properties: CampProperty[] }> }>('/api/camps/');
-      const allProperties: CampProperty[] = [];
-      campsData.camps?.forEach(camp => {
-        if (camp.properties) {
-          allProperties.push(...camp.properties);
-        }
-      });
-      setProperties(allProperties);
-    } catch (err) {
-      console.error('[CenterDietsManagement] Error fetching properties:', err);
-    }
+    // No longer fetching properties
   };
 
   const resetForm = () => {
-    setPropertyId('');
-    setSelectedGeneralDietIds([]);
     setDietName('');
-    setDietPrice(0);
+    setSelectedGeneralDietIds([]);
+    setGeneralDietPrices({});
     setDietDescription('');
-    setStartDate('');
-    setEndDate('');
-    setIsCustomDiet(false);
     setSelectedDiet(null);
   };
 
@@ -120,76 +106,65 @@ export default function CenterDietsManagement() {
 
   const handleEdit = (diet: CenterDiet) => {
     setSelectedDiet(diet);
-    setPropertyId(diet.property_id);
-    if (diet.general_diet_id) {
-      setSelectedGeneralDietIds([diet.general_diet_id]);
-      setIsCustomDiet(false);
-    } else {
-      setIsCustomDiet(true);
-      setDietName(diet.name || '');
-    }
-    setDietPrice(diet.price);
+    setDietName(diet.name || '');
+    
+    // Populate selected general diets and their prices
+    const selectedIds: number[] = [];
+    const prices: Record<number, number> = {};
+    diet.general_diets.forEach(rel => {
+      selectedIds.push(rel.general_diet_id);
+      prices[rel.general_diet_id] = rel.price;
+    });
+    setSelectedGeneralDietIds(selectedIds);
+    setGeneralDietPrices(prices);
+    
     setDietDescription(diet.description || '');
-    setStartDate(diet.start_date);
-    setEndDate(diet.end_date);
     setShowEditModal(true);
   };
 
   const handleSave = async () => {
-    if (!propertyId) {
-      setError('Wybierz turnus obozu');
+    if (!dietName.trim()) {
+      setError('Nazwa diety dla ośrodka jest wymagana');
       return;
     }
-    if (!isCustomDiet && selectedGeneralDietIds.length === 0) {
-      setError('Wybierz dietę ogólną lub utwórz nową dietę');
-      return;
-    }
-    if (isCustomDiet && !dietName.trim()) {
-      setError('Nazwa diety jest wymagana');
-      return;
-    }
-    if (!startDate || !endDate) {
-      setError('Daty rozpoczęcia i zakończenia są wymagane');
-      return;
+    
+    // Validate all prices
+    for (const generalDietId of selectedGeneralDietIds) {
+      const price = generalDietPrices[generalDietId];
+      if (price === undefined || price === null || Number(price) < 0) {
+        setError(`Cena dla diety ${generalDiets.find(gd => gd.id === generalDietId)?.name || generalDietId} musi być większa lub równa 0`);
+        return;
+      }
     }
 
     try {
       setSaving(true);
       setError(null);
 
-      // For now, create one center diet per selected general diet or one custom diet
-      const dietsToCreate = isCustomDiet
-        ? [{ name: dietName.trim(), price: Number(dietPrice), general_diet_id: null }]
-        : selectedGeneralDietIds.map(generalDietId => {
-            const generalDiet = generalDiets.find(gd => gd.id === generalDietId);
-            return {
-              general_diet_id: generalDietId,
-              price: Number(dietPrice), // Override price
-              name: null
-            };
-          });
+      // Build general diets list with prices
+      const generalDietsList = selectedGeneralDietIds.map(generalDietId => ({
+        general_diet_id: generalDietId,
+        price: Number(generalDietPrices[generalDietId])
+      }));
 
-      for (const dietData of dietsToCreate) {
-        const payload = {
-          property_id: Number(propertyId),
-          ...dietData,
-          description: dietDescription.trim() || null,
-          start_date: startDate,
-          end_date: endDate,
-          is_active: true,
-        };
+      const payload = {
+        property_id: null, // Will be set elsewhere
+        name: dietName.trim(),
+        description: dietDescription.trim() || null,
+        is_active: true,
+        general_diets: generalDietsList
+      };
 
-        if (selectedDiet) {
-          await authenticatedApiCall<CenterDiet>(`/api/center-diets/${selectedDiet.id}`, {
-            method: 'PUT',
-            body: JSON.stringify(payload),
-          });
-        } else {
-          await authenticatedApiCall<CenterDiet>('/api/center-diets/', {
-            method: 'POST',
-            body: JSON.stringify(payload),
-          });
-        }
+      if (selectedDiet) {
+        await authenticatedApiCall<CenterDiet>(`/api/center-diets/${selectedDiet.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await authenticatedApiCall<CenterDiet>('/api/center-diets/', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
       }
 
       await fetchDiets();
@@ -256,9 +231,7 @@ export default function CenterDietsManagement() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nazwa</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ośrodek</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cena</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Okres obowiązywania</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Akcje</th>
             </tr>
           </thead>
@@ -266,10 +239,18 @@ export default function CenterDietsManagement() {
             {diets.map((diet) => (
               <tr key={diet.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{diet.display_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{diet.property_city} ({diet.property_period})</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{diet.price.toFixed(2)} PLN</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(diet.start_date).toLocaleDateString('pl-PL')} - {new Date(diet.end_date).toLocaleDateString('pl-PL')}
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {diet.general_diets && diet.general_diets.length > 0 ? (
+                    <div className="space-y-1">
+                      {diet.general_diets.map((rel) => (
+                        <div key={rel.id} className="text-xs">
+                          {rel.general_diet_name}: {rel.price.toFixed(2)} PLN
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">Brak</span>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button
@@ -293,105 +274,145 @@ export default function CenterDietsManagement() {
 
       {/* Create/Edit Modal */}
       {(showCreateModal || showEditModal) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">
-              {selectedDiet ? 'Edytuj dietę dla ośrodka' : 'Dodaj dietę dla ośrodka'}
-            </h2>
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50 p-4 animate-fadeIn"
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            backdropFilter: 'blur(2px)',
+          }}
+          onClick={() => {
+            if (!saving) {
+              resetForm();
+              setShowCreateModal(false);
+              setShowEditModal(false);
+            }
+          }}
+        >
+          <div
+            className="bg-white shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scaleIn"
+            style={{ borderRadius: 0 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {selectedDiet ? 'Edytuj dietę dla ośrodka' : 'Dodaj dietę dla ośrodka'}
+                </h2>
+                <button
+                  onClick={() => {
+                    if (!saving) {
+                      resetForm();
+                      setShowCreateModal(false);
+                      setShowEditModal(false);
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             
             <div className="space-y-4">
+              {/* 1. Nazwa diety dla ośrodka - PIERWSZA POZYCJA */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Turnus obozu *
-                </label>
-                <select
-                  value={propertyId}
-                  onChange={(e) => setPropertyId(e.target.value ? parseInt(e.target.value) : '')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
-                >
-                  <option value="">Wybierz turnus</option>
-                  {properties.map((prop) => (
-                    <option key={prop.id} value={prop.id}>
-                      {prop.city} ({prop.period}) - {new Date(prop.start_date).toLocaleDateString('pl-PL')} - {new Date(prop.end_date).toLocaleDateString('pl-PL')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={isCustomDiet}
-                    onChange={(e) => {
-                      setIsCustomDiet(e.target.checked);
-                      if (e.target.checked) {
-                        setSelectedGeneralDietIds([]);
-                      }
-                    }}
-                    className="mr-2"
-                  />
-                  Utwórz nową dietę (nie opartą na diecie ogólnej)
-                </label>
-              </div>
-              
-              {!isCustomDiet ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Wybierz z diet ogólnych *
-                  </label>
-                  <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
-                    {generalDiets.map((gd) => (
-                      <label key={gd.id} className="flex items-center mb-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedGeneralDietIds.includes(gd.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedGeneralDietIds([...selectedGeneralDietIds, gd.id]);
-                            } else {
-                              setSelectedGeneralDietIds(selectedGeneralDietIds.filter(id => id !== gd.id));
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span>{gd.display_name} - {gd.price.toFixed(2)} PLN</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nazwa diety *
-                  </label>
-                  <input
-                    type="text"
-                    value={dietName}
-                    onChange={(e) => setDietName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
-                    placeholder="np. Specjalna dieta"
-                  />
-                </div>
-              )}
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cena dla tego ośrodka (PLN) *
+                  Nazwa diety dla ośrodka *
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={dietPrice}
-                  onChange={(e) => setDietPrice(e.target.value ? parseFloat(e.target.value) : '')}
+                  type="text"
+                  value={dietName}
+                  onChange={(e) => setDietName(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+                  placeholder="Wprowadź nazwę diety dla ośrodka"
+                  disabled={saving}
                 />
-                {!isCustomDiet && selectedGeneralDietIds.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    To nie zmienia ceny ogólnej diety, tylko ceny dla tego ośrodka
-                  </p>
-                )}
               </div>
+
+              {/* 2. Wybór diet ogólnych - MULTI-SELECT */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Wybierz diety ogólne
+                </label>
+                <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
+                  {generalDiets.map((gd) => (
+                    <label key={gd.id} className="flex items-center mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedGeneralDietIds.includes(gd.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            // Add to selection and prefill price from general diet
+                            setSelectedGeneralDietIds([...selectedGeneralDietIds, gd.id]);
+                            setGeneralDietPrices({
+                              ...generalDietPrices,
+                              [gd.id]: gd.price
+                            });
+                          } else {
+                            // Remove from selection
+                            setSelectedGeneralDietIds(selectedGeneralDietIds.filter(id => id !== gd.id));
+                            const newPrices = { ...generalDietPrices };
+                            delete newPrices[gd.id];
+                            setGeneralDietPrices(newPrices);
+                          }
+                        }}
+                        className="mr-2"
+                        disabled={saving}
+                      />
+                      <span className="text-sm text-gray-700">
+                        {gd.display_name} - {gd.price.toFixed(2)} PLN
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Lista wybranych diet z cenami */}
+              {selectedGeneralDietIds.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Wybrane diety ogólne - ceny dla tego ośrodka
+                  </label>
+                  <div className="space-y-3 border border-gray-300 rounded-lg p-4 bg-gray-50">
+                    {selectedGeneralDietIds.map((generalDietId) => {
+                      const generalDiet = generalDiets.find(gd => gd.id === generalDietId);
+                      if (!generalDiet) return null;
+                      
+                      return (
+                        <div key={generalDietId} className="flex items-center gap-4">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-700">{generalDiet.display_name}</p>
+                            <p className="text-xs text-gray-500">
+                              Cena referencyjna: {generalDiet.price.toFixed(2)} PLN
+                            </p>
+                          </div>
+                          <div className="w-32">
+                            <label className="block text-xs text-gray-600 mb-1">Cena dla ośrodka</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={generalDietPrices[generalDietId] || generalDiet.price}
+                              onChange={(e) => {
+                                const price = e.target.value ? parseFloat(e.target.value) : generalDiet.price;
+                                setGeneralDietPrices({
+                                  ...generalDietPrices,
+                                  [generalDietId]: price
+                                });
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+                              disabled={saving}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Możesz zmienić cenę dla każdej diety ogólnej. To nie zmienia cen w dietach ogólnych.
+                  </p>
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -403,32 +424,6 @@ export default function CenterDietsManagement() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                   rows={3}
                 />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data rozpoczęcia *
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Data zakończenia *
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
-                  />
-                </div>
               </div>
             </div>
             
@@ -451,6 +446,7 @@ export default function CenterDietsManagement() {
                 <Save className="w-4 h-4" />
                 {saving ? 'Zapisywanie...' : 'Zapisz'}
               </button>
+            </div>
             </div>
           </div>
         </div>

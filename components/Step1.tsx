@@ -411,7 +411,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                   <button
                     onClick={() => removeParent(parent.id)}
                     disabled={disabled}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-red-600 hover:text-red-700 text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Usuń opiekuna
                   </button>
@@ -561,7 +561,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
             <button
               onClick={addParent}
               disabled={disabled}
-              className="text-[#03adf0] hover:text-[#0288c7] text-sm font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-[#03adf0] hover:text-[#0288c7] text-sm font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -578,7 +578,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
           Dane uczestnika
         </h2>
         <section className="bg-white p-4 sm:p-6">
-          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+          {/* Zakomentowana sekcja wyboru dziecka */}
+          {/* <div className="flex items-center justify-center gap-2 sm:gap-3 mb-4 sm:mb-6">
             <Image
               src="/child_pictures.svg"
               alt="Child icon"
@@ -596,10 +597,11 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
               <option value="Jan">Jan</option>
               <option value="Anna">Anna</option>
             </select>
-          </div>
-          <div className="mt-4 sm:mt-6 mb-4 sm:mb-6">
+          </div> */}
+          {/* Zakomentowana linia przerywana */}
+          {/* <div className="mt-4 sm:mt-6 mb-4 sm:mb-6">
             <DashedLine />
-          </div>
+          </div> */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
