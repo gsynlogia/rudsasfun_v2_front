@@ -42,9 +42,10 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     
-    // Localhost detection - use local API
+    // Localhost detection - use local API only if explicitly set
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      // Only use localhost if explicitly set in env, otherwise use production
+      return process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
     }
     
     // Production domains - use production API
@@ -56,6 +57,9 @@ export function getApiBaseUrl(): string {
     if (hostname.includes('vercel.app')) {
       return 'https://rejestracja.radsasfun.system-app.pl';
     }
+    
+    // Any other production domain - use production API
+    return 'https://rejestracja.radsasfun.system-app.pl';
   }
 
   // Server-side: check if we're in production via environment
@@ -66,8 +70,8 @@ export function getApiBaseUrl(): string {
     return 'https://rejestracja.radsasfun.system-app.pl';
   }
 
-  // Development fallback: use local API if no env var set
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  // Development fallback: use production API as default (can be overridden with .env.local)
+  return process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 }
 
 /**
@@ -83,9 +87,11 @@ export function getApiBaseUrlRuntime(): string {
 /**
  * Get API base URL (exported constant)
  * Note: In Next.js, this is evaluated at build time for server components
- * For client components, use getApiBaseUrlRuntime() or access directly
+ * For client components, this uses runtime detection
+ * 
+ * IMPORTANT: Always defaults to production API to prevent CORS errors on Vercel
  */
 export const API_BASE_URL = typeof window !== 'undefined' 
-  ? getApiBaseUrl() // Client-side: calculate at runtime
-  : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl'); // Server-side: use env var
+  ? getApiBaseUrl() // Client-side: calculate at runtime (will detect Vercel and use production)
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl'); // Server-side: use env var or production default
 
