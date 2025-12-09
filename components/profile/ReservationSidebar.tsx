@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Download, Upload, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { FileText, Download, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import DashedLine from '../DashedLine';
 import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
@@ -34,15 +34,20 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
   const [isGenerating, setIsGenerating] = useState(false);
   const [qualificationCard, setQualificationCard] = useState<QualificationCardResponse | null>(null);
   const [loadingCard, setLoadingCard] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [downloadingCard, setDownloadingCard] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [fileHistory, setFileHistory] = useState<FileHistoryItem[]>([]);
   const [isFullyPaid, setIsFullyPaid] = useState(false);
   const [hasContract, setHasContract] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loadingContract, setLoadingContract] = useState(false);
+  const [generatingCard, setGeneratingCard] = useState(false);
   const certificateInputRef = useRef<HTMLInputElement>(null);
+  const contractInputRef = useRef<HTMLInputElement>(null);
+  const qualificationCardInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingContract, setUploadingContract] = useState(false);
+  const [uploadingCard, setUploadingCard] = useState(false);
 
   const reservationIdNum = parseInt(reservationId);
   const isValidReservationId = !isNaN(reservationIdNum);
@@ -76,11 +81,11 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         const card = await qualificationCardService.getQualificationCard(reservationIdNum);
         if (card) {
           history.push({
-            id: `qualification-${card.id}`,
+            id: `qualification-${card.reservation_id}`,
             type: 'qualification_card',
-            name: card.file_name,
-            date: card.uploaded_at,
-            fileUrl: card.file_url
+            name: card.card_filename || 'Karta kwalifikacyjna',
+            date: card.created_at,
+            fileUrl: qualificationCardService.getQualificationCardDownloadUrl(reservationIdNum)
           });
         }
       } catch (error) {
@@ -134,8 +139,26 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
   useEffect(() => {
     if (isValidReservationId) {
       loadQualificationCard();
+      loadContractStatus();
     }
   }, [reservationId]);
+
+  // Load contract status
+  const loadContractStatus = async () => {
+    if (!isValidReservationId) return;
+    
+    try {
+      setLoadingContract(true);
+      const contracts = await contractService.listMyContracts();
+      const contract = contracts.find(c => c.reservation_id === reservationIdNum);
+      setHasContract(!!contract);
+    } catch (error) {
+      console.error('Error loading contract status:', error);
+      setHasContract(false);
+    } finally {
+      setLoadingContract(false);
+    }
+  };
 
   const loadQualificationCard = async () => {
     if (!isValidReservationId) return;
@@ -143,9 +166,9 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
     try {
       setLoadingCard(true);
       const card = await qualificationCardService.getQualificationCard(reservationIdNum);
-      setQualificationCard(card); // Will be null if card doesn't exist (404)
+      setQualificationCard(card); // Will be null if card doesn't exist
     } catch (error: any) {
-      // Only log unexpected errors (not 404)
+      // Only log unexpected errors
       console.error('Error loading qualification card:', error);
       setQualificationCard(null);
     } finally {
@@ -160,12 +183,23 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         throw new Error('Invalid reservation ID');
       }
       
-      // Generate contract if it doesn't exist, then download
-      // The backend endpoint will generate it automatically if needed
+      // If contract doesn't exist, generate it first
+      if (!hasContract) {
+        try {
+          await contractService.generateContract(reservationIdNum);
+          // Reload contract status after generation
+          await loadContractStatus();
+        } catch (generateError: any) {
+          // If generation fails, try to download anyway (maybe it was just created)
+          console.log('Contract generation returned error, trying download anyway:', generateError);
+        }
+      }
+      
+      // Now download the contract
       await contractService.downloadContract(reservationIdNum);
       
-      // After successful generation and download, redirect to downloads tab
-      router.push('/profil/do-pobrania');
+      // After successful generation and download, reload status
+      await loadContractStatus();
     } catch (error) {
       console.error('Error generating/downloading contract:', error);
       alert('Nie udało się wygenerować/pobrać umowy. Spróbuj ponownie.');
@@ -174,84 +208,39 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
     }
   };
 
-  const handleUploadClick = () => {
-    setShowUploadModal(true);
-    setUploadError(null);
-  };
-
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.name.endsWith('.pdf')) {
-      setUploadError('Tylko pliki PDF są dozwolone');
-      return;
-    }
-
-    // Validate file size (e.g., max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('Plik jest zbyt duży. Maksymalny rozmiar to 10MB');
-      return;
-    }
-
-    try {
-      setUploading(true);
-      setUploadError(null);
-      const result = await qualificationCardService.uploadQualificationCard(reservationIdNum, file);
-      setQualificationCard({
-        id: result.id,
-        reservation_id: result.reservation_id,
-        file_path: '',
-        file_name: result.file_name,
-        uploaded_at: result.uploaded_at,
-        updated_at: result.uploaded_at,
-        file_url: result.file_url
-      });
-      
-      // Add to file history
-      const newHistory = [...fileHistory, {
-        id: `qualification-${result.id}`,
-        type: 'qualification_card' as const,
-        name: 'Karta kwalifikacyjna',
-        date: result.uploaded_at,
-        fileUrl: result.file_url
-      }];
-      setFileHistory(newHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      
-      setShowUploadModal(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (error: any) {
-      console.error('Error uploading qualification card:', error);
-      setUploadError(error.message || 'Nie udało się przesłać karty kwalifikacyjnej. Spróbuj ponownie.');
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleDownloadCard = async () => {
-    if (!qualificationCard) return;
+    if (!isValidReservationId) {
+      alert('Nieprawidłowy numer rezerwacji');
+      return;
+    }
     
     try {
-      const blob = await qualificationCardService.downloadQualificationCard(qualificationCard.id);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = qualificationCard.file_name;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-        if (document.body.contains(a)) {
-          document.body.removeChild(a);
+      // If card doesn't exist, generate it first
+      if (!qualificationCard) {
+        setGeneratingCard(true);
+        try {
+          await qualificationCardService.generateQualificationCard(reservationIdNum);
+          // Reload card status after generation
+          await loadQualificationCard();
+        } catch (generateError: any) {
+          console.error('Error generating qualification card:', generateError);
+          // If generation fails, try to download anyway (maybe it was just created)
+          console.log('Qualification card generation returned error, trying download anyway:', generateError);
+        } finally {
+          setGeneratingCard(false);
         }
-      }, 100);
-    } catch (error) {
+      }
+      
+      // Now download the card
+      setDownloadingCard(true);
+      await qualificationCardService.downloadQualificationCard(reservationIdNum);
+      // Reload card status after download
+      await loadQualificationCard();
+    } catch (error: any) {
       console.error('Error downloading qualification card:', error);
-      alert('Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
+      alert(error.message || 'Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
+    } finally {
+      setDownloadingCard(false);
     }
   };
 
@@ -272,28 +261,92 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Umowa</p>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
             <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
-              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full" />
+              {(() => {
+                const status = reservation.contract_status;
+                if (status === 'approved') {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full" />;
+                } else if (status === 'rejected') {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full" />;
+                } else {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full" />;
+                }
+              })()}
             </div>
             <div className="flex flex-col items-center gap-2 sm:gap-3">
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
               <p className="text-[10px] sm:text-xs text-gray-600 text-center">Umowa</p>
-              <button 
-                onClick={handleDownloadContract}
-                disabled={isGenerating}
-                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-              >
-                {isGenerating ? (
-                  <>
-                    <span className="animate-spin">⏳</span>
-                    <span>Generowanie...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-3 h-3" />
-                    <span>Pobierz umowę</span>
-                  </>
-                )}
-              </button>
+              {reservation.contract_status === 'rejected' ? (
+                <>
+                  <input
+                    ref={contractInputRef}
+                    type="file"
+                    accept=".pdf"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      try {
+                        setUploadingContract(true);
+                        await contractService.uploadContract(reservationIdNum, file);
+                        alert('Umowa została przesłana pomyślnie');
+                        await loadContractStatus();
+                        if (contractInputRef.current) {
+                          contractInputRef.current.value = '';
+                        }
+                      } catch (error: any) {
+                        alert(error.message || 'Nie udało się przesłać umowy');
+                      } finally {
+                        setUploadingContract(false);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <button 
+                    onClick={() => contractInputRef.current?.click()}
+                    disabled={uploadingContract}
+                    className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                  >
+                    {uploadingContract ? (
+                      <>
+                        <span className="animate-spin">⏳</span>
+                        <span>Przesyłanie...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-3 h-3" />
+                        <span>Dodaj</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={handleDownloadContract}
+                  disabled={isGenerating || loadingContract}
+                  className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  {isGenerating || loadingContract ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      <span>{isGenerating ? (hasContract ? 'Pobieranie...' : 'Generowanie...') : 'Sprawdzanie...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      {hasContract ? (
+                        <>
+                          <Download className="w-3 h-3" />
+                          <span>Pobierz umowę</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-3 h-3" />
+                          <span>Podpisz umowę</span>
+                        </>
+                      )}
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -303,24 +356,96 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Karta kwalifikacyjna</p>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
             <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
-              {qualificationCard ? (
-                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full" />
-              ) : (
-                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full" />
-              )}
+              {(() => {
+                const status = reservation.qualification_card_status;
+                if (status === 'approved') {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full" />;
+                } else if (status === 'rejected') {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full" />;
+                } else {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full" />;
+                }
+              })()}
             </div>
             <div className="flex flex-col items-center gap-2 sm:gap-3">
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
               <p className="text-[10px] sm:text-xs text-gray-600 text-center">
                 {loadingCard ? 'Ładowanie...' : (qualificationCard ? 'Karta kwalifikacyjna' : 'Karta kwalifikacyjna')}
               </p>
-              <button 
-                onClick={handleUploadClick}
-                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-              >
-                <Upload className="w-3 h-3" />
-                <span>dodaj</span>
-              </button>
+              {reservation.qualification_card_status === 'rejected' ? (
+                <>
+                  <input
+                    ref={qualificationCardInputRef}
+                    type="file"
+                    accept=".pdf"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      try {
+                        setUploadingCard(true);
+                        await qualificationCardService.uploadQualificationCard(reservationIdNum, file);
+                        alert('Karta kwalifikacyjna została przesłana pomyślnie');
+                        await loadQualificationCard();
+                        if (qualificationCardInputRef.current) {
+                          qualificationCardInputRef.current.value = '';
+                        }
+                      } catch (error: any) {
+                        alert(error.message || 'Nie udało się przesłać karty kwalifikacyjnej');
+                      } finally {
+                        setUploadingCard(false);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <button 
+                    onClick={() => qualificationCardInputRef.current?.click()}
+                    disabled={uploadingCard}
+                    className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                  >
+                    {uploadingCard ? (
+                      <>
+                        <span className="animate-spin">⏳</span>
+                        <span>Przesyłanie...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-3 h-3" />
+                        <span>Dodaj</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={handleDownloadCard}
+                  disabled={downloadingCard || loadingCard || generatingCard}
+                  className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  {downloadingCard || generatingCard || loadingCard ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      <span>
+                        {generatingCard ? 'Generowanie...' : downloadingCard ? 'Pobieranie...' : 'Sprawdzanie...'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {qualificationCard ? (
+                        <>
+                          <Download className="w-3 h-3" />
+                          <span>Pobierz</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-3 h-3" />
+                          <span>Generuj kartę</span>
+                        </>
+                      )}
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -496,11 +621,11 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                         // Card can be null if it doesn't exist - that's OK
                         if (card) {
                           history.push({
-                            id: `qualification-${card.id}`,
+                            id: `qualification-${card.reservation_id}`,
                             type: 'qualification_card',
-                            name: card.file_name,
-                            date: card.uploaded_at,
-                            fileUrl: card.file_url
+                            name: card.card_filename || 'Karta kwalifikacyjna',
+                            date: card.created_at,
+                            fileUrl: qualificationCardService.getQualificationCardDownloadUrl(reservationIdNum)
                           });
                         }
                       } catch (error) {
@@ -587,65 +712,6 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         </div>
       </UniversalModal>
 
-      {/* Upload Qualification Card Modal */}
-      <UniversalModal
-        isOpen={showUploadModal}
-        title="Prześlij kartę kwalifikacyjną"
-        onClose={() => {
-          setShowUploadModal(false);
-          setUploadError(null);
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-        }}
-        maxWidth="md"
-      >
-        <div className="p-6">
-          {uploadError && (
-            <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
-              <p className="text-sm text-red-700">{uploadError}</p>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="qualification-card-file" className="block text-sm font-medium text-gray-700 mb-2">
-                Wybierz plik PDF <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="qualification-card-file"
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf"
-                onChange={handleFileSelect}
-                disabled={uploading}
-                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
-                style={{ borderRadius: 0 }}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Tylko pliki PDF. Maksymalny rozmiar: 10MB
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowUploadModal(false);
-                  setUploadError(null);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                  }
-                }}
-                disabled={uploading}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ borderRadius: 0 }}
-              >
-                Anuluj
-              </button>
-            </div>
-          </div>
-        </div>
-      </UniversalModal>
     </div>
   );
 }

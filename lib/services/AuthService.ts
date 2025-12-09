@@ -142,7 +142,21 @@ class AuthService {
    */
   isAdmin(): boolean {
     const user = this.getCurrentUser();
-    return user?.user_type === 'admin' || user?.groups?.includes('admin') || false;
+    
+    // Interface with default values
+    const defaultUser: User = {
+      id: 0,
+      login: '',
+      email: '',
+      user_type: '',
+      groups: [],
+      accessible_sections: [],
+      created_at: '',
+      updated_at: '',
+    };
+    
+    const userWithDefaults: User = user || defaultUser;
+    return userWithDefaults.user_type === 'admin' || userWithDefaults.groups.includes('admin');
   }
 
   /**

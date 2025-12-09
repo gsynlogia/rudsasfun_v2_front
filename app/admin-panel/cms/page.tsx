@@ -7,7 +7,7 @@ import { ArrowRight } from 'lucide-react';
 
 export default function CMSPage() {
   return (
-    <SectionGuard section="sources">
+    <SectionGuard section="cms">
       <AdminLayout>
         <div className="container mx-auto p-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-8">CMS - Content Management System</h1>

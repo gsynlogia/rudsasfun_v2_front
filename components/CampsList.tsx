@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { formatDateRange } from '@/utils/api';
 import { saveMagicLinkRedirect } from '@/utils/localStorage';
 import type { Camp, CampProperty } from '@/types/reservation';
-import { Search } from 'lucide-react';
+import { Search, Shield } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/api-config';
 import { fetchWithDefaults } from '@/utils/api-fetch';
 import { DEFAULT_CAMP, DEFAULT_CAMP_PROPERTY } from '@/types/defaults';
 import { BackendUnavailableError } from '@/utils/api-auth';
+import { authService } from '@/lib/services/AuthService';
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -26,6 +27,24 @@ export default function CampsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = () => {
+      const user = authService.getCurrentUser();
+      if (user) {
+        // Check if user is admin: user_type === 'admin', groups includes 'admin', login === 'admin', or id === 0
+        const isAdminUser = 
+          user.user_type === 'admin' || 
+          user.groups?.includes('admin') || 
+          user.login === 'admin' || 
+          user.id === 0;
+        setIsAdmin(isAdminUser);
+      }
+    };
+    checkAdmin();
+  }, []);
 
   useEffect(() => {
     loadCamps();
@@ -68,6 +87,11 @@ export default function CampsList() {
   };
 
   const handleSelectCamp = (campId: number, editionId: number) => {
+    // Block admin users from creating reservations
+    if (isAdmin) {
+      return;
+    }
+    
     // Create reservation URL
     const reservationUrl = `/camps/${campId}/edition/${editionId}/step/1`;
     
@@ -153,6 +177,30 @@ export default function CampsList() {
       <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8 border border-gray-200 text-center">
         <p className="text-sm sm:text-base text-gray-600 mb-2">Brak dostępnych obozów.</p>
         <p className="text-xs sm:text-sm text-gray-500">Sprawdź ponownie później.</p>
+      </div>
+    );
+  }
+
+  // Show admin message if user is admin
+  if (isAdmin) {
+    return (
+      <div className="space-y-4 sm:space-y-6">
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 sm:p-6 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h2 className="text-lg sm:text-xl font-semibold text-yellow-800 mb-2">
+                Konto administratora
+              </h2>
+              <p className="text-sm sm:text-base text-yellow-700 mb-2">
+                To konto służy do logowania się do systemu i zarządzania systemem.
+              </p>
+              <p className="text-sm sm:text-base text-yellow-700 font-medium">
+                Użytkownik z uprawnieniami administratora nie może tworzyć rezerwacji.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

@@ -1,6 +1,7 @@
 'use client';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import SectionGuard from '@/components/admin/SectionGuard';
 import { Settings as SettingsIcon, Users, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -36,7 +37,8 @@ export default function SettingsPage() {
   ];
 
   return (
-    <AdminLayout>
+    <SectionGuard section="settings">
+      <AdminLayout>
       <div className="w-full">
         {/* Header */}
         <div className="mb-6">
@@ -82,5 +84,6 @@ export default function SettingsPage() {
         </div>
       </div>
     </AdminLayout>
+    </SectionGuard>
   );
 }

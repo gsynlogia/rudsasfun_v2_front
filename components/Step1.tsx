@@ -39,8 +39,32 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   const getAvailableBirthYears = (): number[] => {
     const birthYears: number[] = [];
     
-    // Get camp start date from reservation context
-    const startDateStr = reservation.camp?.properties?.start_date;
+    // Interface for camp properties with default values
+    interface CampProperties {
+      start_date: string;
+      end_date: string;
+      period: string;
+      city: string;
+    }
+    
+    interface CampData {
+      properties: CampProperties;
+    }
+    
+    const defaultProperties: CampProperties = {
+      start_date: '',
+      end_date: '',
+      period: '',
+      city: '',
+    };
+    
+    const defaultCamp: CampData = {
+      properties: defaultProperties,
+    };
+    
+    const campData: CampData = reservation.camp || defaultCamp;
+    const startDateStr = campData.properties.start_date;
+    
     if (!startDateStr) {
       // If no camp data, return empty array (will show placeholder)
       return [];
@@ -132,7 +156,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     );
     
     // Clear error for this field when user starts typing
-    if (validationAttemptedRef.current && parentErrors[id]?.[field]) {
+    if (validationAttemptedRef.current && parentErrors[id] && parentErrors[id][field]) {
       setParentErrors((prev) => {
         const newErrors = { ...prev };
         if (newErrors[id]) {
@@ -229,7 +253,32 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       errors.age = 'Pole obowiązkowe';
     } else {
       // Validate that selected birth year gives age 7-17 on camp start date
-      const startDateStr = reservation.camp?.properties?.start_date;
+      // Use same interface as in getAvailableBirthYears
+      interface CampProperties {
+        start_date: string;
+        end_date: string;
+        period: string;
+        city: string;
+      }
+      
+      interface CampData {
+        properties: CampProperties;
+      }
+      
+      const defaultProperties: CampProperties = {
+        start_date: '',
+        end_date: '',
+        period: '',
+        city: '',
+      };
+      
+      const defaultCamp: CampData = {
+        properties: defaultProperties,
+      };
+      
+      const campData: CampData = reservation.camp || defaultCamp;
+      const startDateStr = campData.properties.start_date;
+      
       if (startDateStr) {
         try {
           const startDate = new Date(startDateStr);
@@ -430,10 +479,10 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     onChange={(e) => updateParent(parent.id, 'firstName', e.target.value)}
                     disabled={disabled}
                     className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                      parentErrors[parent.id]?.firstName ? 'border-red-500' : 'border-gray-400'
+                      (parentErrors[parent.id] && parentErrors[parent.id].firstName) ? 'border-red-500' : 'border-gray-400'
                     }`}
                   />
-                  {parentErrors[parent.id]?.firstName && (
+                  {(parentErrors[parent.id] && parentErrors[parent.id].firstName) && (
                     <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].firstName}</p>
                   )}
                 </div>
@@ -447,10 +496,10 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     onChange={(e) => updateParent(parent.id, 'lastName', e.target.value)}
                     disabled={disabled}
                     className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                      parentErrors[parent.id]?.lastName ? 'border-red-500' : 'border-gray-400'
+                      (parentErrors[parent.id] && parentErrors[parent.id].lastName) ? 'border-red-500' : 'border-gray-400'
                     }`}
                   />
-                  {parentErrors[parent.id]?.lastName && (
+                  {(parentErrors[parent.id] && parentErrors[parent.id].lastName) && (
                     <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].lastName}</p>
                   )}
                 </div>
@@ -464,10 +513,10 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     onChange={(e) => updateParent(parent.id, 'email', e.target.value)}
                     disabled={disabled}
                     className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                      parentErrors[parent.id]?.email ? 'border-red-500' : 'border-gray-400'
+                      (parentErrors[parent.id] && parentErrors[parent.id].email) ? 'border-red-500' : 'border-gray-400'
                     }`}
                   />
-                  {parentErrors[parent.id]?.email && (
+                  {(parentErrors[parent.id] && parentErrors[parent.id].email) && (
                     <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].email}</p>
                   )}
                 </div>
@@ -492,10 +541,10 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                         onChange={(e) => updateParent(parent.id, 'phoneNumber', e.target.value)}
                         disabled={disabled}
                         className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                          parentErrors[parent.id]?.phoneNumber ? 'border-red-500' : 'border-gray-400'
+                          (parentErrors[parent.id] && parentErrors[parent.id].phoneNumber) ? 'border-red-500' : 'border-gray-400'
                         }`}
                       />
-                      {parentErrors[parent.id]?.phoneNumber && (
+                      {(parentErrors[parent.id] && parentErrors[parent.id].phoneNumber) && (
                         <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].phoneNumber}</p>
                       )}
                     </div>
@@ -511,10 +560,10 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     onChange={(e) => updateParent(parent.id, 'street', e.target.value)}
                     disabled={disabled}
                     className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                      parentErrors[parent.id]?.street ? 'border-red-500' : 'border-gray-400'
+                      (parentErrors[parent.id] && parentErrors[parent.id].street) ? 'border-red-500' : 'border-gray-400'
                     }`}
                   />
-                  {parentErrors[parent.id]?.street && (
+                  {(parentErrors[parent.id] && parentErrors[parent.id].street) && (
                     <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].street}</p>
                   )}
                 </div>
@@ -528,10 +577,10 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     onChange={(e) => updateParent(parent.id, 'postalCode', e.target.value)}
                     disabled={disabled}
                     className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                      parentErrors[parent.id]?.postalCode ? 'border-red-500' : 'border-gray-400'
+                      (parentErrors[parent.id] && parentErrors[parent.id].postalCode) ? 'border-red-500' : 'border-gray-400'
                     }`}
                   />
-                  {parentErrors[parent.id]?.postalCode && (
+                  {(parentErrors[parent.id] && parentErrors[parent.id].postalCode) && (
                     <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].postalCode}</p>
                   )}
                 </div>
@@ -545,10 +594,10 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     onChange={(e) => updateParent(parent.id, 'city', e.target.value)}
                     disabled={disabled}
                     className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                      parentErrors[parent.id]?.city ? 'border-red-500' : 'border-gray-400'
+                      (parentErrors[parent.id] && parentErrors[parent.id].city) ? 'border-red-500' : 'border-gray-400'
                     }`}
                   />
-                  {parentErrors[parent.id]?.city && (
+                  {(parentErrors[parent.id] && parentErrors[parent.id].city) && (
                     <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].city}</p>
                   )}
                 </div>

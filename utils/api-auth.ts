@@ -148,7 +148,17 @@ export async function authenticatedApiCall<T>(
         if (responseText && responseText.trim()) {
           try {
             responseBody = JSON.parse(responseText);
-            errorDetail = responseBody.detail || responseBody.message || responseBody.error || errorDetail;
+            // Handle FastAPI validation error format: {"detail": [{"loc": [...], "msg": "...", "type": "..."}, ...]}
+            if (responseBody.detail && Array.isArray(responseBody.detail)) {
+              // Format validation errors for display
+              const validationErrors = responseBody.detail.map((err: any) => {
+                const field = Array.isArray(err.loc) ? err.loc.join('.') : String(err.loc);
+                return `${field}: ${err.msg || 'Pole obowiązkowe'}`;
+              });
+              errorDetail = `Błąd walidacji: ${validationErrors.join(', ')}`;
+            } else {
+              errorDetail = responseBody.detail || responseBody.message || responseBody.error || errorDetail;
+            }
           } catch (parseError) {
             // Not JSON, use text as error detail
             errorDetail = responseText || errorDetail;

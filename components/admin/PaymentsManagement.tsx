@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
-import { Search, ChevronUp, ChevronDown, Check, X, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw, RefreshCw } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, Check, X, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw, RefreshCw, Trash2 } from 'lucide-react';
 import PaymentConfirmationModal from './PaymentConfirmationModal';
 import RefundConfirmationModal from './RefundConfirmationModal';
 import { reservationService } from '@/lib/services/ReservationService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
-import { invoiceService } from '@/lib/services/InvoiceService';
+import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 
 /**
  * Payment Item Status
@@ -61,12 +61,74 @@ interface ReservationPayment {
 }
 
 /**
+ * Fetch protection prices for a specific turnus (camp + property)
+ * Returns a map of protection ID to {name, price} with turnus-specific prices
+ */
+const fetchTurnusProtectionPrices = async (
+  campId: number,
+  propertyId: number
+): Promise<Map<number, { name: string; price: number }>> => {
+  try {
+    const { getApiBaseUrlRuntime } = await import('@/utils/api-config');
+    const apiBaseUrl = getApiBaseUrlRuntime();
+    const response = await fetch(`${apiBaseUrl}/api/camps/${campId}/properties/${propertyId}/protections`);
+    
+    if (!response.ok) {
+      console.warn(`Could not fetch turnus protections for camp ${campId}, property ${propertyId}`);
+      return new Map();
+    }
+    
+    const turnusProtections = await response.json();
+    const protectionsMap = new Map<number, { name: string; price: number }>();
+    
+    if (Array.isArray(turnusProtections)) {
+      turnusProtections.forEach((tp: any) => {
+        // Skip placeholders without relations
+        if (tp.has_no_relations) return;
+        
+        // Use general_protection_id for mapping (this is what's stored in selected_protection)
+        const generalProtectionId = tp.general_protection_id || tp.id;
+        if (generalProtectionId) {
+          protectionsMap.set(generalProtectionId, {
+            name: tp.name || 'Ochrona',
+            price: tp.price || 0
+          });
+        }
+      });
+    }
+    
+    return protectionsMap;
+  } catch (err) {
+    console.warn('Error fetching turnus protection prices:', err);
+    return new Map();
+  }
+};
+
+/**
  * Generate payment items for a reservation based on real reservation data and payments
  * Correctly distributes payments across items (camp, protection, diet, addons)
+ * @param reservation - Reservation data from API
+ * @param payments - Array of payment records
+ * @param protectionsMap - Map of protection ID to {name, price} (from API) - fallback to general prices
+ * @param addonsMap - Map of addon ID to {name, price} (from API)
  */
-const generatePaymentItems = (reservation: any, payments: PaymentResponse[]): PaymentItem[] => {
+const generatePaymentItems = async (
+  reservation: any, 
+  payments: PaymentResponse[],
+  protectionsMap: Map<number, { name: string; price: number }> = new Map(),
+  addonsMap: Map<string, { name: string; price: number }> = new Map()
+): Promise<PaymentItem[]> => {
   const items: PaymentItem[] = [];
   let itemId = 1;
+  
+  // Fetch turnus-specific protection prices (these are the actual prices used in reservation)
+  let turnusProtectionsMap = new Map<number, { name: string; price: number }>();
+  if (reservation.camp_id && reservation.property_id) {
+    turnusProtectionsMap = await fetchTurnusProtectionPrices(reservation.camp_id, reservation.property_id);
+  }
+  
+  // Use turnus prices if available, otherwise fallback to general prices
+  const effectiveProtectionsMap = turnusProtectionsMap.size > 0 ? turnusProtectionsMap : protectionsMap;
   
   // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}")
   const reservationPayments = payments.filter(p => {
@@ -103,106 +165,206 @@ const generatePaymentItems = (reservation: any, payments: PaymentResponse[]): Pa
       )[0]
     : null;
   const paymentDate = latestPayment 
-    ? (latestPayment.paid_at || latestPayment.created_at)?.split('T')[0]
+    ? ((latestPayment.paid_at || latestPayment.created_at) || '').split('T')[0]
     : undefined;
   const paymentMethod = latestPayment
     ? (latestPayment.channel_id === 64 ? 'BLIK' : 
        latestPayment.channel_id === 53 ? 'Karta' : 'Online')
     : undefined;
   
-  // Calculate additional items amounts
-  const protectionAmount = reservation.selected_protection ? 200 : 0;
-  const dietAmount = reservation.diet === 'vegetarian' ? 50 : 0;
+  // Parse selected_protection - can be array of strings like ["protection-1", "protection-2"]
+  let selectedProtections: string[] = [];
+  if (reservation.selected_protection) {
+    if (Array.isArray(reservation.selected_protection)) {
+      selectedProtections = reservation.selected_protection;
+    } else if (typeof reservation.selected_protection === 'string') {
+      try {
+        const parsed = JSON.parse(reservation.selected_protection);
+        selectedProtections = Array.isArray(parsed) ? parsed : [reservation.selected_protection];
+      } catch {
+        selectedProtections = [reservation.selected_protection];
+      }
+    }
+  }
   
-  // Calculate addons total
-  const addonPrices: Record<string, number> = {
-    'Skuter wodny': 150,
-    'Banan wodny': 0,
-    'Quady': 150,
-  };
-  const addonsAmount = reservation.selected_addons && Array.isArray(reservation.selected_addons)
-    ? reservation.selected_addons.reduce((sum: number, addonName: string) => {
-        return sum + (addonPrices[addonName] || 0);
-      }, 0)
-    : 0;
+  // Calculate protection amounts from turnus-specific prices
+  let totalProtectionAmount = 0;
+  selectedProtections.forEach((protectionId: string) => {
+    // Extract numeric ID from "protection-X" format
+    const numericIdMatch = protectionId.match(/protection-(\d+)/);
+    if (numericIdMatch) {
+      const numericId = parseInt(numericIdMatch[1], 10);
+      const protectionData = effectiveProtectionsMap.get(numericId);
+      if (protectionData) {
+        totalProtectionAmount += protectionData.price;
+      }
+    }
+  });
   
-  // Calculate transport amount (if transport was selected)
-  // Transport is included in total_price, but we don't have direct access to transport price
-  // So we calculate camp amount as: total_price - (protection + diet + addons)
-  // Note: If transport was selected, its price is already in total_price, so campAmount will be lower
-  // This is correct because campAmount represents the base camp price without transport
-  const additionalItemsAmount = protectionAmount + dietAmount + addonsAmount;
+  // Calculate diet amount (if diet ID is provided)
+  const dietAmount = 0; // Will be calculated from diet data if needed
+  
+  // Calculate addons total from actual addon data
+  let totalAddonsAmount = 0;
+  const selectedAddons = reservation.selected_addons 
+    ? (Array.isArray(reservation.selected_addons) ? reservation.selected_addons : [reservation.selected_addons])
+    : [];
+  
+  selectedAddons.forEach((addonId: string) => {
+    const addonData = addonsMap.get(addonId);
+    if (addonData) {
+      totalAddonsAmount += addonData.price;
+    }
+  });
+  
+  // Calculate camp amount = total_price - (protections + diet + addons + transport + promotion)
+  // Note: transport and promotion are included in total_price, so we calculate camp as remainder
+  const additionalItemsAmount = totalProtectionAmount + dietAmount + totalAddonsAmount;
   const totalPriceFromReservation = reservation.total_price || 0;
-  
-  // Camp amount = total_price - additional items (protection, diet, addons)
-  // Transport is NOT subtracted here because it's a separate line item that should be shown separately
-  // But since we don't have transport price in reservation data, we'll calculate it as remainder
   const campAmount = Math.max(0, totalPriceFromReservation - additionalItemsAmount);
   
   // Total amount should match reservation.total_price (this is the source of truth)
   const totalAmount = totalPriceFromReservation;
   
-  // Distribute payments across items in order: camp -> protection -> diet -> addons
-  let remainingPaid = totalPaid;
+  // Deposit amount: 600 PLN base + all protections + all addons (if deposit was selected)
+  const depositBaseAmount = 600;
+  const depositAmount = depositBaseAmount + totalProtectionAmount + totalAddonsAmount;
   
-  // Camp base price (total_price from reservation)
-  const campPaidAmount = Math.min(remainingPaid, campAmount);
-  const campPaid = campPaidAmount >= campAmount;
-  items.push({
-    id: `item-${itemId++}`,
-    name: `Obóz: ${reservation.camp_name || 'Nieznany obóz'}`,
-    type: 'camp',
-    amount: campAmount,
-    status: campPaid ? 'paid' : (campPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
-    paidDate: campPaid && paymentDate ? paymentDate : undefined,
-    paymentMethod: campPaid && paymentMethod ? paymentMethod : undefined,
-  });
-  remainingPaid -= campPaidAmount;
-
-  // Protection (Tarcza/Oaza) - if selected_protection exists
-  if (reservation.selected_protection) {
-    const protectionPaidAmount = Math.min(remainingPaid, protectionAmount);
-    const protectionPaid = protectionPaidAmount >= protectionAmount;
-    items.push({
-      id: `item-${itemId++}`,
-      name: `Ochrona rezerwacji (${reservation.selected_protection === 'shield' ? 'Tarcza' : 'Oaza'})`,
-      type: 'protection',
-      amount: protectionAmount,
-      status: protectionPaid ? 'paid' : (protectionPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
-      paidDate: protectionPaid && paymentDate ? paymentDate : undefined,
-      paymentMethod: protectionPaid && paymentMethod ? paymentMethod : undefined,
+  // Distribute payments across items
+  // Priority: If totalPaid >= depositAmount, pay deposit first (600 + protections + addons), then camp
+  // Otherwise, if totalPaid < depositAmount but >= depositBaseAmount, pay partial deposit
+  // Otherwise, pay camp first (full payment without deposit)
+  let remainingPaid = totalPaid;
+  const hasDeposit = depositAmount > depositBaseAmount; // Has protections or addons in deposit
+  const isDepositPayment = hasDeposit && totalPaid >= depositBaseAmount && totalPaid < totalAmount;
+  
+  // Always pay deposit components first if deposit was selected (600 + protections + addons)
+  if (isDepositPayment || (hasDeposit && totalPaid >= depositAmount)) {
+    // Pay deposit base (600 PLN) first
+    const depositBasePaid = Math.min(remainingPaid, depositBaseAmount);
+    remainingPaid -= depositBasePaid;
+    
+    // Protections - create separate item for each protection (paid from deposit)
+    selectedProtections.forEach((protectionId: string) => {
+      const numericIdMatch = protectionId.match(/protection-(\d+)/);
+      if (numericIdMatch) {
+        const numericId = parseInt(numericIdMatch[1], 10);
+        const protectionData = effectiveProtectionsMap.get(numericId);
+        if (protectionData) {
+          const protectionPaidAmount = Math.min(remainingPaid, protectionData.price);
+          const protectionPaid = protectionPaidAmount >= protectionData.price;
+          items.push({
+            id: `item-${itemId++}`,
+            name: `Ochrona rezerwacji (${protectionData.name})`,
+            type: 'protection',
+            amount: protectionData.price,
+            status: protectionPaid ? 'paid' : (protectionPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+            paidDate: protectionPaid && paymentDate ? paymentDate : undefined,
+            paymentMethod: protectionPaid && paymentMethod ? paymentMethod : undefined,
+          });
+          remainingPaid -= protectionPaidAmount;
+        }
+      }
     });
-    remainingPaid -= protectionPaidAmount;
-  }
-
-  // Diet (if vegetarian)
-  if (reservation.diet === 'vegetarian') {
-    const dietPaidAmount = Math.min(remainingPaid, dietAmount);
-    const dietPaid = dietPaidAmount >= dietAmount;
-    items.push({
-      id: `item-${itemId++}`,
-      name: 'Dieta wegetariańska',
-      type: 'diet',
-      amount: dietAmount,
-      status: dietPaid ? 'paid' : (dietPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
-      paidDate: dietPaid && paymentDate ? paymentDate : undefined,
-      paymentMethod: dietPaid && paymentMethod ? paymentMethod : undefined,
-    });
-    remainingPaid -= dietPaidAmount;
-  }
-
-  // Addons (if selected_addons exists)
-  if (reservation.selected_addons && Array.isArray(reservation.selected_addons) && reservation.selected_addons.length > 0) {
-    reservation.selected_addons.forEach((addonName: string) => {
-      const addonAmount = addonPrices[addonName] || 0;
-      if (addonAmount > 0) {
-        const addonPaidAmount = Math.min(remainingPaid, addonAmount);
-        const addonPaid = addonPaidAmount >= addonAmount;
+    
+    // Addons - create separate item for each addon (paid from deposit)
+    selectedAddons.forEach((addonId: string) => {
+      const addonData = addonsMap.get(addonId);
+      if (addonData && addonData.price > 0) {
+        const addonPaidAmount = Math.min(remainingPaid, addonData.price);
+        const addonPaid = addonPaidAmount >= addonData.price;
         items.push({
           id: `item-${itemId++}`,
-          name: addonName,
+          name: addonData.name,
           type: 'addon',
-          amount: addonAmount,
+          amount: addonData.price,
+          status: addonPaid ? 'paid' : (addonPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+          paidDate: addonPaid && paymentDate ? paymentDate : undefined,
+          paymentMethod: addonPaid && paymentMethod ? paymentMethod : undefined,
+        });
+        remainingPaid -= addonPaidAmount;
+      }
+    });
+    
+    // Camp - pay remaining amount (if any) after deposit
+    const campPaidAmount = Math.min(remainingPaid, campAmount);
+    const campPaid = campPaidAmount >= campAmount;
+    items.push({
+      id: `item-${itemId++}`,
+      name: `Obóz: ${reservation.camp_name || 'Nieznany obóz'}`,
+      type: 'camp',
+      amount: campAmount,
+      status: campPaid ? 'paid' : (campPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+      paidDate: campPaid && paymentDate ? paymentDate : undefined,
+      paymentMethod: campPaid && paymentMethod ? paymentMethod : undefined,
+    });
+    remainingPaid -= campPaidAmount;
+  } else {
+    // Full payment or partial payment after deposit: distribute camp -> protections -> diet -> addons
+    // Camp base price
+    const campPaidAmount = Math.min(remainingPaid, campAmount);
+    const campPaid = campPaidAmount >= campAmount;
+    items.push({
+      id: `item-${itemId++}`,
+      name: `Obóz: ${reservation.camp_name || 'Nieznany obóz'}`,
+      type: 'camp',
+      amount: campAmount,
+      status: campPaid ? 'paid' : (campPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+      paidDate: campPaid && paymentDate ? paymentDate : undefined,
+      paymentMethod: campPaid && paymentMethod ? paymentMethod : undefined,
+    });
+    remainingPaid -= campPaidAmount;
+
+    // Protections - create separate item for each protection
+    selectedProtections.forEach((protectionId: string) => {
+      const numericIdMatch = protectionId.match(/protection-(\d+)/);
+      if (numericIdMatch) {
+        const numericId = parseInt(numericIdMatch[1], 10);
+        const protectionData = effectiveProtectionsMap.get(numericId);
+        if (protectionData) {
+          const protectionPaidAmount = Math.min(remainingPaid, protectionData.price);
+          const protectionPaid = protectionPaidAmount >= protectionData.price;
+          items.push({
+            id: `item-${itemId++}`,
+            name: `Ochrona rezerwacji (${protectionData.name})`,
+            type: 'protection',
+            amount: protectionData.price,
+            status: protectionPaid ? 'paid' : (protectionPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+            paidDate: protectionPaid && paymentDate ? paymentDate : undefined,
+            paymentMethod: protectionPaid && paymentMethod ? paymentMethod : undefined,
+          });
+          remainingPaid -= protectionPaidAmount;
+        }
+      }
+    });
+
+    // Diet (if selected)
+    if (reservation.diet && dietAmount > 0) {
+      const dietPaidAmount = Math.min(remainingPaid, dietAmount);
+      const dietPaid = dietPaidAmount >= dietAmount;
+      items.push({
+        id: `item-${itemId++}`,
+        name: 'Dieta wegetariańska',
+        type: 'diet',
+        amount: dietAmount,
+        status: dietPaid ? 'paid' : (dietPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
+        paidDate: dietPaid && paymentDate ? paymentDate : undefined,
+        paymentMethod: dietPaid && paymentMethod ? paymentMethod : undefined,
+      });
+      remainingPaid -= dietPaidAmount;
+    }
+
+    // Addons - create separate item for each addon
+    selectedAddons.forEach((addonId: string) => {
+      const addonData = addonsMap.get(addonId);
+      if (addonData && addonData.price > 0) {
+        const addonPaidAmount = Math.min(remainingPaid, addonData.price);
+        const addonPaid = addonPaidAmount >= addonData.price;
+        items.push({
+          id: `item-${itemId++}`,
+          name: addonData.name,
+          type: 'addon',
+          amount: addonData.price,
           status: addonPaid ? 'paid' : (addonPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
           paidDate: addonPaid && paymentDate ? paymentDate : undefined,
           paymentMethod: addonPaid && paymentMethod ? paymentMethod : undefined,
@@ -219,8 +381,13 @@ const generatePaymentItems = (reservation: any, payments: PaymentResponse[]): Pa
  * Generate payment details for a reservation based on real data
  * Uses actual payment amounts from database (paid_amount from Payment records)
  */
-const generatePaymentDetails = (reservation: any, payments: PaymentResponse[]): PaymentDetails => {
-  const items = generatePaymentItems(reservation, payments);
+const generatePaymentDetails = async (
+  reservation: any, 
+  payments: PaymentResponse[],
+  protectionsMap: Map<number, { name: string; price: number }> = new Map(),
+  addonsMap: Map<string, { name: string; price: number }> = new Map()
+): Promise<PaymentDetails> => {
+  const items = await generatePaymentItems(reservation, payments, protectionsMap, addonsMap);
   
   // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}")
   const reservationPayments = payments.filter(p => {
@@ -289,15 +456,17 @@ const generatePaymentDetails = (reservation: any, payments: PaymentResponse[]): 
 /**
  * Map backend reservation and payments to frontend format
  */
-const mapReservationToPaymentFormat = (
+const mapReservationToPaymentFormat = async (
   reservation: any,
-  payments: PaymentResponse[]
-): ReservationPayment => {
+  payments: PaymentResponse[],
+  protectionsMap: Map<number, { name: string; price: number }> = new Map(),
+  addonsMap: Map<string, { name: string; price: number }> = new Map()
+): Promise<ReservationPayment> => {
   const participantName = `${reservation.participant_first_name || ''} ${reservation.participant_last_name || ''}`.trim();
   const firstParent = reservation.parents_data && reservation.parents_data.length > 0 
     ? reservation.parents_data[0] 
     : null;
-  const email = firstParent?.email || reservation.invoice_email || '';
+  const email = (firstParent && firstParent.email) ? firstParent.email : (reservation.invoice_email || '');
   const campName = reservation.camp_name || 'Nieznany obóz';
   const tripName = reservation.property_name || `${reservation.property_period || ''} - ${reservation.property_city || ''}`.trim() || 'Nieznany turnus';
   
@@ -316,7 +485,7 @@ const mapReservationToPaymentFormat = (
     tripName: tripName,
     status: status,
     createdAt: reservation.created_at.split('T')[0],
-    paymentDetails: generatePaymentDetails(reservation, payments),
+    paymentDetails: await generatePaymentDetails(reservation, payments, protectionsMap, addonsMap),
   };
 };
 
@@ -350,6 +519,66 @@ export default function PaymentsManagement() {
   // State for invoice generation
   const [selectedItems, setSelectedItems] = useState<Map<number, Set<string>>>(new Map()); // reservationId -> Set of item IDs
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState<number | null>(null); // reservation ID being processed
+
+  // State for protections and addons data
+  const [protectionsMap, setProtectionsMap] = useState<Map<number, { name: string; price: number }>>(new Map());
+  const [addonsMap, setAddonsMap] = useState<Map<string, { name: string; price: number }>>(new Map());
+  const [reservationInvoices, setReservationInvoices] = useState<Map<number, InvoiceResponse[]>>(new Map()); // reservationId -> invoices
+  const [loadingInvoices, setLoadingInvoices] = useState<Set<number>>(new Set()); // reservation IDs being loaded
+  const [cancelingInvoice, setCancelingInvoice] = useState<number | null>(null); // invoice ID being canceled
+
+  // Load protections and addons data
+  useEffect(() => {
+    const fetchProtectionsAndAddons = async () => {
+      try {
+        // Fetch protections (public endpoint - use regular fetch)
+        try {
+          const { getApiBaseUrlRuntime } = await import('@/utils/api-config');
+          const apiBaseUrl = getApiBaseUrlRuntime();
+          const protectionsResponse = await fetch(`${apiBaseUrl}/api/general-protections/public`);
+          
+          if (!protectionsResponse.ok) {
+            throw new Error(`HTTP error! status: ${protectionsResponse.status}`);
+          }
+          
+          const protections = await protectionsResponse.json();
+          const protectionsMapData = new Map<number, { name: string; price: number }>();
+          if (protections && Array.isArray(protections)) {
+            protections.forEach((protection: { id: number; name: string; price: number }) => {
+              protectionsMapData.set(protection.id, { name: protection.name, price: protection.price });
+            });
+          }
+          setProtectionsMap(protectionsMapData);
+        } catch (err) {
+          console.warn('Error fetching protections (using empty map):', err);
+          setProtectionsMap(new Map());
+        }
+
+        // Fetch addons (requires authentication)
+        try {
+          const { authenticatedApiCall } = await import('@/utils/api-auth');
+          const addonsResponse = await authenticatedApiCall<{ addons: Array<{ id: number; name: string; price: number }>; total: number }>('/api/addons?include_inactive=true');
+          const addonsMapData = new Map<string, { name: string; price: number }>();
+          if (addonsResponse && addonsResponse.addons && Array.isArray(addonsResponse.addons)) {
+            addonsResponse.addons.forEach(addon => {
+              addonsMapData.set(addon.id.toString(), { name: addon.name, price: addon.price || 0 });
+            });
+          }
+          setAddonsMap(addonsMapData);
+        } catch (err) {
+          console.warn('Error fetching addons (using empty map):', err);
+          setAddonsMap(new Map());
+        }
+      } catch (err) {
+        console.error('Error in fetchProtectionsAndAddons:', err);
+        // Continue with empty maps if fetch fails
+        setProtectionsMap(new Map());
+        setAddonsMap(new Map());
+      }
+    };
+
+    fetchProtectionsAndAddons();
+  }, []);
 
   // Load reservations and payments from API
   useEffect(() => {
@@ -401,9 +630,11 @@ export default function PaymentsManagement() {
         
         console.log(`Fetched ${reservationsData.length} reservations and ${paymentsData.length} payments`);
         
-        // Map reservations to payment format
-        const mappedReservations = reservationsData.map(reservation => 
-          mapReservationToPaymentFormat(reservation, paymentsData)
+        // Map reservations to payment format (use current protectionsMap and addonsMap)
+        const mappedReservations = await Promise.all(
+          reservationsData.map(reservation => 
+            mapReservationToPaymentFormat(reservation, paymentsData, protectionsMap, addonsMap)
+          )
         );
         
         setReservations(mappedReservations);
@@ -415,8 +646,10 @@ export default function PaymentsManagement() {
       }
     };
     
+    // Fetch data after protections and addons are loaded (even if empty)
+    // We use a flag to ensure we only fetch once after initial load
     fetchData();
-  }, []);
+  }, [protectionsMap, addonsMap]);
 
   // Filter and sort reservations
   const filteredReservations = useMemo(() => {
@@ -496,16 +729,86 @@ export default function PaymentsManagement() {
   };
 
   // Toggle row expansion
-  const toggleRowExpansion = (reservationId: number) => {
+  const toggleRowExpansion = async (reservationId: number) => {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(reservationId)) {
+      const isCurrentlyExpanded = newSet.has(reservationId);
+      
+      if (isCurrentlyExpanded) {
         newSet.delete(reservationId);
       } else {
         newSet.add(reservationId);
+        // Load invoices when expanding
+        loadInvoicesForReservation(reservationId);
       }
       return newSet;
     });
+  };
+
+  // Load invoices for a reservation
+  const loadInvoicesForReservation = async (reservationId: number) => {
+    // Don't load if already loading or already loaded
+    if (loadingInvoices.has(reservationId) || reservationInvoices.has(reservationId)) {
+      return;
+    }
+
+    try {
+      setLoadingInvoices(prev => new Set(prev).add(reservationId));
+      const invoicesResponse = await invoiceService.getInvoicesByReservation(reservationId);
+      setReservationInvoices(prev => {
+        const newMap = new Map(prev);
+        newMap.set(reservationId, invoicesResponse.invoices);
+        return newMap;
+      });
+    } catch (error) {
+      console.error('Error loading invoices:', error);
+      // Set empty array on error
+      setReservationInvoices(prev => {
+        const newMap = new Map(prev);
+        newMap.set(reservationId, []);
+        return newMap;
+      });
+    } finally {
+      setLoadingInvoices(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reservationId);
+        return newSet;
+      });
+    }
+  };
+
+  // Cancel invoice
+  const handleCancelInvoice = async (invoice: InvoiceResponse, reservationId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!confirm(`Czy na pewno chcesz anulować fakturę ${invoice.invoice_number}?`)) {
+      return;
+    }
+
+    try {
+      setCancelingInvoice(invoice.id);
+      await invoiceService.cancelInvoice(invoice.id);
+      
+      // Remove invoice from the list (or mark as canceled)
+      setReservationInvoices(prev => {
+        const newMap = new Map(prev);
+        const invoices = newMap.get(reservationId) || [];
+        const updatedInvoices = invoices.map(inv => 
+          inv.id === invoice.id 
+            ? { ...inv, is_canceled: true, canceled_at: new Date().toISOString() }
+            : inv
+        );
+        newMap.set(reservationId, updatedInvoices);
+        return newMap;
+      });
+      
+      alert(`Faktura ${invoice.invoice_number} została anulowana.`);
+    } catch (error) {
+      console.error('Error canceling invoice:', error);
+      alert(`Błąd podczas anulowania faktury: ${error instanceof Error ? error.message : 'Nieznany błąd'}`);
+    } finally {
+      setCancelingInvoice(null);
+    }
   };
 
   // Toggle item selection for invoice generation
@@ -533,12 +836,14 @@ export default function PaymentsManagement() {
 
   // Check if item is selected
   const isItemSelected = (reservationId: number, itemId: string): boolean => {
-    return selectedItems.get(reservationId)?.has(itemId) || false;
+    const items = selectedItems.get(reservationId);
+    return items ? items.has(itemId) : false;
   };
 
   // Get selected items count for reservation
   const getSelectedItemsCount = (reservationId: number): number => {
-    return selectedItems.get(reservationId)?.size || 0;
+    const items = selectedItems.get(reservationId);
+    return items ? items.size : 0;
   };
 
   // Handle invoice generation
@@ -573,8 +878,10 @@ export default function PaymentsManagement() {
       // Refresh reservations to show new invoice
       const reservationsData = await reservationService.listReservations(0, 1000);
       const paymentsData = await paymentService.listPayments(0, 1000);
-      const mappedReservations = reservationsData.map(r => 
-        mapReservationToPaymentFormat(r, paymentsData)
+      const mappedReservations = await Promise.all(
+        reservationsData.map(r => 
+          mapReservationToPaymentFormat(r, paymentsData, protectionsMap, addonsMap)
+        )
       );
       setReservations(mappedReservations);
 
@@ -865,8 +1172,10 @@ export default function PaymentsManagement() {
       // Refresh data
       const reservationsData = await reservationService.listReservations(0, 1000);
       const updatedPayments = await paymentService.listPayments(0, 1000);
-      const mappedReservations = reservationsData.map(reservation => 
-        mapReservationToPaymentFormat(reservation, updatedPayments)
+      const mappedReservations = await Promise.all(
+        reservationsData.map(reservation => 
+          mapReservationToPaymentFormat(reservation, updatedPayments, protectionsMap, addonsMap)
+        )
       );
       setReservations(mappedReservations);
       
@@ -1254,23 +1563,6 @@ export default function PaymentsManagement() {
                                   </div>
                                 </div>
 
-                                {/* All Paid Checkbox */}
-                                <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-200">
-                                  <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={allPaid}
-                                      onChange={() => toggleAllPayments(reservation.id)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0]"
-                                      style={{ borderRadius: 0, cursor: 'pointer' }}
-                                    />
-                                    <span className="text-sm font-medium text-gray-900">
-                                      Wszystkie płatności opłacone
-                                    </span>
-                                  </label>
-                                </div>
-
                                 {/* Payment Items */}
                                 <div className="space-y-2">
                                   <h4 className="text-sm font-semibold text-gray-900 mb-3">Elementy płatności</h4>
@@ -1502,6 +1794,116 @@ export default function PaymentsManagement() {
                                     )}
                                   </div>
                                 </div>
+
+                                {/* Invoices Section */}
+                                <div className="mt-6 pt-4 border-t border-gray-200">
+                                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Faktury dla tej rezerwacji</h4>
+                                  
+                                  {loadingInvoices.has(reservation.id) ? (
+                                    <div className="text-center py-4">
+                                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#03adf0]"></div>
+                                      <p className="text-xs text-gray-500 mt-2">Ładowanie faktur...</p>
+                                    </div>
+                                  ) : (
+                                    (() => {
+                                      const invoices = reservationInvoices.get(reservation.id) || [];
+                                      
+                                      if (invoices.length === 0) {
+                                        return (
+                                          <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                            <p className="text-sm text-gray-500">Brak faktur dla tej rezerwacji</p>
+                                          </div>
+                                        );
+                                      }
+                                      
+                                      return (
+                                        <div className="space-y-2">
+                                          {invoices.map((invoice) => (
+                                            <div
+                                              key={invoice.id}
+                                              className={`flex items-center justify-between p-3 rounded border ${
+                                                invoice.is_canceled
+                                                  ? 'bg-red-50 border-red-200'
+                                                  : invoice.is_paid
+                                                  ? 'bg-green-50 border-green-200'
+                                                  : 'bg-white border-gray-200'
+                                              }`}
+                                            >
+                                              <div className="flex items-center gap-3 flex-1">
+                                                <FileText className={`w-4 h-4 ${
+                                                  invoice.is_canceled ? 'text-red-600' : 
+                                                  invoice.is_paid ? 'text-green-600' : 
+                                                  'text-gray-600'
+                                                }`} />
+                                                <div className="flex-1">
+                                                  <p className={`text-sm font-medium ${
+                                                    invoice.is_canceled ? 'text-red-700 line-through' : 'text-gray-900'
+                                                  }`}>
+                                                    {invoice.invoice_number}
+                                                  </p>
+                                                  <p className="text-xs text-gray-500">
+                                                    {formatDate(invoice.issue_date)} • {formatCurrency(invoice.total_amount)}
+                                                    {invoice.is_canceled && invoice.canceled_at && (
+                                                      <span className="text-red-600 ml-2">
+                                                        • Anulowana: {formatDate(invoice.canceled_at)}
+                                                      </span>
+                                                    )}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                {invoice.is_canceled ? (
+                                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                    <XCircle className="w-3 h-3 mr-1" />
+                                                    Anulowana
+                                                  </span>
+                                                ) : invoice.is_paid ? (
+                                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    <Check className="w-3 h-3 mr-1" />
+                                                    Opłacona
+                                                  </span>
+                                                ) : (
+                                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                    Nieopłacona
+                                                  </span>
+                                                )}
+                                                
+                                                {!invoice.is_canceled && (
+                                                  <>
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        window.open(invoiceService.getInvoicePdfUrl(invoice.id), '_blank');
+                                                      }}
+                                                      className="p-1.5 text-[#03adf0] hover:bg-blue-50 transition-all duration-200"
+                                                      title="Pobierz fakturę"
+                                                      style={{ borderRadius: 0, cursor: 'pointer' }}
+                                                    >
+                                                      <Download className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                      onClick={(e) => handleCancelInvoice(invoice, reservation.id, e)}
+                                                      disabled={cancelingInvoice === invoice.id}
+                                                      className="p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                                                      title="Anuluj fakturę"
+                                                      style={{ borderRadius: 0, cursor: cancelingInvoice === invoice.id ? 'not-allowed' : 'pointer' }}
+                                                    >
+                                                      {cancelingInvoice === invoice.id ? (
+                                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                                      ) : (
+                                                        <Trash2 className="w-4 h-4" />
+                                                      )}
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -1577,9 +1979,9 @@ export default function PaymentsManagement() {
       {/* Payment Confirmation Modal */}
       <PaymentConfirmationModal
         isOpen={paymentModalOpen}
-        reservationName={selectedReservationForPayment?.reservationName || ''}
-        participantName={selectedReservationForPayment?.participantName || ''}
-        totalAmount={selectedReservationForPayment?.paymentDetails.totalAmount || 0}
+        reservationName={selectedReservationForPayment ? selectedReservationForPayment.reservationName : ''}
+        participantName={selectedReservationForPayment ? selectedReservationForPayment.participantName : ''}
+        totalAmount={selectedReservationForPayment && selectedReservationForPayment.paymentDetails ? selectedReservationForPayment.paymentDetails.totalAmount : 0}
         onConfirm={handlePaymentConfirm}
         onCancel={() => {
           setPaymentModalOpen(false);
@@ -1590,8 +1992,8 @@ export default function PaymentsManagement() {
       {/* Refund Confirmation Modal (First - Request Refund) */}
       <RefundConfirmationModal
         isOpen={refundModalOpen}
-        itemName={selectedItemForRefund?.item.name || ''}
-        amount={selectedItemForRefund?.item.amount || 0}
+        itemName={selectedItemForRefund && selectedItemForRefund.item ? selectedItemForRefund.item.name : ''}
+        amount={selectedItemForRefund && selectedItemForRefund.item ? selectedItemForRefund.item.amount : 0}
         isFinalConfirmation={false}
         onConfirm={handleRefundConfirm}
         onCancel={() => {
@@ -1603,8 +2005,8 @@ export default function PaymentsManagement() {
       {/* Refund Confirmation Modal (Second - Confirm Refund) */}
       <RefundConfirmationModal
         isOpen={refundFinalModalOpen}
-        itemName={selectedItemForRefund?.item.name || ''}
-        amount={selectedItemForRefund?.item.amount || 0}
+        itemName={selectedItemForRefund && selectedItemForRefund.item ? selectedItemForRefund.item.name : ''}
+        amount={selectedItemForRefund && selectedItemForRefund.item ? selectedItemForRefund.item.amount : 0}
         isFinalConfirmation={true}
         onConfirm={handleRefundFinalConfirm}
         onCancel={() => {

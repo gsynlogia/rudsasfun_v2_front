@@ -57,11 +57,13 @@ export interface CreateReservationRequest {
     selectedAddons?: string[];
     selectedProtection?: string[]; // Array of protection IDs
     selectedPromotion?: string;
+    promotionJustification?: Record<string, any> | null;
     transportData: {
       departureType: 'zbiorowy' | 'wlasny';
       departureCity?: string;
       returnType: 'zbiorowy' | 'wlasny';
       returnCity?: string;
+      differentCities?: boolean;
     };
     selectedSource: string;
     inneText?: string;
@@ -155,6 +157,10 @@ export interface ReservationResponse {
   source_name: string | null;
   selected_addons?: string[] | null;
   selected_protection?: string[] | null;
+  contract_status?: string | null;
+  contract_rejection_reason?: string | null;
+  qualification_card_status?: string | null;
+  qualification_card_rejection_reason?: string | null;
 }
 
 export interface ValidationErrorDetail {
@@ -251,11 +257,32 @@ class ReservationService {
     totalPrice: number,
     depositAmount?: number
   ): CreateReservationRequest {
+    // Filter parents: include all parents that have required fields filled
+    // First parent is always required (firstName, lastName, email, phoneNumber)
+    // Second parent is optional but if present, must have firstName, lastName, phoneNumber (email is optional)
+    const filteredParents = step1Data.parents.filter((parent, index) => {
+      // Always include first parent (index 0) - required fields validated by backend
+      if (index === 0) return true;
+      
+      // For second parent (index 1), include if has required fields (firstName, lastName, phoneNumber)
+      // Email is optional for second parent according to schema
+      if (index === 1) {
+        const hasRequiredFields = 
+          !!(parent.firstName?.trim()) && 
+          !!(parent.lastName?.trim()) && 
+          !!(parent.phoneNumber?.trim());
+        
+        // Include second parent if has required fields (email is optional)
+        return hasRequiredFields;
+      }
+      return false;
+    });
+
     return {
       camp_id: campId,
       property_id: propertyId,
       step1: {
-        parents: step1Data.parents,
+        parents: filteredParents,
         participantData: step1Data.participantData,
         selectedDietId: step1Data.selectedDietId || null,
         accommodationRequest: step1Data.accommodationRequest,
@@ -268,11 +295,13 @@ class ReservationService {
         selectedAddons: step2Data.selectedAddons,
         selectedProtection: step2Data.selectedProtection,
         selectedPromotion: step2Data.selectedPromotion,
+        promotionJustification: step2Data.promotionJustification || null,
         transportData: {
           departureType: step2Data.transportData.departureType as 'zbiorowy' | 'wlasny',
           departureCity: step2Data.transportData.departureCity,
           returnType: step2Data.transportData.returnType as 'zbiorowy' | 'wlasny',
           returnCity: step2Data.transportData.returnCity,
+          differentCities: step2Data.transportData.differentCities || false,
         },
         selectedSource: step2Data.selectedSource,
         inneText: step2Data.inneText,

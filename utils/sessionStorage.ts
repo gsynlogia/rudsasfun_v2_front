@@ -170,13 +170,16 @@ export function clearReservationState(): void {
 export interface Step2FormData {
   selectedDiets?: number[]; // Array of diet IDs
   selectedAddons: string[];
-  selectedProtection: string[]; // Array of protection IDs (can select multiple)
+  selectedProtection: string[]; // Array of protection IDs (can select multiple) - for old ProtectionSection (Tarcza, Oaza)
+  selectedProtectionIds?: number[]; // Array of protection IDs from API (can select multiple) - for new ProtectionsSection
   selectedPromotion: string;
+  promotionJustification?: Record<string, any>;  // JSON field for promotion justification
   transportData: {
     departureType: string;
     departureCity: string;
     returnType: string;
     returnCity: string;
+    differentCities?: boolean;  // True if departure and return cities are different
   };
   transportModalConfirmed?: boolean; // Whether the different cities modal has been confirmed
   selectedSource: string; // 'kolejna' | 'znajomi' | 'internet' | 'wycieczka' | 'inne' | ''
@@ -346,8 +349,8 @@ export function clearStep4FormData(): void {
 }
 
 export interface Step5FormData {
-  payNow: boolean;
-  paymentMethod: 'online' | 'blik' | '';
+  payNow: boolean; // Keep for backward compatibility
+  paymentMethod: 'online' | 'transfer' | 'blik' | '';
   paymentAmount: 'full' | 'deposit' | '';
   paymentInstallments?: 'full' | '2' | '3';
 }

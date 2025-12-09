@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 
 export interface UniversalModalProps {
   isOpen: boolean;
@@ -11,6 +11,8 @@ export interface UniversalModalProps {
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
   showCloseButton?: boolean;
   className?: string;
+  closeOnOverlayClick?: boolean;  // Allow closing by clicking overlay (default: true)
+  closeOnEscape?: boolean;  // Allow closing by pressing Escape (default: true)
 }
 
 /**
@@ -33,7 +35,23 @@ export default function UniversalModal({
   maxWidth = 'md',
   showCloseButton = true,
   className = '',
+  closeOnOverlayClick = true,
+  closeOnEscape = true,
 }: UniversalModalProps) {
+  // Handle Escape key - must be before early return
+  useEffect(() => {
+    if (!isOpen || !closeOnEscape) return;
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose, closeOnEscape]);
+
   if (!isOpen) return null;
 
   const maxWidthClasses = {
@@ -53,7 +71,7 @@ export default function UniversalModal({
           backgroundColor: 'rgba(0, 0, 0, 0.3)',
           backdropFilter: 'blur(2px)',
         }}
-        onClick={onClose}
+        onClick={closeOnOverlayClick ? onClose : undefined}
       >
         <div
           className={`bg-white shadow-2xl ${maxWidthClasses[maxWidth]} w-full ${className} animate-scaleIn`}

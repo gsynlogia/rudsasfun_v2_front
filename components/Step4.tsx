@@ -188,7 +188,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
 
   // Get list of documents to display (only public ones)
   const getDocumentsList = () => {
-    const docNames = ['portal_regulation', 'privacy_policy', 'tourist_events_regulations', 'tourist_regulations_insurance', 'watt_input_regulation'];
+    const docNames = ['portal_regulation', 'privacy_policy', 'tourist_events_regulations'];
     return docNames
       .filter(name => documents.has(name))
       .map(name => ({
@@ -269,10 +269,10 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                         handleDocumentDownload('privacy_policy');
                       }}
                     >
-                      Polityką prywatności
+                      Polityką prywatności RODO
                     </a>
                   ) : (
-                    <span className="text-gray-500">Polityką prywatności</span>
+                    <span className="text-gray-500">Polityką prywatności RODO</span>
                   )}{' '}
                   i akceptuję ich postanowienia.
                   <span className="text-red-500 ml-1">*</span>

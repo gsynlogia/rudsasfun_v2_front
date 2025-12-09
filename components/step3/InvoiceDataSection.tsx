@@ -8,9 +8,15 @@ import DashedLine from '../DashedLine';
 /**
  * InvoiceDataSection Component
  * Displays invoice data form (different fields for private person vs company)
+ * Note: This component is only rendered when invoiceType === 'company' in Step3
  */
-export default function InvoiceDataSection() {
-  const [invoiceType, setInvoiceType] = useState<'private' | 'company'>('private');
+interface InvoiceDataSectionProps {
+  invoiceType?: 'private' | 'company';
+}
+
+export default function InvoiceDataSection({ invoiceType: propInvoiceType }: InvoiceDataSectionProps = {}) {
+  // If prop is provided, use it; otherwise default to 'company' (since this component is only rendered for company)
+  const [invoiceType, setInvoiceType] = useState<'private' | 'company'>(propInvoiceType || 'company');
   
   // Private person fields
   const [privateData, setPrivateData] = useState({
@@ -38,13 +44,22 @@ export default function InvoiceDataSection() {
   const [companyErrors, setCompanyErrors] = useState<Record<string, string>>({});
   const validationAttemptedRef = useRef(false);
 
+  // Sync invoiceType from prop if provided
+  useEffect(() => {
+    if (propInvoiceType && propInvoiceType !== invoiceType) {
+      setInvoiceType(propInvoiceType);
+    }
+  }, [propInvoiceType]);
+
   // Load data from sessionStorage on mount and whenever component is visible
   useEffect(() => {
     const loadData = () => {
       const savedData = loadStep3FormData();
       if (savedData) {
-        // Always load invoice type from sessionStorage
-        if (savedData.invoiceType) {
+        // Load invoice type from prop first, then from sessionStorage
+        if (propInvoiceType) {
+          setInvoiceType(propInvoiceType);
+        } else if (savedData.invoiceType) {
           setInvoiceType(savedData.invoiceType);
         }
         // Load private data if it exists
@@ -81,9 +96,18 @@ export default function InvoiceDataSection() {
     };
   }, []);
 
-  // Update invoice type when it changes (from InvoiceTypeSection via sessionStorage)
-  // Check periodically for changes from other components
+  // Update invoice type when it changes (from prop or InvoiceTypeSection via sessionStorage)
+  // Check periodically for changes from other components (only if prop not provided)
   useEffect(() => {
+    if (propInvoiceType) {
+      // If prop is provided, use it directly
+      if (propInvoiceType !== invoiceType) {
+        setInvoiceType(propInvoiceType);
+      }
+      return;
+    }
+
+    // Otherwise, check sessionStorage periodically
     const checkInvoiceType = () => {
       const savedData = loadStep3FormData();
       if (savedData && savedData.invoiceType && savedData.invoiceType !== invoiceType) {
@@ -95,7 +119,7 @@ export default function InvoiceDataSection() {
     const interval = setInterval(checkInvoiceType, 500);
 
     return () => clearInterval(interval);
-  }, [invoiceType]);
+  }, [invoiceType, propInvoiceType]);
 
   // Save to sessionStorage whenever data changes
   useEffect(() => {
@@ -167,14 +191,11 @@ export default function InvoiceDataSection() {
     return Object.keys(errors).length === 0;
   }, [companyData]);
 
-  // Combined validation
+  // Combined validation - always validate company since this component is only rendered for company
   const validateInvoiceData = useCallback((): boolean => {
-    if (invoiceType === 'private') {
-      return validatePrivate();
-    } else {
-      return validateCompany();
-    }
-  }, [invoiceType, validatePrivate, validateCompany]);
+    // This component is only rendered when invoiceType === 'company', so always validate company
+    return validateCompany();
+  }, [validateCompany]);
 
   // Expose validation function for external use (e.g., Step3 validation)
   useEffect(() => {
@@ -237,179 +258,8 @@ export default function InvoiceDataSection() {
 
         <DashedLine />
 
-        {invoiceType === 'private' ? (
-          // Private Person Form
-          <div className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  Imię <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
-                  <input
-                    type="text"
-                    value={privateData.firstName}
-                    onChange={(e) => updatePrivateField('firstName', e.target.value)}
-                    placeholder="Imię"
-                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
-                      privateErrors.firstName ? 'border-red-500' : 'border-gray-400'
-                    }`}
-                  />
-                </div>
-                {privateErrors.firstName && (
-                  <p className="text-xs text-red-500 mt-1">{privateErrors.firstName}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  Nazwisko <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
-                  <input
-                    type="text"
-                    value={privateData.lastName}
-                    onChange={(e) => updatePrivateField('lastName', e.target.value)}
-                    placeholder="Nazwisko"
-                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
-                      privateErrors.lastName ? 'border-red-500' : 'border-gray-400'
-                    }`}
-                  />
-                </div>
-                {privateErrors.lastName && (
-                  <p className="text-xs text-red-500 mt-1">{privateErrors.lastName}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                Adres e-mail <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
-                <input
-                  type="email"
-                  value={privateData.email}
-                  onChange={(e) => updatePrivateField('email', e.target.value)}
-                  placeholder="Adres e-mail"
-                  className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
-                    privateErrors.email ? 'border-red-500' : 'border-gray-400'
-                  }`}
-                />
-              </div>
-              {privateErrors.email && (
-                <p className="text-xs text-red-500 mt-1">{privateErrors.email}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                Numer telefonu <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
-                <input
-                  type="tel"
-                  value={privateData.phone}
-                  onChange={(e) => updatePrivateField('phone', e.target.value)}
-                  placeholder="+48"
-                  className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
-                    privateErrors.phone ? 'border-red-500' : 'border-gray-400'
-                  }`}
-                />
-              </div>
-              {privateErrors.phone && (
-                <p className="text-xs text-red-500 mt-1">{privateErrors.phone}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                Ulica i numer budynku/mieszkania <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <MapPin className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
-                <input
-                  type="text"
-                  value={privateData.street}
-                  onChange={(e) => updatePrivateField('street', e.target.value)}
-                  placeholder="Ulica i numer budynku/mieszkania"
-                  className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
-                    privateErrors.street ? 'border-red-500' : 'border-gray-400'
-                  }`}
-                />
-              </div>
-              {privateErrors.street && (
-                <p className="text-xs text-red-500 mt-1">{privateErrors.street}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  Kod pocztowy <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
-                  <input
-                    type="text"
-                    value={privateData.postalCode}
-                    onChange={(e) => updatePrivateField('postalCode', e.target.value)}
-                    placeholder="np. 00-000"
-                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
-                      privateErrors.postalCode ? 'border-red-500' : 'border-gray-400'
-                    }`}
-                  />
-                </div>
-                {privateErrors.postalCode && (
-                  <p className="text-xs text-red-500 mt-1">{privateErrors.postalCode}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  Miejscowość <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
-                  <input
-                    type="text"
-                    value={privateData.city}
-                    onChange={(e) => updatePrivateField('city', e.target.value)}
-                    placeholder="Miejscowość"
-                    className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
-                      privateErrors.city ? 'border-red-500' : 'border-gray-400'
-                    }`}
-                  />
-                </div>
-                {privateErrors.city && (
-                  <p className="text-xs text-red-500 mt-1">{privateErrors.city}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                NIP (opcjonalnie)
-              </label>
-              <div className="relative">
-                <FileText className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
-                <input
-                  type="text"
-                  value={privateData.nip}
-                  onChange={(e) => updatePrivateField('nip', e.target.value)}
-                  placeholder="NIP"
-                  className="w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                />
-              </div>
-            </div>
-          </div>
-        ) : (
-          // Company Form
-          <div className="space-y-4 sm:space-y-6">
+        {/* Always show company form since this component is only rendered when invoiceType === 'company' */}
+        <div className="space-y-4 sm:space-y-6">
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                 Nazwa firmy <span className="text-red-500">*</span>
@@ -454,7 +304,7 @@ export default function InvoiceDataSection() {
 
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                Ulica i numer budynku/mieszkania <span className="text-red-500">*</span>
+                Ulica i numer <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <MapPin className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
@@ -462,7 +312,7 @@ export default function InvoiceDataSection() {
                   type="text"
                   value={companyData.street}
                   onChange={(e) => updateCompanyField('street', e.target.value)}
-                  placeholder="Ulica i numer budynku/mieszkania"
+                  placeholder="Ulica i numer"
                   className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
                     companyErrors.street ? 'border-red-500' : 'border-gray-400'
                   }`}
@@ -516,8 +366,7 @@ export default function InvoiceDataSection() {
                 )}
               </div>
             </div>
-          </div>
-        )}
+        </div>
       </section>
     </div>
   );

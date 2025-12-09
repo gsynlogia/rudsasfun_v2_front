@@ -52,7 +52,7 @@ export default function InvoiceTypeSection() {
   return (
     <div>
       <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-800">
-        Typ faktury
+        Rezerwacja dla
       </h2>
       <section className="bg-white p-4 sm:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -73,7 +73,7 @@ export default function InvoiceTypeSection() {
               </span>
             </div>
             <p className="text-xs sm:text-sm opacity-90">
-              Faktura na osobę prywatną
+              Rezerwacja dla osoby prywatnej
             </p>
           </button>
 
@@ -94,7 +94,7 @@ export default function InvoiceTypeSection() {
               </span>
             </div>
             <p className="text-xs sm:text-sm opacity-90">
-              Faktura na firmę
+              Rezerwacja dla firmy
             </p>
           </button>
         </div>

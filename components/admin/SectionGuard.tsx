@@ -56,7 +56,10 @@ export default function SectionGuard({ children, section }: SectionGuardProps) {
               'payments': '/admin-panel/payments',
               'transports': '/admin-panel/transports',
               'diets': '/admin-panel/diets',
-              'sources': '/admin-panel/cms',
+              'promotions': '/admin-panel/promotions',
+              'protections': '/admin-panel/protections',
+              'cms': '/admin-panel/cms',
+              'settings': '/admin-panel/settings',
             };
             const firstSection = accessibleSections[0];
             const redirectPath = sectionMap[firstSection] || '/admin-panel';

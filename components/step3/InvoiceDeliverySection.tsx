@@ -60,12 +60,13 @@ export default function InvoiceDeliverySection() {
     };
   }, []);
 
-  // Restore paper invoice to reservation when initialized
+  // Restore paper invoice to reservation when initialized (only for company)
   useEffect(() => {
     if (!isInitialized) return;
 
     const savedData = loadStep3FormData();
-    if (savedData && savedData.deliveryType === 'paper') {
+    // Only add paper invoice if deliveryType is paper AND invoiceType is company
+    if (savedData && savedData.deliveryType === 'paper' && savedData.invoiceType === 'company') {
       // Check if already exists in reservation
       const existing = reservation.items.find(
         item => item.type === 'other' && item.name === 'Faktura papierowa'
@@ -80,6 +81,15 @@ export default function InvoiceDeliverySection() {
       } else {
         paperInvoiceReservationIdRef.current = existing.id;
       }
+    } else if (savedData && savedData.invoiceType === 'private') {
+      // Remove paper invoice if switching to private person
+      const paperInvoiceItem = reservation.items.find(
+        item => item.type === 'other' && item.name === 'Faktura papierowa'
+      );
+      if (paperInvoiceItem) {
+        removeReservationItem(paperInvoiceItem.id);
+        paperInvoiceReservationIdRef.current = null;
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, reservation.items.length]);
@@ -88,8 +98,12 @@ export default function InvoiceDeliverySection() {
   useEffect(() => {
     if (prevDeliveryTypeRef.current === deliveryType) return;
 
-    if (deliveryType === 'paper') {
-      // Add paper invoice fee
+    // Check invoice type - paper invoice only for company
+    const savedData = loadStep3FormData();
+    const invoiceType = savedData?.invoiceType || 'private';
+
+    if (deliveryType === 'paper' && invoiceType === 'company') {
+      // Add paper invoice fee (only for company)
       const existing = reservation.items.find(
         item => item.type === 'other' && item.name === 'Faktura papierowa'
       );
@@ -104,7 +118,7 @@ export default function InvoiceDeliverySection() {
         paperInvoiceReservationIdRef.current = existing.id;
       }
     } else {
-      // Remove paper invoice fee
+      // Remove paper invoice fee (when switching to electronic OR when switching to private person)
       if (paperInvoiceReservationIdRef.current) {
         removeReservationItem(paperInvoiceReservationIdRef.current);
         paperInvoiceReservationIdRef.current = null;
@@ -260,7 +274,7 @@ export default function InvoiceDeliverySection() {
                 <div className="space-y-4 sm:space-y-6 pt-4 border-t border-gray-200">
                   <div>
                     <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                      Ulica i numer budynku/mieszkania <span className="text-red-500">*</span>
+                      Ulica i numer <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <MapPin className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#03adf0]" />
@@ -268,7 +282,7 @@ export default function InvoiceDeliverySection() {
                         type="text"
                         value={deliveryAddress.street}
                         onChange={(e) => updateDeliveryAddressField('street', e.target.value)}
-                        placeholder="Ulica i numer budynku/mieszkania"
+                        placeholder="Ulica i numer"
                         className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
                           deliveryAddressErrors.street ? 'border-red-500' : 'border-gray-400'
                         }`}

@@ -52,7 +52,7 @@ export default function Step2({ onNext, onPrevious, disabled = false }: StepComp
       <AddonsSection />
       <DashedLine />
 
-      {/* Protection Section */}
+      {/* Protection Section (from API) */}
       <ProtectionSection />
       <DashedLine />
 

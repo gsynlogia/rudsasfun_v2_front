@@ -75,6 +75,11 @@ export default function EditGroupPage() {
           'camps': 'Obozy',
           'payments': 'Płatności',
           'transports': 'Transport',
+          'diets': 'Diety',
+          'promotions': 'Promocje',
+          'protections': 'Ochrony',
+          'cms': 'CMS',
+          'settings': 'Ustawienia',
         });
       }
     } catch (err) {
@@ -85,6 +90,11 @@ export default function EditGroupPage() {
         'camps': 'Obozy',
         'payments': 'Płatności',
         'transports': 'Transport',
+        'diets': 'Diety',
+        'promotions': 'Promocje',
+        'protections': 'Ochrony',
+        'cms': 'CMS',
+        'settings': 'Ustawienia',
       });
     }
   };

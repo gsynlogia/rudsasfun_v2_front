@@ -39,6 +39,52 @@ class ContractService {
   }
 
   /**
+   * Get contract information for a reservation
+   * @param reservationId Reservation ID
+   * @returns Contract information or null if not found
+   */
+  async getContract(reservationId: number): Promise<{ contract_filename: string; created_at: string; contract_path: string } | null> {
+    // Import authService to get token
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    try {
+      // Try to get contract from /my endpoint
+      const response = await fetch(`${this.API_URL}/my`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const contracts = await response.json();
+      const contract = contracts.find((c: any) => c.reservation_id === reservationId);
+      
+      if (contract) {
+        return {
+          contract_filename: contract.contract_filename,
+          created_at: contract.created_at,
+          contract_path: contract.contract_path,
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error fetching contract:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get contract PDF download URL
    * @param reservationId Reservation ID
    * @returns URL to download contract PDF
@@ -148,6 +194,123 @@ class ContractService {
     }
 
     const response = await fetch(`${this.API_URL}/my`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Update contract status (admin only)
+   * @param reservationId Reservation ID
+   * @param status 'approved' or 'rejected'
+   * @param rejectionReason Required if status is 'rejected'
+   */
+  async updateContractStatus(
+    reservationId: number,
+    status: 'approved' | 'rejected',
+    rejectionReason?: string
+  ): Promise<{ status: string; message: string; contract_status: string; rejection_reason?: string | null }> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const body: { status: string; rejection_reason?: string } = { status };
+    if (status === 'rejected') {
+      if (!rejectionReason || !rejectionReason.trim()) {
+        throw new Error('Powód odrzucenia umowy jest wymagany');
+      }
+      body.rejection_reason = rejectionReason.trim();
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/status`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Upload contract file (user can upload when contract is rejected)
+   * @param reservationId Reservation ID
+   * @param file File to upload
+   */
+  async uploadContract(reservationId: number, file: File): Promise<{
+    id: number;
+    reservation_id: number;
+    file_name: string;
+    source: string;
+    uploaded_at: string;
+  }> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get all contract files for a reservation (ordered by uploaded_at DESC)
+   * @param reservationId Reservation ID
+   */
+  async getContractFiles(reservationId: number): Promise<Array<{
+    id: number;
+    reservation_id: number;
+    file_name: string;
+    file_path: string;
+    source: string;
+    uploaded_at: string;
+    created_at: string;
+  }>> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/files`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

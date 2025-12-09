@@ -6,7 +6,7 @@ import SectionGuard from '@/components/admin/SectionGuard';
 
 export default function SourceManagementPage() {
   return (
-    <SectionGuard section="sources">
+    <SectionGuard section="cms">
       <AdminLayout>
         <SourcesManagement />
       </AdminLayout>

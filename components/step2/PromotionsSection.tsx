@@ -1,35 +1,115 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { Info, Download } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL } from '@/utils/api-config';
 
+interface Promotion {
+  id: number;
+  general_promotion_id?: number;
+  center_promotion_id?: number;
+  name: string;
+  price: number; // Can be negative
+  description?: string;
+  is_center_promotion_relation?: boolean;
+  relation_id?: number;
+}
+
 /**
  * PromotionsSection Component
- * Displays promotions select with information
+ * Displays promotions from API for the selected turnus with justification fields
  */
 export default function PromotionsSection() {
   const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
-  const [selectedPromotion, setSelectedPromotion] = useState<string>('');
+  const pathname = usePathname();
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPromotionId, setSelectedPromotionId] = useState<string>('');
+  const [promotionJustification, setPromotionJustification] = useState<Record<string, any>>({});
   const prevPromotionRef = useRef<string>('');
-
-  const promotions = [
-    { value: '', label: 'Wybierz promocję' },
-    { value: 'rodzenstwo', label: 'Rodzeństwo razem: -50 zł' },
-    { value: 'wczesna', label: 'Wczesna rezerwacja: -100 zł' },
-    { value: 'grupa', label: 'Grupa 5+ osób: -75 zł' },
-  ];
-
-  const promotionPrices: Record<string, number> = {
-    rodzenstwo: -50,
-    wczesna: -100,
-    grupa: -75,
-  };
-
   const [isInitialized, setIsInitialized] = useState(false);
   const [promotionDocumentUrl, setPromotionDocumentUrl] = useState<string | null>(null);
+
+  // Extract camp_id and property_id from URL (similar to Step5)
+  const getCampIds = (): { campId: number | null; propertyId: number | null } => {
+    const pathParts = pathname.split('/').filter(Boolean);
+    const campIdIndex = pathParts.indexOf('camps');
+    if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
+      const campId = parseInt(pathParts[campIdIndex + 1], 10);
+      const propertyId = campIdIndex + 3 < pathParts.length 
+        ? parseInt(pathParts[campIdIndex + 3], 10) 
+        : null;
+      return { 
+        campId: !isNaN(campId) ? campId : null, 
+        propertyId: propertyId && !isNaN(propertyId) ? propertyId : null 
+      };
+    }
+    return { campId: null, propertyId: null };
+  };
+
+  // Determine promotion type from name (for justification requirements)
+  const getPromotionType = (promotionName: string): string => {
+    const nameLower = promotionName.toLowerCase();
+    if (nameLower.includes('duża rodzina') || nameLower.includes('duza rodzina')) return 'duza_rodzina';
+    if (nameLower.includes('rodzeństwo razem') || nameLower.includes('rodzenstwo razem')) return 'rodzenstwo_razem';
+    if (nameLower.includes('obozy na maxa') || nameLower.includes('obozy na max')) return 'obozy_na_maxa';
+    if (nameLower.includes('first minute') || nameLower.includes('wczesna rezerwacja')) return 'first_minute';
+    if (nameLower.includes('bonowych') || nameLower.includes('bonowa')) return 'bonowych';
+    return 'other';
+  };
+
+  // Check if promotion requires justification
+  const requiresJustification = (promotionName: string): boolean => {
+    const type = getPromotionType(promotionName);
+    return ['duza_rodzina', 'rodzenstwo_razem', 'obozy_na_maxa', 'first_minute', 'bonowych'].includes(type);
+  };
+
+  // Fetch promotions for the selected turnus
+  useEffect(() => {
+    const fetchPromotions = async () => {
+      const { campId, propertyId } = getCampIds();
+      
+      if (!campId || !propertyId) {
+        setPromotions([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await fetch(
+          `${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/promotions?check_usage=false`
+        );
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            setPromotions([]);
+            setLoading(false);
+            return;
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const promotionsList = Array.isArray(data) ? data : [];
+        setPromotions(promotionsList);
+        console.log('[PromotionsSection] Fetched promotions:', promotionsList.length, promotionsList);
+      } catch (err) {
+        console.error('[PromotionsSection] Error fetching promotions:', err);
+        setError('Nie udało się załadować promocji');
+        setPromotions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPromotions();
+  }, [pathname]);
 
   // Fetch public documents
   useEffect(() => {
@@ -53,67 +133,60 @@ export default function PromotionsSection() {
   useEffect(() => {
     const savedData = loadStep2FormData();
     if (savedData && savedData.selectedPromotion) {
-      setSelectedPromotion(savedData.selectedPromotion);
+      setSelectedPromotionId(savedData.selectedPromotion);
       prevPromotionRef.current = savedData.selectedPromotion;
+    }
+    if (savedData && savedData.promotionJustification) {
+      setPromotionJustification(savedData.promotionJustification);
     }
     setIsInitialized(true);
   }, []);
 
-  // Restore promotion to reservation when initialized
-  useEffect(() => {
-    if (!isInitialized) return;
-
-    const savedData = loadStep2FormData();
-    if (savedData && savedData.selectedPromotion && promotionPrices[savedData.selectedPromotion]) {
-      const selected = promotions.find((p) => p.value === savedData.selectedPromotion);
-      if (selected) {
-        // Check if already exists in reservation
-        const existing = reservation.items.find(
-          item => item.type === 'promotion' && item.name === selected.label
-        );
-        if (!existing) {
-          addReservationItem({
-            name: selected.label,
-            price: promotionPrices[savedData.selectedPromotion],
-            type: 'promotion',
-          });
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized, reservation.items.length]);
-
   // Update reservation when promotion changes
   useEffect(() => {
-    if (prevPromotionRef.current === selectedPromotion) return;
+    if (!isInitialized || prevPromotionRef.current === selectedPromotionId) return;
 
     // Remove previous promotion
     removeReservationItemsByType('promotion');
 
     // Add new promotion if selected
-    if (selectedPromotion && promotionPrices[selectedPromotion]) {
-      const selected = promotions.find((p) => p.value === selectedPromotion);
-      if (selected) {
+    if (selectedPromotionId) {
+      const selectedPromotion = promotions.find(
+        p => String(p.id || p.relation_id) === selectedPromotionId
+      );
+      
+      if (selectedPromotion) {
+        const displayName = selectedPromotion.name;
+        const price = selectedPromotion.price;
+        
         addReservationItem({
-          name: selected.label,
-          price: promotionPrices[selectedPromotion],
+          name: displayName,
+          price: price,
           type: 'promotion',
         });
       }
     }
 
-    prevPromotionRef.current = selectedPromotion;
-  }, [selectedPromotion, addReservationItem, removeReservationItemsByType]);
+    prevPromotionRef.current = selectedPromotionId;
+  }, [selectedPromotionId, promotions, isInitialized, addReservationItem, removeReservationItemsByType]);
 
-  // Save to sessionStorage whenever promotion changes
+  // Save to sessionStorage whenever promotion or justification changes
   useEffect(() => {
+    if (!isInitialized) return;
     const savedData = loadStep2FormData();
     const formData = {
       ...savedData,
-      selectedPromotion,
+      selectedPromotion: selectedPromotionId,
+      promotionJustification: promotionJustification,
     };
     saveStep2FormData(formData as any);
-  }, [selectedPromotion]);
+  }, [selectedPromotionId, promotionJustification, isInitialized]);
+
+  const selectedPromotion = promotions.find(
+    p => String(p.id || p.relation_id) === selectedPromotionId
+  );
+
+  const promotionType = selectedPromotion ? getPromotionType(selectedPromotion.name) : null;
 
   return (
     <div>
@@ -121,43 +194,239 @@ export default function PromotionsSection() {
         Promocje
       </h2>
       <section className="bg-white p-4 sm:p-6">
-        <div className="mb-4 sm:mb-6">
-          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-            Wybierz promocję, która Ci przysługuje
-          </label>
-          <select
-            value={selectedPromotion}
-            onChange={(e) => setSelectedPromotion(e.target.value)}
-            className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10"
-          >
-            {promotions.map((promo) => (
-              <option key={promo.value} value={promo.value}>
-                {promo.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {loading ? (
+          <div className="text-center text-gray-500 py-4">Ładowanie promocji...</div>
+        ) : error ? (
+          <div className="text-center text-red-600 py-4">{error}</div>
+        ) : promotions.length === 0 ? (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+            <p className="text-sm text-red-800 font-medium">
+              Brak promocji dla tego turnusu
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 sm:mb-6">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                Wybierz promocję, która Ci przysługuje
+              </label>
+              <select
+                value={selectedPromotionId}
+                onChange={(e) => {
+                  setSelectedPromotionId(e.target.value);
+                  // Reset justification when promotion changes
+                  if (!e.target.value) {
+                    setPromotionJustification({});
+                  } else {
+                    // Keep existing justification if switching between promotions
+                    // Only reset if switching to empty
+                  }
+                }}
+                className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10"
+              >
+                <option value="">Rezygnuję z promocji</option>
+                {promotions.map((promo) => (
+                  <option key={promo.id || promo.relation_id} value={String(promo.id || promo.relation_id)}>
+                    {promo.name} {promo.price < 0 
+                      ? `${promo.price.toFixed(2)} PLN` 
+                      : promo.price > 0 
+                        ? `+${promo.price.toFixed(2)} PLN` 
+                        : '0.00 PLN'
+                    }
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Information block */}
-        <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg mb-4 sm:mb-6">
-          <Info className="w-5 h-5 text-[#03adf0] flex-shrink-0 mt-0.5" />
-          <p className="text-xs sm:text-sm text-gray-600">
-            Promocje nie łączą się
-          </p>
-        </div>
+            {/* Justification fields based on promotion type */}
+            {selectedPromotion && requiresJustification(selectedPromotion.name) && (
+              <div className="mb-4 sm:mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                  Uzasadnienie promocji *
+                </h3>
+                <p className="text-xs text-gray-600 mb-3">
+                  Wypełnij poniższe pola, aby uzasadnić wybór tej promocji.
+                </p>
+                
+                {promotionType === 'duza_rodzina' && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                      Numer karty dużej rodziny *
+                    </label>
+                    <input
+                      type="text"
+                      value={promotionJustification.card_number || ''}
+                      onChange={(e) => setPromotionJustification({
+                        ...promotionJustification,
+                        card_number: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      placeholder="Wpisz numer karty dużej rodziny"
+                      required
+                    />
+                    {!promotionJustification.card_number?.trim() && (
+                      <p className="text-xs text-red-600 mt-1">To pole jest wymagane</p>
+                    )}
+                  </div>
+                )}
 
-        {/* Regulation button */}
-        {promotionDocumentUrl && (
-          <button
-            onClick={() => window.open(promotionDocumentUrl, '_blank')}
-            className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium"
-          >
-            <Download className="w-4 h-4" />
-            Regulamin promocji
-          </button>
+                {promotionType === 'rodzenstwo_razem' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Imię rodzeństwa *
+                      </label>
+                      <input
+                        type="text"
+                        value={promotionJustification.sibling_first_name || ''}
+                        onChange={(e) => setPromotionJustification({
+                          ...promotionJustification,
+                          sibling_first_name: e.target.value
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        placeholder="Wpisz imię rodzeństwa"
+                        required
+                      />
+                      {!promotionJustification.sibling_first_name?.trim() && (
+                        <p className="text-xs text-red-600 mt-1">To pole jest wymagane</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Nazwisko rodzeństwa *
+                      </label>
+                      <input
+                        type="text"
+                        value={promotionJustification.sibling_last_name || ''}
+                        onChange={(e) => setPromotionJustification({
+                          ...promotionJustification,
+                          sibling_last_name: e.target.value
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        placeholder="Wpisz nazwisko rodzeństwa"
+                        required
+                      />
+                      {!promotionJustification.sibling_last_name?.trim() && (
+                        <p className="text-xs text-red-600 mt-1">To pole jest wymagane</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {promotionType === 'obozy_na_maxa' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Data pierwszego obozu
+                      </label>
+                      <input
+                        type="date"
+                        value={promotionJustification.first_camp_date || ''}
+                        onChange={(e) => setPromotionJustification({
+                          ...promotionJustification,
+                          first_camp_date: e.target.value
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Nazwa pierwszego obozu
+                      </label>
+                      <input
+                        type="text"
+                        value={promotionJustification.first_camp_name || ''}
+                        onChange={(e) => setPromotionJustification({
+                          ...promotionJustification,
+                          first_camp_name: e.target.value
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        placeholder="Wpisz nazwę pierwszego obozu"
+                      />
+                    </div>
+                    {!promotionJustification.first_camp_date && !promotionJustification.first_camp_name?.trim() && (
+                      <p className="text-xs text-red-600 mt-1">Wypełnij przynajmniej jedno pole (data lub nazwa obozu)</p>
+                    )}
+                  </div>
+                )}
+
+                {promotionType === 'first_minute' && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                      Powód wyboru promocji *
+                    </label>
+                    <textarea
+                      value={promotionJustification.reason || ''}
+                      onChange={(e) => setPromotionJustification({
+                        ...promotionJustification,
+                        reason: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      rows={3}
+                      placeholder="Wpisz powód wyboru promocji First Minute"
+                      required
+                    />
+                    {!promotionJustification.reason?.trim() && (
+                      <p className="text-xs text-red-600 mt-1">To pole jest wymagane</p>
+                    )}
+                  </div>
+                )}
+
+                {promotionType === 'bonowych' && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                      Lata uczestnictwa w obozach *
+                    </label>
+                    <input
+                      type="text"
+                      value={Array.isArray(promotionJustification.years) 
+                        ? promotionJustification.years.join(', ') 
+                        : promotionJustification.years || ''
+                      }
+                      onChange={(e) => {
+                        const yearsStr = e.target.value;
+                        const years = yearsStr.split(',').map(y => y.trim()).filter(y => y);
+                        setPromotionJustification({
+                          ...promotionJustification,
+                          years: years
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      placeholder="Wpisz lata uczestnictwa (np. 2023, 2024, 2025)"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Wpisz lata oddzielone przecinkami (np. 2023, 2024, 2025)
+                    </p>
+                    {(!promotionJustification.years || (Array.isArray(promotionJustification.years) && promotionJustification.years.length === 0)) && (
+                      <p className="text-xs text-red-600 mt-1">To pole jest wymagane</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Information block */}
+            <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg mb-4 sm:mb-6">
+              <Info className="w-5 h-5 text-[#03adf0] flex-shrink-0 mt-0.5" />
+              <p className="text-xs sm:text-sm text-gray-600">
+                Promocje nie łączą się. Możesz wybrać tylko jedną promocję.
+              </p>
+            </div>
+
+            {/* Regulation button */}
+            {promotionDocumentUrl && (
+              <button
+                onClick={() => window.open(promotionDocumentUrl, '_blank')}
+                className="flex items-center gap-2 px-4 sm:px-6 py-2 border-2 border-[#03adf0] text-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-colors text-xs sm:text-sm font-medium"
+              >
+                <Download className="w-4 h-4" />
+                Regulamin promocji
+              </button>
+            )}
+          </>
         )}
       </section>
     </div>
   );
 }
-

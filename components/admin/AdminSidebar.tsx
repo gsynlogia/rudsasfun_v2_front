@@ -11,7 +11,9 @@ import {
   UtensilsCrossed,
   FileText,
   Settings, 
-  LogOut
+  LogOut,
+  Tag,
+  Shield
 } from 'lucide-react';
 import { authService } from '@/lib/services/AuthService';
 
@@ -86,18 +88,50 @@ export default function AdminSidebar() {
       section: 'diets',
     },
     {
+      href: '/admin-panel/promotions',
+      icon: Tag,
+      label: 'Promocje',
+      key: 'promotions',
+      section: 'promotions',
+    },
+    {
+      href: '/admin-panel/protections',
+      icon: Shield,  // Shield icon for protections
+      label: 'Ochrony',
+      key: 'protections',
+      section: 'protections',
+    },
+    {
       href: '/admin-panel/cms',
       icon: FileText,
       label: 'CMS',
-      key: 'sources',
-      section: 'sources',
+      key: 'cms',
+      section: 'cms',
+    },
+    {
+      href: '/admin-panel/settings',
+      icon: Settings,
+      label: 'Ustawienia',
+      key: 'settings',
+      section: 'settings',
     },
   ];
 
   // Filter menu items based on accessible sections
   // Admin users have access to all sections
   const user = authService.getCurrentUser();
-  const isAdmin = user?.groups?.includes('admin') || false;
+  
+  // Interface with default values
+  interface UserWithDefaults {
+    groups: string[];
+  }
+  
+  const defaultUser: UserWithDefaults = {
+    groups: [],
+  };
+  
+  const userWithDefaults: UserWithDefaults = user || defaultUser;
+  const isAdmin = userWithDefaults.groups.includes('admin');
   const menuItems = isAdmin 
     ? allMenuItems 
     : allMenuItems.filter(item => accessibleSections.includes(item.section));

@@ -1,42 +1,230 @@
 /**
  * Qualification Card Service
- * Service for managing qualification cards via API
+ * Service for handling qualification card operations with backend API
  */
+
 import { API_BASE_URL } from '@/utils/api-config';
-import { authService } from './AuthService';
 
 export interface QualificationCardResponse {
-  id: number;
   reservation_id: number;
-  file_path: string;
-  file_name: string;
-  uploaded_at: string;
-  updated_at: string;
-  file_url: string;
-}
-
-export interface QualificationCardUploadResponse {
-  id: number;
-  reservation_id: number;
-  file_name: string;
-  file_url: string;
-  uploaded_at: string;
+  card_filename: string;
+  card_path: string;
+  created_at: string;
+  camp_name: string | null;
+  property_name: string | null;
+  participant_first_name: string | null;
+  participant_last_name: string | null;
 }
 
 class QualificationCardService {
+  private API_URL = `${API_BASE_URL}/api/qualification-cards`;
+
   /**
-   * Upload qualification card PDF for a reservation
+   * Get qualification card PDF download URL
+   * @param reservationId Reservation ID
+   * @returns URL to download qualification card PDF
    */
-  async uploadQualificationCard(reservationId: number, file: File): Promise<QualificationCardUploadResponse> {
+  getQualificationCardDownloadUrl(reservationId: number): string {
+    return `${this.API_URL}/${reservationId}`;
+  }
+
+  /**
+   * Download qualification card PDF
+   * Downloads the card that was automatically generated when reservation was created
+   * @param reservationId Reservation ID
+   */
+  async downloadQualificationCard(reservationId: number): Promise<void> {
+    const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
+    
     if (!token) {
-      throw new Error('Brak autoryzacji');
+      throw new Error('Not authenticated');
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+    try {
+      const response = await fetch(`${this.API_URL}/${reservationId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      // Get blob and create download link
+      const blob = await response.blob();
+      this._downloadBlob(blob, reservationId);
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout. Please try again in a moment.');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Helper method to download blob
+   */
+  private _downloadBlob(blob: Blob, reservationId: number): void {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `karta_kwalifikacyjna_${reservationId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  /**
+   * List all qualification cards for the current user
+   * @returns Array of qualification card information
+   */
+  async listMyQualificationCards(): Promise<QualificationCardResponse[]> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/my`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Generate qualification card for a reservation
+   * @param reservationId Reservation ID
+   * @returns Response with card path
+   */
+  async generateQualificationCard(reservationId: number): Promise<{ status: string; message: string; card_path: string }> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/generate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Check if qualification card exists for a reservation
+   * @param reservationId Reservation ID
+   * @returns QualificationCardResponse if exists, null otherwise
+   */
+  async getQualificationCard(reservationId: number): Promise<QualificationCardResponse | null> {
+    try {
+      const cards = await this.listMyQualificationCards();
+      const card = cards.find(c => c.reservation_id === reservationId);
+      return card || null;
+    } catch (error) {
+      // If error, card doesn't exist
+      return null;
+    }
+  }
+
+  /**
+   * Update qualification card status (admin only)
+   * @param reservationId Reservation ID
+   * @param status 'approved' or 'rejected'
+   * @param rejectionReason Required if status is 'rejected'
+   */
+  async updateQualificationCardStatus(
+    reservationId: number,
+    status: 'approved' | 'rejected',
+    rejectionReason?: string
+  ): Promise<{ status: string; message: string; qualification_card_status: string; rejection_reason?: string | null }> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const body: { status: string; rejection_reason?: string } = { status };
+    if (status === 'rejected') {
+      if (!rejectionReason || !rejectionReason.trim()) {
+        throw new Error('Powód odrzucenia karty kwalifikacyjnej jest wymagany');
+      }
+      body.rejection_reason = rejectionReason.trim();
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/status`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Upload qualification card file (user can upload when card is rejected)
+   * @param reservationId Reservation ID
+   * @param file File to upload
+   */
+  async uploadQualificationCard(reservationId: number, file: File): Promise<{
+    id: number;
+    reservation_id: number;
+    file_name: string;
+    source: string;
+    uploaded_at: string;
+  }> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
     }
 
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${API_BASE_URL}/api/qualification-cards/upload?reservation_id=${reservationId}`, {
+    const response = await fetch(`${this.API_URL}/${reservationId}/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -45,67 +233,48 @@ class QualificationCardService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas przesyłania karty kwalifikacyjnej' }));
-      throw new Error(error.detail || 'Błąd podczas przesyłania karty kwalifikacyjnej');
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
     }
 
-    return response.json();
+    return await response.json();
   }
 
   /**
-   * Get qualification card for a reservation
-   * Returns null if card doesn't exist (404), throws error for other errors
+   * Get all qualification card files for a reservation (ordered by uploaded_at DESC)
+   * @param reservationId Reservation ID
    */
-  async getQualificationCard(reservationId: number): Promise<QualificationCardResponse | null> {
+  async getQualificationCardFiles(reservationId: number): Promise<Array<{
+    id: number;
+    reservation_id: number;
+    file_name: string;
+    file_path: string;
+    source: string;
+    uploaded_at: string;
+    created_at: string;
+  }>> {
+    const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
+    
     if (!token) {
-      throw new Error('Brak autoryzacji');
+      throw new Error('Not authenticated');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/qualification-cards/reservation/${reservationId}`, {
+    const response = await fetch(`${this.API_URL}/${reservationId}/files`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
     });
 
     if (!response.ok) {
-      // 404 is expected if card doesn't exist yet - return null
-      if (response.status === 404) {
-        return null;
-      }
-      // For other errors, throw
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas pobierania karty kwalifikacyjnej' }));
-      throw new Error(error.detail || 'Błąd podczas pobierania karty kwalifikacyjnej');
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
     }
 
-    return response.json();
-  }
-
-  /**
-   * Download qualification card PDF
-   */
-  async downloadQualificationCard(cardId: number): Promise<Blob> {
-    const token = authService.getToken();
-    if (!token) {
-      throw new Error('Brak autoryzacji');
-    }
-
-    const response = await fetch(`${API_BASE_URL}/api/qualification-cards/${cardId}/download`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas pobierania karty kwalifikacyjnej' }));
-      throw new Error(error.detail || 'Błąd podczas pobierania karty kwalifikacyjnej');
-    }
-
-    return response.blob();
+    return await response.json();
   }
 }
 
 export const qualificationCardService = new QualificationCardService();
-

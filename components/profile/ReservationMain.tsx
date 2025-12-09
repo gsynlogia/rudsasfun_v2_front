@@ -1,9 +1,11 @@
 'use client';
 
-import { MapPin, User, Calendar, Home, Utensils, Gift, Users, Heart, FileText, Mail, Phone } from 'lucide-react';
+import { MapPin, User, Calendar, Home, Utensils, Gift, Users, Heart, FileText, Mail, Phone, Download, CreditCard } from 'lucide-react';
 import DashedLine from '../DashedLine';
 import { ReservationResponse } from '@/lib/services/ReservationService';
 import { paymentService, PaymentResponse, CreatePaymentRequest } from '@/lib/services/PaymentService';
+import { contractService } from '@/lib/services/ContractService';
+import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AdditionalServicesTiles from './AdditionalServicesTiles';
@@ -26,6 +28,12 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const [isFullyPaid, setIsFullyPaid] = useState(false);
   const [paymentInstallments, setPaymentInstallments] = useState<'full' | '2' | '3'>('full');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [contract, setContract] = useState<any>(null);
+  const [qualificationCard, setQualificationCard] = useState<QualificationCardResponse | null>(null);
+  const [loadingContract, setLoadingContract] = useState(false);
+  const [loadingCard, setLoadingCard] = useState(false);
+  const [downloadingContract, setDownloadingContract] = useState(false);
+  const [downloadingCard, setDownloadingCard] = useState(false);
 
   // Format date helper
   const formatDate = (dateString: string | null | undefined): string => {
@@ -77,8 +85,70 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
     if (isDetailsExpanded) {
       loadPayments();
+      loadDocuments();
     }
   }, [reservation.id, reservation.total_price, isDetailsExpanded]);
+
+  // Load contract and qualification card
+  const loadDocuments = async () => {
+    try {
+      setLoadingContract(true);
+      setLoadingCard(true);
+      
+      // Load contract
+      try {
+        const contracts = await contractService.listMyContracts();
+        const contractData = contracts.find(c => c.reservation_id === reservation.id);
+        setContract(contractData || null);
+      } catch (error) {
+        console.error('Error loading contract:', error);
+        setContract(null);
+      } finally {
+        setLoadingContract(false);
+      }
+      
+      // Load qualification card
+      try {
+        const card = await qualificationCardService.getQualificationCard(reservation.id);
+        setQualificationCard(card);
+      } catch (error) {
+        console.error('Error loading qualification card:', error);
+        setQualificationCard(null);
+      } finally {
+        setLoadingCard(false);
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    }
+  };
+
+  const handleDownloadContract = async () => {
+    try {
+      setDownloadingContract(true);
+      await contractService.downloadContract(reservation.id);
+      // Reload contract status after download
+      await loadDocuments();
+    } catch (error: any) {
+      console.error('Error downloading contract:', error);
+      alert(error.message || 'Nie udało się pobrać umowy. Spróbuj ponownie.');
+    } finally {
+      setDownloadingContract(false);
+    }
+  };
+
+  const handleDownloadQualificationCard = async () => {
+    try {
+      setDownloadingCard(true);
+      await qualificationCardService.downloadQualificationCard(reservation.id);
+      // Reload card status after download
+      await loadDocuments();
+    } catch (error: any) {
+      console.error('Error downloading qualification card:', error);
+      alert(error.message || 'Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
+    } finally {
+      setDownloadingCard(false);
+    }
+  };
 
   // Get participant name
   const participantName = reservation.participant_first_name && reservation.participant_last_name
@@ -456,6 +526,188 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                 </button>
               </div>
             )}
+          </div>
+
+          <DashedLine />
+
+          {/* Details Grid Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Participant Data Section */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm text-gray-900 mb-2">Dane uczestnika</h4>
+              <div className="space-y-1 text-xs">
+                {reservation.parents_data && reservation.parents_data.length > 0 && reservation.parents_data[0].phoneNumber && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3 h-3 text-gray-400" />
+                    <span className="text-gray-600">Telefon:</span>
+                    <span className="text-gray-900">{reservation.parents_data[0].phoneNumber}</span>
+                  </div>
+                )}
+                {reservation.parents_data && reservation.parents_data.length > 0 && reservation.parents_data[0].street && (
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-3 h-3 text-gray-400 mt-0.5" />
+                    <div>
+                      <span className="text-gray-600">Adres: </span>
+                      <span className="text-gray-900">
+                        {reservation.parents_data[0].street}
+                        {reservation.parents_data[0].postalCode && reservation.parents_data[0].city && `, ${reservation.parents_data[0].postalCode} ${reservation.parents_data[0].city}`}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {reservation.participant_age && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-3 h-3 text-gray-400" />
+                    <span className="text-gray-600">Data urodzenia:</span>
+                    <span className="text-gray-900">
+                      {(() => {
+                        try {
+                          const age = parseInt(reservation.participant_age);
+                          const currentYear = new Date().getFullYear();
+                          const birthYear = currentYear - age;
+                          return `31.12.${birthYear} (${age} lat)`;
+                        } catch {
+                          return `${reservation.participant_age} lat`;
+                        }
+                      })()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Guardian Data Section */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm text-gray-900 mb-2">
+                {reservation.parents_data && reservation.parents_data.length > 1 ? 'Dane opiekunów' : 'Dane opiekuna'}
+              </h4>
+              <div className="space-y-3">
+                {reservation.parents_data && reservation.parents_data.length > 0 ? (
+                  reservation.parents_data.map((parent, index) => (
+                    <div key={parent.id || index} className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                      <div className="text-xs font-medium text-gray-700 mb-1.5">
+                        {reservation.parents_data && reservation.parents_data.length > 1 ? `Opiekun ${index + 1}` : 'Opiekun'}
+                      </div>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex items-center gap-2">
+                          <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-600">Imię i nazwisko:</span>
+                          <span className="text-gray-900">{parent.firstName} {parent.lastName}</span>
+                        </div>
+                        {parent.email && (
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-600">Email:</span>
+                            <span className="text-gray-900">{parent.email}</span>
+                          </div>
+                        )}
+                        {(parent.phoneNumber || parent.phone) && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-600">Telefon:</span>
+                            <span className="text-gray-900">{parent.phone || '+48'} {parent.phoneNumber}</span>
+                          </div>
+                        )}
+                        {parent.street && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-600">Adres:</span>
+                            <span className="text-gray-900">
+                              {parent.street}
+                              {parent.postalCode && parent.city && `, ${parent.postalCode} ${parent.city}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-xs text-gray-500">Brak danych</div>
+                )}
+              </div>
+            </div>
+
+            {/* Payments Section */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm text-gray-900 mb-2">Płatności</h4>
+              <div className="space-y-1 text-xs">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-3 h-3 text-gray-400" />
+                  <span className="text-gray-600">Status:</span>
+                  <span className="text-gray-900">
+                    {isFullyPaid ? 'W pełni opłacona' : paidAmount > 0 ? 'Częściowo opłacona' : 'Nieopłacona'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-3 h-3 text-gray-400" />
+                  <span className="text-gray-600">Metoda:</span>
+                  <span className="text-gray-900">Online</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileText className="w-3 h-3 text-gray-400" />
+                  <span className="text-gray-600">Kwota:</span>
+                  <span className="text-gray-900">{paidAmount.toFixed(2)} / {reservation.total_price.toFixed(2)} PLN</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Contract Section */}
+            <div className="space-y-2 md:col-span-2 lg:col-span-3">
+              <h4 className="font-semibold text-sm text-gray-900 mb-2">Umowa</h4>
+              {loadingContract ? (
+                <div className="text-sm text-gray-500 p-3 bg-gray-50 border border-gray-200 rounded">Sprawdzanie...</div>
+              ) : contract ? (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded">
+                  <FileText className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-gray-900">{contract.contract_filename || 'Umowa'}</span>
+                  <span className="text-xs text-gray-500 ml-auto">
+                    Utworzono: {new Date(contract.created_at).toLocaleDateString('pl-PL')}
+                  </span>
+                  <button
+                    onClick={handleDownloadContract}
+                    disabled={downloadingContract}
+                    className="ml-2 px-2 py-1 text-xs text-green-700 bg-green-100 hover:bg-green-200 transition-colors flex items-center gap-1 disabled:opacity-50"
+                    style={{ borderRadius: 0 }}
+                  >
+                    <Download className="w-3 h-3" />
+                    {downloadingContract ? 'Pobieranie...' : 'Pobierz'}
+                  </button>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 p-3 bg-gray-50 border border-gray-200 rounded">
+                  Umowa nie została jeszcze wygenerowana
+                </div>
+              )}
+            </div>
+
+            {/* Qualification Card Section */}
+            <div className="space-y-2 md:col-span-2 lg:col-span-3">
+              <h4 className="font-semibold text-sm text-gray-900 mb-2">Karta kwalifikacyjna</h4>
+              {loadingCard ? (
+                <div className="text-sm text-gray-500 p-3 bg-gray-50 border border-gray-200 rounded">Sprawdzanie...</div>
+              ) : qualificationCard ? (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded">
+                  <FileText className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-gray-900">{qualificationCard.card_filename || 'Karta kwalifikacyjna'}</span>
+                  <span className="text-xs text-gray-500 ml-auto">
+                    Utworzono: {new Date(qualificationCard.created_at).toLocaleDateString('pl-PL')}
+                  </span>
+                  <button
+                    onClick={handleDownloadQualificationCard}
+                    disabled={downloadingCard}
+                    className="ml-2 px-2 py-1 text-xs text-green-700 bg-green-100 hover:bg-green-200 transition-colors flex items-center gap-1 disabled:opacity-50"
+                    style={{ borderRadius: 0 }}
+                  >
+                    <Download className="w-3 h-3" />
+                    {downloadingCard ? 'Pobieranie...' : 'Pobierz'}
+                  </button>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 p-3 bg-gray-50 border border-gray-200 rounded">
+                  Karta kwalifikacyjna nie została jeszcze wygenerowana
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}

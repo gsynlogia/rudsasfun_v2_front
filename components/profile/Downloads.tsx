@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { FileText, Download, CheckCircle, XCircle, Calendar, Loader2 } from 'lucide-react';
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 import { contractService } from '@/lib/services/ContractService';
+import { qualificationCardService, type QualificationCardResponse } from '@/lib/services/QualificationCardService';
 
 interface Document {
   id: string;
-  type: 'contract' | 'invoice';
+  type: 'contract' | 'qualification_card' | 'invoice';
   name: string;
   reservationId: number;
   reservationName: string;
@@ -15,6 +16,7 @@ interface Document {
   date: string;
   amount: number;
   status: 'available' | 'pending' | 'unavailable';
+  contract_status?: string | null; // 'pending', 'approved', 'rejected'
 }
 
 /**
@@ -37,8 +39,16 @@ export default function Downloads() {
         // Get user's contracts (existing contracts from output directory)
         const contracts = await contractService.listMyContracts();
         
+        // Get user's qualification cards
+        const qualificationCards = await qualificationCardService.listMyQualificationCards();
+        
+        // Get user's reservations to get contract_status
+        const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
+        const reservationsMap = new Map(reservations.map(r => [r.id, r]));
+        
         // Map contracts to documents
-        const documentsList: Document[] = contracts.map((contract) => {
+        const contractsList: Document[] = contracts.map((contract) => {
+          const reservation = reservationsMap.get(contract.reservation_id);
           const participantName = contract.participant_first_name && contract.participant_last_name
             ? `${contract.participant_first_name} ${contract.participant_last_name}`
             : 'Brak danych';
@@ -68,8 +78,47 @@ export default function Downloads() {
             date: dateStr,
             amount: contract.total_price || 0,
             status: 'available' as const, // Contract exists, so it's available
+            contract_status: (reservation && reservation.contract_status) ? reservation.contract_status : null,
           };
         });
+        
+        // Map qualification cards to documents
+        const qualificationCardsList: Document[] = qualificationCards.map((card) => {
+          const reservation = reservationsMap.get(card.reservation_id);
+          const participantName = card.participant_first_name && card.participant_last_name
+            ? `${card.participant_first_name} ${card.participant_last_name}`
+            : 'Brak danych';
+          
+          const campName = card.camp_name || 'Brak danych';
+          
+          // Format date from card created_at
+          let dateStr = 'Brak daty';
+          if (card.created_at) {
+            const date = new Date(card.created_at);
+            if (!isNaN(date.getTime())) {
+              dateStr = date.toLocaleDateString('pl-PL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+              });
+            }
+          }
+          
+          return {
+            id: `qualification-card-${card.reservation_id}`,
+            type: 'qualification_card' as const,
+            name: `Karta kwalifikacyjna - ${campName}`,
+            reservationId: card.reservation_id,
+            reservationName: campName,
+            participantName: participantName,
+            date: dateStr,
+            amount: reservation?.total_price || 0,
+            status: 'available' as const, // Card exists, so it's available
+          };
+        });
+        
+        // Combine all documents
+        const documentsList: Document[] = [...contractsList, ...qualificationCardsList];
         
         // Sort by date (newest first)
         documentsList.sort((a, b) => {
@@ -99,6 +148,20 @@ export default function Downloads() {
       } catch (error) {
         console.error('Error downloading contract:', error);
         alert('Nie udało się pobrać dokumentu. Spróbuj ponownie.');
+      } finally {
+        setDownloadingIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(document.id);
+          return newSet;
+        });
+      }
+    } else if (document.type === 'qualification_card') {
+      try {
+        setDownloadingIds(prev => new Set(prev).add(document.id));
+        await qualificationCardService.downloadQualificationCard(document.reservationId);
+      } catch (error) {
+        console.error('Error downloading qualification card:', error);
+        alert('Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
       } finally {
         setDownloadingIds(prev => {
           const newSet = new Set(prev);
@@ -200,7 +263,9 @@ export default function Downloads() {
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900 font-medium">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-gray-400" />
-                          {document.type === 'contract' ? 'Umowa' : 'Inny dokument'}
+                          {document.type === 'contract' ? 'Umowa' : 
+                           document.type === 'qualification_card' ? 'Karta kwalifikacyjna' : 
+                           'Inny dokument'}
                         </div>
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
@@ -219,7 +284,18 @@ export default function Downloads() {
                         {document.amount.toFixed(2)} zł
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        {getStatusBadge(document.status)}
+                        <div className="flex items-center gap-2">
+                          {document.type === 'contract' && document.contract_status && (
+                            <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${
+                              document.contract_status === 'approved' ? 'bg-green-500' : 'bg-yellow-400'
+                            }`} title={
+                              document.contract_status === 'approved' ? 'Umowa zatwierdzona' :
+                              document.contract_status === 'rejected' ? 'Umowa niezatwierdzona' :
+                              'Umowa oczekuje na zatwierdzenie'
+                            }></div>
+                          )}
+                          {getStatusBadge(document.status)}
+                        </div>
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3">
                         <button

@@ -2,7 +2,7 @@
 
 import { AlertCircle } from 'lucide-react';
 
-export type DeleteItemType = 'camp' | 'turnus' | 'reservation' | 'payment' | 'transport' | 'other';
+export type DeleteItemType = 'camp' | 'turnus' | 'reservation' | 'payment' | 'transport' | 'diet' | 'other';
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;
@@ -52,6 +52,8 @@ export default function DeleteConfirmationModal({
         return 'płatność';
       case 'transport':
         return 'przypisanie transportu';
+      case 'diet':
+        return 'przypisanie diety';
       default:
         return 'element';
     }
@@ -69,6 +71,8 @@ export default function DeleteConfirmationModal({
         return 'Ta operacja jest nieodwracalna.';
       case 'transport':
         return 'Przypisanie transportu do tego turnusu zostanie usunięte. Transport pozostanie w systemie i będzie dostępny do przypisania do innych turnusów.';
+      case 'diet':
+        return 'Przypisanie diety do tego turnusu zostanie usunięte. Dieta pozostanie w systemie i będzie dostępna do przypisania do innych turnusów.';
       default:
         return 'Ta operacja jest nieodwracalna.';
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { formatDateRange } from '@/utils/api';
 import HeaderTop from './HeaderTop';
@@ -11,6 +11,8 @@ import Footer from './Footer';
 import NavigationButtons from './NavigationButtons';
 import type { LayoutProps, StepNumber, CampWithProperty, ReservationCamp } from '@/types/reservation';
 import { useReservation } from '@/context/ReservationContext';
+import { authService } from '@/lib/services/AuthService';
+import { Shield } from 'lucide-react';
 
 /**
  * Client-side Layout Component
@@ -28,6 +30,26 @@ export default function LayoutClient({
   const router = useRouter();
   const pathname = usePathname();
   const { updateReservationCamp, reservation } = useReservation();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = () => {
+      const user = authService.getCurrentUser();
+      if (user) {
+        // Check if user is admin: user_type === 'admin', groups includes 'admin', login === 'admin', or id === 0
+        const isAdminUser = 
+          user.user_type === 'admin' || 
+          user.groups?.includes('admin') || 
+          user.login === 'admin' || 
+          user.id === 0;
+        setIsAdmin(isAdminUser);
+      }
+      setCheckingAdmin(false);
+    };
+    checkAdmin();
+  }, []);
 
   const steps = Array.from({ length: TOTAL_STEPS }, (_, i) => {
     const stepNumber = (i + 1) as StepNumber;
@@ -39,45 +61,54 @@ export default function LayoutClient({
     };
   });
 
+  // Common validation function for current step
+  const validateCurrentStep = (): boolean => {
+    let isValid = true;
+    
+    // For step 2, use combined validation function
+    if (currentStep === 2) {
+      const validateStep2Combined = (window as any).validateStep2Combined;
+      if (validateStep2Combined && typeof validateStep2Combined === 'function') {
+        isValid = validateStep2Combined();
+      }
+    } else if (currentStep === 3) {
+      // For step 3, use combined validation function
+      const validateStep3Combined = (window as any).validateStep3Combined;
+      if (validateStep3Combined && typeof validateStep3Combined === 'function') {
+        isValid = validateStep3Combined();
+      }
+    } else {
+      // Check if validation function exists for current step
+      const validateFunction = (window as any)[`validateStep${currentStep}`];
+      if (validateFunction && typeof validateFunction === 'function') {
+        isValid = validateFunction();
+      }
+    }
+    
+    return isValid;
+  };
+
   // Navigate to specific step using URL
   // Only allow navigation to adjacent steps (forward/backward one step at a time)
   const handleStepNavigation = async (step: StepNumber) => {
     if (!campData) return;
     
-    // Check if step is adjacent (only allow forward/backward one step)
+    // If trying to go forward (to a step ahead), validate current step first
+    if (step > currentStep) {
+      const isValid = validateCurrentStep();
+      
+      if (!isValid) {
+        // Validation failed - scroll to top to show errors
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+    
+    // If trying to go to a step that's more than one step away, limit to adjacent step
     const stepDiff = step - currentStep;
-    if (Math.abs(stepDiff) !== 1) {
-      // Not adjacent step - validate current step and move forward if valid
+    if (Math.abs(stepDiff) > 1) {
+      // Not adjacent step - move to adjacent step instead
       if (step > currentStep) {
-        // Trying to go forward - validate current step first
-        let isValid = true;
-        
-        // For step 2, use combined validation function
-        if (currentStep === 2) {
-          const validateStep2Combined = (window as any).validateStep2Combined;
-          if (validateStep2Combined && typeof validateStep2Combined === 'function') {
-            isValid = validateStep2Combined();
-          }
-        } else if (currentStep === 3) {
-          // For step 3, use combined validation function
-          const validateStep3Combined = (window as any).validateStep3Combined;
-          if (validateStep3Combined && typeof validateStep3Combined === 'function') {
-            isValid = validateStep3Combined();
-          }
-        } else {
-          // Check if validation function exists for current step
-          const validateFunction = (window as any)[`validateStep${currentStep}`];
-          if (validateFunction && typeof validateFunction === 'function') {
-            isValid = validateFunction();
-          }
-        }
-        
-        if (!isValid) {
-          // Validation failed - scroll to top to show errors
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-          return;
-        }
-        
         // Valid - move to next step
         step = (currentStep + 1) as StepNumber;
       } else {
@@ -105,27 +136,7 @@ export default function LayoutClient({
   const handleNext = () => {
     if (currentStep < TOTAL_STEPS) {
       // Validate current step before proceeding
-      let isValid = true;
-      
-      // For step 2, use combined validation function
-      if (currentStep === 2) {
-        const validateStep2Combined = (window as any).validateStep2Combined;
-        if (validateStep2Combined && typeof validateStep2Combined === 'function') {
-          isValid = validateStep2Combined();
-        }
-      } else if (currentStep === 3) {
-        // For step 3, use combined validation function
-        const validateStep3Combined = (window as any).validateStep3Combined;
-        if (validateStep3Combined && typeof validateStep3Combined === 'function') {
-          isValid = validateStep3Combined();
-        }
-      } else {
-        // Check if validation function exists for current step
-        const validateFunction = (window as any)[`validateStep${currentStep}`];
-        if (validateFunction && typeof validateFunction === 'function') {
-          isValid = validateFunction();
-        }
-      }
+      const isValid = validateCurrentStep();
       
       // Only proceed if validation passes
       if (isValid) {
@@ -264,6 +275,36 @@ export default function LayoutClient({
             <p className="text-sm sm:text-base text-gray-600">
               Żądany obóz lub edycja nie istnieje. Sprawdź, czy adres URL jest poprawny.
             </p>
+          </div>
+        ) : checkingAdmin ? (
+          <div className="flex items-center justify-center min-h-[400px] py-12">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#03adf0] mb-4"></div>
+              <p className="text-sm sm:text-base text-gray-600">Sprawdzanie uprawnień...</p>
+            </div>
+          </div>
+        ) : isAdmin ? (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 sm:p-6 rounded-lg max-w-2xl mx-auto">
+            <div className="flex items-start gap-3">
+              <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h2 className="text-lg sm:text-xl font-semibold text-yellow-800 mb-2">
+                  Konto administratora
+                </h2>
+                <p className="text-sm sm:text-base text-yellow-700 mb-2">
+                  To konto służy do logowania się do systemu i zarządzania systemem.
+                </p>
+                <p className="text-sm sm:text-base text-yellow-700 font-medium">
+                  Użytkownik z uprawnieniami administratora nie może tworzyć rezerwacji.
+                </p>
+                <a
+                  href="/"
+                  className="inline-block mt-4 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm sm:text-base"
+                >
+                  Powrót do strony głównej
+                </a>
+              </div>
+            </div>
           </div>
         ) : (
           <>

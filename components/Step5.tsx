@@ -14,11 +14,19 @@ import {
   loadReservationState,
   clearAllSessionData
 } from '@/utils/sessionStorage';
+import { 
+  defaultStep1FormData, 
+  defaultStep2FormData, 
+  defaultStep3FormData, 
+  defaultReservationState,
+  withDefaults 
+} from '@/types/stepData';
 import { useReservation } from '@/context/ReservationContext';
 import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { reservationService, ReservationService } from '@/lib/services/ReservationService';
 import { loadStep4FormData } from '@/utils/sessionStorage';
 import UniversalModal from '@/components/admin/UniversalModal';
+import Image from 'next/image';
 
 /**
  * Step5 Component - Summary and Payment
@@ -36,9 +44,9 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
       return savedData;
     }
     return {
-      payNow: true,
+      payNow: true, // Keep for backward compatibility, but not used in UI
       paymentMethod: 'online',
-      paymentAmount: 'deposit',
+      paymentAmount: 'full', // Default: Full payment
     };
   };
 
@@ -68,18 +76,17 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
 
   // Validate payment options
   const validatePayment = (): boolean => {
-    if (!formData.payNow) {
-      return true; // No validation needed if pay now is unchecked
-    }
-    
+    // Always require payment method selection
     if (!formData.paymentMethod) {
       return false;
     }
     
-    if (!formData.paymentAmount) {
+    // If online payment, require payment amount
+    if (formData.paymentMethod === 'online' && !formData.paymentAmount) {
       return false;
     }
     
+    // Transfer payment doesn't require amount selection
     return true;
   };
 
@@ -99,6 +106,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     };
   }, [formData]);
 
+
   // Clear validation error when form is valid
   useEffect(() => {
     if (validatePayment() && validationError) {
@@ -107,15 +115,38 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     }
   }, [formData.payNow, formData.paymentMethod, formData.paymentAmount]);
 
-  // Load summary data from previous steps
-  const step1Data = loadStep1FormData();
-  const step2Data = loadStep2FormData();
-  const step3Data = loadStep3FormData();
-  const reservationState = loadReservationState();
+  // Load summary data from previous steps with defaults
+  const step1DataRaw = loadStep1FormData();
+  const step2DataRaw = loadStep2FormData();
+  const step3DataRaw = loadStep3FormData();
+  const reservationStateRaw = loadReservationState();
+
+  const step1Data = withDefaults(step1DataRaw, defaultStep1FormData);
+  const step2Data = withDefaults(step2DataRaw, defaultStep2FormData);
+  const step3Data = withDefaults(step3DataRaw, defaultStep3FormData);
+  const reservationState = withDefaults(reservationStateRaw, defaultReservationState);
 
   // Calculate payment amounts
-  const totalPrice = reservation.totalPrice || reservationState?.totalPrice || 0;
-  const depositAmount = Math.round(totalPrice * 0.6); // 60% deposit
+  const totalPrice = reservation.totalPrice || reservationState.totalPrice || 0;
+  
+  // Base deposit amount: 600 PLN
+  const baseDepositAmount = 600;
+  
+  // Calculate protection prices (OASA and TARCZA) from reservation items
+  const protectionItems = reservation.items.filter(item => item.type === 'protection');
+  const protectionTotal = protectionItems.reduce((sum, item) => {
+    // Check if it's OASA or TARCZA protection
+    const name = item.name.toLowerCase();
+    if (name.includes('oaza') || name.includes('oasa')) {
+      return sum + item.price; // OASA price (e.g., 120 PLN)
+    } else if (name.includes('tarcza') || name.includes('shield')) {
+      return sum + item.price; // TARCZA price (e.g., 80 PLN)
+    }
+    return sum;
+  }, 0);
+  
+  // Deposit amount = base (600 PLN) + protection prices
+  const depositAmount = baseDepositAmount + protectionTotal;
   const remainingAmount = totalPrice - depositAmount;
 
   // Format price helper
@@ -185,7 +216,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
 
   // Get addons list
   const getAddonsList = (): string[] => {
-    if (!step2Data?.selectedAddons || step2Data.selectedAddons.length === 0) {
+    if (!step2Data.selectedAddons || step2Data.selectedAddons.length === 0) {
       return [];
     }
     
@@ -212,7 +243,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
 
   // Get protection labels (can be multiple)
   const getProtectionLabels = (): string[] => {
-    if (!step2Data?.selectedProtection) return [];
+    if (!step2Data.selectedProtection) return [];
     
     // Get all protection items from reservation
     const protectionItems = reservation.items.filter(item => item.type === 'protection');
@@ -241,7 +272,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
 
   // Get promotion label
   const getPromotionLabel = (): string => {
-    if (!step2Data?.selectedPromotion) return '';
+    if (!step2Data.selectedPromotion) return '';
     
     // Get promotion item from reservation
     const promotionItem = reservation.items.find(item => item.type === 'promotion');
@@ -265,7 +296,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
 
   // Get invoice delivery label
   const getInvoiceDeliveryLabel = (): string => {
-    if (!step3Data?.deliveryType) return 'Wersja elektroniczna (0,00zł)';
+    if (!step3Data.deliveryType) return 'Wersja elektroniczna (0,00zł)';
     
     if (step3Data.deliveryType === 'paper') {
       return 'Wersja papierowa (30,00zł)';
@@ -280,8 +311,8 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
   };
 
   // Handle payment method change
-  const handlePaymentMethodChange = (method: 'online' | 'blik') => {
-    setFormData(prev => ({ ...prev, paymentMethod: method }));
+  const handlePaymentMethodChange = (method: 'online' | 'transfer') => {
+    setFormData(prev => ({ ...prev, paymentMethod: method, payNow: method === 'online' }));
     setValidationError('');
   };
 
@@ -308,11 +339,16 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     return { campId: null, propertyId: null };
   };
 
-  // Handle payment processing (when payNow is checked)
+  // Handle payment processing
   const handlePayment = async () => {
-    if (!formData.payNow) {
-      // If pay later, create reservation without payment
+    // If transfer payment, create reservation without payment
+    if (formData.paymentMethod === 'transfer') {
       await handleReservationWithoutPayment();
+      return;
+    }
+    
+    // If online payment, proceed with payment
+    if (formData.paymentMethod !== 'online') {
       return;
     }
 
@@ -365,19 +401,45 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
       // Get payment amount
       const paymentAmount = formData.paymentAmount === 'full' ? totalPrice : depositAmount;
 
-      // Get payer email from step1 data
-      const payerEmail = firstParent?.email || '';
-      if (!payerEmail) {
-        throw new Error('Brak adresu email płatnika');
+      // ====================================================================
+      // CRITICAL: ALWAYS use the FIRST parent (index 0) for payment data
+      // The second parent (index 1) is completely excluded from payment
+      // Second parent is optional and may not have all required data (e.g., email)
+      // ====================================================================
+      
+      // Validate that we have parents data
+      if (!step1Data.parents || !Array.isArray(step1Data.parents) || step1Data.parents.length === 0) {
+        throw new Error('Brak danych opiekuna. Proszę wypełnić dane opiekuna w kroku 1.');
       }
 
-      // Get payer name - only if we have valid data
+      // ALWAYS use the FIRST parent (index 0) - never use second parent
+      const firstParentForPayment = step1Data.parents[0];
+      
+      if (!firstParentForPayment) {
+        throw new Error('Brak danych pierwszego opiekuna. Proszę wypełnić dane opiekuna w kroku 1.');
+      }
+
+      // Get payer email from FIRST parent only (never from second parent)
+      const payerEmail = firstParentForPayment.email ? firstParentForPayment.email.trim() : '';
+      
+      // Validate email is not empty
+      if (!payerEmail || payerEmail === '' || payerEmail === 'Adres e-mail') {
+        throw new Error('Brak adresu email płatnika. Proszę podać adres email pierwszego opiekuna w kroku 1.');
+      }
+
+      // Validate email format (basic check)
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(payerEmail)) {
+        throw new Error('Nieprawidłowy format adresu email płatnika. Proszę podać prawidłowy adres email pierwszego opiekuna.');
+      }
+
+      // Get payer name from FIRST parent only
       let payerName: string | undefined = undefined;
-      if (firstParent) {
-        const firstName = getValueOrNotSet(firstParent.firstName, '');
-        const lastName = getValueOrNotSet(firstParent.lastName, '');
+      const firstName = firstParentForPayment.firstName ? firstParentForPayment.firstName.trim() : '';
+      const lastName = firstParentForPayment.lastName ? firstParentForPayment.lastName.trim() : '';
+      
+      if (firstName && lastName && firstName !== 'Imię' && lastName !== 'Nazwisko') {
         const fullName = `${firstName} ${lastName}`.trim();
-        // Only set payer_name if it's not empty and not default values
         if (fullName && fullName !== 'Nie ustawiono Nie ustawiono' && fullName !== 'Nie ustawiono') {
           payerName = fullName;
         }
@@ -393,7 +455,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
         order_id: orderId,
         payer_email: payerEmail,
         payer_name: payerName,
-        channel_id: formData.paymentMethod === 'blik' ? 64 : formData.paymentMethod === 'online' ? undefined : undefined,
+        channel_id: formData.paymentMethod === 'online' ? undefined : undefined,
         success_url: `${window.location.origin}/payment/success?reservation_id=${reservationResponse.id}`,
         error_url: `${window.location.origin}/payment/failure?reservation_id=${reservationResponse.id}`,
       };
@@ -417,7 +479,41 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
       if (error instanceof Error) {
         // Check if it's a reservation error
         if (error.message.includes('Błąd walidacji') || error.message.includes('Pole obowiązkowe')) {
+          // Instead of showing technical error, show payment data that was used
+          try {
+            const step1DataForError = loadStep1FormData();
+            if (step1DataForError && step1DataForError.parents && step1DataForError.parents.length > 0) {
+              // Show data from FIRST parent (used for payment)
+              const firstParentForError = step1DataForError.parents[0];
+              const payerEmailForError = firstParentForError?.email || 'BRAK';
+              const payerFirstNameForError = firstParentForError?.firstName || 'BRAK';
+              const payerLastNameForError = firstParentForError?.lastName || 'BRAK';
+              const payerPhoneForError = `${firstParentForError?.phone || '+48'} ${firstParentForError?.phoneNumber || 'BRAK'}`.trim();
+              
+              // Also show all parents data that were sent to backend
+              let allParentsInfo = '';
+              step1DataForError.parents.forEach((parent, index) => {
+                const parentEmail = parent?.email?.trim() || 'BRAK';
+                const parentName = `${parent?.firstName || 'BRAK'} ${parent?.lastName || 'BRAK'}`.trim();
+                allParentsInfo += `\nOpiekun ${index + 1}: ${parentName}, Email: ${parentEmail}`;
+              });
+              
+              const paymentDataMessage = `Dane używane do płatności (z pierwszego opiekuna):\n` +
+                `• Imię: ${payerFirstNameForError}\n` +
+                `• Nazwisko: ${payerLastNameForError}\n` +
+                `• Email: ${payerEmailForError}\n` +
+                `• Telefon: ${payerPhoneForError}\n\n` +
+                `Wszyscy opiekunowie wysłani do backendu:${allParentsInfo}\n\n` +
+                `Błąd walidacji: ${error.message}`;
+              
+              setReservationError(paymentDataMessage);
+            } else {
+              setReservationError(`Brak danych pierwszego opiekuna. ${error.message}`);
+            }
+          } catch (errorLoadingData) {
+            // Fallback to original error if we can't load data
           setReservationError(error.message);
+          }
         } else {
           setPaymentError(error.message);
         }
@@ -485,10 +581,63 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
     }
   };
 
+  // Expose handlePayment function for ReservationSummary button
+  useEffect(() => {
+    (window as any).handleStep5Payment = handlePayment;
+
+    return () => {
+      delete (window as any).handleStep5Payment;
+    };
+  }, [formData, totalPrice, depositAmount]);
+
 
   // Get first parent data (for summary) with safe defaults
-  const firstParent = step1Data?.parents?.[0];
-  const participant = step1Data?.participantData;
+  interface ParentData {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    phoneNumber: string;
+    street: string;
+    postalCode: string;
+    city: string;
+  }
+  
+  interface ParticipantData {
+    firstName: string;
+    lastName: string;
+    age: string;
+    gender: string;
+    city: string;
+    selectedParticipant: string;
+  }
+  
+  const defaultParent: ParentData = {
+    id: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    phoneNumber: '',
+    street: '',
+    postalCode: '',
+    city: '',
+  };
+  
+  const defaultParticipant: ParticipantData = {
+    firstName: '',
+    lastName: '',
+    age: '',
+    gender: '',
+    city: '',
+    selectedParticipant: '',
+  };
+  
+  const firstParent: ParentData = (step1Data?.parents && step1Data.parents.length > 0) 
+    ? step1Data.parents[0] 
+    : defaultParent;
+  const participant: ParticipantData = step1Data?.participantData || defaultParticipant;
   
   // Helper to format phone number
   const formatPhone = (phone: string | undefined, phoneNumber: string | undefined): string => {
@@ -559,9 +708,9 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 {step1Data ? (
                   <>
-                    <div>Choroby przewlekłe: {getHealthStatusLabel(step1Data.healthQuestions?.chronicDiseases)}</div>
-                    <div>Dysfunkcje: {getHealthStatusLabel(step1Data.healthQuestions?.dysfunctions)}</div>
-                    <div>Leczenie psychiatryczne: {getHealthStatusLabel(step1Data.healthQuestions?.psychiatric)}</div>
+                    <div>Choroby przewlekłe: {getHealthStatusLabel(step1Data.healthQuestions.chronicDiseases)}</div>
+                    <div>Dysfunkcje: {getHealthStatusLabel(step1Data.healthQuestions.dysfunctions)}</div>
+                    <div>Leczenie psychiatryczne: {getHealthStatusLabel(step1Data.healthQuestions.psychiatric)}</div>
                     {step1Data.additionalNotes && step1Data.additionalNotes.trim() !== '' ? (
                       <div>Inne: {step1Data.additionalNotes}</div>
                     ) : null}
@@ -593,7 +742,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Wniosek o zakwaterowanie
               </h3>
               <div className="text-xs sm:text-sm text-gray-700">
-                {step1Data?.accommodationRequest && step1Data.accommodationRequest.trim() !== '' 
+                {step1Data.accommodationRequest && step1Data.accommodationRequest.trim() !== '' 
                   ? step1Data.accommodationRequest 
                   : 'Nie ustawiono'}
               </div>
@@ -653,19 +802,10 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Transport do ośrodka
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-                {step2Data?.transportData ? (
+                {step2Data.transportData ? (
                   <>
-                    <div>{getTransportTypeLabel(step2Data.transportData.departureType)} (0,00zł)</div>
+                    <div>Transport zbiórkowy do ośrodka</div>
                     <div>{getCityLabel(step2Data.transportData.departureCity)}</div>
-                    <div>
-                      <a 
-                        href="#" 
-                        className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
-                        onClick={(e) => e.preventDefault()}
-                      >
-                        lista transportów &gt;
-                      </a>
-                    </div>
                   </>
                 ) : (
                   <div className="text-gray-500 italic">Nie ustawiono</div>
@@ -679,19 +819,10 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
                 Transport z ośrodka
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-                {step2Data?.transportData ? (
+                {step2Data.transportData ? (
                   <>
-                    <div>{getTransportTypeLabel(step2Data.transportData.returnType)} (0,00zł)</div>
+                    <div>Transport zbiórkowy z ośrodka</div>
                     <div>{getCityLabel(step2Data.transportData.returnCity)}</div>
-                    <div>
-                      <a 
-                        href="#" 
-                        className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
-                        onClick={(e) => e.preventDefault()}
-                      >
-                        lista transportów &gt;
-                      </a>
-                    </div>
                   </>
                 ) : (
                   <div className="text-gray-500 italic">Nie ustawiono</div>
@@ -704,10 +835,10 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
           
           {/* Segment 6: Invoice Data */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-4 sm:pt-6">
-            {/* Left: Invoice Data */}
+            {/* Left: Invoice/Account Data */}
             <div>
               <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
-                Dane do faktury
+                {step3Data.invoiceType === 'private' ? 'Dane do rachunku' : 'Dane do faktury'}
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 {step3Data ? (
@@ -738,15 +869,17 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
               </div>
             </div>
             
-            {/* Right: Invoice Form */}
-            <div>
-              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
-                Forma faktury
-              </h3>
-              <div className="text-xs sm:text-sm text-gray-700">
-                {step3Data ? getInvoiceDeliveryLabel() : 'Nie wybrano'}
+            {/* Right: Invoice Form - Only show for company */}
+            {step3Data.invoiceType === 'company' && (
+              <div>
+                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
+                  Forma faktury
+                </h3>
+                <div className="text-xs sm:text-sm text-gray-700">
+                  {step3Data ? getInvoiceDeliveryLabel() : 'Nie wybrano'}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </section>
       </div>
@@ -756,28 +889,8 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
         <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-800">
           Płatność
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-          {/* Left: Payment Amounts */}
-          <div className="space-y-2">
-            <div className="text-sm sm:text-base text-gray-700">
-              Koszt całkowity:{' '}
-              <a 
-                href="#" 
-                className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors font-semibold"
-                onClick={(e) => e.preventDefault()}
-              >
-                {formatPrice(totalPrice)} zł
-              </a>
-            </div>
-            <div className="text-sm sm:text-base text-gray-700">
-              Zaliczka: {formatPrice(depositAmount)} zł
-            </div>
-            <div className="text-sm sm:text-base text-gray-700">
-              Pozostała kwota: {formatPrice(remainingAmount)} zł
-            </div>
-          </div>
-          
-          {/* Right: Information */}
+        <div className="mb-4 sm:mb-6">
+          {/* Information */}
           <div className="flex items-start gap-2 sm:gap-3">
             <svg
               className="w-5 h-5 text-gray-600 flex-shrink-0 mt-0.5"
@@ -803,147 +916,198 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
       {/* Block 3: Pay Now Card */}
       <div>
         <section className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-          {/* Pay Now Checkbox */}
-          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-            <input
-              type="checkbox"
-              id="payNow"
-              checked={formData.payNow}
-              onChange={(e) => handlePayNowChange(e.target.checked)}
-              disabled={disabled}
-              className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0"
-            />
-            <label
-              htmlFor="payNow"
-              className="text-sm sm:text-base font-semibold text-gray-900 cursor-pointer flex items-center gap-2"
-            >
-              Zapłać teraz
-              <svg
-                className="w-4 h-4 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          {/* Section 0: Payment Data - ALWAYS from FIRST parent (index 0) */}
+          <div className="mb-4 sm:mb-6">
+            <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
+              Dane rodzica / opiekuna
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Imię *</label>
+                <input 
+                  className="w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed border-gray-400" 
+                  type="text" 
+                  value={firstParent?.firstName || ''} 
+                  disabled
                 />
-              </svg>
-            </label>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Nazwisko *</label>
+                <input 
+                  className="w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed border-gray-400" 
+                  type="text" 
+                  value={firstParent?.lastName || ''} 
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Adres e-mail <span className="text-red-500">*</span></label>
+                <input 
+                  className="w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed border-gray-400" 
+                  type="email" 
+                  value={firstParent?.email || ''} 
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Numer telefonu *</label>
+                <div className="flex gap-2">
+                  <select 
+                    className="px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed" 
+                    disabled
+                  >
+                    <option value="+48">{firstParent?.phone || '+48'}</option>
+                  </select>
+                  <div className="flex-1">
+                    <input 
+                      className="w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed border-gray-400" 
+                      type="tel" 
+                      value={firstParent?.phoneNumber || ''} 
+                      disabled
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Ulica i numer</label>
+                <input 
+                  className="w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed border-gray-400" 
+                  type="text" 
+                  value={firstParent?.street || ''} 
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Kod pocztowy</label>
+                <input 
+                  className="w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed border-gray-400" 
+                  type="text" 
+                  value={firstParent?.postalCode || ''} 
+                  disabled
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Miejscowość</label>
+                <input 
+                  className="w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed border-gray-400" 
+                  type="text" 
+                  value={firstParent?.city || ''} 
+                  disabled
+                />
+              </div>
+            </div>
           </div>
           
           <DashedLine />
           
-          {/* Payment Options - Only shown when payNow is checked */}
-          {formData.payNow && (
-            <div className="mt-4 sm:mt-6">
-              {/* Section 1: Payment Method */}
-              <div className="mb-4 sm:mb-6">
-                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
-                  Wybierz sposób płatności
-                </h3>
-                <div className="space-y-3 sm:space-y-4">
-                  {/* Online Payment */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <input
-                        type="radio"
-                        id="paymentOnline"
-                        name="paymentMethod"
-                        value="online"
-                        checked={formData.paymentMethod === 'online'}
-                        onChange={() => handlePaymentMethodChange('online')}
-                        disabled={disabled || !formData.payNow}
-                        className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                      />
-                      <label
-                        htmlFor="paymentOnline"
-                        className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                      >
-                        Płatność online (bezpłatnie)
-                      </label>
-                    </div>
-                    <div className="w-16 h-10 sm:w-20 sm:h-12 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs font-bold">Pay</span>
-                    </div>
-                  </div>
-                  
-                  {/* BLIK Payment */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <input
-                        type="radio"
-                        id="paymentBlik"
-                        name="paymentMethod"
-                        value="blik"
-                        checked={formData.paymentMethod === 'blik'}
-                        onChange={() => handlePaymentMethodChange('blik')}
-                        disabled={disabled || !formData.payNow}
-                        className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                      />
-                      <label
-                        htmlFor="paymentBlik"
-                        className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                      >
-                        BLIK (bezpłatnie)
-                      </label>
-                    </div>
-                    <div className="w-16 h-10 sm:w-20 sm:h-12 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs font-bold">BLIK</span>
-                    </div>
-                  </div>
+          {/* Section 1: Payment Method */}
+          <div className="mb-4 sm:mb-6">
+            <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
+              Wybierz sposób płatności
+            </h3>
+            <div className="space-y-3 sm:space-y-4">
+              {/* Online Payment (Tpay) */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <input
+                    type="radio"
+                    id="paymentOnline"
+                    name="paymentMethod"
+                    value="online"
+                    checked={formData.paymentMethod === 'online'}
+                    onChange={() => handlePaymentMethodChange('online')}
+                    disabled={disabled}
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  <label
+                    htmlFor="paymentOnline"
+                    className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                  >
+                    Płatność online (Tpay)
+                  </label>
+                </div>
+                <div className="flex items-center justify-center flex-shrink-0" style={{ alignSelf: 'flex-start', marginTop: '-4px' }}>
+                  <Image
+                    src="/tpay-brand-logo-short.png"
+                    alt="Tpay"
+                    width={80}
+                    height={48}
+                    className="h-10 sm:h-12 w-auto object-contain"
+                  />
                 </div>
               </div>
               
-              <DashedLine />
-              
-              {/* Section 2: Payment Amount */}
-              <div className="mt-4 sm:mt-6">
-                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
-                  Wybierz wielkość wpłaty
-                </h3>
-                <div className="space-y-3 sm:space-y-4">
-                  {/* Full Payment */}
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="radio"
-                      id="paymentFull"
-                      name="paymentAmount"
-                      value="full"
-                      checked={formData.paymentAmount === 'full'}
-                      onChange={() => handlePaymentAmountChange('full')}
-                      disabled={disabled || !formData.payNow}
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                    <label
-                      htmlFor="paymentFull"
-                      className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                    >
-                      Pełna wpłata
-                    </label>
-                  </div>
-                  
-                  {/* Deposit Payment */}
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="radio"
-                      id="paymentDeposit"
-                      name="paymentAmount"
-                      value="deposit"
-                      checked={formData.paymentAmount === 'deposit'}
-                      onChange={() => handlePaymentAmountChange('deposit')}
-                      disabled={disabled || !formData.payNow}
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                    <label
-                      htmlFor="paymentDeposit"
-                      className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                    >
-                      Zaliczka
-                    </label>
-                  </div>
+              {/* Traditional Transfer */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <input
+                    type="radio"
+                    id="paymentTransfer"
+                    name="paymentMethod"
+                    value="transfer"
+                    checked={formData.paymentMethod === 'transfer'}
+                    onChange={() => handlePaymentMethodChange('transfer')}
+                    disabled={disabled}
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  <label
+                    htmlFor="paymentTransfer"
+                    className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                  >
+                    Przelew tradycyjny
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <DashedLine />
+          
+          {/* Section 2: Payment Amount - Only shown for online payment */}
+          {formData.paymentMethod === 'online' && (
+            <div className="mt-4 sm:mt-6">
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
+                Wybierz wielkość wpłaty
+              </h3>
+              <div className="space-y-3 sm:space-y-4">
+                {/* Full Payment */}
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <input
+                    type="radio"
+                    id="paymentFull"
+                    name="paymentAmount"
+                    value="full"
+                    checked={formData.paymentAmount === 'full'}
+                    onChange={() => handlePaymentAmountChange('full')}
+                    disabled={disabled}
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  <label
+                    htmlFor="paymentFull"
+                    className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                  >
+                    Pełna wpłata
+                  </label>
+                </div>
+                
+                {/* Deposit Payment */}
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <input
+                    type="radio"
+                    id="paymentDeposit"
+                    name="paymentAmount"
+                    value="deposit"
+                    checked={formData.paymentAmount === 'deposit'}
+                    onChange={() => handlePaymentAmountChange('deposit')}
+                    disabled={disabled}
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  <label
+                    htmlFor="paymentDeposit"
+                    className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                  >
+                    Zaliczka
+                  </label>
                 </div>
               </div>
             </div>
@@ -960,7 +1124,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
           {reservationError && (
             <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded">
               <p className="text-sm text-red-700 font-semibold mb-1">Błąd walidacji rezerwacji:</p>
-              <p className="text-sm text-red-700">{reservationError}</p>
+              <pre className="text-sm text-red-700 whitespace-pre-wrap font-sans">{reservationError}</pre>
             </div>
           )}
           {paymentError && (
@@ -969,31 +1133,22 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
             </div>
           )}
 
-          {/* Pay Now Button - shown when payNow is checked */}
-          {formData.payNow && (
-            <div className="mt-6">
-              <button
-                onClick={handlePayment}
-                disabled={disabled || !formData.payNow || !validatePayment() || isProcessingPayment || isCreatingReservation}
-                className="w-full sm:w-auto px-6 py-3 bg-[#03adf0] text-white font-semibold rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCreatingReservation ? 'Tworzenie rezerwacji...' : isProcessingPayment ? 'Przetwarzanie płatności...' : 'Zapłać teraz'}
-              </button>
-            </div>
-          )}
-
-          {/* Go Further Button - shown when payNow is unchecked */}
-          {!formData.payNow && (
-            <div className="mt-6">
-              <button
-                onClick={handleReservationWithoutPayment}
-                disabled={disabled || isCreatingReservation}
-                className="w-full sm:w-auto px-6 py-3 bg-[#03adf0] text-white font-semibold rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCreatingReservation ? 'Tworzenie rezerwacji...' : 'Dalej'}
-              </button>
-            </div>
-          )}
+          {/* Payment Button */}
+          <div className="mt-6">
+            <button
+              onClick={handlePayment}
+              disabled={disabled || !validatePayment() || isProcessingPayment || isCreatingReservation}
+              className="w-full sm:w-auto px-6 py-3 bg-[#03adf0] text-white font-semibold rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreatingReservation 
+                ? 'Tworzenie rezerwacji...' 
+                : isProcessingPayment 
+                  ? 'Przetwarzanie płatności...' 
+                  : formData.paymentMethod === 'transfer'
+                    ? 'Przejdź dalej'
+                    : 'Zapłać teraz'}
+            </button>
+          </div>
         </section>
       </div>
 

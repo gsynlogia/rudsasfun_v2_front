@@ -26,7 +26,7 @@ export default function DocumentsManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
 
-  // Fetch all documents
+  // Fetch all documents (excluding tourist_regulations_insurance and watt_input_regulation)
   const fetchDocuments = useCallback(async () => {
     try {
       setLoading(true);
@@ -34,7 +34,12 @@ export default function DocumentsManagement() {
       const data = await authenticatedApiCall<{ documents: Document[]; total: number }>(
         '/api/documents/'
       );
-      setDocuments(data.documents || []);
+      // Filter out documents that should not be displayed in admin panel
+      const excludedDocuments = ['tourist_regulations_insurance', 'watt_input_regulation'];
+      const filteredDocuments = (data.documents || []).filter(
+        doc => !excludedDocuments.includes(doc.name)
+      );
+      setDocuments(filteredDocuments);
     } catch (err) {
       console.error('[DocumentsManagement] Error fetching documents:', err);
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas ładowania dokumentów';

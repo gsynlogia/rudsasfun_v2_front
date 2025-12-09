@@ -7,7 +7,7 @@ import SectionGuard from '@/components/admin/SectionGuard';
 
 export default function AdditionsManagementPage() {
   return (
-    <SectionGuard section="sources">
+    <SectionGuard section="cms">
       <AdminLayout>
         <div className="space-y-8">
           <AddonDescriptionManagement />

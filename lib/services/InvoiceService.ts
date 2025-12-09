@@ -17,6 +17,8 @@ export interface InvoiceResponse {
   tax_amount: number;
   is_paid: boolean;
   paid_at: string | null;
+  is_canceled: boolean;
+  canceled_at: string | null;
   issue_date: string;
   sell_date: string;
   payment_to: string;
@@ -119,6 +121,52 @@ class InvoiceService {
    */
   getInvoicePdfUrl(invoiceId: number): string {
     return `${API_BASE_URL}/api/invoices/${invoiceId}/pdf`;
+  }
+
+  /**
+   * Get all invoices for a specific reservation (admin only)
+   */
+  async getInvoicesByReservation(reservationId: number): Promise<InvoiceListResponse> {
+    const token = authService.getToken();
+    if (!token) {
+      throw new Error('Brak autoryzacji');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/invoices/reservation/${reservationId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Błąd podczas pobierania faktur' }));
+      throw new Error(error.detail || 'Błąd podczas pobierania faktur');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Cancel an invoice (admin only)
+   */
+  async cancelInvoice(invoiceId: number): Promise<void> {
+    const token = authService.getToken();
+    if (!token) {
+      throw new Error('Brak autoryzacji');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/invoices/${invoiceId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Błąd podczas anulowania faktury' }));
+      throw new Error(error.detail || 'Błąd podczas anulowania faktury');
+    }
   }
 }
 
