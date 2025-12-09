@@ -866,7 +866,7 @@ export default function ReservationDetailPage() {
                     <Download className="w-4 h-4" />
                     Pobierz umowę
                   </button>
-                  {reservation.contract_status === 'approved' ? (
+                  {reservation.contract_status?.toLowerCase() === 'approved' ? (
                     <button
                       disabled
                       className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded opacity-50 cursor-not-allowed text-sm font-medium"
@@ -884,7 +884,7 @@ export default function ReservationDetailPage() {
                       {isUpdatingContract ? 'Zapisywanie...' : 'Umowa zatwierdzona'}
                     </button>
                   )}
-                  {reservation.contract_status === 'rejected' ? (
+                  {reservation.contract_status?.toLowerCase() === 'rejected' ? (
                     <button
                       onClick={() => {
                         setRejectionReason(reservation.contract_rejection_reason || '');
@@ -958,7 +958,7 @@ export default function ReservationDetailPage() {
                         <Download className="w-4 h-4" />
                         {downloadingCard ? 'Pobieranie...' : 'Pobierz kartę kwalifikacyjną'}
                       </button>
-                      {reservation.qualification_card_status === 'approved' ? (
+                      {reservation.qualification_card_status?.toLowerCase() === 'approved' ? (
                         <button
                           disabled
                           className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded opacity-50 cursor-not-allowed text-sm font-medium"
@@ -976,7 +976,7 @@ export default function ReservationDetailPage() {
                           {isUpdatingQualificationCard ? 'Zapisywanie...' : 'Karta zatwierdzona'}
                         </button>
                       )}
-                      {reservation.qualification_card_status === 'rejected' ? (
+                      {reservation.qualification_card_status?.toLowerCase() === 'rejected' ? (
                         <button
                           onClick={() => {
                             setQualificationCardRejectionReason(reservation.qualification_card_rejection_reason || '');
@@ -1054,12 +1054,12 @@ export default function ReservationDetailPage() {
                   onClick={handleRejectContract}
                   disabled={isUpdatingContract || !rejectionReason.trim()}
                   className={`px-4 py-2 text-white rounded transition-colors text-sm font-medium disabled:opacity-50 ${
-                    reservation?.contract_status === 'rejected'
+                    reservation?.contract_status?.toLowerCase() === 'rejected'
                       ? 'bg-yellow-500 hover:bg-yellow-600'
                       : 'bg-red-600 hover:bg-red-700'
                   }`}
                 >
-                  {isUpdatingContract ? 'Zapisywanie...' : reservation?.contract_status === 'rejected' ? 'Zmień' : 'Odrzuć'}
+                  {isUpdatingContract ? 'Zapisywanie...' : reservation?.contract_status?.toLowerCase() === 'rejected' ? 'Zmień' : 'Odrzuć'}
                 </button>
               </div>
             </div>
@@ -1100,12 +1100,12 @@ export default function ReservationDetailPage() {
                   onClick={handleRejectQualificationCard}
                   disabled={isUpdatingQualificationCard || !qualificationCardRejectionReason.trim()}
                   className={`px-4 py-2 text-white rounded transition-colors text-sm font-medium disabled:opacity-50 ${
-                    reservation?.qualification_card_status === 'rejected'
+                    reservation?.qualification_card_status?.toLowerCase() === 'rejected'
                       ? 'bg-yellow-500 hover:bg-yellow-600'
                       : 'bg-red-600 hover:bg-red-700'
                   }`}
                 >
-                  {isUpdatingQualificationCard ? 'Zapisywanie...' : reservation?.qualification_card_status === 'rejected' ? 'Zmień' : 'Odrzuć'}
+                  {isUpdatingQualificationCard ? 'Zapisywanie...' : reservation?.qualification_card_status?.toLowerCase() === 'rejected' ? 'Zmień' : 'Odrzuć'}
                 </button>
               </div>
             </div>
