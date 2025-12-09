@@ -244,12 +244,13 @@ export default function AddonsManagement() {
 
       // Handle icon upload if file is selected
       // Always upload if new file is selected, even if iconRelativePath exists (user wants to replace old icon)
-      let finalIconRelativePath = iconRelativePath;
+      let finalIconRelativePath: string | null = iconRelativePath;
+      
       if (iconMethod === 'upload' && iconFile) {
         try {
           const uploadResult = await handleIconUpload(iconFile);
-          // uploadResult is { url, relative_path } - but handleIconUpload doesn't return it, so use state
-          finalIconRelativePath = iconRelativePath;
+          // uploadResult is { url, relative_path }
+          finalIconRelativePath = uploadResult.relative_path;
         } catch (uploadErr) {
           // Error already set in handleIconUpload
           return; // Stop saving if upload fails
