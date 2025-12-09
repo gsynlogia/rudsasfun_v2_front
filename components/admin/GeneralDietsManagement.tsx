@@ -97,19 +97,29 @@ export default function GeneralDietsManagement() {
     setIconSvg(diet.icon_svg || '');
     // If diet has icon_url, construct full URL for preview
     if (diet.icon_url) {
-      const API_BASE_URL = getApiBaseUrlRuntime();
-      // Check if icon_url is already a full URL or just a relative path
+      // Use getStaticAssetUrl to properly handle all URL formats
+      const fullUrl = getStaticAssetUrl(diet.icon_url);
+      setIconUploadUrl(fullUrl || null);
+      
+      // Extract relative path for database storage
       if (diet.icon_url.startsWith('http://') || diet.icon_url.startsWith('https://')) {
-        // Already a full URL, use it directly
-        setIconUploadUrl(diet.icon_url);
-        // Extract relative path from full URL
+        // Full URL - extract path
         const urlObj = new URL(diet.icon_url);
-        const relativePath = urlObj.pathname.replace('/static/', '');
-        setIconRelativePath(relativePath);
+        let path = urlObj.pathname;
+        // Remove /static/ prefix if present
+        if (path.startsWith('/static/')) {
+          path = path.replace('/static/', '');
+        }
+        setIconRelativePath(path);
       } else {
-        // Relative path, construct full URL
-        setIconUploadUrl(`${API_BASE_URL}/static/${diet.icon_url}`);
-        setIconRelativePath(diet.icon_url);
+        // Relative path - remove /static/ prefix if present
+        let relativePath = diet.icon_url;
+        if (relativePath.startsWith('/static/')) {
+          relativePath = relativePath.replace('/static/', '');
+        } else if (relativePath.startsWith('/')) {
+          relativePath = relativePath.substring(1);
+        }
+        setIconRelativePath(relativePath);
       }
     } else {
       setIconUploadUrl(null);
@@ -171,9 +181,10 @@ export default function GeneralDietsManagement() {
       setError(null);
 
       // Upload icon file if method is upload and file is selected
+      // Always upload if new file is selected, even if iconRelativePath exists (user wants to replace old icon)
       let finalIconRelativePath: string | null = iconRelativePath;
       
-      if (iconMethod === 'upload' && iconFile && !iconRelativePath) {
+      if (iconMethod === 'upload' && iconFile) {
         try {
           const uploadResult = await handleIconUpload(iconFile);
           // uploadResult is { url, relative_path }
@@ -481,7 +492,7 @@ export default function GeneralDietsManagement() {
                       <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
                         <p className="text-xs text-green-600 mb-1">Ikona została załadowana:</p>
                         <img 
-                          src={iconUploadUrl} 
+                          src={getStaticAssetUrl(iconUploadUrl) || iconUploadUrl || ''} 
                           alt="Uploaded icon"
                           className="w-20 h-20 object-contain bg-white border border-gray-300 rounded"
                         />
