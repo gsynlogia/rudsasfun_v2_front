@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Info } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 
 /**
  * AddonsSection Component
@@ -88,7 +88,7 @@ export default function AddonsSection() {
           price: addon.price,
           icon: addon.icon_url ? (
             <img 
-              src={addon.icon_url} 
+              src={getStaticAssetUrl(addon.icon_url) || ''} 
               alt={addon.name}
               className="w-12 h-12 object-contain"
               onError={(e) => {

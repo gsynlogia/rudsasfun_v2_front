@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
 import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
-import { getApiBaseUrlRuntime } from '@/utils/api-config';
+import { getApiBaseUrlRuntime, getStaticAssetUrl } from '@/utils/api-config';
 
 interface GeneralDiet {
   id: number;
@@ -303,7 +303,7 @@ export default function GeneralDietsManagement() {
                     />
                   ) : diet.icon_url ? (
                     <img 
-                      src={diet.icon_url} 
+                      src={getStaticAssetUrl(diet.icon_url) || ''} 
                       alt={diet.name}
                       className="w-10 h-10 object-contain"
                       onError={(e) => {
