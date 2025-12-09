@@ -98,7 +98,8 @@ export const API_BASE_URL = typeof window !== 'undefined'
 /**
  * Get full URL for static assets (icons, images, etc.)
  * Handles both relative paths (starting with /) and absolute URLs
- * @param iconUrl - Relative path (e.g., "/static/diet-icons/icon.svg") or absolute URL
+ * Prevents double /static/ in URLs
+ * @param iconUrl - Relative path (e.g., "/static/diet-icons/icon.svg", "diet-icons/icon.svg") or absolute URL
  * @returns Full URL that can be used in img src
  */
 export function getStaticAssetUrl(iconUrl: string | null | undefined): string | undefined {
@@ -111,14 +112,25 @@ export function getStaticAssetUrl(iconUrl: string | null | undefined): string | 
     return iconUrl;
   }
   
-  // If relative path starting with /, prepend API_BASE_URL
+  const baseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl');
+  
+  // If relative path starting with /, prepend API_BASE_URL (already has /static/ if needed)
   if (iconUrl.startsWith('/')) {
-    const baseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl');
-    return `${baseUrl}${iconUrl}`;
+    // Remove double slashes (e.g., //static -> /static)
+    const cleanPath = iconUrl.replace(/^\/+/, '/');
+    return `${baseUrl}${cleanPath}`;
   }
   
-  // If relative path without leading /, add /static/ prefix and prepend API_BASE_URL
-  const baseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl');
-  return `${baseUrl}/static/${iconUrl}`;
+  // If relative path without leading /, check if it already contains static/
+  // Backend might return "diet-icons/..." or "static/diet-icons/..."
+  let cleanPath = iconUrl;
+  
+  // Remove leading static/ if present (to avoid double /static/static/)
+  if (cleanPath.startsWith('static/')) {
+    cleanPath = cleanPath.replace(/^static\//, '');
+  }
+  
+  // Add /static/ prefix and prepend API_BASE_URL
+  return `${baseUrl}/static/${cleanPath}`;
 }
 
