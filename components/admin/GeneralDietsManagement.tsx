@@ -106,17 +106,22 @@ export default function GeneralDietsManagement() {
         // Full URL - extract path
         const urlObj = new URL(diet.icon_url);
         let path = urlObj.pathname;
-        // Remove /static/ prefix if present
-        if (path.startsWith('/static/')) {
+        // Remove all /static/ prefixes (handle double /static/static/)
+        while (path.startsWith('/static/')) {
           path = path.replace('/static/', '');
         }
         setIconRelativePath(path);
       } else {
-        // Relative path - remove /static/ prefix if present
+        // Relative path - remove all /static/ prefixes (handle double /static/static/)
         let relativePath = diet.icon_url;
-        if (relativePath.startsWith('/static/')) {
-          relativePath = relativePath.replace('/static/', '');
-        } else if (relativePath.startsWith('/')) {
+        while (relativePath.startsWith('/static/') || relativePath.startsWith('static/')) {
+          if (relativePath.startsWith('/static/')) {
+            relativePath = relativePath.replace('/static/', '');
+          } else if (relativePath.startsWith('static/')) {
+            relativePath = relativePath.replace('static/', '');
+          }
+        }
+        if (relativePath.startsWith('/')) {
           relativePath = relativePath.substring(1);
         }
         setIconRelativePath(relativePath);
