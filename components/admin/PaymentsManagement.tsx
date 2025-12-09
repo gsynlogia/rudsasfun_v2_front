@@ -499,8 +499,8 @@ export default function PaymentsManagement() {
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortColumn, setSortColumn] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortColumn, setSortColumn] = useState<string | null>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
@@ -674,6 +674,11 @@ export default function PaymentsManagement() {
         let bValue: string | number;
 
         switch (sortColumn) {
+          case 'createdAt':
+            // Sort by date (newest first by default)
+            const aDate = new Date(a.createdAt).getTime();
+            const bDate = new Date(b.createdAt).getTime();
+            return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
           case 'reservationName':
             aValue = a.reservationName;
             bValue = b.reservationName;
@@ -1412,6 +1417,16 @@ export default function PaymentsManagement() {
               <tr>
                 <th
                   className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('createdAt')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="flex items-center gap-1">
+                    Data utworzenia
+                    <SortIcon column="createdAt" />
+                  </div>
+                </th>
+                <th
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('reservationName')}
                   style={{ cursor: 'pointer' }}
                 >
@@ -1485,6 +1500,17 @@ export default function PaymentsManagement() {
                         onClick={() => toggleRowExpansion(reservation.id)}
                         style={{ cursor: 'pointer' }}
                       >
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <span className="text-sm text-gray-600">
+                            {new Date(reservation.createdAt).toLocaleDateString('pl-PL', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <span className="text-sm font-medium text-gray-900">
                             {reservation.reservationName}
