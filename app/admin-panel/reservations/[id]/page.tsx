@@ -925,12 +925,12 @@ export default function ReservationDetailPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">Status karty:</span>
                       <span className={`text-sm font-medium ${
-                        reservation.qualification_card_status === 'approved' ? 'text-green-600' :
-                        reservation.qualification_card_status === 'rejected' ? 'text-red-600' :
+                        reservation.qualification_card_status?.toLowerCase() === 'approved' ? 'text-green-600' :
+                        reservation.qualification_card_status?.toLowerCase() === 'rejected' ? 'text-red-600' :
                         'text-yellow-600'
                       }`}>
-                        {reservation.qualification_card_status === 'approved' ? 'Zatwierdzona' :
-                         reservation.qualification_card_status === 'rejected' ? 'Niezatwierdzona' :
+                        {reservation.qualification_card_status?.toLowerCase() === 'approved' ? 'Zatwierdzona' :
+                         reservation.qualification_card_status?.toLowerCase() === 'rejected' ? 'Niezatwierdzona' :
                          'Oczekuje'}
                       </span>
           </div>
