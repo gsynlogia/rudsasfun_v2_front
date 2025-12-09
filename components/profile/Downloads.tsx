@@ -46,8 +46,28 @@ export default function Downloads() {
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
         const reservationsMap = new Map(reservations.map(r => [r.id, r]));
         
-        // Map contracts to documents
-        const contractsList: Document[] = contracts.map((contract) => {
+        // Group contracts and qualification cards by reservation_id to ensure only one of each per reservation
+        const contractsByReservation = new Map<number, typeof contracts[0]>();
+        const cardsByReservation = new Map<number, typeof qualificationCards[0]>();
+        
+        // Keep only the most recent contract per reservation
+        contracts.forEach((contract) => {
+          const existing = contractsByReservation.get(contract.reservation_id);
+          if (!existing || new Date(contract.created_at) > new Date(existing.created_at)) {
+            contractsByReservation.set(contract.reservation_id, contract);
+          }
+        });
+        
+        // Keep only the most recent qualification card per reservation
+        qualificationCards.forEach((card) => {
+          const existing = cardsByReservation.get(card.reservation_id);
+          if (!existing || new Date(card.created_at) > new Date(existing.created_at)) {
+            cardsByReservation.set(card.reservation_id, card);
+          }
+        });
+        
+        // Map contracts to documents (only one per reservation)
+        const contractsList: Document[] = Array.from(contractsByReservation.values()).map((contract) => {
           const reservation = reservationsMap.get(contract.reservation_id);
           const participantName = contract.participant_first_name && contract.participant_last_name
             ? `${contract.participant_first_name} ${contract.participant_last_name}`
@@ -82,8 +102,8 @@ export default function Downloads() {
           };
         });
         
-        // Map qualification cards to documents
-        const qualificationCardsList: Document[] = qualificationCards.map((card) => {
+        // Map qualification cards to documents (only one per reservation)
+        const qualificationCardsList: Document[] = Array.from(cardsByReservation.values()).map((card) => {
           const reservation = reservationsMap.get(card.reservation_id);
           const participantName = card.participant_first_name && card.participant_last_name
             ? `${card.participant_first_name} ${card.participant_last_name}`
@@ -175,6 +195,20 @@ export default function Downloads() {
     }
   };
 
+  const [expandedReservations, setExpandedReservations] = useState<Set<number>>(new Set());
+
+  const toggleReservation = (reservationId: number) => {
+    setExpandedReservations(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(reservationId)) {
+        newSet.delete(reservationId);
+      } else {
+        newSet.add(reservationId);
+      }
+      return newSet;
+    });
+  };
+
   const getStatusBadge = (status: Document['status']) => {
     switch (status) {
       case 'available':
@@ -218,6 +252,19 @@ export default function Downloads() {
     );
   }
 
+  // Group documents by reservation
+  const documentsByReservation = new Map<number, { reservation: Document, documents: Document[] }>();
+  
+  documents.forEach((doc) => {
+    if (!documentsByReservation.has(doc.reservationId)) {
+      documentsByReservation.set(doc.reservationId, {
+        reservation: doc,
+        documents: []
+      });
+    }
+    documentsByReservation.get(doc.reservationId)!.documents.push(doc);
+  });
+
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Documents Section */}
@@ -226,101 +273,127 @@ export default function Downloads() {
           Dokumenty do pobrania
         </h3>
         
-        {documents.length === 0 ? (
+        {documentsByReservation.size === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
             <p className="text-gray-600">Brak dostępnych dokumentów</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Typ dokumentu
-                    </th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Data
-                    </th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Rezerwacja
-                    </th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Kwota
-                    </th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Status
-                    </th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                      Akcje
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {documents.map((document) => (
-                    <tr key={document.id} className="hover:bg-gray-50">
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900 font-medium">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-gray-400" />
-                          {document.type === 'contract' ? 'Umowa' : 
-                           document.type === 'qualification_card' ? 'Karta kwalifikacyjna' : 
-                           'Inny dokument'}
+          <div className="space-y-4">
+            {Array.from(documentsByReservation.entries()).map(([reservationId, { reservation, documents: reservationDocs }]) => {
+              const isExpanded = expandedReservations.has(reservationId);
+              const hasContract = reservationDocs.some(d => d.type === 'contract');
+              const hasCard = reservationDocs.some(d => d.type === 'qualification_card');
+              
+              return (
+                <div key={reservationId} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
+                  {/* Reservation Header - Clickable */}
+                  <button
+                    onClick={() => toggleReservation(reservationId)}
+                    className="w-full px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-transform ${
+                          isExpanded ? 'rotate-90' : ''
+                        }`}>
+                          <svg className="w-full h-full text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                          </svg>
                         </div>
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                          {document.date}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
                         <div>
-                          <div className="font-medium text-gray-900">{document.reservationName}</div>
-                          <div className="text-[10px] sm:text-xs text-gray-500">{document.participantName}</div>
+                          <div className="font-semibold text-sm sm:text-base text-gray-900">
+                            {reservation.reservationName}
+                          </div>
+                          <div className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                            {reservation.participantName} • {reservation.amount.toFixed(2)} zł
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold text-gray-900">
-                        {document.amount.toFixed(2)} zł
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <div className="flex items-center gap-2">
-                          {document.type === 'contract' && document.contract_status && (
-                            <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${
-                              document.contract_status === 'approved' ? 'bg-green-500' : 'bg-yellow-400'
-                            }`} title={
-                              document.contract_status === 'approved' ? 'Umowa zatwierdzona' :
-                              document.contract_status === 'rejected' ? 'Umowa niezatwierdzona' :
-                              'Umowa oczekuje na zatwierdzenie'
-                            }></div>
-                          )}
-                          {getStatusBadge(document.status)}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <button
-                          onClick={() => handleDownloadDocument(document)}
-                          disabled={document.status !== 'available' || downloadingIds.has(document.id)}
-                          className="flex items-center gap-1 text-[#03adf0] text-[10px] sm:text-xs hover:text-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {downloadingIds.has(document.id) ? (
-                            <>
-                              <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
-                              Pobieranie...
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
-                              Pobierz
-                            </>
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-4 ml-4">
+                      <div className="flex items-center gap-2">
+                        {hasContract && (
+                          <span className="text-xs sm:text-sm text-gray-600 bg-blue-50 px-2 py-1 rounded">
+                            Umowa
+                          </span>
+                        )}
+                        {hasCard && (
+                          <span className="text-xs sm:text-sm text-gray-600 bg-green-50 px-2 py-1 rounded">
+                            Karta
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                  
+                  {/* Expanded Content - Documents */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-200 bg-gray-50">
+                      <div className="p-4 sm:p-6 space-y-4">
+                        {reservationDocs.map((document) => (
+                          <div key={document.id} className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                                  <span className="font-medium text-sm sm:text-base text-gray-900">
+                                    {document.type === 'contract' ? 'Umowa' : 
+                                     document.type === 'qualification_card' ? 'Karta kwalifikacyjna' : 
+                                     'Inny dokument'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-4 text-xs sm:text-sm text-gray-600 mb-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    {document.date}
+                                  </div>
+                                  {document.type === 'contract' && document.contract_status && (
+                                    <div className={`flex items-center gap-1.5 ${
+                                      document.contract_status === 'approved' ? 'text-green-600' :
+                                      document.contract_status === 'rejected' ? 'text-red-600' :
+                                      'text-yellow-600'
+                                    }`}>
+                                      <div className={`w-2 h-2 rounded-full ${
+                                        document.contract_status === 'approved' ? 'bg-green-500' :
+                                        document.contract_status === 'rejected' ? 'bg-red-500' :
+                                        'bg-yellow-400'
+                                      }`}></div>
+                                      {document.contract_status === 'approved' ? 'Zatwierdzona' :
+                                       document.contract_status === 'rejected' ? 'Niezatwierdzona' :
+                                       'Oczekuje'}
+                                    </div>
+                                  )}
+                                </div>
+                                {getStatusBadge(document.status)}
+                              </div>
+                              <button
+                                onClick={() => handleDownloadDocument(document)}
+                                disabled={document.status !== 'available' || downloadingIds.has(document.id)}
+                                className="ml-4 flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-[#03adf0] text-white text-xs sm:text-sm rounded hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {downloadingIds.has(document.id) ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                                    <span className="hidden sm:inline">Pobieranie...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    <span className="hidden sm:inline">Pobierz</span>
+                                    <span className="sm:hidden">Pobierz</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
