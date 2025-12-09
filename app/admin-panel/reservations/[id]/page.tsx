@@ -866,7 +866,15 @@ export default function ReservationDetailPage() {
                     <Download className="w-4 h-4" />
                     Pobierz umowę
                   </button>
-                  {reservation.contract_status !== 'approved' && (
+                  {reservation.contract_status === 'approved' ? (
+                    <button
+                      disabled
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded opacity-50 cursor-not-allowed text-sm font-medium"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Umowa zatwierdzona
+                    </button>
+                  ) : (
                     <button
                       onClick={handleApproveContract}
                       disabled={isUpdatingContract}
@@ -876,7 +884,18 @@ export default function ReservationDetailPage() {
                       {isUpdatingContract ? 'Zapisywanie...' : 'Umowa zatwierdzona'}
                     </button>
                   )}
-                  {reservation.contract_status !== 'rejected' && (
+                  {reservation.contract_status === 'rejected' ? (
+                    <button
+                      onClick={() => {
+                        setRejectionReason(reservation.contract_rejection_reason || '');
+                        setContractModalOpen(true);
+                      }}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors text-sm font-medium"
+                    >
+                      <X className="w-4 h-4" />
+                      Zmień
+                    </button>
+                  ) : (
                     <button
                       onClick={() => {
                         setRejectionReason('');
@@ -939,7 +958,15 @@ export default function ReservationDetailPage() {
                         <Download className="w-4 h-4" />
                         {downloadingCard ? 'Pobieranie...' : 'Pobierz kartę kwalifikacyjną'}
                       </button>
-                      {reservation.qualification_card_status !== 'approved' && (
+                      {reservation.qualification_card_status === 'approved' ? (
+                        <button
+                          disabled
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded opacity-50 cursor-not-allowed text-sm font-medium"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Karta zatwierdzona
+                        </button>
+                      ) : (
                         <button
                           onClick={handleApproveQualificationCard}
                           disabled={isUpdatingQualificationCard}
@@ -949,7 +976,18 @@ export default function ReservationDetailPage() {
                           {isUpdatingQualificationCard ? 'Zapisywanie...' : 'Karta zatwierdzona'}
                         </button>
                       )}
-                      {reservation.qualification_card_status !== 'rejected' && (
+                      {reservation.qualification_card_status === 'rejected' ? (
+                        <button
+                          onClick={() => {
+                            setQualificationCardRejectionReason(reservation.qualification_card_rejection_reason || '');
+                            setQualificationCardModalOpen(true);
+                          }}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors text-sm font-medium"
+                        >
+                          <X className="w-4 h-4" />
+                          Zmień
+                        </button>
+                      ) : (
                         <button
                           onClick={() => {
                             setQualificationCardRejectionReason('');
@@ -1015,9 +1053,13 @@ export default function ReservationDetailPage() {
                 <button
                   onClick={handleRejectContract}
                   disabled={isUpdatingContract || !rejectionReason.trim()}
-                  className="px-4 py-2 text-white bg-red-600 rounded hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+                  className={`px-4 py-2 text-white rounded transition-colors text-sm font-medium disabled:opacity-50 ${
+                    reservation?.contract_status === 'rejected'
+                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                      : 'bg-red-600 hover:bg-red-700'
+                  }`}
                 >
-                  {isUpdatingContract ? 'Zapisywanie...' : 'Odrzuć'}
+                  {isUpdatingContract ? 'Zapisywanie...' : reservation?.contract_status === 'rejected' ? 'Zmień' : 'Odrzuć'}
                 </button>
               </div>
             </div>
@@ -1057,9 +1099,13 @@ export default function ReservationDetailPage() {
                 <button
                   onClick={handleRejectQualificationCard}
                   disabled={isUpdatingQualificationCard || !qualificationCardRejectionReason.trim()}
-                  className="px-4 py-2 text-white bg-red-600 rounded hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+                  className={`px-4 py-2 text-white rounded transition-colors text-sm font-medium disabled:opacity-50 ${
+                    reservation?.qualification_card_status === 'rejected'
+                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                      : 'bg-red-600 hover:bg-red-700'
+                  }`}
                 >
-                  {isUpdatingQualificationCard ? 'Zapisywanie...' : 'Odrzuć'}
+                  {isUpdatingQualificationCard ? 'Zapisywanie...' : reservation?.qualification_card_status === 'rejected' ? 'Zmień' : 'Odrzuć'}
                 </button>
               </div>
             </div>
