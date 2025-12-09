@@ -105,9 +105,35 @@ export default function AddonsManagement() {
     setAddonIconSvg(addon.icon_svg || '');
     // If addon has icon_url, construct full URL for preview
     if (addon.icon_url) {
-      const API_BASE_URL = getApiBaseUrlRuntime();
-      setIconUploadUrl(addon.icon_url);
-      setIconRelativePath(addon.icon_url);
+      // Use getStaticAssetUrl to properly handle all URL formats
+      const fullUrl = getStaticAssetUrl(addon.icon_url);
+      setIconUploadUrl(fullUrl || null);
+      
+      // Extract relative path for database storage
+      if (addon.icon_url.startsWith('http://') || addon.icon_url.startsWith('https://')) {
+        // Full URL - extract path
+        const urlObj = new URL(addon.icon_url);
+        let path = urlObj.pathname;
+        // Remove all /static/ prefixes (handle double /static/static/)
+        while (path.startsWith('/static/')) {
+          path = path.replace('/static/', '');
+        }
+        setIconRelativePath(path);
+      } else {
+        // Relative path - remove all /static/ prefixes (handle double /static/static/)
+        let relativePath = addon.icon_url;
+        while (relativePath.startsWith('/static/') || relativePath.startsWith('static/')) {
+          if (relativePath.startsWith('/static/')) {
+            relativePath = relativePath.replace('/static/', '');
+          } else if (relativePath.startsWith('static/')) {
+            relativePath = relativePath.replace('static/', '');
+          }
+        }
+        if (relativePath.startsWith('/')) {
+          relativePath = relativePath.substring(1);
+        }
+        setIconRelativePath(relativePath);
+      }
     } else {
       setIconUploadUrl(null);
       setIconRelativePath(null);
@@ -178,10 +204,12 @@ export default function AddonsManagement() {
       console.log('[AddonsManagement] Upload success:', data);
       setIconUploadUrl(data.url);
       setIconRelativePath(data.relative_path);
-      setIconFile(file);
+      setIconFile(null); // Clear file input after successful upload
       setIconMethod('upload');
       // Clear SVG when uploading
       setAddonIconSvg('');
+      // Return both URL (for preview) and relative_path (for database)
+      return { url: data.url, relative_path: data.relative_path };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas wgrywania ikony';
       setError(errorMessage);
@@ -215,11 +243,17 @@ export default function AddonsManagement() {
       setError(null);
 
       // Handle icon upload if file is selected
+      // Always upload if new file is selected, even if iconRelativePath exists (user wants to replace old icon)
       let finalIconRelativePath = iconRelativePath;
-      if (iconMethod === 'upload' && iconFile && !iconRelativePath) {
-        // Upload icon first
-        await handleIconUpload(iconFile);
-        finalIconRelativePath = iconRelativePath;
+      if (iconMethod === 'upload' && iconFile) {
+        try {
+          const uploadResult = await handleIconUpload(iconFile);
+          // uploadResult is { url, relative_path } - but handleIconUpload doesn't return it, so use state
+          finalIconRelativePath = iconRelativePath;
+        } catch (uploadErr) {
+          // Error already set in handleIconUpload
+          return; // Stop saving if upload fails
+        }
       }
 
       const addonData: any = {
@@ -652,6 +686,10 @@ export default function AddonsManagement() {
                         const file = e.target.files?.[0];
                         if (file) {
                           setIconFile(file);
+                          setAddonIconSvg(''); // Clear SVG when uploading file
+                          // Clear old iconRelativePath when new file is selected - will be set after upload
+                          setIconRelativePath(null);
+                          setIconUploadUrl(null);
                           handleIconUpload(file).catch(() => {
                             // Error already handled in handleIconUpload
                           });
@@ -669,7 +707,7 @@ export default function AddonsManagement() {
                       <p className="text-xs text-gray-600 mb-2">Podgląd wgranej ikony:</p>
                       <div className="w-16 h-16 flex items-center justify-center border border-gray-300 rounded bg-white">
                         <img
-                          src={iconUploadUrl}
+                          src={getStaticAssetUrl(iconUploadUrl) || iconUploadUrl || ''}
                           alt="Icon preview"
                           className="w-full h-full object-contain"
                           onError={(e) => {
