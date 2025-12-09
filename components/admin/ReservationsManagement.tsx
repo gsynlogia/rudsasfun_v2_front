@@ -955,6 +955,16 @@ export default function ReservationsManagement() {
                 </th>
                 <th
                   className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('createdAt')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="flex items-center gap-1">
+                    Data utworzenia
+                    <SortIcon column="createdAt" />
+                  </div>
+                </th>
+                <th
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('participantName')}
                   style={{ cursor: 'pointer' }}
                 >
@@ -1003,16 +1013,6 @@ export default function ReservationsManagement() {
                     <SortIcon column="status" />
                   </div>
                 </th>
-                <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('createdAt')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="flex items-center gap-1">
-                    Data utworzenia
-                    <SortIcon column="createdAt" />
-                  </div>
-                </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                   Akcje
                 </th>
@@ -1043,6 +1043,9 @@ export default function ReservationsManagement() {
                               {reservation.reservationName}
                             </span>
                           </div>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(reservation.createdAt)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2">
@@ -1084,9 +1087,6 @@ export default function ReservationsManagement() {
                           >
                             {reservation.status}
                           </span>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(reservation.createdAt)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
