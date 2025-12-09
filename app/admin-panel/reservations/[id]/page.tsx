@@ -843,12 +843,12 @@ export default function ReservationDetailPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Status umowy:</span>
                   <span className={`text-sm font-medium ${
-                    reservation.contract_status === 'approved' ? 'text-green-600' :
-                    reservation.contract_status === 'rejected' ? 'text-red-600' :
+                    reservation.contract_status?.toLowerCase() === 'approved' ? 'text-green-600' :
+                    reservation.contract_status?.toLowerCase() === 'rejected' ? 'text-red-600' :
                     'text-yellow-600'
                   }`}>
-                    {reservation.contract_status === 'approved' ? 'Zatwierdzona' :
-                     reservation.contract_status === 'rejected' ? 'Niezatwierdzona' :
+                    {reservation.contract_status?.toLowerCase() === 'approved' ? 'Zatwierdzona' :
+                     reservation.contract_status?.toLowerCase() === 'rejected' ? 'Niezatwierdzona' :
                      'Oczekuje'}
                   </span>
                 </div>
