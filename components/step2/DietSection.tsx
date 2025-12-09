@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Info, UtensilsCrossed } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 
 interface Diet {
   id: number;
@@ -263,7 +263,7 @@ export default function DietSection() {
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center">
                     {diet.icon_url ? (
                       <img
-                        src={diet.icon_url}
+                        src={getStaticAssetUrl(diet.icon_url) || ''}
                         alt={diet.name}
                         className="w-full h-full object-contain"
                         onError={(e) => {

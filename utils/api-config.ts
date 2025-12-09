@@ -95,3 +95,30 @@ export const API_BASE_URL = typeof window !== 'undefined'
   ? getApiBaseUrl() // Client-side: calculate at runtime (will detect Vercel and use production)
   : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl'); // Server-side: use env var or production default
 
+/**
+ * Get full URL for static assets (icons, images, etc.)
+ * Handles both relative paths (starting with /) and absolute URLs
+ * @param iconUrl - Relative path (e.g., "/static/diet-icons/icon.svg") or absolute URL
+ * @returns Full URL that can be used in img src
+ */
+export function getStaticAssetUrl(iconUrl: string | null | undefined): string | undefined {
+  if (!iconUrl) {
+    return undefined;
+  }
+  
+  // If already a full URL (http:// or https://), return as-is
+  if (iconUrl.startsWith('http://') || iconUrl.startsWith('https://')) {
+    return iconUrl;
+  }
+  
+  // If relative path starting with /, prepend API_BASE_URL
+  if (iconUrl.startsWith('/')) {
+    const baseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl');
+    return `${baseUrl}${iconUrl}`;
+  }
+  
+  // If relative path without leading /, add /static/ prefix and prepend API_BASE_URL
+  const baseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl');
+  return `${baseUrl}/static/${iconUrl}`;
+}
+

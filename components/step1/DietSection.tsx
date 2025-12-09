@@ -5,7 +5,7 @@ import { usePathname, useParams } from 'next/navigation';
 import { Info } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep1FormData, saveStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { fetchWithDefaults } from '@/utils/api-fetch';
 import { DEFAULT_DIET } from '@/types/defaults';
 import { BackendUnavailableError } from '@/utils/api-auth';
@@ -379,7 +379,7 @@ export default function DietSection() {
                       {/* Icon URL (uploaded icon) - highest priority */}
                       <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 flex items-center justify-center flex-shrink-0">
                         <img
-                          src={diet.icon_url}
+                          src={getStaticAssetUrl(diet.icon_url) || ''}
                           alt={diet.name}
                           className={`w-full h-full object-contain max-w-full max-h-full ${
                             isSelected ? 'brightness-0 invert' : ''

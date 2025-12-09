@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
 import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
-import { getApiBaseUrlRuntime } from '@/utils/api-config';
+import { getApiBaseUrlRuntime, getStaticAssetUrl } from '@/utils/api-config';
 
 interface GeneralProtection {
   id: number;
@@ -302,7 +302,7 @@ export default function GeneralProtectionsManagement() {
                     />
                   ) : protection.icon_url ? (
                     <img
-                      src={protection.icon_url}
+                      src={getStaticAssetUrl(protection.icon_url) || ''}
                       alt={protection.display_name}
                       className="w-8 h-8 object-contain"
                     />

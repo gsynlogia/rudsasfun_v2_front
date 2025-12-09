@@ -5,7 +5,7 @@ import { Info, Download } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 
 interface Protection {
   id: string;  // Protection ID for compatibility
@@ -318,7 +318,7 @@ export default function ProtectionSection() {
                 {protection.icon_url ? (
                   <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
                     <img
-                      src={protection.icon_url}
+                      src={getStaticAssetUrl(protection.icon_url) || ''}
                       alt={protection.name}
                       className={`w-full h-full object-contain max-w-full max-h-full ${
                         isSelected ? 'brightness-0 invert' : ''
