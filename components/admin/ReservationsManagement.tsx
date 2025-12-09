@@ -509,8 +509,13 @@ export default function ReservationsManagement() {
 
         switch (sortColumn) {
           case 'reservationName':
-            aValue = a.reservationName;
-            bValue = b.reservationName;
+            // Extract numeric part from reservation name (e.g., "REZ-2025-004" -> 4)
+            const extractReservationNumber = (name: string): number => {
+              const match = name.match(/-(\d+)$/);
+              return match ? parseInt(match[1], 10) : 0;
+            };
+            aValue = extractReservationNumber(a.reservationName);
+            bValue = extractReservationNumber(b.reservationName);
             break;
           case 'participantName':
             aValue = a.participantName;
