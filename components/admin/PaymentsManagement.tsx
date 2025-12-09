@@ -1501,6 +1501,11 @@ export default function PaymentsManagement() {
                         style={{ cursor: 'pointer' }}
                       >
                         <td className="px-4 py-2 whitespace-nowrap">
+                          <span className="text-sm font-medium text-gray-900">
+                            {reservation.reservationName}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
                           <span className="text-sm text-gray-600">
                             {new Date(reservation.createdAt).toLocaleDateString('pl-PL', {
                               year: 'numeric',
@@ -1509,11 +1514,6 @@ export default function PaymentsManagement() {
                               hour: '2-digit',
                               minute: '2-digit'
                             })}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <span className="text-sm font-medium text-gray-900">
-                            {reservation.reservationName}
                           </span>
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
