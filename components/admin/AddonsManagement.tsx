@@ -708,7 +708,7 @@ export default function AddonsManagement() {
                       <p className="text-xs text-gray-600 mb-2">Podgląd wgranej ikony:</p>
                       <div className="w-16 h-16 flex items-center justify-center border border-gray-300 rounded bg-white">
                         <img
-                          src={getStaticAssetUrl(iconUploadUrl) || iconUploadUrl || ''}
+                          src={getStaticAssetUrl(iconUploadUrl) || ''}
                           alt="Icon preview"
                           className="w-full h-full object-contain"
                           onError={(e) => {
