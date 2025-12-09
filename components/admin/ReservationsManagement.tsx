@@ -447,8 +447,8 @@ export default function ReservationsManagement() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [tripFilter, setTripFilter] = useState<string | null>(null);
   const [campFilters, setCampFilters] = useState<string[]>([]); // Changed to array for multi-select
-  const [sortColumn, setSortColumn] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortColumn, setSortColumn] = useState<string | null>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
