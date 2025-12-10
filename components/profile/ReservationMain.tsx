@@ -454,107 +454,77 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                 <div className="space-y-2 sm:space-y-3">
                   <h6 className="text-xs sm:text-sm font-semibold text-gray-700">Wybierz sposób płatności:</h6>
                   <div className="space-y-2">
-                    {/* Calculate remaining amount */}
+                    {/* Calculate remaining amount - always show all 3 options */}
                     {(() => {
                       const remainingAmount = reservation.total_price - paidAmount;
-                      const selectedPlan = reservation.payment_plan;
-                      
-                      // If payment_plan is set and at least one payment was made, hide other options
-                      const hasPaymentPlan = selectedPlan && selectedPlan !== null;
-                      const hasMadePayment = paidAmount > 0;
-                      const shouldLockPlan = hasPaymentPlan && hasMadePayment;
                       
                       return (
                         <>
-                          {/* Full Payment - hide if plan is '2' or '3' and payment was made */}
-                          {(!shouldLockPlan || selectedPlan === 'full') && (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                id={`installmentFull-${reservation.id}`}
-                                name={`paymentInstallments-${reservation.id}`}
-                                value="full"
-                                checked={paymentInstallments === 'full'}
-                                onChange={async () => {
-                                  setPaymentInstallments('full');
-                                  // Save to database
-                                  try {
-                                    await reservationService.updatePaymentPlan(reservation.id, 'full');
-                                  } catch (error) {
-                                    console.error('Error updating payment plan:', error);
-                                  }
-                                }}
-                                disabled={!!(shouldLockPlan && selectedPlan !== 'full')}
-                                className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              />
-                              <label
-                                htmlFor={`installmentFull-${reservation.id}`}
-                                className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                              >
-                                Pełna płatność ({remainingAmount.toFixed(2)} zł)
-                              </label>
-                            </div>
-                          )}
+                          {/* Full Payment - always visible */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              id={`installmentFull-${reservation.id}`}
+                              name={`paymentInstallments-${reservation.id}`}
+                              value="full"
+                              checked={paymentInstallments === 'full'}
+                              onChange={() => {
+                                // Only update local state, don't save to database yet
+                                setPaymentInstallments('full');
+                              }}
+                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer"
+                            />
+                            <label
+                              htmlFor={`installmentFull-${reservation.id}`}
+                              className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                            >
+                              Pełna płatność ({remainingAmount.toFixed(2)} zł)
+                            </label>
+                          </div>
                           
-                          {/* 2 Equal Installments - hide if plan is 'full' or '3' and payment was made */}
-                          {(!shouldLockPlan || selectedPlan === '2') && (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                id={`installment2-${reservation.id}`}
-                                name={`paymentInstallments-${reservation.id}`}
-                                value="2"
-                                checked={paymentInstallments === '2'}
-                                onChange={async () => {
-                                  setPaymentInstallments('2');
-                                  // Save to database
-                                  try {
-                                    await reservationService.updatePaymentPlan(reservation.id, '2');
-                                  } catch (error) {
-                                    console.error('Error updating payment plan:', error);
-                                  }
-                                }}
-                                disabled={!!(shouldLockPlan && selectedPlan !== '2')}
-                                className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              />
-                              <label
-                                htmlFor={`installment2-${reservation.id}`}
-                                className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                              >
-                                Płatność w dwóch ratach (po {(remainingAmount / 2).toFixed(2)} zł)
-                              </label>
-                            </div>
-                          )}
+                          {/* 2 Equal Installments - always visible */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              id={`installment2-${reservation.id}`}
+                              name={`paymentInstallments-${reservation.id}`}
+                              value="2"
+                              checked={paymentInstallments === '2'}
+                              onChange={() => {
+                                // Only update local state, don't save to database yet
+                                setPaymentInstallments('2');
+                              }}
+                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer"
+                            />
+                            <label
+                              htmlFor={`installment2-${reservation.id}`}
+                              className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                            >
+                              Płatność w dwóch ratach (po {(remainingAmount / 2).toFixed(2)} zł)
+                            </label>
+                          </div>
                           
-                          {/* 3 Equal Installments - hide if plan is 'full' or '2' and payment was made */}
-                          {(!shouldLockPlan || selectedPlan === '3') && (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                id={`installment3-${reservation.id}`}
-                                name={`paymentInstallments-${reservation.id}`}
-                                value="3"
-                                checked={paymentInstallments === '3'}
-                                onChange={async () => {
-                                  setPaymentInstallments('3');
-                                  // Save to database
-                                  try {
-                                    await reservationService.updatePaymentPlan(reservation.id, '3');
-                                  } catch (error) {
-                                    console.error('Error updating payment plan:', error);
-                                  }
-                                }}
-                                disabled={!!(shouldLockPlan && selectedPlan !== '3')}
-                                className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              />
-                              <label
-                                htmlFor={`installment3-${reservation.id}`}
-                                className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                              >
-                                Płatność w trzech ratach (po {(remainingAmount / 3).toFixed(2)} zł)
-                              </label>
-                            </div>
-                          )}
+                          {/* 3 Equal Installments - always visible */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              id={`installment3-${reservation.id}`}
+                              name={`paymentInstallments-${reservation.id}`}
+                              value="3"
+                              checked={paymentInstallments === '3'}
+                              onChange={() => {
+                                // Only update local state, don't save to database yet
+                                setPaymentInstallments('3');
+                              }}
+                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer"
+                            />
+                            <label
+                              htmlFor={`installment3-${reservation.id}`}
+                              className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                            >
+                              Płatność w trzech ratach (po {(remainingAmount / 3).toFixed(2)} zł)
+                            </label>
+                          </div>
                         </>
                       );
                     })()}
@@ -568,8 +538,16 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                       onClick={async () => {
                         if (isProcessingPayment) return;
                         
+                        if (!paymentInstallments) {
+                          alert('Proszę wybrać sposób płatności');
+                          return;
+                        }
+                        
                         setIsProcessingPayment(true);
                         try {
+                          // Save payment plan to database BEFORE creating payment
+                          await reservationService.updatePaymentPlan(reservation.id, paymentInstallments);
+                          
                           // Calculate remaining amount
                           const remainingAmount = reservation.total_price - paidAmount;
                           
