@@ -155,10 +155,11 @@ export default function ReservationDetailPage() {
           paid_amount: number | null;
         }>>('/api/payments/');
         
-        // Filter payments for this reservation (order_id format: "RES-{reservation_id}" or "TARCZA-{reservation_id}-{timestamp}")
+        // Filter payments for this reservation (order_id format: "RES-{reservation_id}" or "RES-{reservation_id}-{timestamp}" or "TARCZA-{reservation_id}-{timestamp}")
         const reservationPayments = payments.filter(p => {
           if (!p.order_id) return false;
-          const match = p.order_id.match(/(?:RES-|TARCZA-)(\d+)/);
+          // Format: "RES-{id}" or "RES-{id}-{timestamp}" or "TARCZA-{id}-{timestamp}"
+          const match = p.order_id.match(/(?:RES-|TARCZA-)(\d+)(?:-|$)/);
           if (match) {
             return parseInt(match[1], 10) === reservationData.id;
           }

@@ -130,13 +130,17 @@ const generatePaymentItems = async (
   // Use turnus prices if available, otherwise fallback to general prices
   const effectiveProtectionsMap = turnusProtectionsMap.size > 0 ? turnusProtectionsMap : protectionsMap;
   
-  // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}")
+  // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}" or "RES-{id}-{timestamp}")
   const reservationPayments = payments.filter(p => {
     const orderId = p.order_id || '';
-    // Check if order_id matches reservation.id (with or without "RES-" prefix)
-    return orderId === String(reservation.id) || 
-           orderId === `RES-${reservation.id}` ||
-           orderId.endsWith(`-${reservation.id}`);
+    // Check if order_id matches reservation.id (with or without "RES-" prefix, or with timestamp)
+    // Format: "RES-{id}" or "RES-{id}-{timestamp}" or just "{id}"
+    if (orderId === String(reservation.id)) return true;
+    if (orderId === `RES-${reservation.id}`) return true;
+    // For format "RES-{id}-{timestamp}", extract the id part
+    const match = orderId.match(/^RES-(\d+)(?:-|$)/);
+    if (match && parseInt(match[1], 10) === reservation.id) return true;
+    return false;
   });
   // Include payments with status 'success' or 'pending' if they have amount set
   // For pending payments, we use 'amount' as the paid amount (assuming payment was made)
@@ -389,13 +393,17 @@ const generatePaymentDetails = async (
 ): Promise<PaymentDetails> => {
   const items = await generatePaymentItems(reservation, payments, protectionsMap, addonsMap);
   
-  // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}")
+  // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}" or "RES-{id}-{timestamp}")
   const reservationPayments = payments.filter(p => {
     const orderId = p.order_id || '';
-    // Check if order_id matches reservation.id (with or without "RES-" prefix)
-    return orderId === String(reservation.id) || 
-           orderId === `RES-${reservation.id}` ||
-           orderId.endsWith(`-${reservation.id}`);
+    // Check if order_id matches reservation.id (with or without "RES-" prefix, or with timestamp)
+    // Format: "RES-{id}" or "RES-{id}-{timestamp}" or just "{id}"
+    if (orderId === String(reservation.id)) return true;
+    if (orderId === `RES-${reservation.id}`) return true;
+    // For format "RES-{id}-{timestamp}", extract the id part
+    const match = orderId.match(/^RES-(\d+)(?:-|$)/);
+    if (match && parseInt(match[1], 10) === reservation.id) return true;
+    return false;
   });
   // Include payments with status 'success' or 'pending' if they have amount set
   // For pending payments, we use 'amount' as the paid amount (assuming payment was made)

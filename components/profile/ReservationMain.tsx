@@ -66,9 +66,13 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         const reservationPayments = allPayments.filter(p => {
           const orderId = p.order_id || '';
           // Check if order_id matches reservation.id (with or without "RES-" prefix, or with timestamp)
-          return orderId === String(reservation.id) || 
-                 orderId === `RES-${reservation.id}` ||
-                 orderId.endsWith(`-${reservation.id}`);
+          // Format: "RES-{id}" or "RES-{id}-{timestamp}" or just "{id}"
+          if (orderId === String(reservation.id)) return true;
+          if (orderId === `RES-${reservation.id}`) return true;
+          // For format "RES-{id}-{timestamp}", extract the id part
+          const match = orderId.match(/^RES-(\d+)(?:-|$)/);
+          if (match && parseInt(match[1], 10) === reservation.id) return true;
+          return false;
         });
         setPayments(reservationPayments);
         
