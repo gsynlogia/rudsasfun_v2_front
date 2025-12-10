@@ -317,27 +317,52 @@ const generatePaymentItems = async (
     const paymentPlan = reservation.payment_plan;
     if (paymentPlan && (paymentPlan === '2' || paymentPlan === '3') && campItem.status === 'partially_paid') {
       const installmentCount = parseInt(paymentPlan, 10);
-      const installmentAmount = campAmount / installmentCount;
       const installments: PaymentInstallment[] = [];
       
-      // Check which installments are paid based on payment descriptions
+      // Calculate remaining amount for installments (after other payments like deposit)
+      const remainingForCamp = campAmount - campPaidAmount;
+      
+      // Find all installment payments from database (with "Rata X/Y" in description)
+      const installmentPayments = successfulPayments
+        .filter(p => p.description && (p.description.includes('Rata') || p.description.includes('rata')))
+        .map(p => {
+          // Extract installment number from description (e.g., "Rata 1/3" -> 1)
+          const match = p.description?.match(/Rata\s+(\d+)\/(\d+)/i);
+          if (match) {
+            return {
+              number: parseInt(match[1], 10),
+              total: parseInt(match[2], 10),
+              payment: p
+            };
+          }
+          return null;
+        })
+        .filter((item): item is { number: number; total: number; payment: PaymentResponse } => item !== null)
+        .filter(item => item.total === installmentCount); // Only match the correct plan
+      
+      // Calculate installment amount based on remaining amount
+      const installmentAmount = remainingForCamp / installmentCount;
+      
+      // For each installment, check if it's paid and get actual amount from database
       for (let i = 1; i <= installmentCount; i++) {
-        const installmentDesc = `Rata ${i}/${installmentCount}`;
-        const installmentPayment = successfulPayments.find(p => 
-          p.description && p.description.includes(installmentDesc)
-        );
-        const isPaid = !!installmentPayment;
+        const installmentPaymentData = installmentPayments.find(item => item.number === i);
+        const isPaid = !!installmentPaymentData;
+        // Use actual paid amount from database if paid, otherwise calculated amount
+        const actualPaidAmount = installmentPaymentData?.payment
+          ? (installmentPaymentData.payment.paid_amount || installmentPaymentData.payment.amount || 0)
+          : installmentAmount;
+        
         installments.push({
           number: i,
           total: installmentCount,
-          amount: installmentAmount,
+          amount: actualPaidAmount, // Use actual amount from database
           paid: isPaid,
-          paidDate: isPaid && installmentPayment?.paid_at 
-            ? installmentPayment.paid_at.split('T')[0] 
+          paidDate: isPaid && installmentPaymentData?.payment?.paid_at 
+            ? installmentPaymentData.payment.paid_at.split('T')[0] 
             : undefined,
-          paymentMethod: isPaid && installmentPayment
-            ? (installmentPayment.channel_id === 64 ? 'BLIK' : 
-               installmentPayment.channel_id === 53 ? 'Karta' : 'Online')
+          paymentMethod: isPaid && installmentPaymentData?.payment
+            ? (installmentPaymentData.payment.channel_id === 64 ? 'BLIK' : 
+               installmentPaymentData.payment.channel_id === 53 ? 'Karta' : 'Online')
             : undefined,
         });
       }
@@ -366,27 +391,52 @@ const generatePaymentItems = async (
     const paymentPlan = reservation.payment_plan;
     if (paymentPlan && (paymentPlan === '2' || paymentPlan === '3') && campItem.status === 'partially_paid') {
       const installmentCount = parseInt(paymentPlan, 10);
-      const installmentAmount = campAmount / installmentCount;
       const installments: PaymentInstallment[] = [];
       
-      // Check which installments are paid based on payment descriptions
+      // Calculate remaining amount for installments (after other payments like deposit)
+      const remainingForCamp = campAmount - campPaidAmount;
+      
+      // Find all installment payments from database (with "Rata X/Y" in description)
+      const installmentPayments = successfulPayments
+        .filter(p => p.description && (p.description.includes('Rata') || p.description.includes('rata')))
+        .map(p => {
+          // Extract installment number from description (e.g., "Rata 1/3" -> 1)
+          const match = p.description?.match(/Rata\s+(\d+)\/(\d+)/i);
+          if (match) {
+            return {
+              number: parseInt(match[1], 10),
+              total: parseInt(match[2], 10),
+              payment: p
+            };
+          }
+          return null;
+        })
+        .filter((item): item is { number: number; total: number; payment: PaymentResponse } => item !== null)
+        .filter(item => item.total === installmentCount); // Only match the correct plan
+      
+      // Calculate installment amount based on remaining amount
+      const installmentAmount = remainingForCamp / installmentCount;
+      
+      // For each installment, check if it's paid and get actual amount from database
       for (let i = 1; i <= installmentCount; i++) {
-        const installmentDesc = `Rata ${i}/${installmentCount}`;
-        const installmentPayment = successfulPayments.find(p => 
-          p.description && p.description.includes(installmentDesc)
-        );
-        const isPaid = !!installmentPayment;
+        const installmentPaymentData = installmentPayments.find(item => item.number === i);
+        const isPaid = !!installmentPaymentData;
+        // Use actual paid amount from database if paid, otherwise calculated amount
+        const actualPaidAmount = installmentPaymentData?.payment
+          ? (installmentPaymentData.payment.paid_amount || installmentPaymentData.payment.amount || 0)
+          : installmentAmount;
+        
         installments.push({
           number: i,
           total: installmentCount,
-          amount: installmentAmount,
+          amount: actualPaidAmount, // Use actual amount from database
           paid: isPaid,
-          paidDate: isPaid && installmentPayment?.paid_at 
-            ? installmentPayment.paid_at.split('T')[0] 
+          paidDate: isPaid && installmentPaymentData?.payment?.paid_at 
+            ? installmentPaymentData.payment.paid_at.split('T')[0] 
             : undefined,
-          paymentMethod: isPaid && installmentPayment
-            ? (installmentPayment.channel_id === 64 ? 'BLIK' : 
-               installmentPayment.channel_id === 53 ? 'Karta' : 'Online')
+          paymentMethod: isPaid && installmentPaymentData?.payment
+            ? (installmentPaymentData.payment.channel_id === 64 ? 'BLIK' : 
+               installmentPaymentData.payment.channel_id === 53 ? 'Karta' : 'Online')
             : undefined,
         });
       }
