@@ -61,24 +61,47 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
       try {
         setLoadingPayments(true);
         const allPayments = await paymentService.listPayments(0, 1000);
-        // Filter payments for this reservation (order_id format: "RES-{id}" or just "{id}")
+        // Filter payments for this reservation (order_id format: "RES-{id}" or just "{id}" or "RES-{id}-{timestamp}")
+        // Use the same logic as PaymentsManagement.tsx for consistency
         const reservationPayments = allPayments.filter(p => {
           const orderId = p.order_id || '';
-          // Match "RES-{id}" format or just "{id}"
-          return orderId === `RES-${reservation.id}` || orderId === String(reservation.id);
+          // Check if order_id matches reservation.id (with or without "RES-" prefix, or with timestamp)
+          return orderId === String(reservation.id) || 
+                 orderId === `RES-${reservation.id}` ||
+                 orderId.endsWith(`-${reservation.id}`);
         });
         setPayments(reservationPayments);
         
-        // Calculate total paid amount from successful payments
-        const totalPaid = reservationPayments
-          .filter(p => p.status === 'paid' || p.status === 'success')
-          .reduce((sum, p) => {
-            // Use paid_amount if available (from webhook), otherwise use amount
-            return sum + (p.paid_amount || p.amount || 0);
-          }, 0);
+        // Include payments with status 'success' or 'pending' if they have amount set
+        // For pending payments, we use 'amount' as the paid amount (assuming payment was made)
+        // For success payments, we use 'paid_amount' if available, otherwise 'amount'
+        // Use the same logic as PaymentsManagement.tsx for consistency
+        const successfulPayments = reservationPayments.filter(p => {
+          // Include success payments
+          if (p.status === 'success') return true;
+          // Include pending payments that have an amount (payment was created)
+          if (p.status === 'pending' && p.amount && p.amount > 0) return true;
+          return false;
+        });
         
-        setPaidAmount(totalPaid);
-        setIsFullyPaid(totalPaid >= reservation.total_price);
+        // Calculate actual paid amount from database
+        // Priority: paid_amount (from webhook) > amount (from payment creation)
+        // Use the same logic as PaymentsManagement.tsx for consistency
+        const actualPaidAmount = successfulPayments.reduce((sum, p) => {
+          // If paid_amount is set (from webhook), use it
+          if (p.paid_amount !== null && p.paid_amount !== undefined && p.paid_amount > 0) {
+            return sum + p.paid_amount;
+          }
+          // Otherwise, use amount (payment was created but webhook didn't update it yet)
+          return sum + (p.amount || 0);
+        }, 0);
+        
+        // Use actual paid amount from database (this is the source of truth for payments)
+        const totalAmount = reservation.total_price || 0;
+        const paidAmount = Math.min(actualPaidAmount, totalAmount);
+        
+        setPaidAmount(paidAmount);
+        setIsFullyPaid(paidAmount >= totalAmount);
         
         // Update payment installments from reservation.payment_plan if available
         if (reservation.payment_plan && (reservation.payment_plan === 'full' || reservation.payment_plan === '2' || reservation.payment_plan === '3')) {
@@ -162,6 +185,15 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const participantName = reservation.participant_first_name && reservation.participant_last_name
     ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
     : 'Brak danych';
+  
+  // Format reservation number (e.g., REZ-2025-003)
+  const formatReservationNumber = (reservationId: number, createdAt: string) => {
+    const year = new Date(createdAt).getFullYear();
+    const paddedId = String(reservationId).padStart(3, '0');
+    return `REZ-${year}-${paddedId}`;
+  };
+  
+  const reservationNumber = formatReservationNumber(reservation.id, reservation.created_at);
 
   // Get age
   const age = reservation.participant_age ? `${reservation.participant_age} lat` : 'Brak danych';
@@ -218,9 +250,14 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
       {/* Header Section */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-          <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
-            {participantName}
-          </h3>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
+              {participantName}
+            </h3>
+            <span className="text-xs sm:text-sm text-gray-500 font-medium">
+              ({reservationNumber})
+            </span>
+          </div>
           <span className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 ${
             statusColor === 'green' ? 'bg-green-50 text-green-700' :
             statusColor === 'red' ? 'bg-red-50 text-red-700' :
