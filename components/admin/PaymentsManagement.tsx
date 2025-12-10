@@ -319,9 +319,6 @@ const generatePaymentItems = async (
       const installmentCount = parseInt(paymentPlan, 10);
       const installments: PaymentInstallment[] = [];
       
-      // Calculate remaining amount for installments (after other payments like deposit)
-      const remainingForCamp = campAmount - campPaidAmount;
-      
       // Find all installment payments from database (with "Rata X/Y" in description)
       const installmentPayments = successfulPayments
         .filter(p => p.description && (p.description.includes('Rata') || p.description.includes('rata')))
@@ -340,22 +337,30 @@ const generatePaymentItems = async (
         .filter((item): item is { number: number; total: number; payment: PaymentResponse } => item !== null)
         .filter(item => item.total === installmentCount); // Only match the correct plan
       
-      // Calculate installment amount based on remaining amount
-      const installmentAmount = remainingForCamp / installmentCount;
+      // Calculate total paid for installments from database
+      const totalInstallmentsPaid = installmentPayments.reduce((sum, item) => {
+        return sum + (item.payment.paid_amount || item.payment.amount || 0);
+      }, 0);
+      
+      // Calculate remaining amount for installments: campAmount minus what's already paid for installments
+      // This gives us the remaining amount that needs to be divided among unpaid installments
+      const remainingForInstallments = campAmount - totalInstallmentsPaid;
+      const installmentAmount = remainingForInstallments / installmentCount;
       
       // For each installment, check if it's paid and get actual amount from database
       for (let i = 1; i <= installmentCount; i++) {
         const installmentPaymentData = installmentPayments.find(item => item.number === i);
         const isPaid = !!installmentPaymentData;
+        
         // Use actual paid amount from database if paid, otherwise calculated amount
-        const actualPaidAmount = installmentPaymentData?.payment
+        const actualAmount = installmentPaymentData?.payment
           ? (installmentPaymentData.payment.paid_amount || installmentPaymentData.payment.amount || 0)
           : installmentAmount;
         
         installments.push({
           number: i,
           total: installmentCount,
-          amount: actualPaidAmount, // Use actual amount from database
+          amount: actualAmount, // Use actual amount from database for paid, calculated for unpaid
           paid: isPaid,
           paidDate: isPaid && installmentPaymentData?.payment?.paid_at 
             ? installmentPaymentData.payment.paid_at.split('T')[0] 
@@ -393,9 +398,6 @@ const generatePaymentItems = async (
       const installmentCount = parseInt(paymentPlan, 10);
       const installments: PaymentInstallment[] = [];
       
-      // Calculate remaining amount for installments (after other payments like deposit)
-      const remainingForCamp = campAmount - campPaidAmount;
-      
       // Find all installment payments from database (with "Rata X/Y" in description)
       const installmentPayments = successfulPayments
         .filter(p => p.description && (p.description.includes('Rata') || p.description.includes('rata')))
@@ -414,22 +416,30 @@ const generatePaymentItems = async (
         .filter((item): item is { number: number; total: number; payment: PaymentResponse } => item !== null)
         .filter(item => item.total === installmentCount); // Only match the correct plan
       
-      // Calculate installment amount based on remaining amount
-      const installmentAmount = remainingForCamp / installmentCount;
+      // Calculate total paid for installments from database
+      const totalInstallmentsPaid = installmentPayments.reduce((sum, item) => {
+        return sum + (item.payment.paid_amount || item.payment.amount || 0);
+      }, 0);
+      
+      // Calculate remaining amount for installments: campAmount minus what's already paid for installments
+      // This gives us the remaining amount that needs to be divided among unpaid installments
+      const remainingForInstallments = campAmount - totalInstallmentsPaid;
+      const installmentAmount = remainingForInstallments / installmentCount;
       
       // For each installment, check if it's paid and get actual amount from database
       for (let i = 1; i <= installmentCount; i++) {
         const installmentPaymentData = installmentPayments.find(item => item.number === i);
         const isPaid = !!installmentPaymentData;
+        
         // Use actual paid amount from database if paid, otherwise calculated amount
-        const actualPaidAmount = installmentPaymentData?.payment
+        const actualAmount = installmentPaymentData?.payment
           ? (installmentPaymentData.payment.paid_amount || installmentPaymentData.payment.amount || 0)
           : installmentAmount;
         
         installments.push({
           number: i,
           total: installmentCount,
-          amount: actualPaidAmount, // Use actual amount from database
+          amount: actualAmount, // Use actual amount from database for paid, calculated for unpaid
           paid: isPaid,
           paidDate: isPaid && installmentPaymentData?.payment?.paid_at 
             ? installmentPaymentData.payment.paid_at.split('T')[0] 
