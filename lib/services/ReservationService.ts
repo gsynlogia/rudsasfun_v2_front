@@ -161,6 +161,7 @@ export interface ReservationResponse {
   contract_rejection_reason?: string | null;
   qualification_card_status?: string | null;
   qualification_card_rejection_reason?: string | null;
+  payment_plan?: string | null; // 'full', '2', '3' - selected payment method
 }
 
 export interface ValidationErrorDetail {
@@ -232,6 +233,22 @@ class ReservationService {
   async getMyReservations(skip: number = 0, limit: number = 100): Promise<ReservationResponse[]> {
     return await authenticatedApiCall<ReservationResponse[]>(
       `/api/reservations/my?skip=${skip}&limit=${limit}`
+    );
+  }
+
+  /**
+   * Update payment plan for a reservation
+   * @param reservationId Reservation ID
+   * @param paymentPlan Payment plan: 'full', '2', or '3'
+   * @returns Updated reservation response
+   */
+  async updatePaymentPlan(reservationId: number, paymentPlan: 'full' | '2' | '3'): Promise<ReservationResponse> {
+    return await authenticatedApiCall<ReservationResponse>(
+      `/api/reservations/${reservationId}/payment-plan`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ payment_plan: paymentPlan }),
+      }
     );
   }
 
