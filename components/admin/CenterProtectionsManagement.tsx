@@ -232,12 +232,14 @@ export default function CenterProtectionsManagement() {
             ) : (
               protections.map((protection) => (
               <tr key={protection.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{protection.display_name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {protection.display_name || protection.name || `Ochrona #${protection.id}`}
+                </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {protection.general_protections.length > 0 ? (
                     <ul className="list-disc list-inside">
                       {protection.general_protections.map((rel) => (
-                        <li key={rel.id}>
+                        <li key={`${protection.id}-${rel.id}-${rel.general_protection_id}`}>
                           {rel.general_protection_name} - {rel.price.toFixed(2)} PLN
                         </li>
                       ))}

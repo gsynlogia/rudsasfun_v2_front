@@ -224,10 +224,19 @@ const generatePaymentItems = async (
     ? (Array.isArray(reservation.selected_addons) ? reservation.selected_addons : [reservation.selected_addons])
     : [];
   
-  selectedAddons.forEach((addonId: string) => {
-    const addonData = addonsMap.get(addonId);
+  selectedAddons.forEach((addonId: string | number) => {
+    // Convert to string if it's a number
+    const addonIdStr = String(addonId);
+    const addonData = addonsMap.get(addonIdStr);
     if (addonData) {
       totalAddonsAmount += addonData.price;
+    } else {
+      // Log missing addon for debugging
+      console.warn(`Addon not found in map: ${addonIdStr} (type: ${typeof addonId})`, {
+        reservationId: reservation.id,
+        selectedAddons: reservation.selected_addons,
+        addonsMapKeys: Array.from(addonsMap.keys())
+      });
     }
   });
   
@@ -282,8 +291,10 @@ const generatePaymentItems = async (
     });
     
     // Addons - create separate item for each addon (paid from deposit)
-    selectedAddons.forEach((addonId: string) => {
-      const addonData = addonsMap.get(addonId);
+    selectedAddons.forEach((addonId: string | number) => {
+      // Convert to string if it's a number
+      const addonIdStr = String(addonId);
+      const addonData = addonsMap.get(addonIdStr);
       if (addonData && addonData.price > 0) {
         const addonPaidAmount = Math.min(remainingPaid, addonData.price);
         const addonPaid = addonPaidAmount >= addonData.price;
@@ -297,6 +308,17 @@ const generatePaymentItems = async (
           paymentMethod: addonPaid && paymentMethod ? paymentMethod : undefined,
         });
         remainingPaid -= addonPaidAmount;
+      } else if (addonData && addonData.price === 0) {
+        // Add addon even if price is 0 (free addon)
+        items.push({
+          id: `item-${itemId++}`,
+          name: addonData.name,
+          type: 'addon',
+          amount: 0,
+          status: 'paid' as PaymentItemStatus,
+          paidDate: paymentDate ? paymentDate : undefined,
+          paymentMethod: paymentMethod ? paymentMethod : undefined,
+        });
       }
     });
     
@@ -319,6 +341,32 @@ const generatePaymentItems = async (
       const installmentCount = parseInt(paymentPlan, 10);
       const installments: PaymentInstallment[] = [];
       
+      // Add deposit (zaliczka) as first item if it was paid
+      if (depositBasePaid > 0) {
+        // Find deposit payment from database (payment with amount around 600 PLN, not a "Rata" payment)
+        const depositPayment = successfulPayments.find(p => {
+          const amount = p.paid_amount || p.amount || 0;
+          // Check if payment is around 600 PLN (deposit) and not an installment
+          return amount >= 500 && amount <= 700 && 
+                 !p.description?.includes('Rata') && 
+                 !p.description?.includes('rata');
+        });
+        
+        installments.push({
+          number: 0, // Special number for deposit
+          total: installmentCount,
+          amount: depositBaseAmount, // 600 PLN
+          paid: depositBasePaid >= depositBaseAmount,
+          paidDate: depositPayment?.paid_at 
+            ? depositPayment.paid_at.split('T')[0] 
+            : (depositBasePaid >= depositBaseAmount && paymentDate ? paymentDate : undefined),
+          paymentMethod: depositPayment
+            ? (depositPayment.channel_id === 64 ? 'BLIK' : 
+               depositPayment.channel_id === 53 ? 'Karta' : 'Online')
+            : undefined,
+        });
+      }
+      
       // Find all installment payments from database (with "Rata X/Y" in description)
       const installmentPayments = successfulPayments
         .filter(p => p.description && (p.description.includes('Rata') || p.description.includes('rata')))
@@ -337,10 +385,15 @@ const generatePaymentItems = async (
         .filter((item): item is { number: number; total: number; payment: PaymentResponse } => item !== null)
         .filter(item => item.total === installmentCount); // Only match the correct plan
       
-      // Calculate installment amount: divide campAmount by number of installments
-      // This is the fixed amount per installment (e.g., 1950 / 3 = 650 PLN per installment)
-      // Each installment should be the same amount, regardless of what's already paid
-      const installmentAmount = campAmount / installmentCount;
+      // Calculate installment amount: divide remaining amount (after deposit) by number of installments
+      // Installments are calculated based on remaining amount after deposit (600 PLN), not full campAmount
+      // Example: campAmount = 2400, deposit = 600, remaining = 1800, but if total is 2550:
+      // remaining = totalPriceFromReservation - depositBaseAmount = 2550 - 600 = 1950
+      // So 1950 / 3 = 650 PLN per installment
+      const remainingForInstallments = depositBasePaid > 0 
+        ? (totalPriceFromReservation - depositBaseAmount) 
+        : campAmount;
+      const installmentAmount = remainingForInstallments / installmentCount;
       
       // For each installment, check if it's paid and get actual amount from database
       for (let i = 1; i <= installmentCount; i++) {
@@ -412,8 +465,7 @@ const generatePaymentItems = async (
         .filter(item => item.total === installmentCount); // Only match the correct plan
       
       // Calculate installment amount: divide campAmount by number of installments
-      // This is the fixed amount per installment (e.g., 1950 / 3 = 650 PLN per installment)
-      // Each installment should be the same amount, regardless of what's already paid
+      // In this branch (else), no deposit was paid, so use campAmount directly
       const installmentAmount = campAmount / installmentCount;
       
       // For each installment, check if it's paid and get actual amount from database
@@ -487,8 +539,10 @@ const generatePaymentItems = async (
     }
 
     // Addons - create separate item for each addon
-    selectedAddons.forEach((addonId: string) => {
-      const addonData = addonsMap.get(addonId);
+    selectedAddons.forEach((addonId: string | number) => {
+      // Convert to string if it's a number
+      const addonIdStr = String(addonId);
+      const addonData = addonsMap.get(addonIdStr);
       if (addonData && addonData.price > 0) {
         const addonPaidAmount = Math.min(remainingPaid, addonData.price);
         const addonPaid = addonPaidAmount >= addonData.price;
@@ -502,6 +556,17 @@ const generatePaymentItems = async (
           paymentMethod: addonPaid && paymentMethod ? paymentMethod : undefined,
         });
         remainingPaid -= addonPaidAmount;
+      } else if (addonData && addonData.price === 0) {
+        // Add addon even if price is 0 (free addon)
+        items.push({
+          id: `item-${itemId++}`,
+          name: addonData.name,
+          type: 'addon',
+          amount: 0,
+          status: 'paid' as PaymentItemStatus,
+          paidDate: paymentDate ? paymentDate : undefined,
+          paymentMethod: paymentMethod ? paymentMethod : undefined,
+        });
       }
     });
   }
@@ -1782,6 +1847,12 @@ export default function PaymentsManagement() {
                                                 'text-gray-900'
                                               }`}>
                                                 {item.name}
+                                                {/* Show payment plan info if installments exist */}
+                                                {item.installments && item.installments.length > 0 && (
+                                                  <span className="ml-2 text-xs text-gray-500 font-normal">
+                                                    ({item.installments.length === 2 ? 'Płatność w dwóch ratach' : item.installments.length === 3 ? 'Płatność w trzech ratach' : 'Pełna płatność'})
+                                                  </span>
+                                                )}
                                               </p>
                                               <p className="text-xs text-gray-500">
                                                 {isCanceled && item.canceledDate
@@ -1860,49 +1931,54 @@ export default function PaymentsManagement() {
                                         {/* Installments sub-items - only show if partially_paid and has installments */}
                                         {isPartiallyPaid && item.installments && item.installments.length > 0 && (
                                           <div className="ml-8 mt-2 space-y-1">
-                                            {item.installments.map((installment) => (
-                                              <div
-                                                key={`installment-${installment.number}`}
-                                                className={`flex items-center justify-between p-2 rounded border ${
-                                                  installment.paid
-                                                    ? 'bg-green-50 border-green-200'
-                                                    : 'bg-gray-50 border-gray-200'
-                                                }`}
-                                              >
-                                                <div className="flex items-center gap-2 flex-1">
-                                                  {/* No checkbox for installments */}
-                                                  <div className="flex items-center gap-2 text-gray-600">
-                                                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                                            {item.installments.map((installment) => {
+                                              // Check if this is deposit (number === 0)
+                                              const isDeposit = installment.number === 0;
+                                              
+                                              return (
+                                                <div
+                                                  key={`installment-${installment.number}`}
+                                                  className={`flex items-center justify-between p-2 rounded border ${
+                                                    installment.paid
+                                                      ? 'bg-green-50 border-green-200'
+                                                      : 'bg-gray-50 border-gray-200'
+                                                  }`}
+                                                >
+                                                  <div className="flex items-center gap-2 flex-1">
+                                                    {/* No checkbox for installments */}
+                                                    <div className="flex items-center gap-2 text-gray-600">
+                                                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                      <p className={`text-xs font-medium ${
+                                                        installment.paid ? 'text-green-700' : 'text-gray-600'
+                                                      }`}>
+                                                        {isDeposit ? 'Zaliczka' : `Rata ${installment.number}/${installment.total}`}
+                                                      </p>
+                                                      {installment.paid && installment.paidDate && (
+                                                        <p className="text-xs text-green-600">
+                                                          Opłacone: {formatDate(installment.paidDate)}
+                                                          {installment.paymentMethod ? ` (${installment.paymentMethod})` : ''}
+                                                        </p>
+                                                      )}
+                                                    </div>
                                                   </div>
-                                                  <div className="flex-1">
-                                                    <p className={`text-xs font-medium ${
+                                                  <div className="flex items-center gap-4">
+                                                    <span className={`text-xs font-medium min-w-[60px] text-right ${
                                                       installment.paid ? 'text-green-700' : 'text-gray-600'
                                                     }`}>
-                                                      Rata {installment.number}/{installment.total}
-                                                    </p>
-                                                    {installment.paid && installment.paidDate && (
-                                                      <p className="text-xs text-green-600">
-                                                        Opłacone: {formatDate(installment.paidDate)}
-                                                        {installment.paymentMethod ? ` (${installment.paymentMethod})` : ''}
-                                                      </p>
+                                                      {formatCurrency(installment.amount)}
+                                                    </span>
+                                                    {installment.paid && (
+                                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        <Check className="w-3 h-3 mr-1" />
+                                                        Opłacone
+                                                      </span>
                                                     )}
                                                   </div>
                                                 </div>
-                                                <div className="flex items-center gap-4">
-                                                  <span className={`text-xs font-medium min-w-[60px] text-right ${
-                                                    installment.paid ? 'text-green-700' : 'text-gray-600'
-                                                  }`}>
-                                                    {formatCurrency(installment.amount)}
-                                                  </span>
-                                                  {installment.paid && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                      <Check className="w-3 h-3 mr-1" />
-                                                      Opłacone
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            ))}
+                                              );
+                                            })}
                                           </div>
                                         )}
                                       </Fragment>

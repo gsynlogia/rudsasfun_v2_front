@@ -2,9 +2,11 @@
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
-import { Settings as SettingsIcon, Users, UserCog } from 'lucide-react';
+import { Settings as SettingsIcon, Users, UserCog, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { authService } from '@/lib/services/AuthService';
 
 /**
  * Admin Panel - Settings Page
@@ -14,6 +16,21 @@ import { usePathname } from 'next/navigation';
  */
 export default function SettingsPage() {
   const pathname = usePathname();
+  const [isUserZero, setIsUserZero] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      if (authService.isAuthenticated()) {
+        const user = await authService.verifyToken();
+        if (user && user.id === 0) {
+          setIsUserZero(true);
+        }
+      }
+      setLoading(false);
+    };
+    checkUser();
+  }, []);
 
   const sections = [
     {
@@ -35,6 +52,16 @@ export default function SettingsPage() {
       icon: UserCog,
     },
   ];
+
+  // Add super functions section only for user ID 0
+  if (!loading && isUserZero) {
+    sections.push({
+      id: 'super-functions',
+      href: '/admin-panel/settings/super-functions',
+      label: 'Super funkcje',
+      icon: Sparkles,
+    });
+  }
 
   return (
     <SectionGuard section="settings">

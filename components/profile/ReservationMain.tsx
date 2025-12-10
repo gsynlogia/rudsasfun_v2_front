@@ -458,13 +458,16 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                 <div className="space-y-2 sm:space-y-3">
                   <h6 className="text-xs sm:text-sm font-semibold text-gray-700">Wybierz sposób płatności:</h6>
                   <div className="space-y-2">
-                    {/* Calculate remaining amount - always show all 3 options */}
+                    {/* Calculate remaining amount - disable other options if payment_plan is already set in database */}
                     {(() => {
                       const remainingAmount = reservation.total_price - paidAmount;
+                      // Check if payment_plan is already saved in database
+                      const savedPaymentPlan = reservation.payment_plan;
+                      const isPlanLocked = !!savedPaymentPlan; // If payment_plan exists, lock other options
                       
                       return (
                         <>
-                          {/* Full Payment - always visible */}
+                          {/* Full Payment - disabled if payment_plan is '2' or '3' */}
                           <div className="flex items-center gap-2">
                             <input
                               type="radio"
@@ -473,20 +476,23 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                               value="full"
                               checked={paymentInstallments === 'full'}
                               onChange={() => {
-                                // Only update local state, don't save to database yet
-                                setPaymentInstallments('full');
+                                // Only update local state if plan is not locked
+                                if (!isPlanLocked) {
+                                  setPaymentInstallments('full');
+                                }
                               }}
-                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer"
+                              disabled={isPlanLocked && savedPaymentPlan !== 'full'}
+                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                             <label
                               htmlFor={`installmentFull-${reservation.id}`}
-                              className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                              className={`text-xs sm:text-sm ${isPlanLocked && savedPaymentPlan !== 'full' ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 cursor-pointer'}`}
                             >
                               Pełna płatność ({remainingAmount.toFixed(2)} zł)
                             </label>
                           </div>
                           
-                          {/* 2 Equal Installments - always visible */}
+                          {/* 2 Equal Installments - disabled if payment_plan is 'full' or '3' */}
                           <div className="flex items-center gap-2">
                             <input
                               type="radio"
@@ -495,20 +501,23 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                               value="2"
                               checked={paymentInstallments === '2'}
                               onChange={() => {
-                                // Only update local state, don't save to database yet
-                                setPaymentInstallments('2');
+                                // Only update local state if plan is not locked
+                                if (!isPlanLocked) {
+                                  setPaymentInstallments('2');
+                                }
                               }}
-                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer"
+                              disabled={isPlanLocked && savedPaymentPlan !== '2'}
+                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                             <label
                               htmlFor={`installment2-${reservation.id}`}
-                              className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                              className={`text-xs sm:text-sm ${isPlanLocked && savedPaymentPlan !== '2' ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 cursor-pointer'}`}
                             >
                               Płatność w dwóch ratach (po {(remainingAmount / 2).toFixed(2)} zł)
                             </label>
                           </div>
                           
-                          {/* 3 Equal Installments - always visible */}
+                          {/* 3 Equal Installments - disabled if payment_plan is 'full' or '2' */}
                           <div className="flex items-center gap-2">
                             <input
                               type="radio"
@@ -517,14 +526,17 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                               value="3"
                               checked={paymentInstallments === '3'}
                               onChange={() => {
-                                // Only update local state, don't save to database yet
-                                setPaymentInstallments('3');
+                                // Only update local state if plan is not locked
+                                if (!isPlanLocked) {
+                                  setPaymentInstallments('3');
+                                }
                               }}
-                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer"
+                              disabled={isPlanLocked && savedPaymentPlan !== '3'}
+                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                             <label
                               htmlFor={`installment3-${reservation.id}`}
-                              className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                              className={`text-xs sm:text-sm ${isPlanLocked && savedPaymentPlan !== '3' ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 cursor-pointer'}`}
                             >
                               Płatność w trzech ratach (po {(remainingAmount / 3).toFixed(2)} zł)
                             </label>

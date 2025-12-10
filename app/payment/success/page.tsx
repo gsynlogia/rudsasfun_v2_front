@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { clearAllSessionData } from '@/utils/sessionStorage';
+import { reservationService } from '@/lib/services/ReservationService';
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
@@ -17,12 +18,33 @@ function PaymentSuccessContent() {
     const orderIdParam = searchParams.get('orderId');
     const trIdParam = searchParams.get('tr_id');
     const reservationIdParam = searchParams.get('reservation_id');
+    const serviceParam = searchParams.get('service'); // Addon ID or protection ID
+    const typeParam = searchParams.get('type'); // 'addon' or 'protection'
+    
     setOrderId(orderIdParam);
     setTransactionId(trIdParam);
     
     // Clear all session storage data after successful payment
     // This is the ONLY place where we clear session storage
     clearAllSessionData();
+    
+    // If this is an addon payment, update selected_addons in reservation
+    if (reservationIdParam && serviceParam && typeParam === 'addon') {
+      const reservationId = parseInt(reservationIdParam, 10);
+      const addonId = serviceParam;
+      
+      if (!isNaN(reservationId) && addonId) {
+        // Update reservation with addon (as backup if webhook didn't work)
+        reservationService.addAddonToReservation(reservationId, addonId)
+          .then(() => {
+            console.log(`✅ Addon ${addonId} added to reservation ${reservationId}`);
+          })
+          .catch((error) => {
+            console.error(`⚠️ Error adding addon to reservation: ${error}`);
+            // Don't block redirect on error - webhook might have already handled it
+          });
+      }
+    }
     
     // Automatically redirect to current reservations page
     // Wait a moment to show success message, then redirect

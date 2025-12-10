@@ -917,7 +917,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
       <div>
         <section className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
           {/* Section 0: Payment Data - ALWAYS from FIRST parent (index 0) */}
-          <div className="mb-4 sm:mb-6">
+          <div className="mb-4 sm:mb-6 hidden">
             <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
               Dane rodzica / opiekuna
             </h3>

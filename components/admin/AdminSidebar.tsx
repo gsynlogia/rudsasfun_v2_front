@@ -13,7 +13,8 @@ import {
   Settings, 
   LogOut,
   Tag,
-  Shield
+  Shield,
+  Sparkles
 } from 'lucide-react';
 import { authService } from '@/lib/services/AuthService';
 
@@ -28,17 +29,29 @@ export default function AdminSidebar() {
   const router = useRouter();
   const [accessibleSections, setAccessibleSections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isUserZero, setIsUserZero] = useState(false);
 
   useEffect(() => {
     const loadUserSections = async () => {
       const user = await authService.verifyToken();
-      if (user && user.accessible_sections) {
-        setAccessibleSections(user.accessible_sections);
+      if (user) {
+        if (user.accessible_sections) {
+          setAccessibleSections(user.accessible_sections);
+        }
+        // Check if user ID is 0
+        if (user.id === 0) {
+          setIsUserZero(true);
+        }
       } else {
         // Fallback: check from stored user
         const storedUser = authService.getCurrentUser();
-        if (storedUser && storedUser.accessible_sections) {
-          setAccessibleSections(storedUser.accessible_sections);
+        if (storedUser) {
+          if (storedUser.accessible_sections) {
+            setAccessibleSections(storedUser.accessible_sections);
+          }
+          if (storedUser.id === 0) {
+            setIsUserZero(true);
+          }
         }
       }
       setLoading(false);
@@ -117,6 +130,18 @@ export default function AdminSidebar() {
     },
   ];
 
+  // Add Super Functions to menu items for user ID 0
+  const menuItemsWithSuperFunctions = [...allMenuItems];
+  if (!loading && isUserZero) {
+    menuItemsWithSuperFunctions.push({
+      href: '/admin-panel/settings/super-functions',
+      icon: Sparkles,
+      label: 'Super funkcje',
+      key: 'super-functions',
+      section: 'settings', // Use settings section for access control
+    });
+  }
+
   // Filter menu items based on accessible sections
   // Admin users have access to all sections
   const user = authService.getCurrentUser();
@@ -132,14 +157,26 @@ export default function AdminSidebar() {
   
   const userWithDefaults: UserWithDefaults = user || defaultUser;
   const isAdmin = userWithDefaults.groups.includes('admin');
-  const menuItems = isAdmin 
-    ? allMenuItems 
-    : allMenuItems.filter(item => accessibleSections.includes(item.section));
+  const baseMenuItems = isAdmin 
+    ? menuItemsWithSuperFunctions 
+    : menuItemsWithSuperFunctions.filter(item => accessibleSections.includes(item.section));
+  
+  // Filter out super-functions if not user ID 0
+  const menuItems = baseMenuItems.filter(item => {
+    if (item.key === 'super-functions') {
+      return isUserZero;
+    }
+    return true;
+  });
 
   const isActive = (href: string) => {
     if (href === '/admin-panel') {
       // For main page, only active if exactly /admin-panel (not /admin-panel/camps, etc.)
       return pathname === '/admin-panel' || pathname === '/admin-panel/';
+    }
+    if (href === '/admin-panel/settings') {
+      // Settings is active for /admin-panel/settings but not for /admin-panel/settings/super-functions
+      return pathname.startsWith('/admin-panel/settings') && !pathname.startsWith('/admin-panel/settings/super-functions') && pathname !== '/admin-panel/settings/super-functions';
     }
     return pathname.startsWith(href);
   };
@@ -215,48 +252,6 @@ export default function AdminSidebar() {
             })
           )}
         </div>
-
-        {/* Separator before settings and logout - Full width */}
-        <div className="h-px bg-gray-200 w-full" />
-
-        {/* Settings - Before logout */}
-        <Link
-          href="/admin-panel/settings"
-          className={`flex items-center transition-colors ${
-            pathname.startsWith('/admin-panel/settings')
-              ? 'bg-[#E0F2FF]'
-              : 'bg-white hover:bg-gray-50 active:bg-gray-100'
-          }`}
-          style={{ 
-            height: '60px',
-            paddingLeft: '24px',
-            paddingRight: '24px',
-            justifyContent: 'flex-start',
-            borderRadius: 0,
-            cursor: 'pointer',
-          }}
-        >
-          <Settings 
-            className="flex-shrink-0"
-            style={{
-              width: '22px',
-              height: '22px',
-              strokeWidth: 2,
-              color: pathname.startsWith('/admin-panel/settings') ? '#0F172A' : '#9CA3AF',
-            }}
-          />
-          <span 
-            className="flex-1 ml-4"
-            style={{
-              fontSize: '16px',
-              fontWeight: 500,
-              lineHeight: '24px',
-              color: pathname.startsWith('/admin-panel/settings') ? '#0F172A' : '#9CA3AF',
-            }}
-          >
-            Ustawienia
-          </span>
-        </Link>
 
         {/* Separator before logout - Full width */}
         <div className="h-px bg-gray-200 w-full" />

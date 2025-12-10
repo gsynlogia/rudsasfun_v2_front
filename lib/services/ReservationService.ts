@@ -23,7 +23,7 @@ export interface CreateReservationRequest {
       id: string;
       firstName: string;
       lastName: string;
-      email: string;
+      email: string | null; // null for second parent if email not provided
       phone: string;
       phoneNumber: string;
       street: string;
@@ -88,12 +88,10 @@ export interface CreateReservationRequest {
       city: string;
     };
     deliveryType: 'electronic' | 'paper';
-    differentAddress: boolean;
-    deliveryAddress?: {
-      street: string;
-      postalCode: string;
-      city: string;
-    };
+    deliveryDifferentAddress: boolean;
+    deliveryStreet?: string;
+    deliveryPostalCode?: string;
+    deliveryCity?: string;
   };
   step4: {
     consent1: boolean;
@@ -253,6 +251,22 @@ class ReservationService {
   }
 
   /**
+   * Add addon to reservation after payment
+   * @param reservationId Reservation ID
+   * @param addonId Addon ID to add
+   * @returns Updated reservation response
+   */
+  async addAddonToReservation(reservationId: number, addonId: string): Promise<ReservationResponse> {
+    return await authenticatedApiCall<ReservationResponse>(
+      `/api/reservations/${reservationId}/addons`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ addon_id: addonId }),
+      }
+    );
+  }
+
+  /**
    * Convert frontend form data to backend request format
    * @param step1Data Step 1 form data
    * @param step2Data Step 2 form data
@@ -277,23 +291,38 @@ class ReservationService {
     // Filter parents: include all parents that have required fields filled
     // First parent is always required (firstName, lastName, email, phoneNumber)
     // Second parent is optional but if present, must have firstName, lastName, phoneNumber (email is optional)
-    const filteredParents = step1Data.parents.filter((parent, index) => {
-      // Always include first parent (index 0) - required fields validated by backend
-      if (index === 0) return true;
-      
-      // For second parent (index 1), include if has required fields (firstName, lastName, phoneNumber)
-      // Email is optional for second parent according to schema
-      if (index === 1) {
-        const hasRequiredFields = 
-          !!(parent.firstName?.trim()) && 
-          !!(parent.lastName?.trim()) && 
-          !!(parent.phoneNumber?.trim());
+    const filteredParents = step1Data.parents
+      .filter((parent, index) => {
+        // Always include first parent (index 0) - required fields validated by backend
+        if (index === 0) return true;
         
-        // Include second parent if has required fields (email is optional)
-        return hasRequiredFields;
-      }
-      return false;
-    });
+        // For second parent (index 1), include if has required fields (firstName, lastName, phoneNumber)
+        // Email is optional for second parent according to schema
+        if (index === 1) {
+          const hasRequiredFields = 
+            !!(parent.firstName?.trim()) && 
+            !!(parent.lastName?.trim()) && 
+            !!(parent.phoneNumber?.trim());
+          
+          // Include second parent if has required fields (email is optional)
+          return hasRequiredFields;
+        }
+        return false;
+      })
+      .map((parent, index) => {
+        // For second parent (index 1), if email is empty, null, undefined, or "BRAK", set it to null
+        // This ensures backend doesn't try to validate "BRAK" or empty string as email
+        if (index === 1) {
+          const email = parent.email?.trim();
+          if (!email || email === '' || email === 'BRAK') {
+            return {
+              ...parent,
+              email: null, // Explicitly set to null for optional email
+            };
+          }
+        }
+        return parent;
+      });
 
     return {
       camp_id: campId,
@@ -328,9 +357,15 @@ class ReservationService {
         privateData: step3Data.invoiceType === 'private' ? step3Data.privateData : undefined,
         companyData: step3Data.invoiceType === 'company' ? step3Data.companyData : undefined,
         deliveryType: step3Data.deliveryType,
-        differentAddress: step3Data.differentAddress,
-        deliveryAddress: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
-          ? step3Data.deliveryAddress 
+        deliveryDifferentAddress: step3Data.differentAddress || false,
+        deliveryStreet: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
+          ? step3Data.deliveryAddress?.street 
+          : undefined,
+        deliveryPostalCode: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
+          ? step3Data.deliveryAddress?.postalCode 
+          : undefined,
+        deliveryCity: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
+          ? step3Data.deliveryAddress?.city 
           : undefined,
       },
       step4: {
