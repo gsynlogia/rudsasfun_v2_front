@@ -449,8 +449,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             )}
             
             {!isFullyPaid && (
-              <div className="flex flex-col gap-3 sm:gap-4">
-                {/* Payment Installments Options */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                {/* Payment Installments Options - Left Side */}
                 <div className="space-y-2 sm:space-y-3">
                   <h6 className="text-xs sm:text-sm font-semibold text-gray-700">Wybierz sposób płatności:</h6>
                   <div className="space-y-2">
@@ -561,95 +561,110 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                   </div>
                 </div>
                 
-                {/* Pay Button - only show if payment method is selected */}
+                {/* Pay Button - Right Side - only show if payment method is selected */}
                 {paymentInstallments && (
-                  <button 
-                    onClick={async () => {
-                      if (isProcessingPayment) return;
-                      
-                      setIsProcessingPayment(true);
-                      try {
-                        // Calculate remaining amount
-                        const remainingAmount = reservation.total_price - paidAmount;
+                  <div className="flex items-end">
+                    <button 
+                      onClick={async () => {
+                        if (isProcessingPayment) return;
                         
-                        // Get payment amount based on selected installments and remaining amount
-                        let paymentAmount = remainingAmount;
-                        if (paymentInstallments === '2') {
-                          paymentAmount = remainingAmount / 2;
-                        } else if (paymentInstallments === '3') {
-                          paymentAmount = remainingAmount / 3;
+                        setIsProcessingPayment(true);
+                        try {
+                          // Calculate remaining amount
+                          const remainingAmount = reservation.total_price - paidAmount;
+                          
+                          // Get payment amount based on selected installments and remaining amount
+                          let paymentAmount = remainingAmount;
+                          if (paymentInstallments === '2') {
+                            paymentAmount = remainingAmount / 2;
+                          } else if (paymentInstallments === '3') {
+                            paymentAmount = remainingAmount / 3;
+                          }
+                          
+                          // Get payer data from reservation
+                          const firstParent = reservation.parents_data && reservation.parents_data.length > 0 
+                            ? reservation.parents_data[0] 
+                            : null;
+                          
+                          if (!firstParent || !firstParent.email) {
+                            throw new Error('Brak danych płatnika (email) w rezerwacji');
+                          }
+                          
+                          const payerEmail = firstParent.email;
+                          const payerName = firstParent.firstName && firstParent.lastName
+                            ? `${firstParent.firstName} ${firstParent.lastName}`.trim()
+                            : undefined;
+                          
+                          // Create order ID
+                          const orderId = `RES-${reservation.id}-${Date.now()}`;
+                          
+                          // Determine installment number for description
+                          let installmentDesc = '';
+                          if (paymentInstallments === 'full') {
+                            installmentDesc = 'Pełna płatność';
+                          } else if (paymentInstallments === '2') {
+                            // Count how many installment payments were made for this reservation
+                            const installmentPayments = payments.filter(p => 
+                              (p.status === 'paid' || p.status === 'success') && 
+                              (p.description?.includes('Rata') || p.description?.includes('rata'))
+                            );
+                            const installmentNumber = installmentPayments.length + 1;
+                            installmentDesc = `Rata ${installmentNumber}/2`;
+                          } else if (paymentInstallments === '3') {
+                            // Count how many installment payments were made for this reservation
+                            const installmentPayments = payments.filter(p => 
+                              (p.status === 'paid' || p.status === 'success') && 
+                              (p.description?.includes('Rata') || p.description?.includes('rata'))
+                            );
+                            const installmentNumber = installmentPayments.length + 1;
+                            installmentDesc = `Rata ${installmentNumber}/3`;
+                          }
+                          
+                          // Prepare payment request
+                          const paymentRequest: CreatePaymentRequest = {
+                            amount: paymentAmount,
+                            description: `Rezerwacja obozu #${reservation.id} - ${installmentDesc}`,
+                            order_id: orderId,
+                            payer_email: payerEmail,
+                            payer_name: payerName,
+                            success_url: `${window.location.origin}/payment/success?reservation_id=${reservation.id}`,
+                            error_url: `${window.location.origin}/payment/failure?reservation_id=${reservation.id}`,
+                          };
+                          
+                          // Create payment
+                          const paymentResponse = await paymentService.createPayment(paymentRequest);
+                          
+                          // Redirect to payment URL if available
+                          if (paymentResponse.payment_url) {
+                            window.location.href = paymentResponse.payment_url;
+                          } else {
+                            throw new Error('Nie otrzymano URL płatności');
+                          }
+                        } catch (error) {
+                          console.error('Błąd podczas tworzenia płatności:', error);
+                          alert(error instanceof Error ? error.message : 'Wystąpił błąd podczas tworzenia płatności');
+                          setIsProcessingPayment(false);
                         }
-                        
-                        // Get payer data from reservation
-                        const firstParent = reservation.parents_data && reservation.parents_data.length > 0 
-                          ? reservation.parents_data[0] 
-                          : null;
-                        
-                        if (!firstParent || !firstParent.email) {
-                          throw new Error('Brak danych płatnika (email) w rezerwacji');
-                        }
-                        
-                        const payerEmail = firstParent.email;
-                        const payerName = firstParent.firstName && firstParent.lastName
-                          ? `${firstParent.firstName} ${firstParent.lastName}`.trim()
-                          : undefined;
-                        
-                        // Create order ID
-                        const orderId = `RES-${reservation.id}-${Date.now()}`;
-                        
-                        // Determine installment number for description
-                        let installmentDesc = '';
-                        if (paymentInstallments === 'full') {
-                          installmentDesc = 'Pełna płatność';
-                        } else if (paymentInstallments === '2') {
-                          // Count how many installment payments were made for this reservation
-                          const installmentPayments = payments.filter(p => 
-                            (p.status === 'paid' || p.status === 'success') && 
-                            (p.description?.includes('Rata') || p.description?.includes('rata'))
-                          );
-                          const installmentNumber = installmentPayments.length + 1;
-                          installmentDesc = `Rata ${installmentNumber}/2`;
-                        } else if (paymentInstallments === '3') {
-                          // Count how many installment payments were made for this reservation
-                          const installmentPayments = payments.filter(p => 
-                            (p.status === 'paid' || p.status === 'success') && 
-                            (p.description?.includes('Rata') || p.description?.includes('rata'))
-                          );
-                          const installmentNumber = installmentPayments.length + 1;
-                          installmentDesc = `Rata ${installmentNumber}/3`;
-                        }
-                        
-                        // Prepare payment request
-                        const paymentRequest: CreatePaymentRequest = {
-                          amount: paymentAmount,
-                          description: `Rezerwacja obozu #${reservation.id} - ${installmentDesc}`,
-                          order_id: orderId,
-                          payer_email: payerEmail,
-                          payer_name: payerName,
-                          success_url: `${window.location.origin}/payment/success?reservation_id=${reservation.id}`,
-                          error_url: `${window.location.origin}/payment/failure?reservation_id=${reservation.id}`,
-                        };
-                        
-                        // Create payment
-                        const paymentResponse = await paymentService.createPayment(paymentRequest);
-                        
-                        // Redirect to payment URL if available
-                        if (paymentResponse.payment_url) {
-                          window.location.href = paymentResponse.payment_url;
-                        } else {
-                          throw new Error('Nie otrzymano URL płatności');
-                        }
-                      } catch (error) {
-                        console.error('Błąd podczas tworzenia płatności:', error);
-                        alert(error instanceof Error ? error.message : 'Wystąpił błąd podczas tworzenia płatności');
-                        setIsProcessingPayment(false);
-                      }
-                    }}
-                    disabled={isProcessingPayment || !paymentInstallments}
-                    className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#03adf0] text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isProcessingPayment ? 'Przetwarzanie...' : 'zapłać'}
-                  </button>
+                      }}
+                      disabled={isProcessingPayment || !paymentInstallments}
+                      className="w-full px-3 sm:px-4 py-1.5 sm:py-2 bg-[#03adf0] text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isProcessingPayment ? (
+                        'Przetwarzanie...'
+                      ) : (
+                        (() => {
+                          const remainingAmount = reservation.total_price - paidAmount;
+                          let paymentAmount = remainingAmount;
+                          if (paymentInstallments === '2') {
+                            paymentAmount = remainingAmount / 2;
+                          } else if (paymentInstallments === '3') {
+                            paymentAmount = remainingAmount / 3;
+                          }
+                          return `zapłać ${paymentAmount.toFixed(2)} zł`;
+                        })()
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
