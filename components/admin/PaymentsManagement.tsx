@@ -17,6 +17,15 @@ export type PaymentItemStatus = 'paid' | 'unpaid' | 'partially_paid' | 'canceled
  * Payment Item Interface
  * Represents a single payment item within a reservation
  */
+interface PaymentInstallment {
+  number: number; // 1, 2, 3
+  total: number; // 2 or 3
+  amount: number;
+  paid: boolean;
+  paidDate?: string;
+  paymentMethod?: string;
+}
+
 interface PaymentItem {
   id: string;
   name: string;
@@ -26,6 +35,7 @@ interface PaymentItem {
   paidDate?: string;
   paymentMethod?: string;
   canceledDate?: string;
+  installments?: PaymentInstallment[]; // Installments for this item (if payment_plan is set)
 }
 
 /**
@@ -293,7 +303,7 @@ const generatePaymentItems = async (
     // Camp - pay remaining amount (if any) after deposit
     const campPaidAmount = Math.min(remainingPaid, campAmount);
     const campPaid = campPaidAmount >= campAmount;
-    items.push({
+    const campItem: PaymentItem = {
       id: `item-${itemId++}`,
       name: `Obóz: ${reservation.camp_name || 'Nieznany obóz'}`,
       type: 'camp',
@@ -301,14 +311,48 @@ const generatePaymentItems = async (
       status: campPaid ? 'paid' : (campPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
       paidDate: campPaid && paymentDate ? paymentDate : undefined,
       paymentMethod: campPaid && paymentMethod ? paymentMethod : undefined,
-    });
+    };
+    
+    // Generate installments if payment_plan is set and camp is partially paid
+    const paymentPlan = reservation.payment_plan;
+    if (paymentPlan && (paymentPlan === '2' || paymentPlan === '3') && campItem.status === 'partially_paid') {
+      const installmentCount = parseInt(paymentPlan, 10);
+      const installmentAmount = campAmount / installmentCount;
+      const installments: PaymentInstallment[] = [];
+      
+      // Check which installments are paid based on payment descriptions
+      for (let i = 1; i <= installmentCount; i++) {
+        const installmentDesc = `Rata ${i}/${installmentCount}`;
+        const installmentPayment = successfulPayments.find(p => 
+          p.description && p.description.includes(installmentDesc)
+        );
+        const isPaid = !!installmentPayment;
+        installments.push({
+          number: i,
+          total: installmentCount,
+          amount: installmentAmount,
+          paid: isPaid,
+          paidDate: isPaid && installmentPayment?.paid_at 
+            ? installmentPayment.paid_at.split('T')[0] 
+            : undefined,
+          paymentMethod: isPaid && installmentPayment
+            ? (installmentPayment.channel_id === 64 ? 'BLIK' : 
+               installmentPayment.channel_id === 53 ? 'Karta' : 'Online')
+            : undefined,
+        });
+      }
+      
+      campItem.installments = installments;
+    }
+    
+    items.push(campItem);
     remainingPaid -= campPaidAmount;
   } else {
     // Full payment or partial payment after deposit: distribute camp -> protections -> diet -> addons
     // Camp base price
     const campPaidAmount = Math.min(remainingPaid, campAmount);
     const campPaid = campPaidAmount >= campAmount;
-    items.push({
+    const campItem: PaymentItem = {
       id: `item-${itemId++}`,
       name: `Obóz: ${reservation.camp_name || 'Nieznany obóz'}`,
       type: 'camp',
@@ -316,7 +360,41 @@ const generatePaymentItems = async (
       status: campPaid ? 'paid' : (campPaidAmount > 0 ? 'partially_paid' : 'unpaid'),
       paidDate: campPaid && paymentDate ? paymentDate : undefined,
       paymentMethod: campPaid && paymentMethod ? paymentMethod : undefined,
-    });
+    };
+    
+    // Generate installments if payment_plan is set and camp is partially paid
+    const paymentPlan = reservation.payment_plan;
+    if (paymentPlan && (paymentPlan === '2' || paymentPlan === '3') && campItem.status === 'partially_paid') {
+      const installmentCount = parseInt(paymentPlan, 10);
+      const installmentAmount = campAmount / installmentCount;
+      const installments: PaymentInstallment[] = [];
+      
+      // Check which installments are paid based on payment descriptions
+      for (let i = 1; i <= installmentCount; i++) {
+        const installmentDesc = `Rata ${i}/${installmentCount}`;
+        const installmentPayment = successfulPayments.find(p => 
+          p.description && p.description.includes(installmentDesc)
+        );
+        const isPaid = !!installmentPayment;
+        installments.push({
+          number: i,
+          total: installmentCount,
+          amount: installmentAmount,
+          paid: isPaid,
+          paidDate: isPaid && installmentPayment?.paid_at 
+            ? installmentPayment.paid_at.split('T')[0] 
+            : undefined,
+          paymentMethod: isPaid && installmentPayment
+            ? (installmentPayment.channel_id === 64 ? 'BLIK' : 
+               installmentPayment.channel_id === 53 ? 'Karta' : 'Online')
+            : undefined,
+        });
+      }
+      
+      campItem.installments = installments;
+    }
+    
+    items.push(campItem);
     remainingPaid -= campPaidAmount;
 
     // Protections - create separate item for each protection
@@ -1609,126 +1687,175 @@ export default function PaymentsManagement() {
                                     const isReturned = item.status === 'returned';
                                     
                                     return (
-                                      <div
-                                        key={item.id}
-                                        className={`flex items-center justify-between p-3 rounded border ${
-                                          isCanceled 
-                                            ? 'bg-red-50 border-red-200' 
-                                            : isReturned
-                                            ? 'bg-purple-50 border-purple-200'
-                                            : isPaid
-                                            ? 'bg-green-50 border-green-200'
-                                            : isPartiallyPaid
-                                            ? 'bg-blue-50 border-blue-200'
-                                            : 'bg-yellow-50 border-yellow-200'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-3 flex-1">
-                                          {/* Checkbox for invoice generation (left side) */}
-                                          {!isCanceled && !isReturned && (
-                                            <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
-                                              <input
-                                                type="checkbox"
-                                                name={`invoice-item-${reservation.id}-${item.id}`}
-                                                id={`invoice-item-${reservation.id}-${item.id}`}
-                                                checked={isItemChecked}
-                                                onChange={(e) => {
-                                                  e.stopPropagation();
-                                                  toggleItemSelection(reservation.id, item.id);
-                                                }}
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                }}
-                                                className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0] cursor-pointer"
-                                                style={{ borderRadius: 0 }}
-                                              />
+                                      <Fragment key={item.id}>
+                                        <div
+                                          className={`flex items-center justify-between p-3 rounded border ${
+                                            isCanceled 
+                                              ? 'bg-red-50 border-red-200' 
+                                              : isReturned
+                                              ? 'bg-purple-50 border-purple-200'
+                                              : isPaid
+                                              ? 'bg-green-50 border-green-200'
+                                              : isPartiallyPaid
+                                              ? 'bg-blue-50 border-blue-200'
+                                              : 'bg-yellow-50 border-yellow-200'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-3 flex-1">
+                                            {/* Checkbox for invoice generation (left side) */}
+                                            {!isCanceled && !isReturned && (
+                                              <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                  type="checkbox"
+                                                  name={`invoice-item-${reservation.id}-${item.id}`}
+                                                  id={`invoice-item-${reservation.id}-${item.id}`}
+                                                  checked={isItemChecked}
+                                                  onChange={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleItemSelection(reservation.id, item.id);
+                                                  }}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                  }}
+                                                  className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0] cursor-pointer"
+                                                  style={{ borderRadius: 0 }}
+                                                />
+                                              </div>
+                                            )}
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                              {getItemTypeIcon(item.type)}
                                             </div>
-                                          )}
-                                          <div className="flex items-center gap-2 text-gray-600">
-                                            {getItemTypeIcon(item.type)}
+                                            <div className="flex-1">
+                                              <p className={`text-sm font-medium ${
+                                                isCanceled ? 'text-red-700 line-through' : 
+                                                isReturned ? 'text-purple-700' : 
+                                                'text-gray-900'
+                                              }`}>
+                                                {item.name}
+                                              </p>
+                                              <p className="text-xs text-gray-500">
+                                                {isCanceled && item.canceledDate
+                                                  ? `Anulowane: ${formatDate(item.canceledDate)}`
+                                                  : isReturned && item.paidDate
+                                                  ? `Zwrócone: ${formatDate(item.paidDate)}${item.paymentMethod ? ` (${item.paymentMethod})` : ''}`
+                                                  : (isPaid || isPartiallyPaid) && item.paidDate
+                                                  ? `Data płatności: ${formatDate(item.paidDate)}${item.paymentMethod ? ` (${item.paymentMethod})` : ''}`
+                                                  : `Data zamówienia: ${formatDate(reservation.paymentDetails.orderDate)}`}
+                                              </p>
+                                            </div>
                                           </div>
-                                          <div className="flex-1">
-                                            <p className={`text-sm font-medium ${
-                                              isCanceled ? 'text-red-700 line-through' : 
-                                              isReturned ? 'text-purple-700' : 
+                                          <div className="flex items-center gap-4">
+                                            <span className={`text-sm font-medium min-w-[80px] text-right ${
+                                              isCanceled ? 'text-red-600 line-through' : 
+                                              isReturned ? 'text-purple-600' : 
                                               'text-gray-900'
                                             }`}>
-                                              {item.name}
-                                            </p>
-                                            <p className="text-xs text-gray-500">
-                                              {isCanceled && item.canceledDate
-                                                ? `Anulowane: ${formatDate(item.canceledDate)}`
-                                                : isReturned && item.paidDate
-                                                ? `Zwrócone: ${formatDate(item.paidDate)}${item.paymentMethod ? ` (${item.paymentMethod})` : ''}`
-                                                : (isPaid || isPartiallyPaid) && item.paidDate
-                                                ? `Data płatności: ${formatDate(item.paidDate)}${item.paymentMethod ? ` (${item.paymentMethod})` : ''}`
-                                                : `Data zamówienia: ${formatDate(reservation.paymentDetails.orderDate)}`}
-                                            </p>
+                                              {formatCurrency(item.amount)}
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                              {/* Status Badge */}
+                                              {isCanceled ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                  <XCircle className="w-3 h-3 mr-1" />
+                                                  Anulowane
+                                                </span>
+                                              ) : isReturned ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                  <RotateCcw className="w-3 h-3 mr-1" />
+                                                  Zwrócone
+                                                </span>
+                                              ) : isPaid ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                  <Check className="w-3 h-3 mr-1" />
+                                                  Opłacone
+                                                </span>
+                                              ) : isPartiallyPaid ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                  <Check className="w-3 h-3 mr-1" />
+                                                  Częściowo opłacone
+                                                </span>
+                                              ) : (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                  Nieopłacone
+                                                </span>
+                                              )}
+                                              
+                                              {/* Refund Button (only for paid items) */}
+                                              {isPaid && (
+                                                <button
+                                                  onClick={(e) => handleRefundRequest(reservation.id, item, e)}
+                                                  className="p-1 text-purple-600 hover:bg-purple-50 transition-all duration-200"
+                                                  title="Zwróć środki"
+                                                  style={{ borderRadius: 0, cursor: 'pointer' }}
+                                                >
+                                                  <RotateCcw className="w-4 h-4" />
+                                                </button>
+                                              )}
+                                              
+                                              {/* Cancel Button (only for unpaid items, not for paid or returned) */}
+                                              {isUnpaid && (
+                                                <button
+                                                  onClick={(e) => cancelPaymentItem(reservation.id, item.id, e)}
+                                                  className="p-1 text-red-600 hover:bg-red-50 transition-all duration-200"
+                                                  title="Anuluj element"
+                                                  style={{ borderRadius: 0, cursor: 'pointer' }}
+                                                >
+                                                  <XCircle className="w-4 h-4" />
+                                                </button>
+                                              )}
+                                              
+                                            </div>
                                           </div>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                          <span className={`text-sm font-medium min-w-[80px] text-right ${
-                                            isCanceled ? 'text-red-600 line-through' : 
-                                            isReturned ? 'text-purple-600' : 
-                                            'text-gray-900'
-                                          }`}>
-                                            {formatCurrency(item.amount)}
-                                          </span>
-                                          <div className="flex items-center gap-2">
-                                            {/* Status Badge */}
-                                            {isCanceled ? (
-                                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                <XCircle className="w-3 h-3 mr-1" />
-                                                Anulowane
-                                              </span>
-                                            ) : isReturned ? (
-                                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                                <RotateCcw className="w-3 h-3 mr-1" />
-                                                Zwrócone
-                                              </span>
-                                            ) : isPaid ? (
-                                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                <Check className="w-3 h-3 mr-1" />
-                                                Opłacone
-                                              </span>
-                                            ) : isPartiallyPaid ? (
-                                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                <Check className="w-3 h-3 mr-1" />
-                                                Częściowo opłacone
-                                              </span>
-                                            ) : (
-                                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                                Nieopłacone
-                                              </span>
-                                            )}
-                                            
-                                            {/* Refund Button (only for paid items) */}
-                                            {isPaid && (
-                                              <button
-                                                onClick={(e) => handleRefundRequest(reservation.id, item, e)}
-                                                className="p-1 text-purple-600 hover:bg-purple-50 transition-all duration-200"
-                                                title="Zwróć środki"
-                                                style={{ borderRadius: 0, cursor: 'pointer' }}
+                                        {/* Installments sub-items - only show if partially_paid and has installments */}
+                                        {isPartiallyPaid && item.installments && item.installments.length > 0 && (
+                                          <div className="ml-8 mt-2 space-y-1">
+                                            {item.installments.map((installment) => (
+                                              <div
+                                                key={`installment-${installment.number}`}
+                                                className={`flex items-center justify-between p-2 rounded border ${
+                                                  installment.paid
+                                                    ? 'bg-green-50 border-green-200'
+                                                    : 'bg-gray-50 border-gray-200'
+                                                }`}
                                               >
-                                                <RotateCcw className="w-4 h-4" />
-                                              </button>
-                                            )}
-                                            
-                                            {/* Cancel Button (only for unpaid items, not for paid or returned) */}
-                                            {isUnpaid && (
-                                              <button
-                                                onClick={(e) => cancelPaymentItem(reservation.id, item.id, e)}
-                                                className="p-1 text-red-600 hover:bg-red-50 transition-all duration-200"
-                                                title="Anuluj element"
-                                                style={{ borderRadius: 0, cursor: 'pointer' }}
-                                              >
-                                                <XCircle className="w-4 h-4" />
-                                              </button>
-                                            )}
-                                            
+                                                <div className="flex items-center gap-2 flex-1">
+                                                  {/* No checkbox for installments */}
+                                                  <div className="flex items-center gap-2 text-gray-600">
+                                                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                                                  </div>
+                                                  <div className="flex-1">
+                                                    <p className={`text-xs font-medium ${
+                                                      installment.paid ? 'text-green-700' : 'text-gray-600'
+                                                    }`}>
+                                                      Rata {installment.number}/{installment.total}
+                                                    </p>
+                                                    {installment.paid && installment.paidDate && (
+                                                      <p className="text-xs text-green-600">
+                                                        Opłacone: {formatDate(installment.paidDate)}
+                                                        {installment.paymentMethod ? ` (${installment.paymentMethod})` : ''}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                  <span className={`text-xs font-medium min-w-[60px] text-right ${
+                                                    installment.paid ? 'text-green-700' : 'text-gray-600'
+                                                  }`}>
+                                                    {formatCurrency(installment.amount)}
+                                                  </span>
+                                                  {installment.paid && (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                      <Check className="w-3 h-3 mr-1" />
+                                                      Opłacone
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ))}
                                           </div>
-                                        </div>
-                                      </div>
+                                        )}
+                                      </Fragment>
                                     );
                                   })}
                                 </div>
