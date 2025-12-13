@@ -29,6 +29,7 @@ export default function CampPropertyForm({
   const [endDate, setEndDate] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number>(50);
   const [useDefaultDiet, setUseDefaultDiet] = useState<boolean>(false);
+  const [basePrice, setBasePrice] = useState<number>(2200);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +55,7 @@ export default function CampPropertyForm({
       setEndDate(property.end_date.split('T')[0]);
       setMaxParticipants(property.max_participants || 50);
       setUseDefaultDiet(property.use_default_diet !== undefined ? property.use_default_diet : false);
+      setBasePrice(property.base_price || 2200);
     }
   }, [property]);
 
@@ -99,6 +101,7 @@ export default function CampPropertyForm({
             end_date: endDate,
             max_participants: maxParticipants,
             use_default_diet: useDefaultDiet,
+            base_price: basePrice,
           })
         : JSON.stringify({
             camp_id: campId,
@@ -108,6 +111,7 @@ export default function CampPropertyForm({
             end_date: endDate,
             max_participants: maxParticipants,
             use_default_diet: useDefaultDiet,
+            base_price: basePrice,
           });
 
       const response = await fetch(url, {
@@ -233,6 +237,27 @@ export default function CampPropertyForm({
               Maks. liczba uczestników
             </p>
           </div>
+
+          <div>
+            <label htmlFor="base-price" className="block text-sm font-medium text-gray-700 mb-2">
+              Cena bazowa turnusu (PLN) <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="base-price"
+              type="number"
+              min="0"
+              step="0.01"
+              value={basePrice}
+              onChange={(e) => setBasePrice(parseFloat(e.target.value) || 0)}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+              placeholder="np. 2200"
+              disabled={loading}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Podstawowa cena za turnus
+            </p>
+          </div>
         </div>
 
         <div>
@@ -279,9 +304,9 @@ export default function CampPropertyForm({
           </button>
           <button
             type="submit"
-            disabled={loading || !city.trim() || !startDate || !endDate || maxParticipants < 1}
+            disabled={loading || !city.trim() || !startDate || !endDate || maxParticipants < 1 || basePrice < 0}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#03adf0] rounded-lg hover:bg-[#0288c7] transition-colors disabled:opacity-50"
-            style={{ cursor: (loading || !city.trim() || !startDate || !endDate || maxParticipants < 1) ? 'not-allowed' : 'pointer' }}
+            style={{ cursor: (loading || !city.trim() || !startDate || !endDate || maxParticipants < 1 || basePrice < 0) ? 'not-allowed' : 'pointer' }}
           >
             <Save className="w-4 h-4" />
             {loading ? 'Zapisywanie...' : isEditMode ? 'Zapisz zmiany' : 'Dodaj edycję'}

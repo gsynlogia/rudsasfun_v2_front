@@ -33,7 +33,7 @@ export default function LayoutClient({
   const TOTAL_STEPS = 5;
   const router = useRouter();
   const pathname = usePathname();
-  const { updateReservationCamp, reservation } = useReservation();
+  const { updateReservationCamp, setBasePrice, reservation } = useReservation();
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
 
@@ -209,8 +209,16 @@ export default function LayoutClient({
         };
         updateReservationCamp(reservationCamp);
       }
+
+      // Update base price from API if available
+      if (campData.property.base_price !== undefined && campData.property.base_price !== null) {
+        const apiBasePrice = campData.property.base_price;
+        if (reservation.basePrice !== apiBasePrice) {
+          setBasePrice(apiBasePrice);
+        }
+      }
     }
-  }, [campData?.camp.id, campData?.property.id, campData?.camp.name, campData?.property.period, campData?.property.city, campData?.property.start_date, campData?.property.end_date, campExists, updateReservationCamp, reservation.camp]);
+  }, [campData?.camp.id, campData?.property.id, campData?.camp.name, campData?.property.period, campData?.property.city, campData?.property.start_date, campData?.property.end_date, campData?.property.base_price, campExists, updateReservationCamp, setBasePrice, reservation.camp, reservation.basePrice]);
 
   return (
     <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>

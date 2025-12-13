@@ -9,6 +9,7 @@ export interface ReservationContextType {
   removeReservationItemsByType: (type: ReservationItem['type']) => void;
   updateReservationItem: (id: string, item: Partial<ReservationItem>) => void;
   updateReservationCamp: (camp: ReservationCamp) => void;
+  setBasePrice: (price: number) => void;
   resetReservation: () => void;
 }
 

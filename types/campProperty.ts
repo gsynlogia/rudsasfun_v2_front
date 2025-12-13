@@ -8,6 +8,7 @@ export interface CampProperty {
   days_count: number;
   max_participants?: number;
   use_default_diet?: boolean;
+  base_price?: number;
   registered_count?: number;
   is_full?: boolean;
   is_ended?: boolean;

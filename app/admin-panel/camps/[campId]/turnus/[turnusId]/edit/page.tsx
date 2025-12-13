@@ -224,6 +224,7 @@ export default function CampTurnusEditPage({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number>(50);
+  const [basePrice, setBasePrice] = useState<number>(2200);
 
   // Transport state
   const [transport, setTransport] = useState<CampPropertyTransport | null>(null);
@@ -349,6 +350,7 @@ export default function CampTurnusEditPage({
             setStartDate(propertyData.start_date.split('T')[0]);
             setEndDate(propertyData.end_date.split('T')[0]);
             setMaxParticipants(propertyData.max_participants || 50);
+            setBasePrice(propertyData.base_price || 2200);
 
             // Populate transport data if exists - map cities to transport fields
             if (transportData) {
@@ -445,6 +447,7 @@ export default function CampTurnusEditPage({
           start_date: startDate,
           end_date: endDate,
           max_participants: maxParticipants,
+          base_price: basePrice,
         }),
       });
 
@@ -1336,6 +1339,28 @@ export default function CampTurnusEditPage({
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Maks. liczba uczestników
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="base-price" className="block text-sm font-medium text-gray-700 mb-2">
+                  Cena bazowa turnusu (PLN) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="base-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={basePrice}
+                  onChange={(e) => setBasePrice(parseFloat(e.target.value) || 0)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+                  style={{ borderRadius: 0 }}
+                  placeholder="np. 2200"
+                  disabled={saving}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Podstawowa cena za turnus
                 </p>
               </div>
             </div>

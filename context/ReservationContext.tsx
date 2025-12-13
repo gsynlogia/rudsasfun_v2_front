@@ -5,20 +5,20 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import type { ReservationState, ReservationContextType, ReservationItem, ReservationCamp } from '@/types/reservation';
 import { saveReservationState, loadReservationState } from '@/utils/sessionStorage';
 
-const BASE_PRICE = 2200;
+const DEFAULT_BASE_PRICE = 2200; // Fallback default, will be replaced by API value
 
 const getDefaultReservationState = (): ReservationState => {
   return {
-    basePrice: BASE_PRICE,
+    basePrice: DEFAULT_BASE_PRICE,
     items: [
       {
         id: 'base',
         name: 'Cena podstawowa',
-        price: BASE_PRICE,
+        price: DEFAULT_BASE_PRICE,
         type: 'base',
       },
     ],
-    totalPrice: BASE_PRICE,
+    totalPrice: DEFAULT_BASE_PRICE,
   };
 };
 
@@ -170,6 +170,28 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
     }));
   }, []);
 
+  const setBasePrice = useCallback((price: number) => {
+    setReservation((prev) => {
+      // Update basePrice
+      const newBasePrice = price;
+
+      // Update base item price
+      const newItems = prev.items.map((item) =>
+        item.id === 'base' ? { ...item, price: newBasePrice } : item,
+      );
+
+      // Recalculate total price
+      const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
+
+      return {
+        ...prev,
+        basePrice: newBasePrice,
+        items: newItems,
+        totalPrice,
+      };
+    });
+  }, []);
+
   const resetReservation = useCallback(() => {
     setReservation(getDefaultReservationState());
   }, []);
@@ -181,6 +203,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
     removeReservationItemsByType,
     updateReservationItem,
     updateReservationCamp,
+    setBasePrice,
     resetReservation,
   };
 
