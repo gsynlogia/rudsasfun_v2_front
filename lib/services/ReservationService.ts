@@ -3,16 +3,16 @@
  * Singleton service for handling reservation operations with backend API
  */
 
-import { API_BASE_URL } from '@/utils/api-config';
-import { authenticatedApiCall } from '@/utils/api-auth';
+import { CreateReservationRequest } from '@/types/createReservationRequest';
+import { ReservationResponse } from '@/types/reservationResponse';
 import { Step1FormData } from '@/types/step1FormData';
 import { Step2FormData } from '@/types/step2FormData';
 import { Step3FormData } from '@/types/step3FormData';
 import { Step4FormData } from '@/types/step4FormData';
-import { CreateReservationRequest } from '@/types/createReservationRequest';
-import { ReservationResponse } from '@/types/reservationResponse';
 import { ValidationErrorDetail } from '@/types/validationErrorDetail';
 import { ValidationErrorResponse } from '@/types/validationErrorResponse';
+import { authenticatedApiCall } from '@/utils/api-auth';
+import { API_BASE_URL } from '@/utils/api-config';
 
 export type { CreateReservationRequest, ReservationResponse, ValidationErrorDetail, ValidationErrorResponse };
 
@@ -41,7 +41,7 @@ class ReservationService {
         {
           method: 'POST',
           body: JSON.stringify(data),
-        }
+        },
       );
     } catch (error) {
       // Handle validation errors with better messages
@@ -60,7 +60,7 @@ class ReservationService {
    */
   async getReservation(reservationId: number): Promise<ReservationResponse> {
     return await authenticatedApiCall<ReservationResponse>(
-      `/api/reservations/${reservationId}`
+      `/api/reservations/${reservationId}`,
     );
   }
 
@@ -72,7 +72,7 @@ class ReservationService {
    */
   async listReservations(skip: number = 0, limit: number = 100): Promise<ReservationResponse[]> {
     return await authenticatedApiCall<ReservationResponse[]>(
-      `/api/reservations/?skip=${skip}&limit=${limit}`
+      `/api/reservations/?skip=${skip}&limit=${limit}`,
     );
   }
 
@@ -84,7 +84,7 @@ class ReservationService {
    */
   async getMyReservations(skip: number = 0, limit: number = 100): Promise<ReservationResponse[]> {
     return await authenticatedApiCall<ReservationResponse[]>(
-      `/api/reservations/my?skip=${skip}&limit=${limit}`
+      `/api/reservations/my?skip=${skip}&limit=${limit}`,
     );
   }
 
@@ -100,7 +100,7 @@ class ReservationService {
       {
         method: 'PATCH',
         body: JSON.stringify({ payment_plan: paymentPlan }),
-      }
+      },
     );
   }
 
@@ -116,7 +116,7 @@ class ReservationService {
       {
         method: 'PATCH',
         body: JSON.stringify({ addon_id: addonId }),
-      }
+      },
     );
   }
 
@@ -140,7 +140,7 @@ class ReservationService {
     campId: number,
     propertyId: number,
     totalPrice: number,
-    depositAmount?: number
+    depositAmount?: number,
   ): CreateReservationRequest {
     // Filter parents: include all parents that have required fields filled
     // First parent is always required (firstName, lastName, email, phoneNumber)
@@ -149,15 +149,15 @@ class ReservationService {
       .filter((parent, index) => {
         // Always include first parent (index 0) - required fields validated by backend
         if (index === 0) return true;
-        
+
         // For second parent (index 1), include if has required fields (firstName, lastName, phoneNumber)
         // Email is optional for second parent according to schema
         if (index === 1) {
-          const hasRequiredFields = 
-            !!(parent.firstName && parent.firstName.trim()) && 
-            !!(parent.lastName && parent.lastName.trim()) && 
+          const hasRequiredFields =
+            !!(parent.firstName && parent.firstName.trim()) &&
+            !!(parent.lastName && parent.lastName.trim()) &&
             !!(parent.phoneNumber && parent.phoneNumber.trim());
-          
+
           // Include second parent if has required fields (email is optional)
           return hasRequiredFields;
         }
@@ -212,13 +212,13 @@ class ReservationService {
         companyData: step3Data.invoiceType === 'company' ? step3Data.companyData : undefined,
         deliveryType: step3Data.deliveryType,
         deliveryDifferentAddress: step3Data.differentAddress || false,
-        deliveryStreet: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
+        deliveryStreet: step3Data.deliveryType === 'paper' && step3Data.differentAddress
           ? (step3Data.deliveryAddress?.street || undefined)
           : undefined,
-        deliveryPostalCode: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
+        deliveryPostalCode: step3Data.deliveryType === 'paper' && step3Data.differentAddress
           ? (step3Data.deliveryAddress?.postalCode || undefined)
           : undefined,
-        deliveryCity: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
+        deliveryCity: step3Data.deliveryType === 'paper' && step3Data.differentAddress
           ? (step3Data.deliveryAddress?.city || undefined)
           : undefined,
       },

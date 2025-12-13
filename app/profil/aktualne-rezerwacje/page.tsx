@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
-import NotificationsStrip from '@/components/profile/NotificationsStrip';
+
 import CurrentReservations from '@/components/profile/CurrentReservations';
+import NotificationsStrip from '@/components/profile/NotificationsStrip';
 
 /**
  * Current Reservations Page
@@ -16,6 +17,4 @@ export default function CurrentReservationsPage() {
     </>
   );
 }
-
-
 

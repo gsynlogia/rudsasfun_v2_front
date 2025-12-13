@@ -1,6 +1,6 @@
-import { ReservationState } from './reservationState';
-import { ReservationItem } from './reservationItem';
 import { ReservationCamp } from './reservationCamp';
+import { ReservationItem } from './reservationItem';
+import { ReservationState } from './reservationState';
 
 export interface ReservationContextType {
   reservation: ReservationState;

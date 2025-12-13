@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+
 import type { ReservationState, ReservationContextType, ReservationItem, ReservationCamp } from '@/types/reservation';
 import { saveReservationState, loadReservationState } from '@/utils/sessionStorage';
 
@@ -76,7 +77,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
         // For protection/addon without customId, check by name to avoid duplicates
         if (!customId) {
           const existingItem = prev.items.find(
-            i => i.type === item.type && i.name === item.name
+            i => i.type === item.type && i.name === item.name,
           );
           if (existingItem) {
             // Item already exists, don't add duplicate
@@ -88,7 +89,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
       } else {
         // For non-addon, non-protection types, replace existing item of the same type
         const existingItemIndex = prev.items.findIndex(
-          (i) => i.type === item.type
+          (i) => i.type === item.type,
         );
         if (existingItemIndex !== -1) {
           const newItems = [...prev.items];
@@ -150,7 +151,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
   const updateReservationItem = useCallback((id: string, item: Partial<ReservationItem>) => {
     setReservation((prev) => {
       const newItems = prev.items.map((i) =>
-        i.id === id ? { ...i, ...item } : i
+        i.id === id ? { ...i, ...item } : i,
       );
       const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
 

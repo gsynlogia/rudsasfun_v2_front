@@ -1,18 +1,22 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { Shield } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { formatDateRange } from '@/utils/api';
-import HeaderTop from './HeaderTop';
-import HeaderSecondary from './HeaderSecondary';
-import ProgressBar from './ProgressBar';
-import ReservationSummary from './ReservationSummary';
-import Footer from './Footer';
-import NavigationButtons from './NavigationButtons';
-import type { LayoutProps, StepNumber, CampWithProperty, ReservationCamp } from '@/types/reservation';
+import { useEffect, useLayoutEffect, useState } from 'react';
+
 import { useReservation } from '@/context/ReservationContext';
 import { authService } from '@/lib/services/AuthService';
-import { Shield } from 'lucide-react';
+import type { LayoutProps, StepNumber, ReservationCamp } from '@/types/reservation';
+import { formatDateRange } from '@/utils/api';
+
+import Footer from './Footer';
+import HeaderSecondary from './HeaderSecondary';
+import HeaderTop from './HeaderTop';
+import NavigationButtons from './NavigationButtons';
+import ProgressBar from './ProgressBar';
+import ReservationSummary from './ReservationSummary';
+
 
 /**
  * Client-side Layout Component
@@ -24,7 +28,7 @@ export default function LayoutClient({
   onStepClick,
   children,
   campData,
-  isDisabled,
+  isDisabled: _isDisabled,
 }: LayoutProps) {
   const TOTAL_STEPS = 5;
   const router = useRouter();
@@ -39,10 +43,10 @@ export default function LayoutClient({
       const user = authService.getCurrentUser();
       if (user) {
         // Check if user is admin: user_type === 'admin', groups includes 'admin', login === 'admin', or id === 0
-        const isAdminUser = 
-          user.user_type === 'admin' || 
-          user.groups?.includes('admin') || 
-          user.login === 'admin' || 
+        const isAdminUser =
+          user.user_type === 'admin' ||
+          user.groups?.includes('admin') ||
+          user.login === 'admin' ||
           user.id === 0;
         setIsAdmin(isAdminUser);
       }
@@ -64,16 +68,16 @@ export default function LayoutClient({
   // Common validation function for current step
   const validateCurrentStep = (): boolean => {
     let isValid = true;
-    
+
     // For step 2, use combined validation function
     if (currentStep === 2) {
-      const validateStep2Combined = (window as any).validateStep2Combined;
+      const { validateStep2Combined } = (window as any);
       if (validateStep2Combined && typeof validateStep2Combined === 'function') {
         isValid = validateStep2Combined();
       }
     } else if (currentStep === 3) {
       // For step 3, use combined validation function
-      const validateStep3Combined = (window as any).validateStep3Combined;
+      const { validateStep3Combined } = (window as any);
       if (validateStep3Combined && typeof validateStep3Combined === 'function') {
         isValid = validateStep3Combined();
       }
@@ -84,7 +88,7 @@ export default function LayoutClient({
         isValid = validateFunction();
       }
     }
-    
+
     return isValid;
   };
 
@@ -92,18 +96,18 @@ export default function LayoutClient({
   // Only allow navigation to adjacent steps (forward/backward one step at a time)
   const handleStepNavigation = async (step: StepNumber) => {
     if (!campData) return;
-    
+
     // If trying to go forward (to a step ahead), validate current step first
     if (step > currentStep) {
       const isValid = validateCurrentStep();
-      
+
       if (!isValid) {
         // Validation failed - scroll to top to show errors
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
     }
-    
+
     // If trying to go to a step that's more than one step away, limit to adjacent step
     const stepDiff = step - currentStep;
     if (Math.abs(stepDiff) > 1) {
@@ -116,14 +120,14 @@ export default function LayoutClient({
         step = (currentStep - 1) as StepNumber;
       }
     }
-    
+
     // Extract campId and editionId from current path
     const pathParts = pathname.split('/').filter(Boolean);
     const campIdIndex = pathParts.indexOf('camps');
     if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
       const campId = pathParts[campIdIndex + 1];
       const editionId = pathParts[campIdIndex + 3]; // edition/[editionId]
-      
+
       // Navigate to new step URL
       const newPath = `/camps/${campId}/edition/${editionId}/step/${step}`;
       await router.push(newPath);
@@ -137,7 +141,7 @@ export default function LayoutClient({
     if (currentStep < TOTAL_STEPS) {
       // Validate current step before proceeding
       const isValid = validateCurrentStep();
-      
+
       // Only proceed if validation passes
       if (isValid) {
         stepClickHandler((currentStep + 1) as StepNumber);
@@ -161,7 +165,7 @@ export default function LayoutClient({
     }
 
     const { camp, property } = campData;
-    
+
     // Check if camp/edition exists (id = 0 means doesn't exist)
     if (camp.id === 0 || property.id === 0 || !camp.name) {
       return 'Obóz lub edycja nie istnieje';
@@ -169,10 +173,10 @@ export default function LayoutClient({
 
     const periodLabel = property.period === 'lato' ? 'Lato' : 'Zima';
     const year = new Date(property.start_date).getFullYear();
-    
+
     return `Rezerwacja obozu "${camp.name}" - ${periodLabel} ${year} - ${property.city} - ${formatDateRange(property.start_date, property.end_date)} (${property.days_count} ${property.days_count === 1 ? 'dzień' : 'dni'})`;
   };
-  
+
   // Check if camp/edition exists
   const campExists = campData && campData.camp.id > 0 && campData.property.id > 0 && campData.camp.name;
 
@@ -184,7 +188,7 @@ export default function LayoutClient({
     if (campExists && campData) {
       // Check if camp info needs to be updated (avoid unnecessary updates)
       const currentCamp = reservation.camp;
-      const shouldUpdate = !currentCamp || 
+      const shouldUpdate = !currentCamp ||
         currentCamp.id !== campData.camp.id ||
         currentCamp.name !== campData.camp.name ||
         currentCamp.properties.period !== campData.property.period ||
@@ -297,12 +301,12 @@ export default function LayoutClient({
                 <p className="text-sm sm:text-base text-yellow-700 font-medium">
                   Użytkownik z uprawnieniami administratora nie może tworzyć rezerwacji.
                 </p>
-                <a
+                <Link
                   href="/"
                   className="inline-block mt-4 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm sm:text-base"
                 >
                   Powrót do strony głównej
-                </a>
+                </Link>
               </div>
             </div>
           </div>
@@ -326,10 +330,10 @@ export default function LayoutClient({
               </div>
 
               {/* Right Column - Summary - Mobile: below, Desktop: sticky */}
-              <aside 
+              <aside
                 className="lg:w-[25%] w-full order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start"
-                style={{ 
-                  alignSelf: 'flex-start'
+                style={{
+                  alignSelf: 'flex-start',
                 }}
               >
                 <ReservationSummary currentStep={currentStep} onNext={handleNext} />

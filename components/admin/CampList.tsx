@@ -1,6 +1,7 @@
 'use client';
 
 import { Edit, Trash2 } from 'lucide-react';
+
 import type { Camp, CampProperty } from '@/types/reservation';
 
 interface CampWithProperties extends Camp {
@@ -26,9 +27,9 @@ export default function CampList({
   onSelectCamp,
   onEditCamp,
   onDeleteCamp,
-  onCreateProperty,
-  onEditProperty,
-  onDeleteProperty,
+  onCreateProperty: _onCreateProperty,
+  onEditProperty: _onEditProperty,
+  onDeleteProperty: _onDeleteProperty,
 }: CampListProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -124,7 +125,7 @@ export default function CampList({
             </div>
           ) : (
             <div className="px-4 py-6 text-center text-gray-500">
-              <p>Brak edycji dla tego obozu. Kliknij "Zarządzaj edycjami", aby dodać pierwszą edycję.</p>
+              <p>Brak edycji dla tego obozu. Kliknij &quot;Zarządzaj edycjami&quot;, aby dodać pierwszą edycję.</p>
             </div>
           )}
         </div>

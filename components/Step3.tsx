@@ -1,21 +1,23 @@
 'use client';
 
 import { useEffect, useCallback, useState } from 'react';
-import DashedLine from './DashedLine';
-import InvoiceTypeSection from './step3/InvoiceTypeSection';
-import InvoiceDataSection from './step3/InvoiceDataSection';
-import InvoiceDeliverySection from './step3/InvoiceDeliverySection';
+
+import { useReservation } from '@/context/ReservationContext';
 import type { StepComponentProps } from '@/types/reservation';
 import { saveStep3FormData, loadStep3FormData, type Step3FormData } from '@/utils/sessionStorage';
 import { loadStep1FormData } from '@/utils/sessionStorage';
-import { useReservation } from '@/context/ReservationContext';
+
+import DashedLine from './DashedLine';
+import InvoiceDataSection from './step3/InvoiceDataSection';
+import InvoiceDeliverySection from './step3/InvoiceDeliverySection';
+import InvoiceTypeSection from './step3/InvoiceTypeSection';
 
 /**
  * Step3 Component - Invoices
  * Contains: Invoice type selection, Invoice data form (only for company), Invoice delivery options (only for company)
  * For private person: only type selection is shown, no invoice data fields
  */
-export default function Step3({ onNext, onPrevious, disabled = false }: StepComponentProps) {
+export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabled: _disabled = false }: StepComponentProps) {
   const [invoiceType, setInvoiceType] = useState<'private' | 'company'>('private');
   const { reservation, removeReservationItem } = useReservation();
 
@@ -34,17 +36,17 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
       const savedData = loadStep3FormData();
       if (savedData && savedData.invoiceType && savedData.invoiceType !== invoiceType) {
         setInvoiceType(savedData.invoiceType);
-        
+
         // If switching to private, auto-fill from Step1 and clear company data
         if (savedData.invoiceType === 'private') {
           // Remove paper invoice (30 PLN) from reservation when switching to private person
           const paperInvoiceItem = reservation.items.find(
-            item => item.type === 'other' && item.name === 'Faktura papierowa'
+            item => item.type === 'other' && item.name === 'Faktura papierowa',
           );
           if (paperInvoiceItem) {
             removeReservationItem(paperInvoiceItem.id);
           }
-          
+
           const step1Data = loadStep1FormData();
           if (step1Data && step1Data.parents && step1Data.parents.length > 0) {
             const firstParent = step1Data.parents[0];
@@ -58,7 +60,7 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
               city: firstParent.city || '',
               nip: '', // NIP is optional for private person
             };
-            
+
             const formData: Step3FormData = {
               ...savedData,
               invoiceType: 'private',
@@ -76,7 +78,7 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
               differentAddress: false,
               deliveryAddress: { street: '', postalCode: '', city: '' },
             };
-            
+
             saveStep3FormData(formData);
           } else {
             // Even if no Step1 data, clear company data and reset delivery
@@ -113,7 +115,7 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
     // Always validate delivery section (for both private and company, if paper version is selected)
     const validateDelivery = (window as any).validateInvoiceDeliverySection;
     const deliveryValid = validateDelivery ? validateDelivery() : true;
-    
+
     // If private person, only validate delivery (no invoice data required)
     if (invoiceType === 'private') {
       return deliveryValid;
@@ -122,7 +124,7 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
     // If company, validate both invoice data and delivery sections
     const validateInvoiceData = (window as any).validateInvoiceDataSection;
     const invoiceDataValid = validateInvoiceData ? validateInvoiceData() : true;
-    
+
     return invoiceDataValid && deliveryValid;
   }, [invoiceType]);
 
@@ -140,7 +142,7 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
     if (invoiceType === 'private') {
       // Remove paper invoice (30 PLN) from reservation when invoiceType is private
       const paperInvoiceItem = reservation.items.find(
-        item => item.type === 'other' && item.name === 'Faktura papierowa'
+        item => item.type === 'other' && item.name === 'Faktura papierowa',
       );
       if (paperInvoiceItem) {
         removeReservationItem(paperInvoiceItem.id);
@@ -152,18 +154,18 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
   useEffect(() => {
     const savedData = loadStep3FormData();
     const step1Data = loadStep1FormData();
-    
+
     // If private person is selected and we have Step1 data, auto-fill from first parent
     if (invoiceType === 'private' && step1Data && step1Data.parents && step1Data.parents.length > 0) {
       const firstParent = step1Data.parents[0];
-      
+
       // Only update if privateData is not already filled
       const currentPrivateData = savedData ? savedData.privateData : null;
-      const needsUpdate = !currentPrivateData || 
-        !currentPrivateData.firstName || 
+      const needsUpdate = !currentPrivateData ||
+        !currentPrivateData.firstName ||
         !currentPrivateData.lastName ||
         !currentPrivateData.email;
-      
+
       if (needsUpdate) {
         const privateData = {
           firstName: firstParent.firstName || '',
@@ -175,7 +177,7 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
           city: firstParent.city || '',
           nip: '', // NIP is optional for private person
         };
-        
+
         const formData: Step3FormData = {
           ...savedData,
           invoiceType: 'private',
@@ -191,7 +193,7 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
           differentAddress: (savedData && savedData.differentAddress !== undefined) ? savedData.differentAddress : false,
           deliveryAddress: (savedData && savedData.deliveryAddress) ? savedData.deliveryAddress : { street: '', postalCode: '', city: '' },
         };
-        
+
         saveStep3FormData(formData);
       }
     }
@@ -201,7 +203,7 @@ export default function Step3({ onNext, onPrevious, disabled = false }: StepComp
     <div className="space-y-4 sm:space-y-6">
       {/* Invoice Type Section */}
       <InvoiceTypeSection />
-      
+
       {/* Invoice Data Section - Only show for company */}
       {invoiceType === 'company' && (
         <>

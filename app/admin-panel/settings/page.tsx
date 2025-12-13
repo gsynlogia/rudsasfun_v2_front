@@ -1,17 +1,18 @@
 'use client';
 
-import AdminLayout from '@/components/admin/AdminLayout';
-import SectionGuard from '@/components/admin/SectionGuard';
 import { Settings as SettingsIcon, Users, UserCog, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
+import AdminLayout from '@/components/admin/AdminLayout';
+import SectionGuard from '@/components/admin/SectionGuard';
 import { authService } from '@/lib/services/AuthService';
 
 /**
  * Admin Panel - Settings Page
  * Route: /admin-panel/settings
- * 
+ *
  * Settings page with three buttons side by side: General, Users, Groups
  */
 export default function SettingsPage() {
@@ -78,7 +79,7 @@ export default function SettingsPage() {
           {sections.map((section) => {
             const Icon = section.icon;
             const isActive = pathname === section.href;
-            
+
             return (
               <Link
                 key={section.id}
@@ -90,12 +91,12 @@ export default function SettingsPage() {
                     : 'hover:bg-gray-50 border-2 border-transparent'
                   }
                 `}
-                style={{ 
+                style={{
                   borderRadius: 0,
                   cursor: 'pointer',
                 }}
               >
-                <Icon 
+                <Icon
                   size={24}
                   style={{
                     strokeWidth: 2,

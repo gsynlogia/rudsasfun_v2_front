@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useParams } from 'next/navigation';
-import { Info } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep1FormData, saveStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
-import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
-import { fetchWithDefaults } from '@/utils/api-fetch';
 import { DEFAULT_DIET } from '@/types/defaults';
 import { BackendUnavailableError } from '@/utils/api-auth';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
+import { loadStep1FormData, saveStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
 
 interface Diet {
   id: number;
@@ -26,10 +25,10 @@ interface Diet {
  * Replaces hardcoded standard/vegetarian diets
  */
 export default function DietSection() {
-  const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
+  const { reservation: _reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
   const params = useParams();
-  
+
   const [selectedDietId, setSelectedDietId] = useState<number | null>(null);
   const [diets, setDiets] = useState<Diet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,20 +67,20 @@ export default function DietSection() {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Get property_id from URL params (editionId is the property_id)
         const editionId = params?.editionId as string | undefined;
         const propertyId = editionId ? parseInt(editionId, 10) : undefined;
-        
+
         // Extract campId from pathname
         const pathParts = pathname.split('/').filter(Boolean);
         const campIdIndex = pathParts.indexOf('camps');
-        const campId = campIdIndex !== -1 && campIdIndex + 1 < pathParts.length 
-          ? parseInt(pathParts[campIdIndex + 1], 10) 
+        const campId = campIdIndex !== -1 && campIdIndex + 1 < pathParts.length
+          ? parseInt(pathParts[campIdIndex + 1], 10)
           : undefined;
-        
+
         let dietsData: Diet[] = [];
-        
+
         // First, try to get diets assigned to this turnus (property_id)
         // This endpoint returns:
         // - Diets from turnus_diets table (many-to-many)
@@ -94,10 +93,10 @@ export default function DietSection() {
               const turnusDiets = await turnusDietsResponse.json();
               if (turnusDiets && Array.isArray(turnusDiets) && turnusDiets.length > 0) {
                 console.log('[DietSection] Raw turnus diets from API:', turnusDiets);
-                
+
                 // Check if all diets are center diets without relations (has_no_relations flag)
                 const hasOnlyCenterDietsWithoutRelations = turnusDiets.every((td: any) => td.has_no_relations === true);
-                
+
                 if (hasOnlyCenterDietsWithoutRelations) {
                   // Center diet is assigned but has no relations - use general diets as fallback
                   console.log('[DietSection] Center diet assigned but no relations - using general diets as fallback');
@@ -123,7 +122,7 @@ export default function DietSection() {
                         icon_url: td.icon_url, // Icon from general_diet
                         icon_svg: td.icon_svg, // Icon SVG from general_diet
                         is_active: td.is_active,
-                        is_center_diet_relation: td.is_center_diet_relation || false // Mark if from center diet relation
+                        is_center_diet_relation: td.is_center_diet_relation || false, // Mark if from center diet relation
                       };
                       console.log('[DietSection] Mapped diet:', { original: td, mapped: mappedDiet });
                       return mappedDiet;
@@ -138,7 +137,7 @@ export default function DietSection() {
             console.warn('[DietSection] Error fetching turnus diets, falling back to general diets:', err);
           }
         }
-        
+
         // If no turnus diets, use general diets (fallback to "dieta ogólna")
         // DO NOT use center-diets/property endpoint here - it returns center diets with legacy property_id
         // which may not be assigned to this turnus. Only use diets explicitly assigned via get_turnus_diets.
@@ -156,7 +155,7 @@ export default function DietSection() {
                 description: gd.description,
                 icon_url: gd.icon_url,
                 icon_svg: gd.icon_svg,
-                is_active: gd.is_active
+                is_active: gd.is_active,
               }));
               console.log('[DietSection] Using general diets (no turnus diets assigned):', dietsData.length);
             } else {
@@ -171,7 +170,7 @@ export default function DietSection() {
                   description: gd.description,
                   icon_url: gd.icon_url,
                   icon_svg: gd.icon_svg,
-                  is_active: gd.is_active
+                  is_active: gd.is_active,
                 }));
                 console.log('[DietSection] Using general diets from center-diets/general/public:', dietsData.length);
               } else {
@@ -199,13 +198,13 @@ export default function DietSection() {
             }
           }
         }
-        
+
         setDiets(dietsData);
-        
+
         // Check sessionStorage directly to get the most up-to-date value
         const savedData = loadStep1FormData();
         const savedDietId = savedData?.selectedDietId;
-        
+
         // Only set default diet if we haven't loaded from sessionStorage
         if (!hasLoadedFromStorageRef.current && dietsData && dietsData.length > 0) {
           // When using general diets (no turnus diets), always use the first general diet
@@ -217,12 +216,12 @@ export default function DietSection() {
             console.log('[DietSection] No turnus diets - using first general diet as default:', defaultDiet.name);
           } else {
             // When turnus has specific diets, try to find "ogólna" or "standardowa"
-            const generalDiet = dietsData.find((d: Diet) => 
-              d.name?.toLowerCase().includes('ogólna') || 
+            const generalDiet = dietsData.find((d: Diet) =>
+              d.name?.toLowerCase().includes('ogólna') ||
               d.name?.toLowerCase().includes('ogolna') ||
-              d.name?.toLowerCase().includes('standardowa') || 
+              d.name?.toLowerCase().includes('standardowa') ||
               d.name?.toLowerCase().includes('standard') ||
-              d.name?.toLowerCase().includes('general')
+              d.name?.toLowerCase().includes('general'),
             );
             defaultDiet = generalDiet || dietsData[0];
             console.log('[DietSection] Turnus has specific diets - default diet selected:', defaultDiet.name);
@@ -245,12 +244,12 @@ export default function DietSection() {
               console.log('[DietSection] Saved diet not found - using first general diet as fallback:', defaultDiet.name);
             } else {
               // When turnus has specific diets, try to find "ogólna" or "standardowa"
-              const generalDiet = dietsData.find((d: Diet) => 
-                d.name?.toLowerCase().includes('ogólna') || 
+              const generalDiet = dietsData.find((d: Diet) =>
+                d.name?.toLowerCase().includes('ogólna') ||
                 d.name?.toLowerCase().includes('ogolna') ||
-                d.name?.toLowerCase().includes('standardowa') || 
+                d.name?.toLowerCase().includes('standardowa') ||
                 d.name?.toLowerCase().includes('standard') ||
-                d.name?.toLowerCase().includes('general')
+                d.name?.toLowerCase().includes('general'),
               );
               defaultDiet = generalDiet || dietsData[0];
               console.log('[DietSection] Saved diet not found - fallback diet selected:', defaultDiet.name);
@@ -280,7 +279,7 @@ export default function DietSection() {
     };
 
     fetchDiets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [params?.editionId]); // Re-fetch when property changes
 
   // Update reservation when diet changes
@@ -308,7 +307,7 @@ export default function DietSection() {
   // Save to sessionStorage whenever diet changes
   useEffect(() => {
     if (selectedDietId === null) return;
-    
+
     const savedData = loadStep1FormData();
     if (savedData) {
       const formData: Step1FormData = {
@@ -384,12 +383,12 @@ export default function DietSection() {
                           className={`w-full h-full object-contain max-w-full max-h-full ${
                             isSelected ? 'brightness-0 invert' : ''
                           }`}
-                          style={{ 
-                            width: '100%', 
-                            height: '100%', 
+                          style={{
+                            width: '100%',
+                            height: '100%',
                             objectFit: 'contain',
                             maxWidth: '100%',
-                            maxHeight: '100%'
+                            maxHeight: '100%',
                           }}
                         />
                       </div>
@@ -407,10 +406,10 @@ export default function DietSection() {
                   ) : diet.icon_svg ? (
                     <>
                       {/* SVG icon (pasted SVG code) - second priority */}
-                      <div 
+                      <div
                         className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 flex items-center justify-center flex-shrink-0 overflow-hidden"
-                        style={{ 
-                          filter: isSelected ? 'brightness(0) invert(1)' : 'none'
+                        style={{
+                          filter: isSelected ? 'brightness(0) invert(1)' : 'none',
                         }}
                       >
                         <div
@@ -420,9 +419,9 @@ export default function DietSection() {
                             height: '100%',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
                           }}
-                          dangerouslySetInnerHTML={{ 
+                          dangerouslySetInnerHTML={{
                             __html: diet.icon_svg.replace(
                               /<svg([^>]*?)>/i,
                               (match, attrs) => {
@@ -430,8 +429,8 @@ export default function DietSection() {
                                 attrs = attrs.replace(/\s*(width|height|style)=["'][^"']*["']/gi, '');
                                 // Add fixed size and contain behavior
                                 return `<svg${attrs} style="width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain;">`;
-                              }
-                            )
+                              },
+                            ),
                           }}
                         />
                       </div>

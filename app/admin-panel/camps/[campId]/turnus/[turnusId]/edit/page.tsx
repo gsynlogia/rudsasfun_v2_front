@@ -1,10 +1,15 @@
 'use client';
 
+import { ArrowLeft, Save, Calendar, MapPin, Truck, Copy, Search, Trash2, UtensilsCrossed, Tag, Shield } from 'lucide-react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
-import { ArrowLeft, Save, Calendar, MapPin, Truck, Copy, Search, Plus, Trash2, UtensilsCrossed, DollarSign, FileText, Tag, Shield } from 'lucide-react';
+import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
+import UniversalModal from '@/components/admin/UniversalModal';
 import type { Camp, CampProperty, CampPropertyTransport, TransportCity } from '@/types/reservation';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 // Helper interface for transport city with defaults
 interface TransportCityWithDefaults {
@@ -20,11 +25,11 @@ const getFirstCity = (cities?: TransportCity[]): TransportCityWithDefaults => {
     departure_price: null,
     return_price: null,
   };
-  
+
   if (!cities || cities.length === 0) {
     return defaultCity;
   }
-  
+
   const firstCity = cities[0];
   return {
     city: firstCity.city || null,
@@ -32,9 +37,6 @@ const getFirstCity = (cities?: TransportCity[]): TransportCityWithDefaults => {
     return_price: firstCity.return_price ?? null,
   };
 };
-import UniversalModal from '@/components/admin/UniversalModal';
-import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
-import { authenticatedApiCall } from '@/utils/api-auth';
 
 /**
  * Fetch camp by ID
@@ -51,9 +53,9 @@ const fetchCampById = (id: number): Promise<Camp | null> => {
       }
       return response.json();
     })
-    .catch(err => {
-      console.error('[CampTurnusEditPage] Error fetching camp:', err);
-      throw err;
+    .catch(_err => {
+      console.error('[CampTurnusEditPage] Error fetching camp:', _err);
+      throw _err;
     });
 };
 
@@ -77,9 +79,9 @@ const fetchCampProperty = (campId: number, propertyId: number): Promise<CampProp
       // Find the specific property by ID
       return properties.find(p => p.id === propertyId) || null;
     })
-    .catch(err => {
-      console.error('[CampTurnusEditPage] Error fetching camp property:', err);
-      throw err;
+    .catch(_err => {
+      console.error('[CampTurnusEditPage] Error fetching camp property:', _err);
+      throw _err;
     });
 };
 
@@ -103,8 +105,8 @@ const fetchTurnusDiets = async (campId: number, propertyId: number): Promise<any
     }
     const data = await response.json();
     return data || [];
-  } catch (err) {
-    console.warn('[CampTurnusEditPage] Error fetching turnus diets:', err);
+  } catch (_err) {
+    console.warn('[CampTurnusEditPage] Error fetching turnus diets:', _err);
     return [];
   }
 };
@@ -129,8 +131,8 @@ const fetchTurnusPromotions = async (campId: number, propertyId: number): Promis
     }
     const data = await response.json();
     return data || [];
-  } catch (err) {
-    console.warn('[CampTurnusEditPage] Error fetching turnus promotions:', err);
+  } catch (_err) {
+    console.warn('[CampTurnusEditPage] Error fetching turnus promotions:', _err);
     return [];
   }
 };
@@ -155,8 +157,8 @@ const fetchTurnusProtections = async (campId: number, propertyId: number): Promi
     }
     const data = await response.json();
     return data || [];
-  } catch (err) {
-    console.warn('[CampTurnusEditPage] Error fetching turnus protections:', err);
+  } catch (_err) {
+    console.warn('[CampTurnusEditPage] Error fetching turnus protections:', _err);
     return [];
   }
 };
@@ -186,9 +188,9 @@ const fetchTransport = (campId: number, propertyId: number): Promise<CampPropert
       }
       return data;
     })
-    .catch(err => {
+    .catch(_err => {
       // Network errors or other issues - log but return null (transport is optional)
-      console.warn('[CampTurnusEditPage] Error fetching transport (will be created on save):', err.message || err);
+      console.warn('[CampTurnusEditPage] Error fetching transport (will be created on save):', _err.message || _err);
       return null; // Return null if transport doesn't exist yet or fetch fails
     });
 };
@@ -196,12 +198,12 @@ const fetchTransport = (campId: number, propertyId: number): Promise<CampPropert
 /**
  * Camp Turnus Edit Page
  * Route: /admin-panel/camps/[campId]/turnus/[turnusId]/edit
- * 
+ *
  * Allows editing a specific camp turnus/property
  */
-export default function CampTurnusEditPage({ 
-  params 
-}: { 
+export default function CampTurnusEditPage({
+  params,
+}: {
   params: Promise<{ campId: string; turnusId: string }> | { campId: string; turnusId: string }
 }) {
   const router = useRouter();
@@ -231,7 +233,7 @@ export default function CampTurnusEditPage({
   const [showAvailableTransportsModal, setShowAvailableTransportsModal] = useState(false);
   const [availableTransports, setAvailableTransports] = useState<any[]>([]);
   const [loadingAvailableTransports, setLoadingAvailableTransports] = useState(false);
-  
+
   // Delete transport confirmation modal
   const [showDeleteTransportModal, setShowDeleteTransportModal] = useState(false);
   const [isDeletingTransport, setIsDeletingTransport] = useState(false);
@@ -256,7 +258,7 @@ export default function CampTurnusEditPage({
   const [loadingAvailablePromotions, setLoadingAvailablePromotions] = useState(false);
   const [searchPromotionQuery, setSearchPromotionQuery] = useState('');
   const [showDeletePromotionModal, setShowDeletePromotionModal] = useState(false);
-  const [promotionToDelete, setPromotionToDelete] = useState<number | null>(null);
+  const [_promotionToDelete, setPromotionToDelete] = useState<number | null>(null);
   const [isDeletingPromotion, setIsDeletingPromotion] = useState(false);
 
   // Protections state
@@ -267,7 +269,7 @@ export default function CampTurnusEditPage({
   const [loadingAvailableProtections, setLoadingAvailableProtections] = useState(false);
   const [searchProtectionQuery, setSearchProtectionQuery] = useState('');
   const [showDeleteProtectionModal, setShowDeleteProtectionModal] = useState(false);
-  const [protectionToDelete, setProtectionToDelete] = useState<number | null>(null);
+  const [_protectionToDelete, setProtectionToDelete] = useState<number | null>(null);
   const [isDeletingProtection, setIsDeletingProtection] = useState(false);
 
   // Resolve params (handle both Promise and direct params)
@@ -277,23 +279,23 @@ export default function CampTurnusEditPage({
         const resolvedParams = params instanceof Promise ? await params : params;
         const resolvedCampId = parseInt(resolvedParams.campId);
         const resolvedTurnusId = parseInt(resolvedParams.turnusId);
-        
+
         if (isNaN(resolvedCampId) || isNaN(resolvedTurnusId)) {
           console.error('[CampTurnusEditPage] Invalid params:', resolvedParams);
           setError('Nieprawidłowe parametry URL');
           setLoading(false);
           return;
         }
-        
+
         setCampId(resolvedCampId);
         setTurnusId(resolvedTurnusId);
-      } catch (err) {
-        console.error('[CampTurnusEditPage] Error resolving params:', err);
+      } catch (_err) {
+        console.error('[CampTurnusEditPage] Error resolving params:', _err);
         setError('Błąd podczas parsowania parametrów');
         setLoading(false);
       }
     };
-    
+
     resolveParams();
   }, [params]);
 
@@ -305,34 +307,34 @@ export default function CampTurnusEditPage({
           setLoading(false);
           return;
         }
-        
+
         Promise.all([
           fetchCampById(campId),
           fetchCampProperty(campId, turnusId),
           fetchTransport(campId, turnusId),
           fetchTurnusDiets(campId, turnusId),
           fetchTurnusPromotions(campId, turnusId),
-          fetchTurnusProtections(campId, turnusId)
+          fetchTurnusProtections(campId, turnusId),
         ])
           .then(([campData, propertyData, transportData, dietsData, promotionsData, protectionsData]) => {
           setCamp(campData);
           setProperty(propertyData);
-          
+
           console.log('[CampTurnusEditPage] Fetched diets data:', dietsData);
           console.log('[CampTurnusEditPage] Diets data length:', dietsData?.length || 0);
-          
+
           // Set turnus diets immediately after fetching
           setTurnusDiets(dietsData || []);
           console.log('[CampTurnusEditPage] Set turnusDiets to:', dietsData || []);
-          
+
           // Set turnus promotions immediately after fetching
           setTurnusPromotions(promotionsData || []);
           console.log('[CampTurnusEditPage] Set turnusPromotions to:', promotionsData || []);
-          
+
           // Set turnus protections immediately after fetching
           setTurnusProtections(protectionsData || []);
           console.log('[CampTurnusEditPage] Set turnusProtections to:', protectionsData || []);
-          
+
           if (!campData) {
             console.error(`[CampTurnusEditPage] Camp ${campId} not found`);
             setError(`Obóz o ID ${campId} nie został znaleziony.`);
@@ -347,7 +349,7 @@ export default function CampTurnusEditPage({
             setStartDate(propertyData.start_date.split('T')[0]);
             setEndDate(propertyData.end_date.split('T')[0]);
             setMaxParticipants(propertyData.max_participants || 50);
-            
+
             // Populate transport data if exists - map cities to transport fields
             if (transportData) {
               // Map cities array to transport fields for display
@@ -370,14 +372,14 @@ export default function CampTurnusEditPage({
             } else {
               setTransport(null);
             }
-            
+
             console.log('[CampTurnusEditPage] Data loaded successfully:', { campId, turnusId, transportData, dietsData });
           }
           setLoading(false);
         })
-        .catch(err => {
-          console.error('[CampTurnusEditPage] Error loading data:', err);
-          setError(err instanceof Error ? err.message : 'Błąd podczas ładowania danych');
+        .catch(_err => {
+          console.error('[CampTurnusEditPage] Error loading data:', _err);
+          setError(_err instanceof Error ? _err.message : 'Błąd podczas ładowania danych');
           setLoading(false);
         });
     }
@@ -385,7 +387,7 @@ export default function CampTurnusEditPage({
 
   // Get today's date in YYYY-MM-DD format for min date
   const today = new Date().toISOString().split('T')[0];
-  
+
   // Calculate minimum end date (start date + 1 day)
   const getMinEndDate = () => {
     if (!startDate) return today;
@@ -453,12 +455,12 @@ export default function CampTurnusEditPage({
       }
 
       console.log('[CampTurnusEditPage] Property save successful');
-      
+
       console.log('[CampTurnusEditPage] All saves successful, navigating to camps list');
       router.push('/admin-panel/camps');
-    } catch (err) {
-      console.error('[CampTurnusEditPage] Error saving:', err);
-      setError(err instanceof Error ? err.message : 'Błąd podczas zapisywania turnusu obozu');
+    } catch (_err) {
+      console.error('[CampTurnusEditPage] Error saving:', _err);
+      setError(_err instanceof Error ? _err.message : 'Błąd podczas zapisywania turnusu obozu');
     } finally {
       setSaving(false);
     }
@@ -475,12 +477,10 @@ export default function CampTurnusEditPage({
       setLoadingTransport(true);
       setError(null);
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
-
       // First, check if this turnus already has a transport assigned
       // If yes, unassign it before assigning the new one
       if (transport && transport.id && transport.id !== transportId) {
-        console.log('[CampTurnusEditPage] Unassigning previous transport:', transport.id);
+        console.warn('[CampTurnusEditPage] Unassigning previous transport:', transport.id);
         try {
           await authenticatedApiCall<CampPropertyTransport>(
             `/api/camps/transports/${transport.id}`,
@@ -489,9 +489,9 @@ export default function CampTurnusEditPage({
               body: JSON.stringify({
                 property_id: null, // Unassign previous transport from this turnus
               }),
-            }
+            },
           );
-          console.log('[CampTurnusEditPage] Previous transport unassigned');
+          console.warn('[CampTurnusEditPage] Previous transport unassigned');
         } catch (err) {
           console.warn('[CampTurnusEditPage] Error unassigning previous transport (continuing anyway):', err);
         }
@@ -507,17 +507,17 @@ export default function CampTurnusEditPage({
             property_id: turnusId, // Assign transport to this turnus
             // Backend automatically assigns transport to camp of this turnus
           }),
-        }
+        },
       );
-      
+
       // Reload transport data for this turnus to get the updated transport
       // This ensures we have the correct transport after assignment
       let mappedTransport: CampPropertyTransport | null = null;
       try {
         const transportData = await authenticatedApiCall<CampPropertyTransport>(
-          `/api/camps/${campId}/properties/${turnusId}/transport`
+          `/api/camps/${campId}/properties/${turnusId}/transport`,
         );
-        
+
         if (transportData) {
           // Map cities array to transport fields for display
           const firstCity = getFirstCity(transportData.cities);
@@ -538,7 +538,7 @@ export default function CampTurnusEditPage({
       } catch (err) {
         console.warn('[CampTurnusEditPage] Error reloading transport (using updated transport):', err);
       }
-      
+
       // Fallback to updatedTransport if reload failed
       if (!mappedTransport) {
         const firstCity = getFirstCity(updatedTransport.cities);
@@ -556,9 +556,9 @@ export default function CampTurnusEditPage({
           return_own_price: null,
         };
       }
-      
+
       setTransport(mappedTransport);
-      
+
       console.log('[CampTurnusEditPage] Transport assigned successfully:', mappedTransport);
     } catch (err) {
       console.error('[CampTurnusEditPage] Error assigning transport:', err);
@@ -586,7 +586,7 @@ export default function CampTurnusEditPage({
         `/api/camps/transports/${transport.id}`,
         {
           method: 'GET',
-        }
+        },
       );
 
       console.log('[CampTurnusEditPage] Current transport:', currentTransport);
@@ -601,7 +601,7 @@ export default function CampTurnusEditPage({
             property_id: null, // Unassign transport from this turnus
             // Note: Camp associations remain if transport is used by other turnuses
           }),
-        }
+        },
       );
 
       console.log('[CampTurnusEditPage] Transport updated:', updatedTransport);
@@ -642,22 +642,22 @@ export default function CampTurnusEditPage({
         // Assume transport was removed if reload fails
         setTransport(null);
       }
-      
+
       setShowDeleteTransportModal(false);
-      
+
       console.log('[CampTurnusEditPage] Transport unassigned successfully');
     } catch (err) {
       console.error('[CampTurnusEditPage] Error removing transport:', err);
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas usuwania przypisania transportu';
       setError(errorMessage);
-      
+
       // Log additional details for debugging
       if (err instanceof Error) {
         console.error('[CampTurnusEditPage] Error details:', {
           message: err.message,
           stack: err.stack,
           transportId: transport?.id,
-          campId: campId
+          campId: campId,
         });
       }
     } finally {
@@ -710,13 +710,13 @@ export default function CampTurnusEditPage({
 
   const handleSelectDiet = async (diet: any) => {
     console.log('[CampTurnusEditPage] handleSelectDiet called with:', { diet, campId, turnusId });
-    
+
     if (!campId || !turnusId) {
       console.error('[CampTurnusEditPage] Missing campId or turnusId:', { campId, turnusId });
       setError('Brak ID obozu lub turnusu');
       return;
     }
-    
+
     if (!diet || !diet.id) {
       console.error('[CampTurnusEditPage] Missing diet or diet.id:', diet);
       setError('Brak ID diety do przypisania');
@@ -733,7 +733,7 @@ export default function CampTurnusEditPage({
         `/api/camps/${campId}/properties/${turnusId}/diets/${diet.id}`,
         {
           method: 'POST',
-        }
+        },
       );
 
       console.log('[CampTurnusEditPage] Diet assignment API call successful, response:', response);
@@ -771,7 +771,7 @@ export default function CampTurnusEditPage({
         `/api/camps/${campId}/properties/${turnusId}/diets/${dietToDelete}`,
         {
           method: 'DELETE',
-        }
+        },
       );
 
       // Reload diets
@@ -844,13 +844,13 @@ export default function CampTurnusEditPage({
 
   const handleSelectPromotion = async (promotion: any) => {
     console.log('[CampTurnusEditPage] handleSelectPromotion called with:', { promotion, campId, turnusId });
-    
+
     if (!campId || !turnusId) {
       console.error('[CampTurnusEditPage] Missing campId or turnusId:', { campId, turnusId });
       setError('Brak ID obozu lub turnusu');
       return;
     }
-    
+
     if (!promotion || !promotion.id) {
       console.error('[CampTurnusEditPage] Missing promotion or promotion.id:', promotion);
       setError('Brak ID promocji do przypisania');
@@ -867,7 +867,7 @@ export default function CampTurnusEditPage({
         `/api/camps/${campId}/properties/${turnusId}/promotions/${promotion.id}`,
         {
           method: 'POST',
-        }
+        },
       );
 
       console.log('[CampTurnusEditPage] Promotion assignment API call successful, response:', response);
@@ -914,7 +914,7 @@ export default function CampTurnusEditPage({
           `/api/camps/${campId}/properties/${turnusId}/promotions/${centerPromotionId}`,
           {
             method: 'DELETE',
-          }
+          },
         );
       }
 
@@ -971,13 +971,13 @@ export default function CampTurnusEditPage({
 
   const handleSelectProtection = async (protection: any) => {
     console.log('[CampTurnusEditPage] handleSelectProtection called with:', { protection, campId, turnusId });
-    
+
     if (!campId || !turnusId) {
       console.error('[CampTurnusEditPage] Missing campId or turnusId:', { campId, turnusId });
       setError('Brak ID obozu lub turnusu');
       return;
     }
-    
+
     if (!protection || !protection.id) {
       console.error('[CampTurnusEditPage] Missing protection or protection.id:', protection);
       setError('Brak ID ochrony do przypisania');
@@ -994,7 +994,7 @@ export default function CampTurnusEditPage({
         `/api/camps/${campId}/properties/${turnusId}/protections/${protection.id}`,
         {
           method: 'POST',
-        }
+        },
       );
 
       console.log('[CampTurnusEditPage] Protection assignment API call successful, response:', response);
@@ -1041,7 +1041,7 @@ export default function CampTurnusEditPage({
           `/api/camps/${campId}/properties/${turnusId}/protections/${centerProtectionId}`,
           {
             method: 'DELETE',
-          }
+          },
         );
       }
 
@@ -1092,7 +1092,7 @@ export default function CampTurnusEditPage({
           headers: {
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -1110,7 +1110,7 @@ export default function CampTurnusEditPage({
         name: t.name,
         camp_ids: t.camp_ids,
         camp_name: t.camp_name,
-        is_assigned_to_current_camp: t.is_assigned_to_current_camp
+        is_assigned_to_current_camp: t.is_assigned_to_current_camp,
       })));
       setAvailableTransports(transports);
     } catch (err) {
@@ -1133,10 +1133,10 @@ export default function CampTurnusEditPage({
   const handleSelectTransport = async (selectedTransport: any) => {
     try {
       setLoadingTransport(true);
-      
+
       // Assign transport to this turnus
       await assignTransportToTurnus(selectedTransport.id);
-      
+
       // Update transport state with selected transport
       const firstCity = getFirstCity(selectedTransport.cities);
       const transportData: CampPropertyTransport = {
@@ -1153,7 +1153,7 @@ export default function CampTurnusEditPage({
         return_own_price: null,
       };
       setTransport(transportData);
-      
+
       // Close modal
       setShowAvailableTransportsModal(false);
       setSearchTransportQuery('');
@@ -1173,8 +1173,8 @@ export default function CampTurnusEditPage({
     const period = transport.turnus_period?.toLowerCase() || '';
     const city = transport.turnus_city?.toLowerCase() || '';
     // Check cities array (new structure)
-    const citiesMatch = transport.cities?.some((c: any) => 
-      c.city?.toLowerCase().includes(query)
+    const citiesMatch = transport.cities?.some((c: any) =>
+      c.city?.toLowerCase().includes(query),
     ) || false;
     // Fallback to old structure
     const firstCity = getFirstCity(transport.cities);
@@ -1223,7 +1223,7 @@ export default function CampTurnusEditPage({
       <div className="p-4">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
-            {camp && property 
+            {camp && property
               ? `Edytuj turnus: ${camp.name} - ${getPeriodLabel(property.period)} ${property.city}`
               : 'Edytuj turnus obozu'}
           </h1>
@@ -1419,7 +1419,7 @@ export default function CampTurnusEditPage({
                 </div>
               ) : (
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center text-sm text-gray-500">
-                  Brak przypisanego transportu. Kliknij "Wybierz transport", aby przypisać transport do tego turnusu.
+                  Brak przypisanego transportu. Kliknij &quot;Wybierz transport&quot;, aby przypisać transport do tego turnusu.
                 </div>
               )}
             </div>
@@ -1487,10 +1487,12 @@ export default function CampTurnusEditPage({
                             {/* Show icon if available */}
                             {diet.icon_url && (
                               <div className="mt-2">
-                                <img 
-                                  src={diet.icon_url} 
-                                  alt={diet.name || 'Dieta'} 
-                                  className="w-8 h-8 object-contain"
+                                <Image
+                                  src={diet.icon_url}
+                                  alt={diet.name || 'Dieta'}
+                                  width={32}
+                                  height={32}
+                                  className="object-contain"
                                 />
                               </div>
                             )}
@@ -1506,7 +1508,7 @@ export default function CampTurnusEditPage({
                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-300 hover:bg-red-50 transition-all duration-200"
                           style={{ borderRadius: 0, cursor: 'pointer' }}
                           disabled={saving || loading || isDeletingDiet}
-                          title={diet.is_center_diet_relation ? "Usuń relację z center diet" : "Usuń przypisanie diety"}
+                          title={diet.is_center_diet_relation ? 'Usuń relację z center diet' : 'Usuń przypisanie diety'}
                         >
                           <Trash2 className="w-3 h-3" />
                           Usuń
@@ -1594,10 +1596,10 @@ export default function CampTurnusEditPage({
                               {/* Display price from relation (center-specific price, can be negative) */}
                               {promotion.price !== undefined && (
                                 <p className="text-xs text-gray-700 mt-1 font-medium">
-                                  Cena: {promotion.price < 0 
-                                    ? `${promotion.price.toFixed(2)} PLN` 
-                                    : promotion.price > 0 
-                                      ? `+${promotion.price.toFixed(2)} PLN` 
+                                  Cena: {promotion.price < 0
+                                    ? `${promotion.price.toFixed(2)} PLN`
+                                    : promotion.price > 0
+                                      ? `+${promotion.price.toFixed(2)} PLN`
                                       : '0.00 PLN'
                                   }
                                   {promotion.is_center_promotion_relation && (

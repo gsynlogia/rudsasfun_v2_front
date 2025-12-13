@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+
 import { authService } from '@/lib/services/AuthService';
 import { clearMagicLinkRedirect } from '@/utils/localStorage';
 
@@ -48,21 +49,21 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
   const handleLogout = async () => {
     // Clear authentication (calls backend logout endpoint)
     await authService.logout();
-    
+
     // Clear magic link redirect from localStorage
     clearMagicLinkRedirect();
-    
+
     // Update state
     setIsAuthenticated(false);
     setAccountDropdownOpen(false);
-    
+
     // Redirect to home page
     router.push('/');
   };
 
-  const headerClasses = fixed 
-    ? "bg-white fixed top-0 left-0 right-0 z-50"
-    : "bg-white";
+  const headerClasses = fixed
+    ? 'bg-white fixed top-0 left-0 right-0 z-50'
+    : 'bg-white';
 
   return (
     <header className={headerClasses}>
@@ -125,10 +126,10 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   <span className="text-sm">Moje konto</span>
-                  <svg 
+                  <svg
                     className={`w-3 h-3 text-[#03adf0] transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`}
-                    fill="none" 
-                    stroke="currentColor" 
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -243,5 +244,4 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
     </header>
   );
 }
-
 

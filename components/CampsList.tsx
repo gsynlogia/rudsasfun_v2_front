@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { formatDateRange } from '@/utils/api';
-import { saveMagicLinkRedirect } from '@/utils/localStorage';
-import type { Camp, CampProperty } from '@/types/reservation';
 import { Search, Shield } from 'lucide-react';
-import { API_BASE_URL } from '@/utils/api-config';
-import { fetchWithDefaults } from '@/utils/api-fetch';
-import { DEFAULT_CAMP, DEFAULT_CAMP_PROPERTY } from '@/types/defaults';
-import { BackendUnavailableError } from '@/utils/api-auth';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+
 import { authService } from '@/lib/services/AuthService';
+import { DEFAULT_CAMP, DEFAULT_CAMP_PROPERTY } from '@/types/defaults';
+import type { Camp, CampProperty } from '@/types/reservation';
+import { formatDateRange } from '@/utils/api';
+import { BackendUnavailableError } from '@/utils/api-auth';
+import { fetchWithDefaults } from '@/utils/api-fetch';
+import { saveMagicLinkRedirect } from '@/utils/localStorage';
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -35,10 +35,10 @@ export default function CampsList() {
       const user = authService.getCurrentUser();
       if (user) {
         // Check if user is admin: user_type === 'admin', groups includes 'admin', login === 'admin', or id === 0
-        const isAdminUser = 
-          user.user_type === 'admin' || 
-          user.groups?.includes('admin') || 
-          user.login === 'admin' || 
+        const isAdminUser =
+          user.user_type === 'admin' ||
+          user.groups?.includes('admin') ||
+          user.login === 'admin' ||
           user.id === 0;
         setIsAdmin(isAdminUser);
       }
@@ -54,13 +54,13 @@ export default function CampsList() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const data = await fetchWithDefaults<{ camps: CampWithProperties[] }>(
         '/api/camps/',
         { camps: [] },
-        { method: 'GET' }
+        { method: 'GET' },
       );
-      
+
       // Use defaults for each camp if needed
       const campsWithDefaults = (data.camps || []).map(camp => ({
         ...DEFAULT_CAMP,
@@ -70,7 +70,7 @@ export default function CampsList() {
           ...prop,
         })),
       }));
-      
+
       setCamps(campsWithDefaults);
     } catch (err) {
       if (err instanceof BackendUnavailableError) {
@@ -91,13 +91,13 @@ export default function CampsList() {
     if (isAdmin) {
       return;
     }
-    
+
     // Create reservation URL
     const reservationUrl = `/camps/${campId}/edition/${editionId}/step/1`;
-    
+
     // Save redirect URL to localStorage BEFORE redirecting to login
     saveMagicLinkRedirect(reservationUrl);
-    
+
     // Redirect to login with reservation URL as redirect parameter
     router.push(`/login?redirect=${encodeURIComponent(reservationUrl)}`);
   };
@@ -113,19 +113,19 @@ export default function CampsList() {
     }
 
     const query = searchQuery.toLowerCase().trim();
-    
+
     return camps
       .map((camp) => {
         // Check if camp name matches
         const campNameMatches = camp.name.toLowerCase().includes(query);
-        
+
         // Filter properties that match the search
         const matchingProperties = camp.properties.filter((property) => {
           const periodLabel = formatPeriod(property.period).toLowerCase();
           const cityMatches = property.city.toLowerCase().includes(query);
           const periodMatches = periodLabel.includes(query);
           const campMatches = campNameMatches;
-          
+
           return campMatches || cityMatches || periodMatches;
         });
 
@@ -136,7 +136,7 @@ export default function CampsList() {
             properties: matchingProperties.length > 0 ? matchingProperties : camp.properties,
           };
         }
-        
+
         return null;
       })
       .filter((camp): camp is CampWithProperties => camp !== null);
@@ -288,7 +288,7 @@ export default function CampsList() {
                     const isFull = property.is_full === true;
                     const isEnded = property.is_ended === true;
                     const isDisabled = isFull || isEnded;
-                    
+
                     return (
                       <button
                         key={property.id}

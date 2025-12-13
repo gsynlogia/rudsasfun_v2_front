@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
+import { useState } from 'react';
+
 import DashedLine from './DashedLine';
 
 interface ParentData {
@@ -35,7 +36,7 @@ export default function ReservationForm() {
   const addParent = () => {
     // Maksymalnie 2 opiekunów: pierwszy obowiązkowy, drugi opcjonalny
     if (parents.length >= 2) return;
-    
+
     const newParent: ParentData = {
       id: Date.now().toString(),
       firstName: '',
@@ -58,7 +59,7 @@ export default function ReservationForm() {
 
   const updateParent = (id: string, field: keyof ParentData, value: string) => {
     setParents(
-      parents.map((p) => (p.id === id ? { ...p, [field]: value } : p))
+      parents.map((p) => (p.id === id ? { ...p, [field]: value } : p)),
     );
   };
 
@@ -225,9 +226,9 @@ export default function ReservationForm() {
         <section className="bg-white rounded-xl p-4 sm:p-6 ">
           <div className="mb-3 sm:mb-4 flex justify-center items-center gap-2 sm:gap-3">
           <div className="flex items-center">
-            <Image 
-              src="/child_pictures.svg" 
-              alt="Child icon" 
+            <Image
+              src="/child_pictures.svg"
+              alt="Child icon"
               width={40}
               height={33}
               className="w-8 h-8 sm:w-10 sm:h-10"
@@ -576,7 +577,7 @@ export default function ReservationForm() {
               <div className="text-xs sm:text-sm text-gray-700">
                 <p className="font-bold mb-1 text-gray-900">Uwaga!</p>
                 <p>
-                  Z uwagi na brak możliwości zapewnienia pełnej opieki osobom z zaburzeniami ze spektrum autyzmu (Autyzm, Zespół Aspergera, Zespół Retta, Zespół Hellera, Zespół Tourette'a) oraz chorobą autoimmunologiczną - Celiakia, nie przyjmujemy uczestników z tymi schorzeniami.
+                  Z uwagi na brak możliwości zapewnienia pełnej opieki osobom z zaburzeniami ze spektrum autyzmu (Autyzm, Zespół Aspergera, Zespół Retta, Zespół Hellera, Zespół Tourette&apos;a) oraz chorobą autoimmunologiczną - Celiakia, nie przyjmujemy uczestników z tymi schorzeniami.
                 </p>
               </div>
             </div>

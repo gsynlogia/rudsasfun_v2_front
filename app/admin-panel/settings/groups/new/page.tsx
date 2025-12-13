@@ -1,16 +1,17 @@
 'use client';
 
-import AdminLayout from '@/components/admin/AdminLayout';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+
+import AdminLayout from '@/components/admin/AdminLayout';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 /**
  * Admin Panel - Add Group Page
  * Route: /admin-panel/settings/groups/new
- * 
+ *
  * Separate page for adding new group
  */
 export default function AddGroupPage() {
@@ -41,7 +42,7 @@ export default function AddGroupPage() {
             name: formData.name,
             description: formData.description || null,
           }),
-        }
+        },
       );
 
       // Redirect back to groups page
@@ -138,14 +139,4 @@ export default function AddGroupPage() {
     </AdminLayout>
   );
 }
-
-
-
-
-
-
-
-
-
-
 

@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { ArrowLeft, Check, X, User, Building2, FileText, Shield, Tag, MapPin, Phone, Mail, Calendar, CreditCard, CheckCircle, Download } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Check, X, User, Building2, FileText, Shield, Tag, MapPin, Phone, Mail, Calendar, CreditCard, CheckCircle, Download, AlertCircle } from 'lucide-react';
-import { reservationService } from '@/lib/services/ReservationService';
+import { useState, useEffect } from 'react';
+
+import AdminLayout from '@/components/admin/AdminLayout';
+import SectionGuard from '@/components/admin/SectionGuard';
 import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
+import { reservationService } from '@/lib/services/ReservationService';
 import { authenticatedApiCall } from '@/utils/api-auth';
-import SectionGuard from '@/components/admin/SectionGuard';
-import AdminLayout from '@/components/admin/AdminLayout';
 
 interface BackendReservation {
   id: number;
@@ -87,7 +88,7 @@ export default function ReservationDetailPage() {
   const params = useParams();
   const router = useRouter();
   const reservationId = parseInt(params.id as string);
-  
+
   const [reservation, setReservation] = useState<BackendReservation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,19 +111,19 @@ export default function ReservationDetailPage() {
         setIsLoading(true);
         const data = await reservationService.getReservation(reservationId);
         setReservation(data as any);
-        
+
         // Load qualification card
         try {
           setLoadingCard(true);
           const card = await qualificationCardService.getQualificationCard(reservationId);
           setQualificationCard(card);
-        } catch (error) {
-          console.error('Error loading qualification card:', error);
+        } catch (_error) {
+          console.error('Error loading qualification card:', _error);
           setQualificationCard(null);
         } finally {
           setLoadingCard(false);
         }
-        
+
         // Update page title with reservation number
         if (data) {
           const year = new Date((data as any).created_at).getFullYear();
@@ -130,13 +131,13 @@ export default function ReservationDetailPage() {
           const reservationNumber = `REZ-${year}-${paddedId}`;
           document.title = `Rezerwacja ${reservationNumber} - Panel Admin`;
         }
-        
+
         // Fetch payments for this reservation
         if (data) {
           await fetchPaymentsForReservation(data);
         }
-      } catch (err: any) {
-        setError(err.message || 'Błąd podczas ładowania rezerwacji');
+      } catch (_err: any) {
+        setError(_err.message || 'Błąd podczas ładowania rezerwacji');
       } finally {
         setIsLoading(false);
       }
@@ -144,7 +145,7 @@ export default function ReservationDetailPage() {
 
     const fetchPaymentsForReservation = async (reservationData: any) => {
       if (!reservationData) return;
-      
+
       try {
         // Fetch all payments and calculate total paid amount for this reservation
         const payments = await authenticatedApiCall<Array<{
@@ -154,7 +155,7 @@ export default function ReservationDetailPage() {
           amount: number;
           paid_amount: number | null;
         }>>('/api/payments/');
-        
+
         // Filter payments for this reservation (order_id format: "RES-{reservation_id}" or "RES-{reservation_id}-{timestamp}" or "TARCZA-{reservation_id}-{timestamp}")
         const reservationPayments = payments.filter(p => {
           if (!p.order_id) return false;
@@ -165,15 +166,15 @@ export default function ReservationDetailPage() {
           }
           return false;
         });
-        
+
         // Calculate total paid amount (only from successful payments)
         const totalPaid = reservationPayments
           .filter(p => p.status === 'success')
           .reduce((sum, p) => sum + (p.paid_amount || p.amount || 0), 0);
-        
+
         setTotalPaidAmount(totalPaid);
-      } catch (err) {
-        console.error('Error fetching payments:', err);
+      } catch (_err) {
+        console.error('Error fetching payments:', _err);
         // If payments can't be fetched, use deposit_amount as fallback
         setTotalPaidAmount(reservationData.deposit_amount || 0);
       }
@@ -189,8 +190,8 @@ export default function ReservationDetailPage() {
           });
         }
         setAddonsMap(map);
-      } catch (err) {
-        console.error('Error fetching addons:', err);
+      } catch (_err) {
+        console.error('Error fetching addons:', _err);
       }
     };
 
@@ -204,8 +205,8 @@ export default function ReservationDetailPage() {
           });
         }
         setProtectionsMap(map);
-      } catch (err) {
-        console.error('Error fetching protections:', err);
+      } catch (_err) {
+        console.error('Error fetching protections:', _err);
       }
     };
 
@@ -237,13 +238,13 @@ export default function ReservationDetailPage() {
       await contractService.updateContractStatus(
         reservationId,
         'approved',
-        undefined
+        undefined,
       );
-      
+
       // Refresh reservation data
       const updatedData = await reservationService.getReservation(reservationId);
       setReservation(updatedData as any);
-      
+
       alert('Status umowy został zmieniony na: Zatwierdzona');
     } catch (error: any) {
       console.error('Error updating contract status:', error);
@@ -264,13 +265,13 @@ export default function ReservationDetailPage() {
       await contractService.updateContractStatus(
         reservationId,
         'rejected',
-        rejectionReason
+        rejectionReason,
       );
-      
+
       // Refresh reservation data
       const updatedData = await reservationService.getReservation(reservationId);
       setReservation(updatedData as any);
-      
+
       setContractModalOpen(false);
       setRejectionReason('');
       alert('Status umowy został zmieniony na: Odrzucona');
@@ -312,13 +313,13 @@ export default function ReservationDetailPage() {
       await qualificationCardService.updateQualificationCardStatus(
         reservationId,
         'approved',
-        undefined
+        undefined,
       );
-      
+
       // Refresh reservation data
       const updatedData = await reservationService.getReservation(reservationId);
       setReservation(updatedData as any);
-      
+
       alert('Status karty kwalifikacyjnej został zmieniony na: Zatwierdzona');
     } catch (error: any) {
       console.error('Error updating qualification card status:', error);
@@ -339,13 +340,13 @@ export default function ReservationDetailPage() {
       await qualificationCardService.updateQualificationCardStatus(
         reservationId,
         'rejected',
-        qualificationCardRejectionReason
+        qualificationCardRejectionReason,
       );
-      
+
       // Refresh reservation data
       const updatedData = await reservationService.getReservation(reservationId);
       setReservation(updatedData as any);
-      
+
       setQualificationCardModalOpen(false);
       setQualificationCardRejectionReason('');
       alert('Status karty kwalifikacyjnej został zmieniony na: Odrzucona');
@@ -567,7 +568,7 @@ export default function ReservationDetailPage() {
                 <div>
                   <span className="text-sm text-gray-600">Transport do ośrodka:</span>
                   <span className="text-sm font-medium text-gray-900 ml-2">
-                    {reservation.departure_type === 'zbiorowy' 
+                    {reservation.departure_type === 'zbiorowy'
                       ? `Transport zbiórkowy - ${reservation.departure_city || 'Brak miasta'}`
                       : 'Transport własny'}
                   </span>
@@ -575,7 +576,7 @@ export default function ReservationDetailPage() {
                 <div>
                   <span className="text-sm text-gray-600">Transport z ośrodka:</span>
                   <span className="text-sm font-medium text-gray-900 ml-2">
-                    {reservation.return_type === 'zbiorowy' 
+                    {reservation.return_type === 'zbiorowy'
                       ? `Transport zbiórkowy - ${reservation.return_city || 'Brak miasta'}`
                       : 'Transport własny'}
                   </span>
@@ -637,7 +638,7 @@ export default function ReservationDetailPage() {
                     } else {
                       numericId = Number(protectionId);
                     }
-                    
+
                     const protectionName = protectionsMap.get(numericId) || `Ochrona ID: ${protectionId}`;
                     return (
                       <div key={index} className="flex items-center gap-2 text-sm">

@@ -1,8 +1,10 @@
 'use client';
 
+import { Building2, MapPin, FileText, Info, Download } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Building2, User, Mail, Phone, MapPin, FileText, Info, Download } from 'lucide-react';
+
 import { loadStep3FormData, saveStep3FormData } from '@/utils/sessionStorage';
+
 import DashedLine from '../DashedLine';
 
 /**
@@ -17,7 +19,7 @@ interface InvoiceDataSectionProps {
 export default function InvoiceDataSection({ invoiceType: propInvoiceType }: InvoiceDataSectionProps = {}) {
   // If prop is provided, use it; otherwise default to 'company' (since this component is only rendered for company)
   const [invoiceType, setInvoiceType] = useState<'private' | 'company'>(propInvoiceType || 'company');
-  
+
   // Private person fields
   const [privateData, setPrivateData] = useState({
     firstName: '',
@@ -90,7 +92,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
     };
 
     window.addEventListener('focus', handleFocus);
-    
+
     return () => {
       window.removeEventListener('focus', handleFocus);
     };
@@ -136,7 +138,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
   }, [invoiceType, privateData, companyData]);
 
   // Validate private person fields
-  const validatePrivate = useCallback((): boolean => {
+  const _validatePrivate = useCallback((): boolean => {
     const errors: Record<string, string> = {};
 
     if (!privateData.firstName || privateData.firstName.trim() === '') {
@@ -209,7 +211,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
     };
   }, [validateInvoiceData]);
 
-  const updatePrivateField = (field: keyof typeof privateData, value: string) => {
+  const _updatePrivateField = (field: keyof typeof privateData, value: string) => {
     setPrivateData((prev) => ({ ...prev, [field]: value }));
     // Clear error for this field when user starts typing
     if (privateErrors[field]) {

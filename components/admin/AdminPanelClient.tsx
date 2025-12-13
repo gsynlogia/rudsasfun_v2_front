@@ -1,11 +1,14 @@
 'use client';
 
+import { Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Building2, Calendar, MapPin } from 'lucide-react';
-import CampList from './CampList';
-import CampForm from './CampForm';
-import CampPropertyForm from './CampPropertyForm';
+
 import type { Camp, CampProperty } from '@/types/reservation';
+
+import CampForm from './CampForm';
+import CampList from './CampList';
+import CampPropertyForm from './CampPropertyForm';
+
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -214,5 +217,4 @@ export default function AdminPanelClient() {
     </div>
   );
 }
-
 

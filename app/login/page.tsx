@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { magicLinkService } from '@/lib/services/MagicLinkService';
-import { authService } from '@/lib/services/AuthService';
-import { saveMagicLinkRedirect, loadMagicLinkRedirect, clearMagicLinkRedirect } from '@/utils/localStorage';
-import HeaderTop from '@/components/HeaderTop';
+import { useState, useEffect, Suspense } from 'react';
+
 import Footer from '@/components/Footer';
+import HeaderTop from '@/components/HeaderTop';
+import { authService } from '@/lib/services/AuthService';
+import { magicLinkService } from '@/lib/services/MagicLinkService';
+import { saveMagicLinkRedirect, loadMagicLinkRedirect, clearMagicLinkRedirect } from '@/utils/localStorage';
 
 function LoginContent() {
   const router = useRouter();
@@ -35,7 +36,7 @@ function LoginContent() {
         if (user) {
           // User is authenticated - check for redirect URL in localStorage
           const savedRedirect = loadMagicLinkRedirect();
-          
+
           // Use saved redirect if exists and is valid, otherwise use query param, otherwise home
           let finalRedirect = '/';
           if (savedRedirect && savedRedirect !== '/' && savedRedirect.startsWith('/')) {
@@ -43,10 +44,10 @@ function LoginContent() {
           } else if (redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')) {
             finalRedirect = redirectUrl;
           }
-          
+
           // Clear redirect from localStorage after reading
           clearMagicLinkRedirect();
-          
+
           // User is authenticated, redirect to intended page or home
           router.replace(finalRedirect);
         } else {
@@ -77,7 +78,7 @@ function LoginContent() {
   return (
     <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
       <HeaderTop />
-      
+
       <main className="max-w-container mx-auto px-3 sm:px-6 py-8 sm:py-12">
         <div className="max-w-md mx-auto">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8">

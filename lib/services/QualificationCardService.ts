@@ -3,8 +3,8 @@
  * Singleton service for handling qualification card operations with backend API
  */
 
-import { API_BASE_URL } from '@/utils/api-config';
 import { QualificationCardResponse } from '@/types/qualificationCardResponse';
+import { API_BASE_URL } from '@/utils/api-config';
 
 export type { QualificationCardResponse };
 
@@ -38,7 +38,7 @@ class QualificationCardService {
   async downloadQualificationCard(reservationId: number): Promise<void> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -95,7 +95,7 @@ class QualificationCardService {
   async listMyQualificationCards(): Promise<QualificationCardResponse[]> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -124,7 +124,7 @@ class QualificationCardService {
   async generateQualificationCard(reservationId: number): Promise<{ status: string; message: string; card_path: string }> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -155,7 +155,7 @@ class QualificationCardService {
       const cards = await this.listMyQualificationCards();
       const card = cards.find(c => c.reservation_id === reservationId);
       return card || null;
-    } catch (error) {
+    } catch {
       // If error, card doesn't exist
       return null;
     }
@@ -170,11 +170,11 @@ class QualificationCardService {
   async updateQualificationCardStatus(
     reservationId: number,
     status: 'approved' | 'rejected',
-    rejectionReason?: string
+    rejectionReason?: string,
   ): Promise<{ status: string; message: string; qualification_card_status: string; rejection_reason?: string | null }> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -218,7 +218,7 @@ class QualificationCardService {
   }> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -257,7 +257,7 @@ class QualificationCardService {
   }>> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }

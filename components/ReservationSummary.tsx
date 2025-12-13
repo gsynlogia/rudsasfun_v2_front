@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep5FormData } from '@/utils/sessionStorage';
 import type { StepNumber } from '@/types/reservation';
+import { loadStep5FormData } from '@/utils/sessionStorage';
 
 const BASE_PRICE = 2200;
 const TOTAL_STEPS = 5;
@@ -30,13 +31,13 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
   const [paymentAmount, setPaymentAmount] = useState<'full' | 'deposit'>('full');
   const router = useRouter();
   const pathname = usePathname();
-  
+
   // Calculate payment amounts for Step 5
   const totalPrice = propTotalPrice ?? reservation.totalPrice;
-  
+
   // Base deposit amount: 600 PLN
   const baseDepositAmount = 600;
-  
+
   // Calculate protection prices (OASA and TARCZA) from reservation items
   const protectionItems = reservation.items.filter(item => item.type === 'protection');
   const protectionTotal = protectionItems.reduce((sum, item) => {
@@ -49,10 +50,10 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
     }
     return sum;
   }, 0);
-  
+
   // Deposit amount = base (600 PLN) + protection prices
   const depositAmountValue = baseDepositAmount + protectionTotal;
-  
+
   // Monitor payment amount selection from Step5
   useEffect(() => {
     if (currentStep === 5) {
@@ -62,21 +63,21 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
           setPaymentAmount(step5Data.paymentAmount);
         }
       };
-      
+
       // Check immediately
       checkPaymentAmount();
-      
+
       // Check periodically for changes
       const interval = setInterval(checkPaymentAmount, 500);
-      
+
       return () => clearInterval(interval);
     }
   }, [currentStep]);
-  
+
   // Calculate amounts based on selected payment option
-  const depositAmount = propDepositAmount ?? depositAmountValue;
-  const remainingAmount = propRemainingAmount ?? (totalPrice - depositAmountValue);
-  
+  const _depositAmount = propDepositAmount ?? depositAmountValue;
+  const _remainingAmount = propRemainingAmount ?? (totalPrice - depositAmountValue);
+
   // For display: show deposit and remaining only if deposit is selected
   // When deposit is selected, show depositAmountValue (which includes protections)
   // When full payment is selected, show totalPrice
@@ -92,7 +93,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
   const handleNextClick = () => {
     // For Step 5, use payment handler from Step5 component
     if (currentStep === 5) {
-      const handleStep5Payment = (window as any).handleStep5Payment;
+      const { handleStep5Payment } = (window as any);
       if (handleStep5Payment && typeof handleStep5Payment === 'function') {
         handleStep5Payment();
         return;
@@ -172,7 +173,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
             {BASE_PRICE.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
           </div>
         </div>
-        <button 
+        <button
           onClick={handleNextClick}
           className="w-1/2 bg-[#03adf0] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-2 mt-4 sm:mt-6 text-sm sm:text-base"
         >
@@ -198,17 +199,17 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
             className="w-full h-full"
           />
         </div>
-        
+
         {/* Title under icon */}
         <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">Twoja rezerwacja</h3>
-        
+
         {/* Base price */}
         {baseItem && (
           <div className="text-base sm:text-lg font-medium text-gray-700 mb-2">
             {baseItem.price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
           </div>
         )}
-        
+
         {/* Additional items (diet, accommodation, etc.) */}
         {additionalItems.length > 0 && (
           <div className="w-full mb-2">
@@ -225,20 +226,20 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
             ))}
           </div>
         )}
-        
+
         {/* HR line - solid gray */}
         <div className="w-full h-px bg-gray-300 mb-3 sm:mb-4"></div>
-        
+
         {/* Cost summary link */}
         <Link href="#" className="text-[#03adf0] hover:underline text-xs sm:text-sm font-medium mb-3 sm:mb-4">
           Podsumowanie kosztów
         </Link>
-        
+
         {/* Full cost summary - only show on Step 5 */}
         {currentStep === 5 && (
           <div className="w-full mb-3 space-y-2">
             <h4 className="text-sm sm:text-base font-semibold text-gray-900 mb-2">Podsumowanie kosztów</h4>
-            
+
             {/* All reservation items - exclude protections if deposit is selected (they'll be shown in deposit breakdown) */}
             <div className="space-y-1 mb-2">
               {reservation.items
@@ -261,9 +262,9 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                   </div>
                 ))}
             </div>
-            
+
             <div className="w-full h-px bg-gray-300 my-2"></div>
-            
+
             {/* Total cost */}
             <div className="text-xs sm:text-sm text-gray-700 flex items-center justify-between font-semibold">
               <span>Koszt całkowity:</span>
@@ -271,13 +272,13 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                 {totalPrice.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
               </span>
             </div>
-            
+
             {/* Deposit breakdown - only if deposit is selected */}
             {paymentAmount === 'deposit' && (
               <>
                 <div className="w-full h-px bg-gray-300 my-2"></div>
                 <div className="text-xs sm:text-sm font-semibold text-gray-900 mb-1">Zaliczka:</div>
-                
+
                 {/* Base deposit */}
                 <div className="text-xs sm:text-sm text-gray-600 flex items-center justify-between ml-2">
                   <span>Zaliczka:</span>
@@ -285,13 +286,13 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                     {baseDepositAmount.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
                   </span>
                 </div>
-                
+
                 {/* Protection items breakdown */}
                 {protectionItems.map((item) => {
                   const name = item.name.toLowerCase();
                   const isOasa = name.includes('oaza') || name.includes('oasa');
                   const isTarcza = name.includes('tarcza') || name.includes('shield');
-                  
+
                   if (isOasa || isTarcza) {
                     return (
                       <div
@@ -307,7 +308,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                   }
                   return null;
                 })}
-                
+
                 {/* Deposit total */}
                 <div className="text-xs sm:text-sm text-gray-700 flex items-center justify-between font-semibold mt-1">
                   <span>Suma zaliczki:</span>
@@ -315,7 +316,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                     {displayDepositAmount.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
                   </span>
                 </div>
-                
+
                 {/* Remaining amount */}
                 <div className="text-xs sm:text-sm text-gray-600 flex items-center justify-between mt-1">
                   <span>Pozostała kwota:</span>
@@ -325,7 +326,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                 </div>
               </>
             )}
-            
+
             {/* Amount to pay */}
             <div className="w-full h-px bg-gray-300 my-2"></div>
             <div className="text-sm sm:text-base text-gray-900 flex items-center justify-between font-bold">
@@ -336,7 +337,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
             </div>
           </div>
         )}
-        
+
         {/* Total sum - only show if not Step 5 (Step 5 shows it in cost summary) */}
         {currentStep !== 5 && (
           <div className="text-xl sm:text-2xl font-bold text-[#03adf0] mb-4 sm:mb-6">
@@ -344,9 +345,9 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
           </div>
         )}
       </div>
-      
+
       {/* Button */}
-      <button 
+      <button
         onClick={handleNextClick}
         className="w-full bg-[#03adf0] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
       >

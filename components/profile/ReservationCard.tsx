@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+
+import { ReservationResponse } from '@/lib/services/ReservationService';
+
 import ReservationMain from './ReservationMain';
 import ReservationSidebar from './ReservationSidebar';
-import { ReservationResponse } from '@/lib/services/ReservationService';
 
 interface ReservationCardProps {
   reservation: ReservationResponse;
@@ -25,16 +27,16 @@ export default function ReservationCard({ reservation }: ReservationCardProps) {
       <div className="flex flex-col lg:flex-row">
         {/* Left: Main Content */}
         <div className="flex-1 p-3 sm:p-4 md:p-6">
-          <ReservationMain 
-            reservation={reservation} 
+          <ReservationMain
+            reservation={reservation}
             isDetailsExpanded={isDetailsExpanded}
             onToggleDetails={toggleDetails}
           />
         </div>
-        
+
         {/* Right: Sidebar */}
         <div className="lg:w-80 border-t lg:border-t-0 lg:border-l border-gray-200 p-3 sm:p-4 md:p-6 bg-gray-50">
-          <ReservationSidebar 
+          <ReservationSidebar
             reservationId={String(reservation.id)}
             reservation={reservation}
             isDetailsExpanded={isDetailsExpanded}

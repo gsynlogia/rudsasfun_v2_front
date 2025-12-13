@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { Search, Edit, Trash2, Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Users, Search, Edit, Trash2, Plus, X, Check } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface User {
@@ -48,10 +49,10 @@ export default function UsersManagement() {
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
-  
+
   // State for groups
   const [groups, setGroups] = useState<Group[]>([]);
-  const [userGroups, setUserGroups] = useState<number[]>([]); // Groups assigned to user being edited
+  const [_userGroups, _setUserGroups] = useState<number[]>([]); // Groups assigned to user being edited
 
   // State for delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -115,9 +116,9 @@ export default function UsersManagement() {
   // Handle edit user (groups only)
   const handleEditUser = async (user: User) => {
     setEditingUser(user);
-    
+
     // Load user's groups from all groups
-    let userGroupIds: number[] = [];
+    const userGroupIds: number[] = [];
     try {
       const allGroups = await authenticatedApiCall<Group[]>(`${API_BASE_URL}/api/groups`);
       // Check which groups contain this user
@@ -127,7 +128,7 @@ export default function UsersManagement() {
           if (groupWithUsers.users && groupWithUsers.users.some((u: {id: number}) => u.id === user.id)) {
             userGroupIds.push(group.id);
           }
-        } catch (err) {
+        } catch {
           // Group might not have users endpoint working, skip
           continue;
         }
@@ -135,13 +136,13 @@ export default function UsersManagement() {
     } catch (err) {
       console.error('Error loading user groups:', err);
     }
-    
+
     setFormData({
       login: user.login,
       password: '', // Don't show password
       groupIds: userGroupIds,
     });
-    setUserGroups(userGroupIds);
+    _setUserGroups(userGroupIds);
     setFormError(null);
     setShowUserForm(true);
   };
@@ -167,13 +168,13 @@ export default function UsersManagement() {
             // Try to remove user from group (will fail silently if not in group)
             await authenticatedApiCall(
               `${API_BASE_URL}/api/groups/${group.id}/users/${editingUser.id}`,
-              { method: 'DELETE' }
+              { method: 'DELETE' },
             ).catch(() => {}); // Ignore errors if user not in group
-          } catch (err) {
+          } catch {
             // Ignore
           }
         }
-        
+
         // Add user to selected groups
         for (const groupId of formData.groupIds) {
           try {
@@ -187,7 +188,7 @@ export default function UsersManagement() {
                 body: JSON.stringify({
                   user_ids: [editingUser.id],
                 }),
-              }
+              },
             );
           } catch (err) {
             console.error(`Error assigning user to group ${groupId}:`, err);
@@ -216,7 +217,7 @@ export default function UsersManagement() {
         `${API_BASE_URL}/api/auth/users/${userToDelete.id}`,
         {
           method: 'DELETE',
-        }
+        },
       );
 
       // Reload users and close modal

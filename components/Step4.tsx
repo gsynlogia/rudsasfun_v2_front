@@ -1,20 +1,23 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import DashedLine from './DashedLine';
+import { useState, useEffect, useRef } from 'react';
+
+
 import type { StepComponentProps } from '@/types/reservation';
-import { saveStep4FormData, loadStep4FormData, type Step4FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL } from '@/utils/api-config';
+import { saveStep4FormData, loadStep4FormData, type Step4FormData } from '@/utils/sessionStorage';
+
+import DashedLine from './DashedLine';
 
 /**
  * Step4 Component - Consents and Regulations
  * Contains: Consent checkboxes and downloadable documents
  */
-export default function Step4({ onNext, onPrevious, disabled = false }: StepComponentProps) {
+export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabled = false }: StepComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
-  
+
   // Initialize state from sessionStorage or defaults
   const getInitialState = (): Step4FormData => {
     const savedData = loadStep4FormData();

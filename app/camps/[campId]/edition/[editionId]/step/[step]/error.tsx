@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
 import Link from 'next/link';
+import { useEffect } from 'react';
 
 /**
  * Error Boundary for Camp Edition Page
@@ -21,7 +21,7 @@ export default function Error({
 
   const getErrorMessage = () => {
     const message = error.message || 'Wystąpił nieoczekiwany błąd';
-    
+
     if (message.includes('not found') || message.includes('nie istnieje')) {
       return 'Nie znaleziono obozu lub edycji. Sprawdź, czy adres URL jest poprawny.';
     }
@@ -34,7 +34,7 @@ export default function Error({
     if (message.includes('Invalid') || message.includes('Invalid')) {
       return 'Nieprawidłowe dane. Sprawdź, czy adres URL jest poprawny.';
     }
-    
+
     return message;
   };
 
@@ -56,21 +56,21 @@ export default function Error({
             />
           </svg>
         </div>
-        
+
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
           Wystąpił błąd
         </h1>
-        
+
         <p className="text-lg text-gray-600 mb-2">
           {getErrorMessage()}
         </p>
-        
+
         {error.digest && (
           <p className="text-xs text-gray-400 mb-8">
             Kod błędu: {error.digest}
           </p>
         )}
-        
+
         <div className="space-y-4">
           <button
             onClick={reset}
@@ -78,7 +78,7 @@ export default function Error({
           >
             Spróbuj ponownie
           </button>
-          
+
           <Link
             href="/"
             className="block w-full bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-300 transition-colors"
@@ -90,15 +90,4 @@ export default function Error({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 

@@ -1,16 +1,17 @@
 'use client';
 
-import AdminLayout from '@/components/admin/AdminLayout';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+import AdminLayout from '@/components/admin/AdminLayout';
 import { authService } from '@/lib/services/AuthService';
 
 /**
  * Admin Panel - Super Functions Page
  * Route: /admin-panel/settings/super-functions
- * 
+ *
  * Super functions page - only accessible for user ID 0
  * Completely separate from the system
  */
@@ -83,7 +84,7 @@ export default function SuperFunctionsPage() {
         {/* Super Functions Section */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">Dostępne super funkcje</h2>
-          
+
           <div className="space-y-4">
             {/* Globalna edycja obozów i turnusów */}
             <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-[#03adf0] transition-colors">
@@ -103,7 +104,7 @@ export default function SuperFunctionsPage() {
             </div>
 
             {/* Inteligentna analiza rezerwacji - WYŁĄCZONA */}
-            {/* 
+            {/*
             <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-[#03adf0] transition-colors">
               <div className="flex items-center justify-between">
                 <div>

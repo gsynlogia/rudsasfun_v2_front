@@ -15,10 +15,10 @@ export interface FetchOptions extends RequestInit {
  */
 export async function authenticatedFetch(
   endpoint: string,
-  options: FetchOptions = {}
+  options: FetchOptions = {},
 ): Promise<Response> {
   const { requireAuth = true, ...fetchOptions } = options;
-  
+
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(fetchOptions.headers || {}),
@@ -47,15 +47,4 @@ export async function authenticatedFetch(
 
   return response;
 }
-
-
-
-
-
-
-
-
-
-
-
 

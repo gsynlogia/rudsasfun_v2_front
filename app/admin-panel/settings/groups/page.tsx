@@ -1,14 +1,15 @@
 'use client';
 
-import AdminLayout from '@/components/admin/AdminLayout';
-import GroupsManagement from '@/components/admin/GroupsManagement';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+
+import AdminLayout from '@/components/admin/AdminLayout';
+import GroupsManagement from '@/components/admin/GroupsManagement';
 
 /**
  * Admin Panel - Settings Groups Page
  * Route: /admin-panel/settings/groups
- * 
+ *
  * Groups management page with back button to settings
  */
 export default function SettingsGroupsPage() {
@@ -35,14 +36,4 @@ export default function SettingsGroupsPage() {
     </AdminLayout>
   );
 }
-
-
-
-
-
-
-
-
-
-
 

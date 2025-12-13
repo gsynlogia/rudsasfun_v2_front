@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { authService } from '@/lib/services/AuthService';
+import { useState, useEffect, Suspense } from 'react';
+
 import HeaderTop from '@/components/HeaderTop';
+import { authService } from '@/lib/services/AuthService';
 
 function LoginPageContent() {
   const router = useRouter();
@@ -34,7 +35,7 @@ function LoginPageContent() {
           authService.logout();
         }
       }
-      
+
       // Check for error query param
       const errorParam = searchParams.get('error');
       if (errorParam === 'admin_only') {
@@ -65,11 +66,11 @@ function LoginPageContent() {
   return (
     <div className="min-h-screen w-full bg-gray-50">
       <HeaderTop fixed={true} />
-      
+
       <div className="flex items-center justify-center" style={{ paddingTop: '84px', minHeight: 'calc(100vh - 84px)' }}>
         <div className="w-full max-w-md p-8 bg-white shadow-lg" style={{ borderRadius: 0 }}>
           <h1 className="text-2xl font-semibold text-gray-900 mb-6">Logowanie do panelu administracyjnego</h1>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="login" className="block text-sm font-medium text-gray-700 mb-2">
@@ -146,5 +147,4 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-
 

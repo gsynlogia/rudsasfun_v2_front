@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { Info } from 'lucide-react';
+import Image from 'next/image';
+import { useState, useEffect, useRef } from 'react';
+
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
+import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 /**
  * AddonsSection Component
@@ -12,7 +14,7 @@ import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
  */
 export default function AddonsSection() {
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
-  
+
   // Initialize with data from sessionStorage if available
   const getInitialSelectedAddons = (): Set<string> => {
     if (typeof window === 'undefined') return new Set();
@@ -22,7 +24,7 @@ export default function AddonsSection() {
     }
     return new Set();
   };
-  
+
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(getInitialSelectedAddons);
   const [addonDescription, setAddonDescription] = useState<string>('');
   const [infoHeader, setInfoHeader] = useState<string>('');
@@ -87,10 +89,13 @@ export default function AddonsSection() {
           description: addon.description || '',
           price: addon.price,
           icon: addon.icon_url ? (
-            <img 
-              src={getStaticAssetUrl(addon.icon_url) || ''} 
+            <Image
+              src={getStaticAssetUrl(addon.icon_url) || ''}
               alt={addon.name}
-              className="w-12 h-12 object-contain"
+              width={48}
+              height={48}
+              className="object-contain"
+              unoptimized
               onError={(e) => {
                 // Fallback to SVG if image fails
                 const target = e.target as HTMLImageElement;
@@ -106,8 +111,8 @@ export default function AddonsSection() {
               }}
             />
           ) : addon.icon_svg ? (
-            <div 
-              className="w-12 h-12" 
+            <div
+              className="w-12 h-12"
               dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
             />
           ) : (
@@ -158,10 +163,10 @@ export default function AddonsSection() {
       const addon = addons.find(a => a.id === addonId);
       if (addon) {
         const reservationId = `addon-${addonId}`;
-        
+
         // Check if already exists in reservation
         const existing = reservation.items.find(
-          item => item.type === 'addon' && item.name === addon.name
+          item => item.type === 'addon' && item.name === addon.name,
         );
         if (!existing) {
           addonReservationIdsRef.current.set(addonId, reservationId);
@@ -176,7 +181,7 @@ export default function AddonsSection() {
         }
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [isInitialized, addons.length, reservation.items.length]);
 
   // Update reservation when addons change
@@ -203,7 +208,7 @@ export default function AddonsSection() {
           const addon = addons.find(a => a.id === addonId);
           if (addon) {
             const itemByName = reservation.items.find(
-              item => item.type === 'addon' && item.name === addon.name
+              item => item.type === 'addon' && item.name === addon.name,
             );
             if (itemByName) {
               removeReservationItem(itemByName.id);
@@ -220,10 +225,10 @@ export default function AddonsSection() {
       if (addon) {
         // Use predictable ID format: addon-{addonId}
         const reservationId = `addon-${addonId}`;
-        
+
         // Check if item with this ID already exists
         const existingItem = reservation.items.find(item => item.id === reservationId);
-        
+
         if (!existingItem) {
           addonReservationIdsRef.current.set(addonId, reservationId);
           // Use the predictable ID when adding
@@ -243,7 +248,7 @@ export default function AddonsSection() {
   // Save to sessionStorage whenever addons change
   useEffect(() => {
     if (!isInitialized) return; // Don't save during initial load
-    
+
     const savedData = loadStep2FormData();
     const formData = {
       selectedDiets: savedData?.selectedDiets || [],
@@ -348,7 +353,7 @@ export default function AddonsSection() {
             <Info className="w-5 h-5 text-[#03adf0] flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               {infoHeader && (
-                <div 
+                <div
                   className="text-xs sm:text-sm font-medium text-gray-800 mb-2"
                   dangerouslySetInnerHTML={{ __html: infoHeader }}
                 />

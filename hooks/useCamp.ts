@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { getCurrentCamp, type Camp } from '@/utils/api';
 
 interface UseCampReturn {
@@ -43,15 +44,4 @@ export function useCamp(): UseCampReturn {
     refetch: fetchCamp,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
 

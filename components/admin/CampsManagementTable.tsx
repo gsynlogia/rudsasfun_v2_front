@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
-import { useRouter } from 'next/navigation';
 import { Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Calendar, MapPin, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
+
 import type { Camp, CampProperty } from '@/types/reservation';
+import { authenticatedApiCall } from '@/utils/api-auth';
+
 import CampPropertyForm from './CampPropertyForm';
 import DeleteConfirmationModal, { DeleteItemType } from './DeleteConfirmationModal';
-import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -45,7 +47,7 @@ export default function CampsManagementTable() {
   // State for search, filters, sorting, and pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [periodFilter, setPeriodFilter] = useState<string | null>(null);
-  const [cityFilter, setCityFilter] = useState<string | null>(null);
+  const [_cityFilter, _setCityFilter] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -114,22 +116,22 @@ export default function CampsManagementTable() {
           camp.name.toLowerCase().includes(query) ||
           camp.properties?.some(prop =>
             prop.city.toLowerCase().includes(query) ||
-            prop.period.toLowerCase().includes(query)
-          )
+            prop.period.toLowerCase().includes(query),
+          ),
       );
     }
 
     // Period filter
     if (periodFilter) {
       filtered = filtered.filter(camp =>
-        camp.properties?.some(prop => prop.period === periodFilter)
+        camp.properties?.some(prop => prop.period === periodFilter),
       );
     }
 
     // City filter (multi-select)
     if (cityFilters.length > 0) {
       filtered = filtered.filter(camp =>
-        camp.properties?.some(prop => cityFilters.includes(prop.city))
+        camp.properties?.some(prop => cityFilters.includes(prop.city)),
       );
     }
 
@@ -237,7 +239,7 @@ export default function CampsManagementTable() {
       return availableCities;
     }
     return availableCities.filter(city =>
-      city.toLowerCase().includes(citySearchQuery.toLowerCase())
+      city.toLowerCase().includes(citySearchQuery.toLowerCase()),
     );
   }, [availableCities, citySearchQuery]);
 

@@ -14,11 +14,3 @@ export default function GeneralDietsPage() {
   );
 }
 
-
-
-
-
-
-
-
-

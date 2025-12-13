@@ -1,9 +1,10 @@
 'use client';
 
+import { ArrowLeft, Save, Truck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
-import { ArrowLeft, Save, MapPin, Truck, Plus, X } from 'lucide-react';
 import type { CampPropertyTransport } from '@/types/reservation';
 
 /**
@@ -35,12 +36,12 @@ const fetchTransportById = (transportId: number): Promise<CampPropertyTransport 
 /**
  * Transport Edit Page
  * Route: /admin-panel/transports/[transportId]/edit
- * 
+ *
  * Allows editing a specific transport
  */
-export default function TransportEditPage({ 
-  params 
-}: { 
+export default function TransportEditPage({
+  params,
+}: {
   params: Promise<{ transportId: string }> | { transportId: string }
 }) {
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function TransportEditPage({
   const [transportName, setTransportName] = useState('');
   const [departureType, setDepartureType] = useState<'collective' | 'own'>('collective');
   const [returnType, setReturnType] = useState<'collective' | 'own'>('collective');
-  
+
   // Cities state - array of {city: string, departure_price: number | '', return_price: number | ''}
   interface CityFormData {
     id: string; // Temporary ID for React keys
@@ -65,7 +66,7 @@ export default function TransportEditPage({
     return_price: number | '';
   }
   const [cities, setCities] = useState<CityFormData[]>([]);
-  
+
   // Helper functions for cities
   const addCity = () => {
     setCities([...cities, {
@@ -81,8 +82,8 @@ export default function TransportEditPage({
   };
 
   const updateCity = (id: string, field: 'city' | 'departure_price' | 'return_price', value: string | number) => {
-    setCities(cities.map(c => 
-      c.id === id ? { ...c, [field]: value } : c
+    setCities(cities.map(c =>
+      c.id === id ? { ...c, [field]: value } : c,
     ));
   };
 
@@ -92,14 +93,14 @@ export default function TransportEditPage({
       try {
         const resolvedParams = params instanceof Promise ? await params : params;
         const resolvedTransportId = parseInt(resolvedParams.transportId);
-        
+
         if (isNaN(resolvedTransportId)) {
           console.error('[TransportEditPage] Invalid params:', resolvedParams);
           setError('Nieprawidłowe parametry URL');
           setLoading(false);
           return;
         }
-        
+
         setTransportId(resolvedTransportId);
       } catch (err) {
         console.error('[TransportEditPage] Error resolving params:', err);
@@ -107,7 +108,7 @@ export default function TransportEditPage({
         setLoading(false);
       }
     };
-    
+
     resolveParams();
   }, [params]);
 
@@ -117,7 +118,7 @@ export default function TransportEditPage({
       fetchTransportById(transportId)
         .then((transportData) => {
           setTransport(transportData);
-          
+
           if (!transportData) {
             console.error(`[TransportEditPage] Transport ${transportId} not found`);
             setError(`Transport o ID ${transportId} nie został znaleziony.`);
@@ -126,7 +127,7 @@ export default function TransportEditPage({
             setTransportName(transportData.name || '');
             setDepartureType(transportData.departure_type);
             setReturnType(transportData.return_type);
-            
+
             // Load cities from new structure
             const transportCities = (transportData as any).cities || [];
             if (transportCities.length > 0) {
@@ -142,7 +143,7 @@ export default function TransportEditPage({
                 addCity();
               }
             }
-            
+
             console.log('[TransportEditPage] Data loaded successfully:', { transportId, transportData });
           }
           setLoading(false);
@@ -226,7 +227,7 @@ export default function TransportEditPage({
 
       const savedTransport = await response.json();
       setTransport(savedTransport);
-      
+
       console.log('[TransportEditPage] Save successful, navigating to transports list');
       router.push('/admin-panel/transports');
     } catch (err) {
@@ -270,7 +271,7 @@ export default function TransportEditPage({
       <div className="p-4">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
-            {transport 
+            {transport
               ? `Edytuj transport: ${transport.name || 'Transport ogólny'}`
               : 'Edytuj transport'}
           </h1>
@@ -315,7 +316,7 @@ export default function TransportEditPage({
             {/* Note: Camp assignment removed - transport can only be assigned to camps during turnus editing */}
             <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
               <p className="text-sm text-blue-700">
-                <strong>Uwaga:</strong> Transport może być przypisany do obozu tylko podczas edycji turnusu. 
+                <strong>Uwaga:</strong> Transport może być przypisany do obozu tylko podczas edycji turnusu.
                 Aby przypisać transport do obozu, edytuj turnus i wybierz transport z listy dostępnych transportów.
               </p>
             </div>

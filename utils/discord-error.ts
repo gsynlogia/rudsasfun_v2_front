@@ -13,7 +13,7 @@ const DISCORD_WEBHOOK_URL = process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL || '';
  */
 export async function sendErrorToDiscord(
   error: Error | string,
-  context?: Record<string, any>
+  context?: Record<string, any>,
 ): Promise<void> {
   // Don't send if webhook URL is not configured
   if (!DISCORD_WEBHOOK_URL) {
@@ -112,11 +112,4 @@ export async function sendErrorToDiscord(
     console.error('[Discord] Error sending to Discord:', err);
   }
 }
-
-
-
-
-
-
-
 

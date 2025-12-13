@@ -7,7 +7,7 @@ import SectionGuard from '@/components/admin/SectionGuard';
 /**
  * Admin Panel - Payments Page
  * Route: /admin-panel/payments
- * 
+ *
  * Displays payments management with detailed payment verification
  */
 export default function PaymentsPage() {

@@ -7,7 +7,7 @@ import SectionGuard from '@/components/admin/SectionGuard';
 /**
  * Admin Panel Main Page
  * Route: /admin-panel
- * 
+ *
  * Displays reservations management
  */
 export default function AdminPanelPage() {

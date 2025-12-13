@@ -3,10 +3,10 @@
  * Replaces optional chaining with interfaces that have default values
  */
 
+import { ReservationStorageState } from './reservationStorageState';
 import { Step1FormData } from './step1FormData';
 import { Step2FormData } from './step2FormData';
 import { Step3FormData } from './step3FormData';
-import { ReservationStorageState } from './reservationStorageState';
 
 // Default values for Step1FormData
 export const defaultStep1FormData: Step1FormData = {
@@ -120,10 +120,4 @@ export function withDefaults<T>(data: T | null, defaults: T): T {
   if (!data) return defaults;
   return { ...defaults, ...data };
 }
-
-
-
-
-
-
 

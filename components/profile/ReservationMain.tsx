@@ -1,13 +1,17 @@
 'use client';
 
-import { MapPin, User, Calendar, Home, Utensils, Gift, Users, Heart, FileText, Mail, Phone, Download, CreditCard } from 'lucide-react';
-import DashedLine from '../DashedLine';
-import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
-import { paymentService, PaymentResponse, CreatePaymentRequest } from '@/lib/services/PaymentService';
-import { contractService } from '@/lib/services/ContractService';
-import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
-import { useState, useEffect } from 'react';
+import { MapPin, User, Calendar, Mail, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
+import { contractService } from '@/lib/services/ContractService';
+import { paymentService, PaymentResponse, CreatePaymentRequest } from '@/lib/services/PaymentService';
+import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
+import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
+
+import DashedLine from '../DashedLine';
+
+
 import AdditionalServicesTiles from './AdditionalServicesTiles';
 
 interface ReservationMainProps {
@@ -21,9 +25,9 @@ interface ReservationMainProps {
  * Left part of reservation card with main details
  */
 export default function ReservationMain({ reservation, isDetailsExpanded, onToggleDetails }: ReservationMainProps) {
-  const router = useRouter();
+  const _router = useRouter();
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
-  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [_loadingPayments, _setLoadingPayments] = useState(false);
   const [paidAmount, setPaidAmount] = useState(0);
   const [isFullyPaid, setIsFullyPaid] = useState(false);
   const [paymentInstallments, setPaymentInstallments] = useState<'full' | '2' | '3' | null>(() => {
@@ -31,12 +35,12 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     return (reservation.payment_plan as 'full' | '2' | '3') || null;
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [contract, setContract] = useState<any>(null);
-  const [qualificationCard, setQualificationCard] = useState<QualificationCardResponse | null>(null);
-  const [loadingContract, setLoadingContract] = useState(false);
-  const [loadingCard, setLoadingCard] = useState(false);
-  const [downloadingContract, setDownloadingContract] = useState(false);
-  const [downloadingCard, setDownloadingCard] = useState(false);
+  const [_contract, _setContract] = useState<any>(null);
+  const [_qualificationCard, _setQualificationCard] = useState<QualificationCardResponse | null>(null);
+  const [_loadingContract, _setLoadingContract] = useState(false);
+  const [_loadingCard, _setLoadingCard] = useState(false);
+  const [_downloadingContract, _setDownloadingContract] = useState(false);
+  const [_downloadingCard, _setDownloadingCard] = useState(false);
 
   // Format date helper
   const formatDate = (dateString: string | null | undefined): string => {
@@ -59,7 +63,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   useEffect(() => {
     const loadPayments = async () => {
       try {
-        setLoadingPayments(true);
+        _setLoadingPayments(true);
         const allPayments = await paymentService.listPayments(0, 1000);
         // Filter payments for this reservation (order_id format: "RES-{id}" or just "{id}" or "RES-{id}-{timestamp}")
         // Use the same logic as PaymentsManagement.tsx for consistency
@@ -75,7 +79,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           return false;
         });
         setPayments(reservationPayments);
-        
+
         // Include payments with status 'success' or 'pending' if they have amount set
         // For pending payments, we use 'amount' as the paid amount (assuming payment was made)
         // For success payments, we use 'paid_amount' if available, otherwise 'amount'
@@ -87,7 +91,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           if (p.status === 'pending' && p.amount && p.amount > 0) return true;
           return false;
         });
-        
+
         // Calculate actual paid amount from database
         // Priority: paid_amount (from webhook) > amount (from payment creation)
         // Use the same logic as PaymentsManagement.tsx for consistency
@@ -99,14 +103,14 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           // Otherwise, use amount (payment was created but webhook didn't update it yet)
           return sum + (p.amount || 0);
         }, 0);
-        
+
         // Use actual paid amount from database (this is the source of truth for payments)
         const totalAmount = reservation.total_price || 0;
         const paidAmount = Math.min(actualPaidAmount, totalAmount);
-        
+
         setPaidAmount(paidAmount);
         setIsFullyPaid(paidAmount >= totalAmount);
-        
+
         // Update payment installments from reservation.payment_plan if available
         if (reservation.payment_plan && (reservation.payment_plan === 'full' || reservation.payment_plan === '2' || reservation.payment_plan === '3')) {
           setPaymentInstallments(reservation.payment_plan as 'full' | '2' | '3');
@@ -114,7 +118,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
       } catch (error) {
         console.error('Error loading payments:', error);
       } finally {
-        setLoadingPayments(false);
+        _setLoadingPayments(false);
       }
     };
 
@@ -127,39 +131,39 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   // Load contract and qualification card
   const loadDocuments = async () => {
     try {
-      setLoadingContract(true);
-      setLoadingCard(true);
-      
+      _setLoadingContract(true);
+      _setLoadingCard(true);
+
       // Load contract
       try {
         const contracts = await contractService.listMyContracts();
         const contractData = contracts.find(c => c.reservation_id === reservation.id);
-        setContract(contractData || null);
+        _setContract(contractData || null);
       } catch (error) {
         console.error('Error loading contract:', error);
-        setContract(null);
+        _setContract(null);
       } finally {
-        setLoadingContract(false);
+        _setLoadingContract(false);
       }
-      
+
       // Load qualification card
       try {
         const card = await qualificationCardService.getQualificationCard(reservation.id);
-        setQualificationCard(card);
+        _setQualificationCard(card);
       } catch (error) {
         console.error('Error loading qualification card:', error);
-        setQualificationCard(null);
+        _setQualificationCard(null);
       } finally {
-        setLoadingCard(false);
+        _setLoadingCard(false);
       }
     } catch (error) {
       console.error('Error loading documents:', error);
     }
   };
 
-  const handleDownloadContract = async () => {
+  const _handleDownloadContract = async () => {
     try {
-      setDownloadingContract(true);
+      _setDownloadingContract(true);
       await contractService.downloadContract(reservation.id);
       // Reload contract status after download
       await loadDocuments();
@@ -167,13 +171,13 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
       console.error('Error downloading contract:', error);
       alert(error.message || 'Nie udało się pobrać umowy. Spróbuj ponownie.');
     } finally {
-      setDownloadingContract(false);
+      _setDownloadingContract(false);
     }
   };
 
-  const handleDownloadQualificationCard = async () => {
+  const _handleDownloadQualificationCard = async () => {
     try {
-      setDownloadingCard(true);
+      _setDownloadingCard(true);
       await qualificationCardService.downloadQualificationCard(reservation.id);
       // Reload card status after download
       await loadDocuments();
@@ -181,7 +185,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
       console.error('Error downloading qualification card:', error);
       alert(error.message || 'Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
     } finally {
-      setDownloadingCard(false);
+      _setDownloadingCard(false);
     }
   };
 
@@ -189,14 +193,14 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const participantName = reservation.participant_first_name && reservation.participant_last_name
     ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
     : 'Brak danych';
-  
+
   // Format reservation number (e.g., REZ-2025-003)
   const formatReservationNumber = (reservationId: number, createdAt: string) => {
     const year = new Date(createdAt).getFullYear();
     const paddedId = String(reservationId).padStart(3, '0');
     return `REZ-${year}-${paddedId}`;
   };
-  
+
   const reservationNumber = formatReservationNumber(reservation.id, reservation.created_at);
 
   // Get age
@@ -212,13 +216,13 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const campName = reservation.camp_name || 'Brak danych';
 
   // Get turnus name (property name)
-  const turnusName = reservation.property_name || 'Brak danych';
+  const _turnusName = reservation.property_name || 'Brak danych';
 
   // Get dates
   const dates = formatDateRange(reservation.property_start_date, reservation.property_end_date);
 
   // Get center/city
-  const center = reservation.property_city || 'Brak danych';
+  const _center = reservation.property_city || 'Brak danych';
 
   // Get transport info
   const departureType = reservation.departure_type === 'zbiorowy' ? 'Transport zbiorowy' : 'Transport własny';
@@ -275,7 +279,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             {status}
           </span>
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
           <div className="flex items-center gap-1 sm:gap-1.5">
             <User className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -427,7 +431,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           {/* Total Cost and Actions */}
           <div>
             <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">Koszt całkowity</h5>
-            
+
             {/* Detailed Payment Breakdown */}
             {!isFullyPaid && (
               <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 space-y-2 text-xs sm:text-sm">
@@ -445,13 +449,13 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                 </div>
               </div>
             )}
-            
+
             {isFullyPaid && (
               <div className="text-xs sm:text-sm text-green-600 mb-3 sm:mb-4 font-semibold">
                 ✅ Rezerwacja w pełni opłacona
               </div>
             )}
-            
+
             {!isFullyPaid && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {/* Payment Installments Options - Left Side */}
@@ -464,7 +468,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                       // Check if payment_plan is already saved in database
                       const savedPaymentPlan = reservation.payment_plan;
                       const isPlanLocked = !!savedPaymentPlan; // If payment_plan exists, lock other options
-                      
+
                       return (
                         <>
                           {/* Full Payment - disabled if payment_plan is '2' or '3' */}
@@ -491,7 +495,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                               Pełna płatność ({remainingAmount.toFixed(2)} zł)
                             </label>
                           </div>
-                          
+
                           {/* 2 Equal Installments - disabled if payment_plan is 'full' or '3' */}
                           <div className="flex items-center gap-2">
                             <input
@@ -516,7 +520,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                               Płatność w dwóch ratach (po {(remainingAmount / 2).toFixed(2)} zł)
                             </label>
                           </div>
-                          
+
                           {/* 3 Equal Installments - disabled if payment_plan is 'full' or '2' */}
                           <div className="flex items-center gap-2">
                             <input
@@ -546,27 +550,27 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                     })()}
                   </div>
                 </div>
-                
+
                 {/* Pay Button - Right Side - only show if payment method is selected */}
                 {paymentInstallments && (
                   <div className="flex items-end">
-                    <button 
+                    <button
                       onClick={async () => {
                         if (isProcessingPayment) return;
-                        
+
                         if (!paymentInstallments) {
                           alert('Proszę wybrać sposób płatności');
                           return;
                         }
-                        
+
                         setIsProcessingPayment(true);
                         try {
                           // Save payment plan to database BEFORE creating payment
                           await reservationService.updatePaymentPlan(reservation.id, paymentInstallments);
-                          
+
                           // Calculate remaining amount
                           const remainingAmount = reservation.total_price - paidAmount;
-                          
+
                           // Get payment amount based on selected installments and remaining amount
                           let paymentAmount = remainingAmount;
                           if (paymentInstallments === '2') {
@@ -574,46 +578,46 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                           } else if (paymentInstallments === '3') {
                             paymentAmount = remainingAmount / 3;
                           }
-                          
+
                           // Get payer data from reservation
-                          const firstParent = reservation.parents_data && reservation.parents_data.length > 0 
-                            ? reservation.parents_data[0] 
+                          const firstParent = reservation.parents_data && reservation.parents_data.length > 0
+                            ? reservation.parents_data[0]
                             : null;
-                          
+
                           if (!firstParent || !firstParent.email) {
                             throw new Error('Brak danych płatnika (email) w rezerwacji');
                           }
-                          
+
                           const payerEmail = firstParent.email;
                           const payerName = firstParent.firstName && firstParent.lastName
                             ? `${firstParent.firstName} ${firstParent.lastName}`.trim()
                             : undefined;
-                          
+
                           // Create order ID
                           const orderId = `RES-${reservation.id}-${Date.now()}`;
-                          
+
                           // Determine installment number for description
                           let installmentDesc = '';
                           if (paymentInstallments === 'full') {
                             installmentDesc = 'Pełna płatność';
                           } else if (paymentInstallments === '2') {
                             // Count how many installment payments were made for this reservation
-                            const installmentPayments = payments.filter(p => 
-                              (p.status === 'paid' || p.status === 'success') && 
-                              (p.description?.includes('Rata') || p.description?.includes('rata'))
+                            const installmentPayments = payments.filter(p =>
+                              (p.status === 'paid' || p.status === 'success') &&
+                              (p.description?.includes('Rata') || p.description?.includes('rata')),
                             );
                             const installmentNumber = installmentPayments.length + 1;
                             installmentDesc = `Rata ${installmentNumber}/2`;
                           } else if (paymentInstallments === '3') {
                             // Count how many installment payments were made for this reservation
-                            const installmentPayments = payments.filter(p => 
-                              (p.status === 'paid' || p.status === 'success') && 
-                              (p.description?.includes('Rata') || p.description?.includes('rata'))
+                            const installmentPayments = payments.filter(p =>
+                              (p.status === 'paid' || p.status === 'success') &&
+                              (p.description?.includes('Rata') || p.description?.includes('rata')),
                             );
                             const installmentNumber = installmentPayments.length + 1;
                             installmentDesc = `Rata ${installmentNumber}/3`;
                           }
-                          
+
                           // Prepare payment request
                           const paymentRequest: CreatePaymentRequest = {
                             amount: paymentAmount,
@@ -624,10 +628,10 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                             success_url: `${window.location.origin}/payment/success?reservation_id=${reservation.id}`,
                             error_url: `${window.location.origin}/payment/failure?reservation_id=${reservation.id}`,
                           };
-                          
+
                           // Create payment
                           const paymentResponse = await paymentService.createPayment(paymentRequest);
-                          
+
                           // Redirect to payment URL if available
                           if (paymentResponse.payment_url) {
                             window.location.href = paymentResponse.payment_url;
@@ -670,15 +674,15 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
       {/* Toggle Details Button */}
       <div className={`text-center ${isDetailsExpanded ? 'pt-3 sm:pt-4' : ''}`}>
-        <button 
+        <button
           onClick={onToggleDetails}
           className="text-xs sm:text-sm text-[#03adf0] hover:text-[#0288c7] flex items-center gap-1 mx-auto transition-colors"
         >
           {isDetailsExpanded ? 'ukryj szczegóły' : 'pokaż szczegóły'}
-          <svg 
-            className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${isDetailsExpanded ? '' : 'rotate-180'}`} 
-            fill="none" 
-            stroke="currentColor" 
+          <svg
+            className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${isDetailsExpanded ? '' : 'rotate-180'}`}
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />

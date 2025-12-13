@@ -171,18 +171,11 @@ export function createDefault<T extends Record<string, any>>(defaultValue: T): T
 // Helper function to merge defaults with partial data
 export function withDefaults<T extends Record<string, any>>(
   data: Partial<T> | null | undefined,
-  defaults: T
+  defaults: T,
 ): T {
   if (!data) {
     return { ...defaults };
   }
   return { ...defaults, ...data };
 }
-
-
-
-
-
-
-
 

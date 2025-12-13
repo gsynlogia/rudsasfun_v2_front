@@ -1,12 +1,12 @@
 import CampsList from '@/components/CampsList';
-import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import Header from '@/components/Header';
 
 /**
  * Home Page Component
  * Displays list of camps with their editions (turnusy) for selection
  * Route: /
- * 
+ *
  * This is a dynamic route - marked as such to prevent static generation errors
  * Uses the same layout structure as reservation pages for consistency
  */

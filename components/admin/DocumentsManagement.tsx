@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { FileText, Upload, Check, X, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { FileText, Check, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
+
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 interface Document {
@@ -32,12 +34,12 @@ export default function DocumentsManagement() {
       setLoading(true);
       setError(null);
       const data = await authenticatedApiCall<{ documents: Document[]; total: number }>(
-        '/api/documents/'
+        '/api/documents/',
       );
       // Filter out documents that should not be displayed in admin panel
       const excludedDocuments = ['tourist_regulations_insurance', 'watt_input_regulation'];
       const filteredDocuments = (data.documents || []).filter(
-        doc => !excludedDocuments.includes(doc.name)
+        doc => !excludedDocuments.includes(doc.name),
       );
       setDocuments(filteredDocuments);
     } catch (err) {
@@ -73,7 +75,7 @@ export default function DocumentsManagement() {
         {
           method: 'POST',
           body: formData,
-        }
+        },
       );
 
       // Refresh documents list

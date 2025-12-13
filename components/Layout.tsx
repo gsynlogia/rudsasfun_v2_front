@@ -1,13 +1,14 @@
 'use client';
 
 import { useCamp } from '@/hooks/useCamp';
+import type { LayoutProps, StepNumber } from '@/types/reservation';
 import { formatDateRange } from '@/utils/api';
+
+import Footer from './Footer';
 import Header from './Header';
+import NavigationButtons from './NavigationButtons';
 import ProgressBar from './ProgressBar';
 import ReservationSummary from './ReservationSummary';
-import Footer from './Footer';
-import NavigationButtons from './NavigationButtons';
-import type { LayoutProps, StepNumber } from '@/types/reservation';
 
 /**
  * Layout Component
@@ -95,10 +96,10 @@ export default function Layout({
           </div>
 
           {/* Right Column - Summary - Mobile: below, Desktop: sticky */}
-          <aside 
+          <aside
             className="lg:w-[25%] w-full order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start"
-            style={{ 
-              alignSelf: 'flex-start'
+            style={{
+              alignSelf: 'flex-start',
             }}
           >
             <ReservationSummary />

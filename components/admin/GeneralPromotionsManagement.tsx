@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface GeneralPromotion {
@@ -21,7 +22,7 @@ export default function GeneralPromotionsManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<GeneralPromotion | null>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Form state
   const [promotionName, setPromotionName] = useState('');
   const [promotionPrice, setPromotionPrice] = useState<number | ''>(0);
@@ -40,7 +41,7 @@ export default function GeneralPromotionsManagement() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas ładowania promocji';
       console.error('[GeneralPromotionsManagement] Error fetching promotions:', err);
-      
+
       if (errorMessage.includes('404') || errorMessage.includes('Not found')) {
         setPromotions([]);
         setError(null);
@@ -179,7 +180,7 @@ export default function GeneralPromotionsManagement() {
             {promotions.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500">
-                  Brak promocji ogólnych. Kliknij "Dodaj promocję", aby utworzyć nową.
+                  Brak promocji ogólnych. Kliknij &quot;Dodaj promocję&quot;, aby utworzyć nową.
                 </td>
               </tr>
             ) : (
@@ -187,9 +188,9 @@ export default function GeneralPromotionsManagement() {
               <tr key={promotion.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{promotion.display_name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {promotion.price < 0 
+                  {promotion.price < 0
                     ? `${promotion.price.toFixed(2)} PLN`  // Negative price (discount)
-                    : promotion.price > 0 
+                    : promotion.price > 0
                       ? `+${promotion.price.toFixed(2)} PLN`  // Positive price
                       : '0.00 PLN'  // Free
                   }
@@ -328,10 +329,4 @@ export default function GeneralPromotionsManagement() {
     </div>
   );
 }
-
-
-
-
-
-
 

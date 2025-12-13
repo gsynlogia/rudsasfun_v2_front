@@ -1,12 +1,15 @@
 'use client';
 
+import { Search, ChevronUp, ChevronDown, Check, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw, RefreshCw, Trash2 } from 'lucide-react';
 import { useState, useMemo, useEffect, Fragment } from 'react';
-import { Search, ChevronUp, ChevronDown, Check, X, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw, RefreshCw, Trash2 } from 'lucide-react';
+
+import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
+import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
+import { reservationService } from '@/lib/services/ReservationService';
+
 import PaymentConfirmationModal from './PaymentConfirmationModal';
 import RefundConfirmationModal from './RefundConfirmationModal';
-import { reservationService } from '@/lib/services/ReservationService';
-import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
-import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
+
 
 /**
  * Payment Item Status
@@ -76,37 +79,37 @@ interface ReservationPayment {
  */
 const fetchTurnusProtectionPrices = async (
   campId: number,
-  propertyId: number
+  propertyId: number,
 ): Promise<Map<number, { name: string; price: number }>> => {
   try {
     const { getApiBaseUrlRuntime } = await import('@/utils/api-config');
     const apiBaseUrl = getApiBaseUrlRuntime();
     const response = await fetch(`${apiBaseUrl}/api/camps/${campId}/properties/${propertyId}/protections`);
-    
+
     if (!response.ok) {
       console.warn(`Could not fetch turnus protections for camp ${campId}, property ${propertyId}`);
       return new Map();
     }
-    
+
     const turnusProtections = await response.json();
     const protectionsMap = new Map<number, { name: string; price: number }>();
-    
+
     if (Array.isArray(turnusProtections)) {
       turnusProtections.forEach((tp: any) => {
         // Skip placeholders without relations
         if (tp.has_no_relations) return;
-        
+
         // Use general_protection_id for mapping (this is what's stored in selected_protection)
         const generalProtectionId = tp.general_protection_id || tp.id;
         if (generalProtectionId) {
           protectionsMap.set(generalProtectionId, {
             name: tp.name || 'Ochrona',
-            price: tp.price || 0
+            price: tp.price || 0,
           });
         }
       });
     }
-    
+
     return protectionsMap;
   } catch (err) {
     console.warn('Error fetching turnus protection prices:', err);
@@ -123,23 +126,23 @@ const fetchTurnusProtectionPrices = async (
  * @param addonsMap - Map of addon ID to {name, price} (from API)
  */
 const generatePaymentItems = async (
-  reservation: any, 
+  reservation: any,
   payments: PaymentResponse[],
   protectionsMap: Map<number, { name: string; price: number }> = new Map(),
-  addonsMap: Map<string, { name: string; price: number }> = new Map()
+  addonsMap: Map<string, { name: string; price: number }> = new Map(),
 ): Promise<PaymentItem[]> => {
   const items: PaymentItem[] = [];
   let itemId = 1;
-  
+
   // Fetch turnus-specific protection prices (these are the actual prices used in reservation)
   let turnusProtectionsMap = new Map<number, { name: string; price: number }>();
   if (reservation.camp_id && reservation.property_id) {
     turnusProtectionsMap = await fetchTurnusProtectionPrices(reservation.camp_id, reservation.property_id);
   }
-  
+
   // Use turnus prices if available, otherwise fallback to general prices
   const effectiveProtectionsMap = turnusProtectionsMap.size > 0 ? turnusProtectionsMap : protectionsMap;
-  
+
   // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}" or "RES-{id}-{timestamp}")
   const reservationPayments = payments.filter(p => {
     const orderId = p.order_id || '';
@@ -170,22 +173,22 @@ const generatePaymentItems = async (
     // Otherwise, use amount (payment was created but webhook didn't update it yet)
     return sum + (p.amount || 0);
   }, 0);
-  
+
   // Get the latest payment date and method for display
-  const latestPayment = successfulPayments.length > 0 
-    ? successfulPayments.sort((a, b) => 
-        new Date(b.paid_at || b.created_at || 0).getTime() - 
-        new Date(a.paid_at || a.created_at || 0).getTime()
+  const latestPayment = successfulPayments.length > 0
+    ? successfulPayments.sort((a, b) =>
+        new Date(b.paid_at || b.created_at || 0).getTime() -
+        new Date(a.paid_at || a.created_at || 0).getTime(),
       )[0]
     : null;
-  const paymentDate = latestPayment 
+  const paymentDate = latestPayment
     ? ((latestPayment.paid_at || latestPayment.created_at) || '').split('T')[0]
     : undefined;
   const paymentMethod = latestPayment
-    ? (latestPayment.channel_id === 64 ? 'BLIK' : 
+    ? (latestPayment.channel_id === 64 ? 'BLIK' :
        latestPayment.channel_id === 53 ? 'Karta' : 'Online')
     : undefined;
-  
+
   // Parse selected_protection - can be array of strings like ["protection-1", "protection-2"]
   let selectedProtections: string[] = [];
   if (reservation.selected_protection) {
@@ -200,7 +203,7 @@ const generatePaymentItems = async (
       }
     }
   }
-  
+
   // Calculate protection amounts from turnus-specific prices
   let totalProtectionAmount = 0;
   selectedProtections.forEach((protectionId: string) => {
@@ -214,16 +217,16 @@ const generatePaymentItems = async (
       }
     }
   });
-  
+
   // Calculate diet amount (if diet ID is provided)
   const dietAmount = 0; // Will be calculated from diet data if needed
-  
+
   // Calculate addons total from actual addon data
   let totalAddonsAmount = 0;
-  const selectedAddons = reservation.selected_addons 
+  const selectedAddons = reservation.selected_addons
     ? (Array.isArray(reservation.selected_addons) ? reservation.selected_addons : [reservation.selected_addons])
     : [];
-  
+
   selectedAddons.forEach((addonId: string | number) => {
     // Convert to string if it's a number
     const addonIdStr = String(addonId);
@@ -235,24 +238,24 @@ const generatePaymentItems = async (
       console.warn(`Addon not found in map: ${addonIdStr} (type: ${typeof addonId})`, {
         reservationId: reservation.id,
         selectedAddons: reservation.selected_addons,
-        addonsMapKeys: Array.from(addonsMap.keys())
+        addonsMapKeys: Array.from(addonsMap.keys()),
       });
     }
   });
-  
+
   // Calculate camp amount = total_price - (protections + diet + addons + transport + promotion)
   // Note: transport and promotion are included in total_price, so we calculate camp as remainder
   const additionalItemsAmount = totalProtectionAmount + dietAmount + totalAddonsAmount;
   const totalPriceFromReservation = reservation.total_price || 0;
   const campAmount = Math.max(0, totalPriceFromReservation - additionalItemsAmount);
-  
+
   // Total amount should match reservation.total_price (this is the source of truth)
   const totalAmount = totalPriceFromReservation;
-  
+
   // Deposit amount: 600 PLN base + all protections + all addons (if deposit was selected)
   const depositBaseAmount = 600;
   const depositAmount = depositBaseAmount + totalProtectionAmount + totalAddonsAmount;
-  
+
   // Distribute payments across items
   // Priority: If totalPaid >= depositAmount, pay deposit first (600 + protections + addons), then camp
   // Otherwise, if totalPaid < depositAmount but >= depositBaseAmount, pay partial deposit
@@ -260,13 +263,13 @@ const generatePaymentItems = async (
   let remainingPaid = totalPaid;
   const hasDeposit = depositAmount > depositBaseAmount; // Has protections or addons in deposit
   const isDepositPayment = hasDeposit && totalPaid >= depositBaseAmount && totalPaid < totalAmount;
-  
+
   // Always pay deposit components first if deposit was selected (600 + protections + addons)
   if (isDepositPayment || (hasDeposit && totalPaid >= depositAmount)) {
     // Pay deposit base (600 PLN) first
     const depositBasePaid = Math.min(remainingPaid, depositBaseAmount);
     remainingPaid -= depositBasePaid;
-    
+
     // Protections - create separate item for each protection (paid from deposit)
     selectedProtections.forEach((protectionId: string) => {
       const numericIdMatch = protectionId.match(/protection-(\d+)/);
@@ -289,7 +292,7 @@ const generatePaymentItems = async (
         }
       }
     });
-    
+
     // Addons - create separate item for each addon (paid from deposit)
     selectedAddons.forEach((addonId: string | number) => {
       // Convert to string if it's a number
@@ -321,7 +324,7 @@ const generatePaymentItems = async (
         });
       }
     });
-    
+
     // Camp - pay remaining amount (if any) after deposit
     const campPaidAmount = Math.min(remainingPaid, campAmount);
     const campPaid = campPaidAmount >= campAmount;
@@ -334,39 +337,39 @@ const generatePaymentItems = async (
       paidDate: campPaid && paymentDate ? paymentDate : undefined,
       paymentMethod: campPaid && paymentMethod ? paymentMethod : undefined,
     };
-    
+
     // Generate installments if payment_plan is set and camp is partially paid
     const paymentPlan = reservation.payment_plan;
     if (paymentPlan && (paymentPlan === '2' || paymentPlan === '3') && campItem.status === 'partially_paid') {
       const installmentCount = parseInt(paymentPlan, 10);
       const installments: PaymentInstallment[] = [];
-      
+
       // Add deposit (zaliczka) as first item if it was paid
       if (depositBasePaid > 0) {
         // Find deposit payment from database (payment with amount around 600 PLN, not a "Rata" payment)
         const depositPayment = successfulPayments.find(p => {
           const amount = p.paid_amount || p.amount || 0;
           // Check if payment is around 600 PLN (deposit) and not an installment
-          return amount >= 500 && amount <= 700 && 
-                 !p.description?.includes('Rata') && 
+          return amount >= 500 && amount <= 700 &&
+                 !p.description?.includes('Rata') &&
                  !p.description?.includes('rata');
         });
-        
+
         installments.push({
           number: 0, // Special number for deposit
           total: installmentCount,
           amount: depositBaseAmount, // 600 PLN
           paid: depositBasePaid >= depositBaseAmount,
-          paidDate: depositPayment?.paid_at 
-            ? depositPayment.paid_at.split('T')[0] 
+          paidDate: depositPayment?.paid_at
+            ? depositPayment.paid_at.split('T')[0]
             : (depositBasePaid >= depositBaseAmount && paymentDate ? paymentDate : undefined),
           paymentMethod: depositPayment
-            ? (depositPayment.channel_id === 64 ? 'BLIK' : 
+            ? (depositPayment.channel_id === 64 ? 'BLIK' :
                depositPayment.channel_id === 53 ? 'Karta' : 'Online')
             : undefined,
         });
       }
-      
+
       // Find all installment payments from database (with "Rata X/Y" in description)
       const installmentPayments = successfulPayments
         .filter(p => p.description && (p.description.includes('Rata') || p.description.includes('rata')))
@@ -377,52 +380,52 @@ const generatePaymentItems = async (
             return {
               number: parseInt(match[1], 10),
               total: parseInt(match[2], 10),
-              payment: p
+              payment: p,
             };
           }
           return null;
         })
         .filter((item): item is { number: number; total: number; payment: PaymentResponse } => item !== null)
         .filter(item => item.total === installmentCount); // Only match the correct plan
-      
+
       // Calculate installment amount: divide remaining amount (after deposit) by number of installments
       // Installments are calculated based on remaining amount after deposit (600 PLN), not full campAmount
       // Example: campAmount = 2400, deposit = 600, remaining = 1800, but if total is 2550:
       // remaining = totalPriceFromReservation - depositBaseAmount = 2550 - 600 = 1950
       // So 1950 / 3 = 650 PLN per installment
-      const remainingForInstallments = depositBasePaid > 0 
-        ? (totalPriceFromReservation - depositBaseAmount) 
+      const remainingForInstallments = depositBasePaid > 0
+        ? (totalPriceFromReservation - depositBaseAmount)
         : campAmount;
       const installmentAmount = remainingForInstallments / installmentCount;
-      
+
       // For each installment, check if it's paid and get actual amount from database
       for (let i = 1; i <= installmentCount; i++) {
         const installmentPaymentData = installmentPayments.find(item => item.number === i);
         const isPaid = !!installmentPaymentData;
-        
+
         // Use actual paid amount from database if paid, otherwise use fixed installment amount
         const actualAmount = installmentPaymentData?.payment
           ? (installmentPaymentData.payment.paid_amount || installmentPaymentData.payment.amount || 0)
           : installmentAmount;
-        
+
         installments.push({
           number: i,
           total: installmentCount,
           amount: actualAmount, // Use actual amount from database for paid, calculated for unpaid
           paid: isPaid,
           paidDate: isPaid && installmentPaymentData?.payment && installmentPaymentData.payment.paid_at
-            ? installmentPaymentData.payment.paid_at.split('T')[0] 
+            ? installmentPaymentData.payment.paid_at.split('T')[0]
             : undefined,
           paymentMethod: isPaid && installmentPaymentData?.payment
-            ? (installmentPaymentData.payment.channel_id === 64 ? 'BLIK' : 
+            ? (installmentPaymentData.payment.channel_id === 64 ? 'BLIK' :
                installmentPaymentData.payment.channel_id === 53 ? 'Karta' : 'Online')
             : undefined,
         });
       }
-      
+
       campItem.installments = installments;
     }
-    
+
     items.push(campItem);
     remainingPaid -= campPaidAmount;
   } else {
@@ -439,13 +442,13 @@ const generatePaymentItems = async (
       paidDate: campPaid && paymentDate ? paymentDate : undefined,
       paymentMethod: campPaid && paymentMethod ? paymentMethod : undefined,
     };
-    
+
     // Generate installments if payment_plan is set and camp is partially paid
     const paymentPlan = reservation.payment_plan;
     if (paymentPlan && (paymentPlan === '2' || paymentPlan === '3') && campItem.status === 'partially_paid') {
       const installmentCount = parseInt(paymentPlan, 10);
       const installments: PaymentInstallment[] = [];
-      
+
       // Find all installment payments from database (with "Rata X/Y" in description)
       const installmentPayments = successfulPayments
         .filter(p => p.description && (p.description.includes('Rata') || p.description.includes('rata')))
@@ -456,46 +459,46 @@ const generatePaymentItems = async (
             return {
               number: parseInt(match[1], 10),
               total: parseInt(match[2], 10),
-              payment: p
+              payment: p,
             };
           }
           return null;
         })
         .filter((item): item is { number: number; total: number; payment: PaymentResponse } => item !== null)
         .filter(item => item.total === installmentCount); // Only match the correct plan
-      
+
       // Calculate installment amount: divide campAmount by number of installments
       // In this branch (else), no deposit was paid, so use campAmount directly
       const installmentAmount = campAmount / installmentCount;
-      
+
       // For each installment, check if it's paid and get actual amount from database
       for (let i = 1; i <= installmentCount; i++) {
         const installmentPaymentData = installmentPayments.find(item => item.number === i);
         const isPaid = !!installmentPaymentData;
-        
+
         // Use actual paid amount from database if paid, otherwise use fixed installment amount
         const actualAmount = installmentPaymentData?.payment
           ? (installmentPaymentData.payment.paid_amount || installmentPaymentData.payment.amount || 0)
           : installmentAmount;
-        
+
         installments.push({
           number: i,
           total: installmentCount,
           amount: actualAmount, // Use actual amount from database for paid, calculated for unpaid
           paid: isPaid,
           paidDate: isPaid && installmentPaymentData?.payment && installmentPaymentData.payment.paid_at
-            ? installmentPaymentData.payment.paid_at.split('T')[0] 
+            ? installmentPaymentData.payment.paid_at.split('T')[0]
             : undefined,
           paymentMethod: isPaid && installmentPaymentData?.payment
-            ? (installmentPaymentData.payment.channel_id === 64 ? 'BLIK' : 
+            ? (installmentPaymentData.payment.channel_id === 64 ? 'BLIK' :
                installmentPaymentData.payment.channel_id === 53 ? 'Karta' : 'Online')
             : undefined,
         });
       }
-      
+
       campItem.installments = installments;
     }
-    
+
     items.push(campItem);
     remainingPaid -= campPaidAmount;
 
@@ -579,13 +582,13 @@ const generatePaymentItems = async (
  * Uses actual payment amounts from database (paid_amount from Payment records)
  */
 const generatePaymentDetails = async (
-  reservation: any, 
+  reservation: any,
   payments: PaymentResponse[],
   protectionsMap: Map<number, { name: string; price: number }> = new Map(),
-  addonsMap: Map<string, { name: string; price: number }> = new Map()
+  addonsMap: Map<string, { name: string; price: number }> = new Map(),
 ): Promise<PaymentDetails> => {
   const items = await generatePaymentItems(reservation, payments, protectionsMap, addonsMap);
-  
+
   // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}" or "RES-{id}-{timestamp}")
   const reservationPayments = payments.filter(p => {
     const orderId = p.order_id || '';
@@ -608,7 +611,7 @@ const generatePaymentDetails = async (
     if (p.status === 'pending' && p.amount && p.amount > 0) return true;
     return false;
   });
-  
+
   // Calculate actual paid amount from database
   // Priority: paid_amount (from webhook) > amount (from payment creation)
   const actualPaidAmount = successfulPayments.reduce((sum, p) => {
@@ -619,27 +622,27 @@ const generatePaymentDetails = async (
     // Otherwise, use amount (payment was created but webhook didn't update it yet)
     return sum + (p.amount || 0);
   }, 0);
-  
+
   // Only count non-canceled and non-returned items in total amount
   const activeItems = items.filter(item => item.status !== 'canceled' && item.status !== 'returned');
-  
+
   // Total amount should be from reservation.total_price (this is the source of truth)
   // Don't recalculate from items to avoid rounding errors or missing transport costs
   const totalAmount = reservation.total_price || activeItems.reduce((sum, item) => sum + item.amount, 0);
-  
+
   // Use actual paid amount from database (this is the source of truth for payments)
   // Don't calculate from items status - use actual payment records from Payment table
   const paidAmount = Math.min(actualPaidAmount, totalAmount);
   const remainingAmount = Math.max(0, totalAmount - paidAmount);
-  
+
   // All active items must be paid (canceled and returned items don't count)
   const allActiveItemsPaid = activeItems.length > 0 && activeItems.every(item => item.status === 'paid');
   const hasCanceledItems = items.some(item => item.status === 'canceled');
   const hasSuccessfulPayment = successfulPayments.length > 0;
-  
+
   // Determine if payment is full or partial
   const isFullPayment = paidAmount >= totalAmount && allActiveItemsPaid;
-  const isPartialPayment = paidAmount > 0 && paidAmount < totalAmount;
+  const _isPartialPayment = paidAmount > 0 && paidAmount < totalAmount;
 
   return {
     reservationId: reservation.id,
@@ -661,16 +664,16 @@ const mapReservationToPaymentFormat = async (
   reservation: any,
   payments: PaymentResponse[],
   protectionsMap: Map<number, { name: string; price: number }> = new Map(),
-  addonsMap: Map<string, { name: string; price: number }> = new Map()
+  addonsMap: Map<string, { name: string; price: number }> = new Map(),
 ): Promise<ReservationPayment> => {
   const participantName = `${reservation.participant_first_name || ''} ${reservation.participant_last_name || ''}`.trim();
-  const firstParent = reservation.parents_data && reservation.parents_data.length > 0 
-    ? reservation.parents_data[0] 
+  const firstParent = reservation.parents_data && reservation.parents_data.length > 0
+    ? reservation.parents_data[0]
     : null;
   const email = (firstParent && firstParent.email) ? firstParent.email : (reservation.invoice_email || '');
   const campName = reservation.camp_name || 'Nieznany obóz';
   const tripName = reservation.property_name || `${reservation.property_period || ''} - ${reservation.property_city || ''}`.trim() || 'Nieznany turnus';
-  
+
   // Map status
   let status = reservation.status || 'pending';
   if (status === 'pending') status = 'aktywna';
@@ -737,11 +740,11 @@ export default function PaymentsManagement() {
           const { getApiBaseUrlRuntime } = await import('@/utils/api-config');
           const apiBaseUrl = getApiBaseUrlRuntime();
           const protectionsResponse = await fetch(`${apiBaseUrl}/api/general-protections/public`);
-          
+
           if (!protectionsResponse.ok) {
             throw new Error(`HTTP error! status: ${protectionsResponse.status}`);
           }
-          
+
           const protections = await protectionsResponse.json();
           const protectionsMapData = new Map<number, { name: string; price: number }>();
           if (protections && Array.isArray(protections)) {
@@ -787,15 +790,15 @@ export default function PaymentsManagement() {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         console.log('Fetching reservations and payments...');
-        
+
         // Fetch reservations first
         const reservationsData = await reservationService.listReservations(0, 1000).catch(err => {
           console.error('Error fetching reservations:', err);
           throw new Error(`Błąd pobierania rezerwacji: ${err.message}`);
         });
-        
+
         // Try to fetch payments, but don't fail if it doesn't work
         let paymentsData: PaymentResponse[] = [];
         try {
@@ -804,7 +807,7 @@ export default function PaymentsManagement() {
           console.warn('Warning: Could not fetch payments, continuing with empty array:', err);
           // Continue with empty payments array - reservations will still work
         }
-        
+
         // Automatyczna synchronizacja statusu płatności ze statusem 'pending'
         // Webhook nie działa w środowisku lokalnym (localhost), więc synchronizujemy ręcznie
         console.log('🔄 Synchronizacja statusu płatności z API Tpay (sandbox)...');
@@ -824,20 +827,20 @@ export default function PaymentsManagement() {
             // Nie przerywaj procesu - kontynuuj z pozostałymi płatnościami
           }
         });
-        
+
         // Wykonaj synchronizację równolegle (ale nie blokuj UI)
         await Promise.allSettled(syncPromises);
         console.log(`✅ Zsynchronizowano ${pendingPayments.length} płatności`);
-        
+
         console.log(`Fetched ${reservationsData.length} reservations and ${paymentsData.length} payments`);
-        
+
         // Map reservations to payment format (use current protectionsMap and addonsMap)
         const mappedReservations = await Promise.all(
-          reservationsData.map(reservation => 
-            mapReservationToPaymentFormat(reservation, paymentsData, protectionsMap, addonsMap)
-          )
+          reservationsData.map(reservation =>
+            mapReservationToPaymentFormat(reservation, paymentsData, protectionsMap, addonsMap),
+          ),
         );
-        
+
         setReservations(mappedReservations);
       } catch (err) {
         console.error('Error fetching payments data:', err);
@@ -846,7 +849,7 @@ export default function PaymentsManagement() {
         setIsLoading(false);
       }
     };
-    
+
     // Fetch data after protections and addons are loaded (even if empty)
     // We use a flag to ensure we only fetch once after initial load
     fetchData();
@@ -864,7 +867,7 @@ export default function PaymentsManagement() {
           res.reservationName.toLowerCase().includes(query) ||
           res.participantName.toLowerCase().includes(query) ||
           res.email.toLowerCase().includes(query) ||
-          res.campName.toLowerCase().includes(query)
+          res.campName.toLowerCase().includes(query),
       );
     }
 
@@ -939,7 +942,7 @@ export default function PaymentsManagement() {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
       const isCurrentlyExpanded = newSet.has(reservationId);
-      
+
       if (isCurrentlyExpanded) {
         newSet.delete(reservationId);
       } else {
@@ -986,7 +989,7 @@ export default function PaymentsManagement() {
   // Cancel invoice
   const handleCancelInvoice = async (invoice: InvoiceResponse, reservationId: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!confirm(`Czy na pewno chcesz anulować fakturę ${invoice.invoice_number}?`)) {
       return;
     }
@@ -994,20 +997,20 @@ export default function PaymentsManagement() {
     try {
       setCancelingInvoice(invoice.id);
       await invoiceService.cancelInvoice(invoice.id);
-      
+
       // Remove invoice from the list (or mark as canceled)
       setReservationInvoices(prev => {
         const newMap = new Map(prev);
         const invoices = newMap.get(reservationId) || [];
-        const updatedInvoices = invoices.map(inv => 
-          inv.id === invoice.id 
+        const updatedInvoices = invoices.map(inv =>
+          inv.id === invoice.id
             ? { ...inv, is_canceled: true, canceled_at: new Date().toISOString() }
-            : inv
+            : inv,
         );
         newMap.set(reservationId, updatedInvoices);
         return newMap;
       });
-      
+
       alert(`Faktura ${invoice.invoice_number} została anulowana.`);
     } catch (error) {
       console.error('Error canceling invoice:', error);
@@ -1023,19 +1026,19 @@ export default function PaymentsManagement() {
       const newMap = new Map(prev);
       // Create a new Set to ensure React detects the change
       const reservationItems = new Set(newMap.get(reservationId) || []);
-      
+
       if (reservationItems.has(itemId)) {
         reservationItems.delete(itemId);
       } else {
         reservationItems.add(itemId);
       }
-      
+
       if (reservationItems.size === 0) {
         newMap.delete(reservationId);
       } else {
         newMap.set(reservationId, reservationItems);
       }
-      
+
       return newMap;
     });
   };
@@ -1055,7 +1058,7 @@ export default function PaymentsManagement() {
   // Handle invoice generation
   const handleGenerateInvoice = async (reservation: ReservationPayment, e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     const selected = selectedItems.get(reservation.id);
     if (!selected || selected.size === 0) {
       alert('Proszę zaznaczyć przynajmniej jeden element płatności do faktury');
@@ -1064,14 +1067,14 @@ export default function PaymentsManagement() {
 
     try {
       setIsGeneratingInvoice(reservation.id);
-      
+
       // Get buyer tax number if available (from reservation invoice data)
       const buyerTaxNo = undefined; // TODO: Get from reservation if available
-      
+
       const invoice = await invoiceService.generateInvoice({
         reservation_id: reservation.id,
         selected_items: Array.from(selected),
-        buyer_tax_no: buyerTaxNo
+        buyer_tax_no: buyerTaxNo,
       });
 
       // Clear selected items for this reservation
@@ -1085,9 +1088,9 @@ export default function PaymentsManagement() {
       const reservationsData = await reservationService.listReservations(0, 1000);
       const paymentsData = await paymentService.listPayments(0, 1000);
       const mappedReservations = await Promise.all(
-        reservationsData.map(r => 
-          mapReservationToPaymentFormat(r, paymentsData, protectionsMap, addonsMap)
-        )
+        reservationsData.map(r =>
+          mapReservationToPaymentFormat(r, paymentsData, protectionsMap, addonsMap),
+        ),
       );
       setReservations(mappedReservations);
 
@@ -1106,7 +1109,7 @@ export default function PaymentsManagement() {
         console.error('Error downloading invoice PDF:', pdfError);
         // Still show success message even if PDF download fails
       }
-      
+
       alert(`Faktura ${invoice.invoice_number} została wygenerowana pomyślnie!`);
     } catch (error) {
       console.error('Error generating invoice:', error);
@@ -1117,7 +1120,7 @@ export default function PaymentsManagement() {
   };
 
   // Toggle payment item status (paid/unpaid, cannot toggle canceled)
-  const togglePaymentItem = (reservationId: number, itemId: string) => {
+  const _togglePaymentItem = (reservationId: number, itemId: string) => {
     setReservations(prev => {
       return prev.map(res => {
         if (res.id === reservationId) {
@@ -1203,7 +1206,7 @@ export default function PaymentsManagement() {
   };
 
   // Toggle all payments (mark all active items as paid/unpaid, skip canceled and returned)
-  const toggleAllPayments = (reservationId: number) => {
+  const _toggleAllPayments = (reservationId: number) => {
     setReservations(prev => {
       return prev.map(res => {
         if (res.id === reservationId) {
@@ -1250,7 +1253,7 @@ export default function PaymentsManagement() {
     const activeItems = reservation.paymentDetails.items.filter(item => item.status !== 'canceled' && item.status !== 'returned');
     const allPaid = activeItems.length > 0 && activeItems.every(item => item.status === 'paid');
     const hasCanceledItems = reservation.paymentDetails.items.some(item => item.status === 'canceled');
-    
+
     if (allPaid && reservation.paymentDetails.remainingAmount === 0 && !hasCanceledItems) {
       setReservations(prev => {
         return prev.map(res => {
@@ -1336,7 +1339,7 @@ export default function PaymentsManagement() {
     setIsSyncing(true);
     try {
       console.log('🔄 Ręczna synchronizacja wszystkich płatności...');
-      
+
       // Fetch payments again
       let paymentsData: PaymentResponse[] = [];
       try {
@@ -1347,17 +1350,17 @@ export default function PaymentsManagement() {
         setIsSyncing(false);
         return;
       }
-      
+
       // Find all pending payments
       const pendingPayments = paymentsData.filter(p => p.status === 'pending' && p.transaction_id);
       console.log(`Znaleziono ${pendingPayments.length} płatności do synchronizacji`);
-      
+
       if (pendingPayments.length === 0) {
         alert('Brak płatności do synchronizacji. Wszystkie płatności są już zsynchronizowane.');
         setIsSyncing(false);
         return;
       }
-      
+
       // Sync all pending payments
       const syncPromises = pendingPayments.map(async (payment) => {
         try {
@@ -1370,21 +1373,21 @@ export default function PaymentsManagement() {
           return null;
         }
       });
-      
+
       const syncedPayments = await Promise.allSettled(syncPromises);
       const successful = syncedPayments.filter(p => p.status === 'fulfilled' && p.value !== null).length;
       console.log(`✅ Zsynchronizowano ${successful} z ${pendingPayments.length} płatności`);
-      
+
       // Refresh data
       const reservationsData = await reservationService.listReservations(0, 1000);
       const updatedPayments = await paymentService.listPayments(0, 1000);
       const mappedReservations = await Promise.all(
-        reservationsData.map(reservation => 
-          mapReservationToPaymentFormat(reservation, updatedPayments, protectionsMap, addonsMap)
-        )
+        reservationsData.map(reservation =>
+          mapReservationToPaymentFormat(reservation, updatedPayments, protectionsMap, addonsMap),
+        ),
       );
       setReservations(mappedReservations);
-      
+
       alert(`Zsynchronizowano ${successful} z ${pendingPayments.length} płatności.`);
     } catch (err) {
       console.error('Błąd synchronizacji:', err);
@@ -1713,7 +1716,7 @@ export default function PaymentsManagement() {
                               month: '2-digit',
                               day: '2-digit',
                               hour: '2-digit',
-                              minute: '2-digit'
+                              minute: '2-digit',
                             })}
                           </span>
                         </td>
@@ -1800,13 +1803,13 @@ export default function PaymentsManagement() {
                                     const isPartiallyPaid = item.status === 'partially_paid';
                                     const isUnpaid = item.status === 'unpaid';
                                     const isReturned = item.status === 'returned';
-                                    
+
                                     return (
                                       <Fragment key={item.id}>
                                         <div
                                           className={`flex items-center justify-between p-3 rounded border ${
-                                            isCanceled 
-                                              ? 'bg-red-50 border-red-200' 
+                                            isCanceled
+                                              ? 'bg-red-50 border-red-200'
                                               : isReturned
                                               ? 'bg-purple-50 border-purple-200'
                                               : isPaid
@@ -1842,8 +1845,8 @@ export default function PaymentsManagement() {
                                             </div>
                                             <div className="flex-1">
                                               <p className={`text-sm font-medium ${
-                                                isCanceled ? 'text-red-700 line-through' : 
-                                                isReturned ? 'text-purple-700' : 
+                                                isCanceled ? 'text-red-700 line-through' :
+                                                isReturned ? 'text-purple-700' :
                                                 'text-gray-900'
                                               }`}>
                                                 {item.name}
@@ -1867,8 +1870,8 @@ export default function PaymentsManagement() {
                                           </div>
                                           <div className="flex items-center gap-4">
                                             <span className={`text-sm font-medium min-w-[80px] text-right ${
-                                              isCanceled ? 'text-red-600 line-through' : 
-                                              isReturned ? 'text-purple-600' : 
+                                              isCanceled ? 'text-red-600 line-through' :
+                                              isReturned ? 'text-purple-600' :
                                               'text-gray-900'
                                             }`}>
                                               {formatCurrency(item.amount)}
@@ -1900,7 +1903,7 @@ export default function PaymentsManagement() {
                                                   Nieopłacone
                                                 </span>
                                               )}
-                                              
+
                                               {/* Refund Button (only for paid items) */}
                                               {isPaid && (
                                                 <button
@@ -1912,7 +1915,7 @@ export default function PaymentsManagement() {
                                                   <RotateCcw className="w-4 h-4" />
                                                 </button>
                                               )}
-                                              
+
                                               {/* Cancel Button (only for unpaid items, not for paid or returned) */}
                                               {isUnpaid && (
                                                 <button
@@ -1924,7 +1927,7 @@ export default function PaymentsManagement() {
                                                   <XCircle className="w-4 h-4" />
                                                 </button>
                                               )}
-                                              
+
                                             </div>
                                           </div>
                                         </div>
@@ -1934,7 +1937,7 @@ export default function PaymentsManagement() {
                                             {item.installments.map((installment) => {
                                               // Check if this is deposit (number === 0)
                                               const isDeposit = installment.number === 0;
-                                              
+
                                               return (
                                                 <div
                                                   key={`installment-${installment.number}`}
@@ -2035,7 +2038,7 @@ export default function PaymentsManagement() {
                                         )}
                                       </button>
                                     )}
-                                    
+
                                     {/* View Invoice Button */}
                                     {reservation.paymentDetails.invoiceLink && (
                                       <button
@@ -2071,7 +2074,7 @@ export default function PaymentsManagement() {
                                         Ręczne potwierdzenie płatności
                                       </button>
                                     )}
-                                    
+
                                     {/* Warning if there are canceled items */}
                                     {hasCanceledItems && (
                                       <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs">
@@ -2085,7 +2088,7 @@ export default function PaymentsManagement() {
                                 {/* Invoices Section */}
                                 <div className="mt-6 pt-4 border-t border-gray-200">
                                   <h4 className="text-sm font-semibold text-gray-900 mb-3">Faktury dla tej rezerwacji</h4>
-                                  
+
                                   {loadingInvoices.has(reservation.id) ? (
                                     <div className="text-center py-4">
                                       <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#03adf0]"></div>
@@ -2094,7 +2097,7 @@ export default function PaymentsManagement() {
                                   ) : (
                                     (() => {
                                       const invoices = reservationInvoices.get(reservation.id) || [];
-                                      
+
                                       if (invoices.length === 0) {
                                         return (
                                           <div className="bg-gray-50 rounded-lg p-4 text-center">
@@ -2102,7 +2105,7 @@ export default function PaymentsManagement() {
                                           </div>
                                         );
                                       }
-                                      
+
                                       return (
                                         <div className="space-y-2">
                                           {invoices.map((invoice) => (
@@ -2118,8 +2121,8 @@ export default function PaymentsManagement() {
                                             >
                                               <div className="flex items-center gap-3 flex-1">
                                                 <FileText className={`w-4 h-4 ${
-                                                  invoice.is_canceled ? 'text-red-600' : 
-                                                  invoice.is_paid ? 'text-green-600' : 
+                                                  invoice.is_canceled ? 'text-red-600' :
+                                                  invoice.is_paid ? 'text-green-600' :
                                                   'text-gray-600'
                                                 }`} />
                                                 <div className="flex-1">
@@ -2154,7 +2157,7 @@ export default function PaymentsManagement() {
                                                     Nieopłacona
                                                   </span>
                                                 )}
-                                                
+
                                                 {!invoice.is_canceled && (
                                                   <>
                                                     <button

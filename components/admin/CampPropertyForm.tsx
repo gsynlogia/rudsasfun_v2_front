@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { X, Save, Calendar, MapPin } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import type { CampProperty } from '@/types/reservation';
 import { API_BASE_URL } from '@/utils/api-config';
 
@@ -22,7 +23,7 @@ export default function CampPropertyForm({
   onSuccess,
   onCancel,
 }: CampPropertyFormProps) {
-  const [period, setPeriod] = useState<'lato' | 'zima'>('lato');
+  const [_period, setPeriod] = useState<'lato' | 'zima'>('lato');
   const [city, setCity] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -32,10 +33,10 @@ export default function CampPropertyForm({
   const [error, setError] = useState<string | null>(null);
 
   const isEditMode = property !== null;
-  
+
   // Get today's date in YYYY-MM-DD format for min date
   const today = new Date().toISOString().split('T')[0];
-  
+
   // Calculate minimum end date (start date + 1 day)
   const getMinEndDate = () => {
     if (!startDate) return today;

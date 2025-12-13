@@ -1,7 +1,7 @@
 'use client';
 
-import HeaderTop from './HeaderTop';
 import HeaderSecondary from './HeaderSecondary';
+import HeaderTop from './HeaderTop';
 
 /**
  * Header Component

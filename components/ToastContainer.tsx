@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+
 import Toast, { Toast as ToastType } from './Toast';
 
 interface ToastContextType {
@@ -44,35 +45,35 @@ export function ToastProvider({ children }: ToastProviderProps) {
 
       setToasts((prev) => [...prev, newToast]);
     },
-    []
+    [],
   );
 
   const showSuccess = useCallback(
     (message: string, duration?: number) => {
       showToast(message, 'success', duration);
     },
-    [showToast]
+    [showToast],
   );
 
   const showWarning = useCallback(
     (message: string, duration?: number) => {
       showToast(message, 'warning', duration);
     },
-    [showToast]
+    [showToast],
   );
 
   const showError = useCallback(
     (message: string, duration?: number) => {
       showToast(message, 'error', duration);
     },
-    [showToast]
+    [showToast],
   );
 
   const showInfo = useCallback(
     (message: string, duration?: number) => {
       showToast(message, 'info', duration);
     },
-    [showToast]
+    [showToast],
   );
 
   return (
@@ -89,11 +90,4 @@ export function ToastProvider({ children }: ToastProviderProps) {
     </ToastContext.Provider>
   );
 }
-
-
-
-
-
-
-
 

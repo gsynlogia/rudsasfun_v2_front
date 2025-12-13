@@ -1,12 +1,12 @@
 /**
  * API Configuration
  * Automatically detects environment (localhost vs production) and sets correct API URL
- * 
+ *
  * Priority order (Next.js loads .env files in this order):
  * 1. .env.local (highest priority, not committed to git) - for local development
  * 2. .env.development / .env.production (based on NODE_ENV)
  * 3. .env (lowest priority, committed to git) - for production defaults
- * 
+ *
  * Rules:
  * 1. If NEXT_PUBLIC_API_URL is set in environment, use it (highest priority)
  *    - .env.local overrides .env for local development
@@ -29,35 +29,35 @@ export function getApiBaseUrl(): string {
     // - .env should contain: NEXT_PUBLIC_API_URL=https://rejestracja.radsasfun.system-app.pl
   if (process.env.NEXT_PUBLIC_API_URL) {
     let url = process.env.NEXT_PUBLIC_API_URL;
-    
+
     // Force HTTPS for production domains to prevent Mixed Content errors
     if (url.includes('rejestracja.radsasfun.system-app.pl') && url.startsWith('http://')) {
       url = url.replace('http://', 'https://');
     }
-    
+
     return url;
   }
 
   // Auto-detect environment based on window.location (client-side only)
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
+    const { hostname } = window.location;
+
     // Localhost detection - use local API only if explicitly set
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       // Only use localhost if explicitly set in env, otherwise use production
       return process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
     }
-    
+
     // Production domains - use production API
     if (hostname.includes('rejestracja.radsasfun.system-app.pl')) {
       return 'https://rejestracja.radsasfun.system-app.pl';
     }
-    
+
     // Vercel preview deployments - use production API
     if (hostname.includes('vercel.app')) {
       return 'https://rejestracja.radsasfun.system-app.pl';
     }
-    
+
     // Any other production domain - use production API
     return 'https://rejestracja.radsasfun.system-app.pl';
   }
@@ -88,10 +88,10 @@ export function getApiBaseUrlRuntime(): string {
  * Get API base URL (exported constant)
  * Note: In Next.js, this is evaluated at build time for server components
  * For client components, this uses runtime detection
- * 
+ *
  * IMPORTANT: Always defaults to production API to prevent CORS errors on Vercel
  */
-export const API_BASE_URL = typeof window !== 'undefined' 
+export const API_BASE_URL = typeof window !== 'undefined'
   ? getApiBaseUrl() // Client-side: calculate at runtime (will detect Vercel and use production)
   : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl'); // Server-side: use env var or production default
 
@@ -106,30 +106,30 @@ export function getStaticAssetUrl(iconUrl: string | null | undefined): string | 
   if (!iconUrl) {
     return undefined;
   }
-  
+
   // If already a full URL (http:// or https://), return as-is
   if (iconUrl.startsWith('http://') || iconUrl.startsWith('https://')) {
     return iconUrl;
   }
-  
+
   const baseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl');
-  
+
   // If relative path starting with /, prepend API_BASE_URL (already has /static/ if needed)
   if (iconUrl.startsWith('/')) {
     // Remove double slashes (e.g., //static -> /static)
     const cleanPath = iconUrl.replace(/^\/+/, '/');
     return `${baseUrl}${cleanPath}`;
   }
-  
+
   // If relative path without leading /, check if it already contains static/
   // Backend might return "diet-icons/..." or "static/diet-icons/..."
   let cleanPath = iconUrl;
-  
+
   // Remove leading static/ if present (to avoid double /static/static/)
   if (cleanPath.startsWith('static/')) {
     cleanPath = cleanPath.replace(/^static\//, '');
   }
-  
+
   // Add /static/ prefix and prepend API_BASE_URL
   return `${baseUrl}/static/${cleanPath}`;
 }

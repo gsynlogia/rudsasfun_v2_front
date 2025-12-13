@@ -1,22 +1,23 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { ReservationProvider } from "@/context/ReservationContext";
-import { ToastProvider } from "@/components/ToastContainer";
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+
+import './globals.css';
+import { ToastProvider } from '@/components/ToastContainer';
+import { ReservationProvider } from '@/context/ReservationContext';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: "RADSASfun",
-  description: "System rezerwacji obozów i wycieczek RADSASfun",
+  title: 'RADSASfun',
+  description: 'System rezerwacji obozów i wycieczek RADSASfun',
 };
 
 export default function RootLayout({

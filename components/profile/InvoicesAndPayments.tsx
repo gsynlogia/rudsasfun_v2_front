@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { FileText, Download, CheckCircle, XCircle, Calendar, CreditCard, Loader2 } from 'lucide-react';
-import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
+import { useEffect, useState } from 'react';
+
 import { contractService } from '@/lib/services/ContractService';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
+import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 
 interface Document {
   id: string;
@@ -45,21 +46,21 @@ export default function InvoicesAndPayments() {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         // Get user's invoices
         const invoicesResponse = await invoiceService.getMyInvoices();
-        
+
         // Get reservations to match with invoices
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
         const reservationsMap = new Map(reservations.map(r => [r.id, r]));
-        
+
         // Map invoices to documents
         const documentsList: Document[] = invoicesResponse.invoices.map((invoice: InvoiceResponse) => {
           const reservation = reservationsMap.get(invoice.reservation_id);
-          const participantName = reservation 
+          const participantName = reservation
             ? `${reservation.participant_first_name || ''} ${reservation.participant_last_name || ''}`.trim()
             : '';
-          
+
           return {
             id: `invoice-${invoice.id}`,
             type: 'invoice' as const,
@@ -72,9 +73,9 @@ export default function InvoicesAndPayments() {
             status: 'available' as const, // Invoices are always available
           };
         });
-        
+
         setDocuments(documentsList);
-        
+
         // Load payments from reservations (for now, keep empty - payments are shown separately)
         setPayments([]);
       } catch (err) {
@@ -110,7 +111,7 @@ export default function InvoicesAndPayments() {
         // Extract invoice ID from doc.id (format: "invoice-{id}")
         const invoiceId = parseInt(doc.id.replace('invoice-', ''));
         const blob = await invoiceService.downloadInvoice(invoiceId);
-        
+
         // Create download link
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -189,7 +190,7 @@ export default function InvoicesAndPayments() {
         <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">
           Faktury
         </h3>
-        
+
         {documents.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
@@ -279,7 +280,7 @@ export default function InvoicesAndPayments() {
           <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">
             Historia płatności
           </h3>
-          
+
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -341,6 +342,4 @@ export default function InvoicesAndPayments() {
     </div>
   );
 }
-
-
 

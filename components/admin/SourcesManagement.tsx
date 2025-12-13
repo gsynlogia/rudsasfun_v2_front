@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import { FileText, Plus, Search, Edit, Trash2, Power, PowerOff, Save, GripVertical } from 'lucide-react';
-import UniversalModal from './UniversalModal';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
+import { useState, useEffect, useCallback } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
+
+import DeleteConfirmationModal from './DeleteConfirmationModal';
+import UniversalModal from './UniversalModal';
+
 
 interface Source {
   id: number;
@@ -38,7 +41,7 @@ export default function SourcesManagement() {
       setLoading(true);
       setError(null);
       const data = await authenticatedApiCall<{ sources: Source[]; total: number }>(
-        '/api/sources/?include_inactive=true'
+        '/api/sources/?include_inactive=true',
       );
       // Sort by display_order
       const sorted = (data.sources || []).sort((a, b) => a.display_order - b.display_order);
@@ -138,11 +141,11 @@ export default function SourcesManagement() {
     try {
       setSaving(true);
       setError(null);
-      
-      const response = await authenticatedApiCall(`/api/sources/${selectedSource.id}`, {
+
+      const _response = await authenticatedApiCall(`/api/sources/${selectedSource.id}`, {
         method: 'DELETE',
       });
-      
+
       // DELETE should return 204 No Content, so response might be empty
       // If we get here without error, deletion was successful
       await fetchSources();
@@ -422,7 +425,7 @@ export default function SourcesManagement() {
                   disabled={saving}
                 />
                 <span className="text-sm text-gray-700">
-                  To opcja "Inne" (wymaga dodatkowego pola tekstowego)
+                  To opcja &quot;Inne&quot; (wymaga dodatkowego pola tekstowego)
                 </span>
               </label>
             </div>

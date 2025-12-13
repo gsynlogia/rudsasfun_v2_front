@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
-import Link from 'next/link';
 
 export default function ProtectionsPage() {
   return (
@@ -10,7 +11,7 @@ export default function ProtectionsPage() {
       <AdminLayout>
         <div className="p-6">
           <h1 className="text-2xl font-bold mb-6">Zarządzanie ochronami</h1>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Link
               href="/admin-panel/protections/general"
@@ -21,7 +22,7 @@ export default function ProtectionsPage() {
                 Zarządzaj ochronami ogólnymi dostępnymi dla wszystkich obozów
               </p>
             </Link>
-            
+
             <Link
               href="/admin-panel/protections/center"
               className="block p-6 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"

@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
 import { Info, Check } from 'lucide-react';
+import Image from 'next/image';
+import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
+import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 interface Protection {
   id: number;
@@ -27,7 +29,7 @@ interface Protection {
  * NOTE: Multiple selection allowed (checkboxes), NO justification required
  */
 export default function ProtectionsSection() {
-  const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
+  const { reservation: _reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
   const [protections, setProtections] = useState<Protection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,12 +43,12 @@ export default function ProtectionsSection() {
     const campIdIndex = pathParts.indexOf('camps');
     if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
       const campId = parseInt(pathParts[campIdIndex + 1], 10);
-      const propertyId = campIdIndex + 3 < pathParts.length 
-        ? parseInt(pathParts[campIdIndex + 3], 10) 
+      const propertyId = campIdIndex + 3 < pathParts.length
+        ? parseInt(pathParts[campIdIndex + 3], 10)
         : null;
-      return { 
-        campId: !isNaN(campId) ? campId : null, 
-        propertyId: propertyId && !isNaN(propertyId) ? propertyId : null 
+      return {
+        campId: !isNaN(campId) ? campId : null,
+        propertyId: propertyId && !isNaN(propertyId) ? propertyId : null,
       };
     }
     return { campId: null, propertyId: null };
@@ -56,7 +58,7 @@ export default function ProtectionsSection() {
   useEffect(() => {
     const fetchProtections = async () => {
       const { campId, propertyId } = getCampIds();
-      
+
       if (!campId || !propertyId) {
         setProtections([]);
         setLoading(false);
@@ -66,12 +68,12 @@ export default function ProtectionsSection() {
       try {
         setLoading(true);
         setError(null);
-        
+
         // FIRST PRIORITY: Fetch protections assigned to this turnus
         const turnusProtectionsResponse = await fetch(
-          `${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/protections`
+          `${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/protections`,
         );
-        
+
         if (!turnusProtectionsResponse.ok) {
           if (turnusProtectionsResponse.status === 404) {
             // No turnus protections - fallback to general protections
@@ -95,15 +97,15 @@ export default function ProtectionsSection() {
           }
           throw new Error(`HTTP error! status: ${turnusProtectionsResponse.status}`);
         }
-        
+
         const turnusProtections = await turnusProtectionsResponse.json();
         const protectionsList = Array.isArray(turnusProtections) ? turnusProtections : [];
-        
+
         // Check if all protections are placeholders without relations
         const hasOnlyCenterProtectionsWithoutRelations = protectionsList.every(
-          (tp: any) => tp.has_no_relations === true
+          (tp: any) => tp.has_no_relations === true,
         );
-        
+
         if (hasOnlyCenterProtectionsWithoutRelations || protectionsList.length === 0) {
           // Fallback to general protections
           const generalProtectionsResponse = await fetch(`${API_BASE_URL}/api/general-protections/public`);
@@ -135,7 +137,7 @@ export default function ProtectionsSection() {
               is_center_protection_relation: tp.is_center_protection_relation || false,
             })));
         }
-        
+
         console.log('[ProtectionsSection] Fetched protections:', protectionsList.length, protectionsList);
       } catch (err) {
         console.error('[ProtectionsSection] Error fetching protections:', err);
@@ -154,8 +156,8 @@ export default function ProtectionsSection() {
     const savedData = loadStep2FormData();
     if (savedData && savedData.selectedProtectionIds && Array.isArray(savedData.selectedProtectionIds)) {
       // Verify that selected protections exist in fetched protections
-      const validIds = savedData.selectedProtectionIds.filter((id: number) => 
-        protections.some((p: Protection) => p.id === id)
+      const validIds = savedData.selectedProtectionIds.filter((id: number) =>
+        protections.some((p: Protection) => p.id === id),
       );
       setSelectedProtectionIds(validIds);
     }
@@ -168,7 +170,7 @@ export default function ProtectionsSection() {
 
     // Remove all previous protection items
     removeReservationItemsByType('protection');
-    
+
     if (selectedProtectionIds.length > 0 && protections.length > 0) {
       // Add all selected protections with predictable IDs
       selectedProtectionIds.forEach((protectionId) => {
@@ -184,7 +186,7 @@ export default function ProtectionsSection() {
         }
       });
     }
-    
+
     // Save to sessionStorage
     const savedData = loadStep2FormData();
     if (savedData) {
@@ -233,7 +235,7 @@ export default function ProtectionsSection() {
             <div className="flex flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">
               {activeProtections.map((protection) => {
                 const isSelected = selectedProtectionIds.includes(protection.id);  // MULTIPLE SELECTION
-                
+
                 return (
                   <div key={protection.id} className="relative">
                     <button
@@ -247,22 +249,25 @@ export default function ProtectionsSection() {
                       {/* Icon display */}
                       {protection.icon_url ? (
                         <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center flex-shrink-0">
-                          <img
+                          <Image
                             src={getStaticAssetUrl(protection.icon_url) || ''}
                             alt={protection.name}
-                            className={`w-full h-full object-contain max-w-full max-h-full ${
+                            width={48}
+                            height={48}
+                            className={`object-contain max-w-full max-h-full ${
                               isSelected ? 'brightness-0 invert' : ''
                             }`}
-                            style={{ 
-                              filter: isSelected ? 'brightness(0) invert(1)' : 'none'
+                            unoptimized
+                            style={{
+                              filter: isSelected ? 'brightness(0) invert(1)' : 'none',
                             }}
                           />
                         </div>
                       ) : protection.icon_svg ? (
-                        <div 
+                        <div
                           className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center flex-shrink-0 overflow-hidden"
-                          style={{ 
-                            filter: isSelected ? 'brightness(0) invert(1)' : 'none'
+                          style={{
+                            filter: isSelected ? 'brightness(0) invert(1)' : 'none',
                           }}
                           dangerouslySetInnerHTML={{
                             __html: protection.icon_svg.replace(
@@ -272,12 +277,12 @@ export default function ProtectionsSection() {
                                 attrs = attrs.replace(/\s*(width|height|style)=["'][^"']*["']/gi, '');
                                 // Add fixed size and contain behavior
                                 return `<svg${attrs} width="100%" height="100%" style="max-width: 100%; max-height: 100%; object-fit: contain;">`;
-                              }
-                            )
+                              },
+                            ),
                           }}
                         />
                       ) : null}
-                      
+
                       {/* Name and price */}
                       <span className={`text-xs sm:text-sm font-medium text-center ${
                         isSelected ? 'text-white' : 'text-gray-600'

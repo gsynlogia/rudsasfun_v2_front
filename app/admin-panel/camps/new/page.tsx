@@ -1,9 +1,10 @@
 'use client';
 
+import { ArrowLeft, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
-import { ArrowLeft, Save } from 'lucide-react';
 
 export default function CampNewPage() {
   const router = useRouter();

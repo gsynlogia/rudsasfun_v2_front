@@ -1,10 +1,12 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
-import HeaderTop from '../HeaderTop';
-import Footer from '../Footer';
-import ProfileSidebar from './ProfileSidebar';
 import { Menu, X } from 'lucide-react';
+import { ReactNode, useState } from 'react';
+
+import Footer from '../Footer';
+import HeaderTop from '../HeaderTop';
+
+import ProfileSidebar from './ProfileSidebar';
 
 interface ProfileLayoutProps {
   children: ReactNode;
@@ -22,7 +24,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
     <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
       {/* Top Bar - Existing component */}
       <HeaderTop />
-      
+
       {/* Main Content Area with Sidebar */}
       <main className="max-w-container mx-auto px-[60px] py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Mobile Menu Button */}
@@ -62,14 +64,14 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
           <div className="hidden lg:block flex-shrink-0 lg:w-[400px]">
             <ProfileSidebar />
           </div>
-          
+
           {/* Right Content Area - narrower to make room for wider sidebar */}
           <div className="flex-1 w-full lg:pl-6">
             {children}
           </div>
         </div>
       </main>
-      
+
       {/* Footer - Existing component */}
       <Footer />
     </div>

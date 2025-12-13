@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface GeneralPromotionRelation {
@@ -42,7 +43,7 @@ export default function CenterPromotionsManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<CenterPromotion | null>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Form state
   const [promotionName, setPromotionName] = useState('');
   const [selectedGeneralPromotionIds, setSelectedGeneralPromotionIds] = useState<number[]>([]);
@@ -94,7 +95,7 @@ export default function CenterPromotionsManagement() {
     setSelectedPromotion(promotion);
     setPromotionName(promotion.name);
     setPromotionDescription(promotion.description || '');
-    
+
     // Set selected general promotions and their prices
     const selectedIds: number[] = [];
     const prices: Record<number, number> = {};
@@ -104,7 +105,7 @@ export default function CenterPromotionsManagement() {
     });
     setSelectedGeneralPromotionIds(selectedIds);
     setGeneralPromotionPrices(prices);
-    
+
     setShowEditModal(true);
   };
 
@@ -121,7 +122,7 @@ export default function CenterPromotionsManagement() {
       // Build general promotions list with prices
       const generalPromotionsList = selectedGeneralPromotionIds.map(generalPromotionId => ({
         general_promotion_id: generalPromotionId,
-        price: Number(generalPromotionPrices[generalPromotionId]) || 0  // Can be negative
+        price: Number(generalPromotionPrices[generalPromotionId]) || 0,  // Can be negative
       }));
 
       const promotionData = {
@@ -217,7 +218,7 @@ export default function CenterPromotionsManagement() {
             {promotions.length === 0 ? (
               <tr>
                 <td colSpan={3} className="px-6 py-8 text-center text-sm text-gray-500">
-                  Brak promocji dla ośrodków. Kliknij "Dodaj promocję", aby utworzyć nową.
+                  Brak promocji dla ośrodków. Kliknij &quot;Dodaj promocję&quot;, aby utworzyć nową.
                 </td>
               </tr>
             ) : (
@@ -229,10 +230,10 @@ export default function CenterPromotionsManagement() {
                     <ul className="list-disc list-inside">
                       {promotion.general_promotions.map((rel) => (
                         <li key={rel.id}>
-                          {rel.general_promotion_name} - {rel.price < 0 
-                            ? `${rel.price.toFixed(2)} PLN` 
-                            : rel.price > 0 
-                              ? `+${rel.price.toFixed(2)} PLN` 
+                          {rel.general_promotion_name} - {rel.price < 0
+                            ? `${rel.price.toFixed(2)} PLN`
+                            : rel.price > 0
+                              ? `+${rel.price.toFixed(2)} PLN`
                               : '0.00 PLN'
                           }
                         </li>
@@ -330,7 +331,7 @@ export default function CenterPromotionsManagement() {
                                 setSelectedGeneralPromotionIds([...selectedGeneralPromotionIds, gp.id]);
                                 setGeneralPromotionPrices({
                                   ...generalPromotionPrices,
-                                  [gp.id]: gp.price  // Prefill with general promotion's price
+                                  [gp.id]: gp.price,  // Prefill with general promotion's price
                                 });
                               } else {
                                 setSelectedGeneralPromotionIds(selectedGeneralPromotionIds.filter(id => id !== gp.id));
@@ -342,10 +343,10 @@ export default function CenterPromotionsManagement() {
                             className="w-4 h-4"
                           />
                           <label className="flex-1 text-sm">
-                            {gp.display_name} (cena referencyjna: {gp.price < 0 
-                              ? `${gp.price.toFixed(2)} PLN` 
-                              : gp.price > 0 
-                                ? `+${gp.price.toFixed(2)} PLN` 
+                            {gp.display_name} (cena referencyjna: {gp.price < 0
+                              ? `${gp.price.toFixed(2)} PLN`
+                              : gp.price > 0
+                                ? `+${gp.price.toFixed(2)} PLN`
                                 : '0.00 PLN'
                             })
                           </label>
@@ -376,7 +377,7 @@ export default function CenterPromotionsManagement() {
                               const price = e.target.value ? parseFloat(e.target.value) : generalPromotion.price;
                               setGeneralPromotionPrices({
                                 ...generalPromotionPrices,
-                                [generalPromotionId]: price  // Can be negative
+                                [generalPromotionId]: price,  // Can be negative
                               });
                             }}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
@@ -439,10 +440,4 @@ export default function CenterPromotionsManagement() {
     </div>
   );
 }
-
-
-
-
-
-
 

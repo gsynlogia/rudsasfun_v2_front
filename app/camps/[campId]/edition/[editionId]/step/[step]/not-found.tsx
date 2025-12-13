@@ -23,19 +23,19 @@ export default function NotFound() {
             />
           </svg>
         </div>
-        
+
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
           Nie znaleziono obozu lub edycji
         </h1>
-        
+
         <p className="text-lg text-gray-600 mb-2">
           Przepraszamy, ale żądany obóz lub edycja nie istnieje.
         </p>
-        
+
         <p className="text-sm text-gray-500 mb-8">
           Sprawdź, czy adres URL jest poprawny lub wybierz inny obóz z listy dostępnych.
         </p>
-        
+
         <div className="space-y-4">
           <Link
             href="/"
@@ -48,15 +48,4 @@ export default function NotFound() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 

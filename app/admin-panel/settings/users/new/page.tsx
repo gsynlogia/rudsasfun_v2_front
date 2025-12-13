@@ -1,10 +1,11 @@
 'use client';
 
-import AdminLayout from '@/components/admin/AdminLayout';
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
+import AdminLayout from '@/components/admin/AdminLayout';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface Group {
@@ -16,7 +17,7 @@ interface Group {
 /**
  * Admin Panel - Add User Page
  * Route: /admin-panel/settings/users/new
- * 
+ *
  * Separate page for adding new user with group assignment
  */
 export default function AddUserPage() {
@@ -63,7 +64,7 @@ export default function AddUserPage() {
             login: formData.login,
             password: formData.password,
           }),
-        }
+        },
       );
 
       // Assign user to selected groups
@@ -80,7 +81,7 @@ export default function AddUserPage() {
                 body: JSON.stringify({
                   user_ids: [newUser.id],
                 }),
-              }
+              },
             );
           } catch (err) {
             console.error(`Error assigning user to group ${groupId}:`, err);

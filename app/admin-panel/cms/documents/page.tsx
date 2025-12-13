@@ -1,8 +1,8 @@
 'use client';
 
 import AdminLayout from '@/components/admin/AdminLayout';
-import SectionGuard from '@/components/admin/SectionGuard';
 import DocumentsManagement from '@/components/admin/DocumentsManagement';
+import SectionGuard from '@/components/admin/SectionGuard';
 
 export default function DocumentsPage() {
   return (

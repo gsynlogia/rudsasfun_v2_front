@@ -2,10 +2,10 @@
  * Authentication Service
  * Singleton service for managing JWT tokens and authentication state
  */
-import { API_BASE_URL } from '@/utils/api-config';
 import { LoginRequest } from '@/types/loginRequest';
 import { LoginResponse } from '@/types/loginResponse';
 import { User } from '@/types/user';
+import { API_BASE_URL } from '@/utils/api-config';
 
 export type { LoginRequest, LoginResponse, User };
 
@@ -41,7 +41,7 @@ class AuthService {
     }
 
     const data: LoginResponse = await response.json();
-    
+
     // Store token and user info
     if (typeof window !== 'undefined') {
       localStorage.setItem(this.tokenKey, data.access_token);
@@ -58,7 +58,7 @@ class AuthService {
    */
   async logout(): Promise<void> {
     const token = this.getToken();
-    
+
     // Call backend logout endpoint if token exists (optional, for logging)
     if (token) {
       try {
@@ -74,7 +74,7 @@ class AuthService {
         // Ignore errors
       }
     }
-    
+
     // Clear local storage
     if (typeof window !== 'undefined') {
       localStorage.removeItem(this.tokenKey);
@@ -142,7 +142,7 @@ class AuthService {
   /**
    * Get authorization header for API requests
    */
-  getAuthHeader(): { Authorization: string } | {} {
+  getAuthHeader(): { Authorization: string } | Record<string, never> {
     const token = this.getToken();
     if (!token) return {};
     return { Authorization: `Bearer ${token}` };
@@ -168,7 +168,7 @@ class AuthService {
       }
 
       const user: User = await response.json();
-      
+
       // Update stored user info
       if (typeof window !== 'undefined') {
         localStorage.setItem(this.userKey, JSON.stringify(user));
@@ -184,5 +184,4 @@ class AuthService {
 
 // Export singleton instance
 export const authService = AuthService.getInstance();
-
 

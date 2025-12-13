@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { usePathname } from 'next/navigation';
 import { AlertTriangle, Download, FileText, MapPin } from 'lucide-react';
-import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
-import { authenticatedApiCall } from '@/utils/api-auth';
-import { useReservation } from '@/context/ReservationContext';
+import { usePathname } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
+
 import UniversalModal from '@/components/admin/UniversalModal';
+import { useReservation } from '@/context/ReservationContext';
+import { authenticatedApiCall } from '@/utils/api-auth';
+import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 
@@ -23,16 +24,16 @@ interface TransportCity {
  */
 export default function TransportSection() {
   const pathname = usePathname();
-  const { addReservationItem, removeReservationItemsByType, reservation } = useReservation();
-  
+  const { addReservationItem, removeReservationItemsByType, reservation: _reservation } = useReservation();
+
   // Extract campId and editionId from URL
   const pathParts = pathname.split('/').filter(Boolean);
   const campIdIndex = pathParts.indexOf('camps');
-  const campId = campIdIndex !== -1 && campIdIndex + 1 < pathParts.length 
-    ? parseInt(pathParts[campIdIndex + 1], 10) 
+  const campId = campIdIndex !== -1 && campIdIndex + 1 < pathParts.length
+    ? parseInt(pathParts[campIdIndex + 1], 10)
     : null;
-  const editionId = campIdIndex !== -1 && campIdIndex + 3 < pathParts.length 
-    ? parseInt(pathParts[campIdIndex + 3], 10) 
+  const editionId = campIdIndex !== -1 && campIdIndex + 3 < pathParts.length
+    ? parseInt(pathParts[campIdIndex + 3], 10)
     : null;
 
   const [transportData, setTransportData] = useState({
@@ -116,22 +117,22 @@ export default function TransportSection() {
   useEffect(() => {
     const checkTransportAndFetchCities = async () => {
       if (!campId || !editionId) return;
-      
+
       // First, check if transport exists for this turnus
       try {
         const transportResponse = await authenticatedApiCall<any>(
-          `${API_BASE_URL}/api/camps/${campId}/properties/${editionId}/transport`
+          `${API_BASE_URL}/api/camps/${campId}/properties/${editionId}/transport`,
         );
-        
+
         if (transportResponse && transportResponse.id) {
           setHasTransport(true);
-          
+
           // If collective transport is selected, fetch cities
           if (transportData.departureType === 'zbiorowy' || transportData.returnType === 'zbiorowy') {
             setLoadingCities(true);
             try {
               const citiesResponse = await authenticatedApiCall<TransportCity[]>(
-                `${API_BASE_URL}/api/camps/${campId}/properties/${editionId}/transport/cities`
+                `${API_BASE_URL}/api/camps/${campId}/properties/${editionId}/transport/cities`,
               );
               setCities(citiesResponse || []);
             } catch (error) {
@@ -180,10 +181,10 @@ export default function TransportSection() {
 
   // Check for different cities and show modal immediately when different cities are selected
   useEffect(() => {
-    const citiesDifferent = 
-      transportData.departureType === 'zbiorowy' && 
+    const citiesDifferent =
+      transportData.departureType === 'zbiorowy' &&
       transportData.returnType === 'zbiorowy' &&
-      transportData.departureCity && 
+      transportData.departureCity &&
       transportData.returnCity &&
       transportData.departureCity !== transportData.returnCity;
 
@@ -196,13 +197,13 @@ export default function TransportSection() {
 
   // Update differentCities flag in transportData when cities change
   useEffect(() => {
-    const citiesDifferent: boolean = 
-      transportData.departureType === 'zbiorowy' && 
+    const citiesDifferent: boolean =
+      transportData.departureType === 'zbiorowy' &&
       transportData.returnType === 'zbiorowy' &&
-      !!transportData.departureCity && 
+      !!transportData.departureCity &&
       !!transportData.returnCity &&
       transportData.departureCity !== transportData.returnCity;
-    
+
     if (transportData.differentCities !== citiesDifferent) {
       setTransportData(prev => ({ ...prev, differentCities: citiesDifferent }));
     }
@@ -226,14 +227,14 @@ export default function TransportSection() {
     if (maxPrice > 0) {
       const departureCityName = cities.find(c => c.city === transportData.departureCity)?.city || transportData.departureCity;
       const returnCityName = cities.find(c => c.city === transportData.returnCity)?.city || transportData.returnCity;
-      
-      const citiesDifferent = 
-        transportData.departureType === 'zbiorowy' && 
+
+      const citiesDifferent =
+        transportData.departureType === 'zbiorowy' &&
         transportData.returnType === 'zbiorowy' &&
-        transportData.departureCity && 
+        transportData.departureCity &&
         transportData.returnCity &&
         transportData.departureCity !== transportData.returnCity;
-      
+
       let transportName = 'Transport';
       if (citiesDifferent) {
         transportName = `Transport zbiórkowy: ${departureCityName} (wyjazd), ${returnCityName} (powrót)`;
@@ -255,13 +256,13 @@ export default function TransportSection() {
   useEffect(() => {
     const savedData = loadStep2FormData();
     // Ensure differentCities is set correctly
-    const citiesDifferent = 
-      transportData.departureType === 'zbiorowy' && 
+    const citiesDifferent =
+      transportData.departureType === 'zbiorowy' &&
       transportData.returnType === 'zbiorowy' &&
-      transportData.departureCity && 
+      transportData.departureCity &&
       transportData.returnCity &&
       transportData.departureCity !== transportData.returnCity;
-    
+
     const formData = {
       ...savedData,
       transportData: {
@@ -307,10 +308,10 @@ export default function TransportSection() {
     }
 
     // Check if different cities are selected and modal needs to be confirmed
-    const citiesDifferent = 
-      transportData.departureType === 'zbiorowy' && 
+    const citiesDifferent =
+      transportData.departureType === 'zbiorowy' &&
       transportData.returnType === 'zbiorowy' &&
-      transportData.departureCity && 
+      transportData.departureCity &&
       transportData.returnCity &&
       transportData.departureCity !== transportData.returnCity;
 
@@ -353,18 +354,18 @@ export default function TransportSection() {
     if (cities.length === 0) {
       return [{ value: '', label: 'Wybierz miasto' }];
     }
-    
+
     const options = [{ value: '', label: 'Wybierz miasto' }];
-    
+
     // Sort cities alphabetically by city name
     const sortedCities = [...cities].sort((a, b) => {
       return a.city.localeCompare(b.city, 'pl', { sensitivity: 'base' });
     });
-    
+
     sortedCities.forEach(city => {
       options.push({ value: city.city, label: city.city });
     });
-    
+
     return options;
   };
 
@@ -412,7 +413,7 @@ export default function TransportSection() {
             </div>
           </div>
         )}
-        
+
         {/* All sections below are only visible when transport is assigned */}
         {hasTransport === true && (
           <>
@@ -590,7 +591,7 @@ export default function TransportSection() {
                   {/* Always show only the higher price, never the lower one */}
                   {Math.max(
                     departurePrice || 0,
-                    returnPrice || 0
+                    returnPrice || 0,
                   ) > 0 && (
                     <p className="text-xs sm:text-sm font-semibold text-gray-900 mt-2">
                       Cena transportu: {Math.max(departurePrice || 0, returnPrice || 0).toFixed(2)} zł

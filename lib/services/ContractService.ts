@@ -27,7 +27,7 @@ class ContractService {
     // Import authService to get token
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -57,7 +57,7 @@ class ContractService {
     // Import authService to get token
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -78,7 +78,7 @@ class ContractService {
 
       const contracts = await response.json();
       const contract = contracts.find((c: any) => c.reservation_id === reservationId);
-      
+
       if (contract) {
         return {
           contract_filename: contract.contract_filename,
@@ -101,9 +101,10 @@ class ContractService {
    */
   getContractDownloadUrl(reservationId: number): string {
     // Import authService to get token
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { authService } = require('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -121,7 +122,7 @@ class ContractService {
     // Import authService to get token
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -130,7 +131,7 @@ class ContractService {
     // This ensures contract is always generated on first click
     try {
       await this.generateContract(reservationId);
-    } catch (error: any) {
+    } catch {
       // If generation fails, try to download existing contract
       console.log('Contract generation failed, trying to download existing contract...');
     }
@@ -198,7 +199,7 @@ class ContractService {
   }>> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -228,11 +229,11 @@ class ContractService {
   async updateContractStatus(
     reservationId: number,
     status: 'approved' | 'rejected',
-    rejectionReason?: string
+    rejectionReason?: string,
   ): Promise<{ status: string; message: string; contract_status: string; rejection_reason?: string | null }> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -276,7 +277,7 @@ class ContractService {
   }> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -315,7 +316,7 @@ class ContractService {
   }>> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }

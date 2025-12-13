@@ -1,10 +1,11 @@
 'use client';
 
+import { Save, Phone } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
 import { authenticatedApiCall } from '@/utils/api-auth';
-import { Save, Phone } from 'lucide-react';
 
 interface BlinkConfig {
   id: number;
@@ -46,7 +47,7 @@ export default function BlinkConfigurationPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!phoneNumber.trim()) {
       setError('Numer telefonu jest wymagany');
       return;
@@ -77,7 +78,7 @@ export default function BlinkConfigurationPage() {
       <AdminLayout>
         <div className="container mx-auto p-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-8">Konfiguracja Blink</h1>
-          
+
           <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl">
             <form onSubmit={handleSave} className="space-y-6">
               <div>

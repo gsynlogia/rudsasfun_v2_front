@@ -32,5 +32,5 @@ module.exports = {
     '!**/node_modules/**',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
-}
+};
 

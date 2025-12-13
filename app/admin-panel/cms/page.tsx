@@ -1,9 +1,10 @@
 'use client';
 
+import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
-import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
 
 export default function CMSPage() {
   return (
@@ -11,7 +12,7 @@ export default function CMSPage() {
       <AdminLayout>
         <div className="container mx-auto p-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-8">CMS - Content Management System</h1>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Managing the information fields box */}
             <Link

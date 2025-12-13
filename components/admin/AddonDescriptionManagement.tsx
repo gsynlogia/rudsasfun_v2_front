@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface AddonDescription {
@@ -47,9 +48,9 @@ export default function AddonDescriptionManagement() {
 
       await authenticatedApiCall<AddonDescription>('/api/addon-description/', {
         method: 'PUT',
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           description: description.trim() || null,
-          info_header: infoHeader.trim() || null
+          info_header: infoHeader.trim() || null,
         }),
       });
 
@@ -107,7 +108,7 @@ export default function AddonDescriptionManagement() {
           disabled={saving}
         />
         <p className="mt-2 text-xs text-gray-500">
-          Ten tekst będzie wyświetlany na górze sekcji "Dodatki" w formularzu rezerwacji (Step 2).
+          Ten tekst będzie wyświetlany na górze sekcji &quot;Dodatki&quot; w formularzu rezerwacji (Step 2).
         </p>
       </div>
 

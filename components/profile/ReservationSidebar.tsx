@@ -1,15 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { FileText, Download, CheckCircle, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { FileText, Download, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import DashedLine from '../DashedLine';
-import { contractService } from '@/lib/services/ContractService';
-import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
+import { useState, useEffect, useRef } from 'react';
+
+
 import { certificateService, CertificateResponse } from '@/lib/services/CertificateService';
+import { contractService } from '@/lib/services/ContractService';
+import { paymentService } from '@/lib/services/PaymentService';
+import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { ReservationResponse } from '@/lib/services/ReservationService';
-import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
+
 import UniversalModal from '../admin/UniversalModal';
+import DashedLine from '../DashedLine';
 
 interface ReservationSidebarProps {
   reservationId: string;
@@ -73,9 +76,9 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
   useEffect(() => {
     const loadFileHistory = async () => {
       if (!isValidReservationId) return;
-      
+
       const history: FileHistoryItem[] = [];
-      
+
       // Check for qualification card
       try {
         const card = await qualificationCardService.getQualificationCard(reservationIdNum);
@@ -85,13 +88,13 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
             type: 'qualification_card',
             name: card.card_filename || 'Karta kwalifikacyjna',
             date: card.created_at,
-            fileUrl: qualificationCardService.getQualificationCardDownloadUrl(reservationIdNum)
+            fileUrl: qualificationCardService.getQualificationCardDownloadUrl(reservationIdNum),
           });
         }
-      } catch (error) {
+      } catch {
         // Qualification card doesn't exist, ignore
       }
-      
+
       // Check for certificates
       try {
         const certResponse = await certificateService.getCertificates(reservationIdNum);
@@ -102,14 +105,14 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               type: 'certificate',
               name: cert.file_name,
               date: cert.uploaded_at,
-              fileUrl: cert.file_url
+              fileUrl: cert.file_url,
             });
           });
         }
-      } catch (error) {
+      } catch {
         // Certificates don't exist, ignore
       }
-      
+
       // Check for contract
       try {
         const contracts = await contractService.listMyContracts();
@@ -120,16 +123,16 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
             type: 'contract',
             name: 'Umowa',
             date: contract.created_at || new Date().toISOString(),
-            fileUrl: contractService.getContractDownloadUrl(reservationIdNum)
+            fileUrl: contractService.getContractDownloadUrl(reservationIdNum),
           });
         }
-      } catch (error) {
+      } catch {
         // Contract doesn't exist, skip
       }
-      
+
       setFileHistory(history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     };
-    
+
     if (isDetailsExpanded) {
       loadFileHistory();
     }
@@ -146,7 +149,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
   // Load contract status
   const loadContractStatus = async () => {
     if (!isValidReservationId) return;
-    
+
     try {
       setLoadingContract(true);
       const contracts = await contractService.listMyContracts();
@@ -162,7 +165,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
 
   const loadQualificationCard = async () => {
     if (!isValidReservationId) return;
-    
+
     try {
       setLoadingCard(true);
       const card = await qualificationCardService.getQualificationCard(reservationIdNum);
@@ -182,7 +185,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       if (!isValidReservationId) {
         throw new Error('Invalid reservation ID');
       }
-      
+
       // If contract doesn't exist, generate it first
       if (!hasContract) {
         try {
@@ -194,10 +197,10 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           console.log('Contract generation returned error, trying download anyway:', generateError);
         }
       }
-      
+
       // Now download the contract
       await contractService.downloadContract(reservationIdNum);
-      
+
       // After successful generation and download, reload status
       await loadContractStatus();
     } catch (error) {
@@ -213,7 +216,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       alert('Nieprawidłowy numer rezerwacji');
       return;
     }
-    
+
     try {
       // If card doesn't exist, generate it first
       if (!qualificationCard) {
@@ -230,7 +233,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           setGeneratingCard(false);
         }
       }
-      
+
       // Now download the card
       setDownloadingCard(true);
       await qualificationCardService.downloadQualificationCard(reservationIdNum);
@@ -284,7 +287,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      
+
                       try {
                         setUploadingContract(true);
                         await contractService.uploadContract(reservationIdNum, file);
@@ -301,7 +304,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                     }}
                     className="hidden"
                   />
-                  <button 
+                  <button
                     onClick={() => contractInputRef.current?.click()}
                     disabled={uploadingContract}
                     className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
@@ -320,7 +323,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                   </button>
                 </>
               ) : (
-                <button 
+                <button
                   onClick={handleDownloadContract}
                   disabled={isGenerating || loadingContract}
                   className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
@@ -381,7 +384,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      
+
                       try {
                         setUploadingCard(true);
                         await qualificationCardService.uploadQualificationCard(reservationIdNum, file);
@@ -398,7 +401,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                     }}
                     className="hidden"
                   />
-                  <button 
+                  <button
                     onClick={() => qualificationCardInputRef.current?.click()}
                     disabled={uploadingCard}
                     className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
@@ -417,7 +420,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                   </button>
                 </>
               ) : (
-                <button 
+                <button
                   onClick={handleDownloadCard}
                   disabled={downloadingCard || loadingCard || generatingCard}
                   className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
@@ -470,13 +473,13 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
 
           {/* Action Buttons */}
           <div className="space-y-1.5 sm:space-y-2">
-            <button 
+            <button
               onClick={() => router.push('/profil/faktury-i-platnosci')}
               className="w-full px-3 sm:px-4 py-1.5 sm:py-2 bg-[#03adf0] text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-[#0288c7] transition-colors"
             >
               faktury vat
             </button>
-            <button 
+            <button
               onClick={() => setShowCertificateModal(true)}
               className="w-full px-3 sm:px-4 py-1.5 sm:py-2 bg-[#03adf0] text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-[#0288c7] transition-colors"
             >
@@ -493,14 +496,14 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               <div className="space-y-1.5 sm:space-y-2 text-[10px] sm:text-xs text-gray-600">
                 {fileHistory.map((file) => {
                   const date = new Date(file.date);
-                  const formattedDate = date.toLocaleDateString('pl-PL', { 
-                    day: '2-digit', 
-                    month: '2-digit', 
+                  const formattedDate = date.toLocaleDateString('pl-PL', {
+                    day: '2-digit',
+                    month: '2-digit',
                     year: 'numeric',
                     hour: '2-digit',
-                    minute: '2-digit'
+                    minute: '2-digit',
                   });
-                  
+
                   const handleDownload = async () => {
                     if (file.type === 'certificate' && file.id.startsWith('certificate-')) {
                       const certId = parseInt(file.id.replace('certificate-', ''));
@@ -527,7 +530,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       window.open(file.fileUrl, '_blank');
                     }
                   };
-                  
+
                   return (
                     <div key={file.id} className="flex items-center justify-between">
                       <div>
@@ -603,18 +606,18 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                   try {
                     setUploading(true);
                     setUploadError(null);
-                    
+
                     // Upload all files
-                    const uploadPromises = files.map(file => 
-                      certificateService.uploadCertificate(reservationIdNum, file)
+                    const uploadPromises = files.map(file =>
+                      certificateService.uploadCertificate(reservationIdNum, file),
                     );
-                    
-                    const uploadedCertificates = await Promise.all(uploadPromises);
-                    
+
+                    const _uploadedCertificates = await Promise.all(uploadPromises);
+
                     // Reload file history
                     const loadFileHistory = async () => {
                       const history: FileHistoryItem[] = [];
-                      
+
                       // Reload qualification card
                       try {
                         const card = await qualificationCardService.getQualificationCard(reservationIdNum);
@@ -625,13 +628,13 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                             type: 'qualification_card',
                             name: card.card_filename || 'Karta kwalifikacyjna',
                             date: card.created_at,
-                            fileUrl: qualificationCardService.getQualificationCardDownloadUrl(reservationIdNum)
+                            fileUrl: qualificationCardService.getQualificationCardDownloadUrl(reservationIdNum),
                           });
                         }
-                      } catch (error) {
+                      } catch {
                         // Ignore
                       }
-                      
+
                       // Reload certificates
                       try {
                         const certResponse = await certificateService.getCertificates(reservationIdNum);
@@ -642,14 +645,14 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                               type: 'certificate',
                               name: cert.file_name,
                               date: cert.uploaded_at,
-                              fileUrl: cert.file_url
+                              fileUrl: cert.file_url,
                             });
                           });
                         }
-                      } catch (error) {
+                      } catch {
                         // Ignore
                       }
-                      
+
                       // Reload contract
                       try {
                         const contracts = await contractService.listMyContracts();
@@ -660,18 +663,18 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                             type: 'contract',
                             name: 'Umowa',
                             date: contract.created_at || new Date().toISOString(),
-                            fileUrl: contractService.getContractDownloadUrl(reservationIdNum)
+                            fileUrl: contractService.getContractDownloadUrl(reservationIdNum),
                           });
                         }
-                      } catch (error) {
+                      } catch {
                         // Ignore
                       }
-                      
+
                       setFileHistory(history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
                     };
-                    
+
                     await loadFileHistory();
-                    
+
                     setShowCertificateModal(false);
                     if (certificateInputRef.current) {
                       certificateInputRef.current.value = '';

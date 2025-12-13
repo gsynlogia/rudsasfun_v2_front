@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
 import { Info, Download } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL } from '@/utils/api-config';
+import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 interface Promotion {
   id: number;
@@ -23,7 +24,7 @@ interface Promotion {
  * Displays promotions from API for the selected turnus with justification fields
  */
 export default function PromotionsSection() {
-  const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
+  const { reservation: _reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,12 +41,12 @@ export default function PromotionsSection() {
     const campIdIndex = pathParts.indexOf('camps');
     if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
       const campId = parseInt(pathParts[campIdIndex + 1], 10);
-      const propertyId = campIdIndex + 3 < pathParts.length 
-        ? parseInt(pathParts[campIdIndex + 3], 10) 
+      const propertyId = campIdIndex + 3 < pathParts.length
+        ? parseInt(pathParts[campIdIndex + 3], 10)
         : null;
-      return { 
-        campId: !isNaN(campId) ? campId : null, 
-        propertyId: propertyId && !isNaN(propertyId) ? propertyId : null 
+      return {
+        campId: !isNaN(campId) ? campId : null,
+        propertyId: propertyId && !isNaN(propertyId) ? propertyId : null,
       };
     }
     return { campId: null, propertyId: null };
@@ -72,7 +73,7 @@ export default function PromotionsSection() {
   useEffect(() => {
     const fetchPromotions = async () => {
       const { campId, propertyId } = getCampIds();
-      
+
       if (!campId || !propertyId) {
         setPromotions([]);
         setLoading(false);
@@ -83,9 +84,9 @@ export default function PromotionsSection() {
         setLoading(true);
         setError(null);
         const response = await fetch(
-          `${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/promotions?check_usage=false`
+          `${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/promotions?check_usage=false`,
         );
-        
+
         if (!response.ok) {
           if (response.status === 404) {
             setPromotions([]);
@@ -94,7 +95,7 @@ export default function PromotionsSection() {
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = await response.json();
         const promotionsList = Array.isArray(data) ? data : [];
         setPromotions(promotionsList);
@@ -152,13 +153,13 @@ export default function PromotionsSection() {
     // Add new promotion if selected
     if (selectedPromotionId) {
       const selectedPromotion = promotions.find(
-        p => String(p.id || p.relation_id) === selectedPromotionId
+        p => String(p.id || p.relation_id) === selectedPromotionId,
       );
-      
+
       if (selectedPromotion) {
         const displayName = selectedPromotion.name;
-        const price = selectedPromotion.price;
-        
+        const { price } = selectedPromotion;
+
         addReservationItem({
           name: displayName,
           price: price,
@@ -183,7 +184,7 @@ export default function PromotionsSection() {
   }, [selectedPromotionId, promotionJustification, isInitialized]);
 
   const selectedPromotion = promotions.find(
-    p => String(p.id || p.relation_id) === selectedPromotionId
+    p => String(p.id || p.relation_id) === selectedPromotionId,
   );
 
   const promotionType = selectedPromotion ? getPromotionType(selectedPromotion.name) : null;
@@ -227,10 +228,10 @@ export default function PromotionsSection() {
                 <option value="">Rezygnuję z promocji</option>
                 {promotions.map((promo) => (
                   <option key={promo.id || promo.relation_id} value={String(promo.id || promo.relation_id)}>
-                    {promo.name} {promo.price < 0 
-                      ? `${promo.price.toFixed(2)} PLN` 
-                      : promo.price > 0 
-                        ? `+${promo.price.toFixed(2)} PLN` 
+                    {promo.name} {promo.price < 0
+                      ? `${promo.price.toFixed(2)} PLN`
+                      : promo.price > 0
+                        ? `+${promo.price.toFixed(2)} PLN`
                         : '0.00 PLN'
                     }
                   </option>
@@ -247,7 +248,7 @@ export default function PromotionsSection() {
                 <p className="text-xs text-gray-600 mb-3">
                   Wypełnij poniższe pola, aby uzasadnić wybór tej promocji.
                 </p>
-                
+
                 {promotionType === 'duza_rodzina' && (
                   <div>
                     <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
@@ -258,7 +259,7 @@ export default function PromotionsSection() {
                       value={promotionJustification.card_number || ''}
                       onChange={(e) => setPromotionJustification({
                         ...promotionJustification,
-                        card_number: e.target.value
+                        card_number: e.target.value,
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
                       placeholder="Wpisz numer karty dużej rodziny"
@@ -281,7 +282,7 @@ export default function PromotionsSection() {
                         value={promotionJustification.sibling_first_name || ''}
                         onChange={(e) => setPromotionJustification({
                           ...promotionJustification,
-                          sibling_first_name: e.target.value
+                          sibling_first_name: e.target.value,
                         })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
                         placeholder="Wpisz imię rodzeństwa"
@@ -300,7 +301,7 @@ export default function PromotionsSection() {
                         value={promotionJustification.sibling_last_name || ''}
                         onChange={(e) => setPromotionJustification({
                           ...promotionJustification,
-                          sibling_last_name: e.target.value
+                          sibling_last_name: e.target.value,
                         })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
                         placeholder="Wpisz nazwisko rodzeństwa"
@@ -324,7 +325,7 @@ export default function PromotionsSection() {
                         value={promotionJustification.first_camp_date || ''}
                         onChange={(e) => setPromotionJustification({
                           ...promotionJustification,
-                          first_camp_date: e.target.value
+                          first_camp_date: e.target.value,
                         })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
                       />
@@ -338,7 +339,7 @@ export default function PromotionsSection() {
                         value={promotionJustification.first_camp_name || ''}
                         onChange={(e) => setPromotionJustification({
                           ...promotionJustification,
-                          first_camp_name: e.target.value
+                          first_camp_name: e.target.value,
                         })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
                         placeholder="Wpisz nazwę pierwszego obozu"
@@ -359,7 +360,7 @@ export default function PromotionsSection() {
                       value={promotionJustification.reason || ''}
                       onChange={(e) => setPromotionJustification({
                         ...promotionJustification,
-                        reason: e.target.value
+                        reason: e.target.value,
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
                       rows={3}
@@ -379,8 +380,8 @@ export default function PromotionsSection() {
                     </label>
                     <input
                       type="text"
-                      value={Array.isArray(promotionJustification.years) 
-                        ? promotionJustification.years.join(', ') 
+                      value={Array.isArray(promotionJustification.years)
+                        ? promotionJustification.years.join(', ')
                         : promotionJustification.years || ''
                       }
                       onChange={(e) => {
@@ -388,7 +389,7 @@ export default function PromotionsSection() {
                         const years = yearsStr.split(',').map(y => y.trim()).filter(y => y);
                         setPromotionJustification({
                           ...promotionJustification,
-                          years: years
+                          years: years,
                         });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"

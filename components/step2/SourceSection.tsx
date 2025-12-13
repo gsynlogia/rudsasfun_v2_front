@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
+
 import { API_BASE_URL } from '@/utils/api-config';
+import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 interface Source {
   id: number;
@@ -69,8 +70,8 @@ export default function SourceSection() {
     const savedData = loadStep2FormData();
     const formData = {
       selectedAddons: savedData?.selectedAddons || [],
-      selectedProtection: Array.isArray(savedData?.selectedProtection) 
-        ? savedData.selectedProtection 
+      selectedProtection: Array.isArray(savedData?.selectedProtection)
+        ? savedData.selectedProtection
         : (savedData?.selectedProtection ? [savedData.selectedProtection] : []),
       selectedPromotion: savedData?.selectedPromotion || '',
       transportData: savedData?.transportData || {
@@ -170,7 +171,7 @@ export default function SourceSection() {
             activeSources.map((source) => {
               const isSelected = selectedSource === source.id.toString();
               const isOther = source.is_other;
-              
+
               return (
                 <div key={source.id}>
                   <label className={`flex items-center gap-2 cursor-pointer p-2 rounded ${sourceError && !selectedSource ? 'bg-red-50' : ''}`}>

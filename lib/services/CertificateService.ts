@@ -2,11 +2,12 @@
  * Certificate Service
  * Singleton service for managing certificates via API
  */
-import { API_BASE_URL } from '@/utils/api-config';
-import { authService } from './AuthService';
+import { CertificateListResponse } from '@/types/certificateListResponse';
 import { CertificateResponse } from '@/types/certificateResponse';
 import { CertificateUploadResponse } from '@/types/certificateUploadResponse';
-import { CertificateListResponse } from '@/types/certificateListResponse';
+import { API_BASE_URL } from '@/utils/api-config';
+
+import { authService } from './AuthService';
 
 export type { CertificateResponse, CertificateUploadResponse, CertificateListResponse };
 

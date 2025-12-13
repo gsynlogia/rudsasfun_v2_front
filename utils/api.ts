@@ -3,9 +3,10 @@
  * Functions for communicating with the backend API
  */
 
-import { API_BASE_URL } from './api-config';
 import { Camp } from '@/types/camp';
 import { CampListResponse } from '@/types/campListResponse';
+
+import { API_BASE_URL } from './api-config';
 
 export type { Camp, CampListResponse };
 
@@ -81,12 +82,4 @@ export async function getCurrentCamp(): Promise<Camp> {
     throw error;
   }
 }
-
-
-
-
-
-
-
-
 

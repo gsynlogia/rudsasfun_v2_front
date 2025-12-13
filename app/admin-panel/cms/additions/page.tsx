@@ -1,8 +1,8 @@
 'use client';
 
-import AdminLayout from '@/components/admin/AdminLayout';
 import AddonDescriptionManagement from '@/components/admin/AddonDescriptionManagement';
 import AddonsManagement from '@/components/admin/AddonsManagement';
+import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
 
 export default function AdditionsManagementPage() {

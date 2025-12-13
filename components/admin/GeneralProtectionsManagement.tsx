@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import Image from 'next/image';
+import { useState, useEffect } from 'react';
+
 import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
 import { getApiBaseUrlRuntime, getStaticAssetUrl } from '@/utils/api-config';
 
@@ -24,7 +26,7 @@ export default function GeneralProtectionsManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProtection, setSelectedProtection] = useState<GeneralProtection | null>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Form state
   const [protectionName, setProtectionName] = useState('');
   const [protectionPrice, setProtectionPrice] = useState<number | ''>(0);
@@ -49,7 +51,7 @@ export default function GeneralProtectionsManagement() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas ładowania ochron';
       console.error('[GeneralProtectionsManagement] Error fetching protections:', err);
-      
+
       if (errorMessage.includes('404') || errorMessage.includes('Not found')) {
         setProtections([]);
         setError(null);
@@ -93,7 +95,7 @@ export default function GeneralProtectionsManagement() {
       // Use getStaticAssetUrl to properly handle all URL formats
       const fullUrl = getStaticAssetUrl(protection.icon_url);
       setIconUploadUrl(fullUrl || null);
-      
+
       // Extract relative path for database storage
       if (protection.icon_url.startsWith('http://') || protection.icon_url.startsWith('https://')) {
         // Full URL - extract path
@@ -132,10 +134,10 @@ export default function GeneralProtectionsManagement() {
     try {
       setUploadingIcon(true);
       setError(null);
-      
+
       const formData = new FormData();
       formData.append('file', file);
-      
+
       // Use authenticatedFetch for FormData upload
       const API_BASE_URL = getApiBaseUrlRuntime();
       const response = await authenticatedFetch(`${API_BASE_URL}/api/general-protections/general-protection-icon-upload`, {
@@ -143,7 +145,7 @@ export default function GeneralProtectionsManagement() {
         body: formData,
         // authenticatedFetch will handle Authorization header and Content-Type for FormData
       });
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Sesja wygasła. Zaloguj się ponownie.');
@@ -151,7 +153,7 @@ export default function GeneralProtectionsManagement() {
         const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       setIconUploadUrl(data.url);
       setIconRelativePath(data.relative_path);
@@ -186,13 +188,13 @@ export default function GeneralProtectionsManagement() {
       // Upload icon file if method is upload and file is selected
       // Always upload if new file is selected, even if iconRelativePath exists (user wants to replace old icon)
       let finalIconRelativePath: string | null = iconRelativePath;
-      
+
       if (iconMethod === 'upload' && iconFile) {
         try {
           const uploadResult = await handleIconUpload(iconFile);
           // uploadResult is { url, relative_path }
           finalIconRelativePath = uploadResult.relative_path;
-        } catch (uploadErr) {
+        } catch {
           // Error already set in handleIconUpload
           return; // Stop saving if upload fails
         }
@@ -204,7 +206,7 @@ export default function GeneralProtectionsManagement() {
         description: protectionDescription.trim() || null,
         is_active: true,
       };
-      
+
       // Add icon based on selected method
       if (iconMethod === 'paste' && iconSvg.trim()) {
         protectionData.icon_svg = iconSvg.trim();
@@ -304,7 +306,7 @@ export default function GeneralProtectionsManagement() {
             {protections.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">
-                  Brak ochron ogólnych. Kliknij "Dodaj ochronę", aby utworzyć nową.
+                  Brak ochron ogólnych. Kliknij &quot;Dodaj ochronę&quot;, aby utworzyć nową.
                 </td>
               </tr>
             ) : (
@@ -317,10 +319,13 @@ export default function GeneralProtectionsManagement() {
                       dangerouslySetInnerHTML={{ __html: protection.icon_svg }}
                     />
                   ) : protection.icon_url ? (
-                    <img
+                    <Image
                       src={getStaticAssetUrl(protection.icon_url) || ''}
                       alt={protection.display_name}
-                      className="w-8 h-8 object-contain"
+                      width={32}
+                      height={32}
+                      className="object-contain"
+                      unoptimized
                     />
                   ) : (
                     <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">
@@ -437,7 +442,7 @@ export default function GeneralProtectionsManagement() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Ikona (opcjonalne)
                 </label>
-                
+
                 {/* Method selection */}
                 <div className="flex gap-4 mb-3">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -487,10 +492,13 @@ export default function GeneralProtectionsManagement() {
                       <div className="mt-2">
                         <p className="text-xs text-gray-600 mb-1">Wybrany plik: {iconFile.name}</p>
                         {iconFile.type.startsWith('image/') && (
-                          <img
+                          <Image
                             src={URL.createObjectURL(iconFile)}
                             alt="Preview"
-                            className="w-16 h-16 object-contain border border-gray-200 rounded"
+                            width={64}
+                            height={64}
+                            className="object-contain border border-gray-200 rounded"
+                            unoptimized
                           />
                         )}
                       </div>
@@ -498,10 +506,13 @@ export default function GeneralProtectionsManagement() {
                     {iconUploadUrl && (
                       <div className="mt-2">
                         <p className="text-xs text-gray-600 mb-1">Obecna ikona:</p>
-                        <img
+                        <Image
                           src={getStaticAssetUrl(iconUploadUrl) || iconUploadUrl || ''}
                           alt="Uploaded icon"
-                          className="w-16 h-16 object-contain border border-gray-200 rounded"
+                          width={64}
+                          height={64}
+                          className="object-contain border border-gray-200 rounded"
+                          unoptimized
                         />
                       </div>
                     )}

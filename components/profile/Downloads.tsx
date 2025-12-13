@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { FileText, Download, CheckCircle, XCircle, Calendar, Loader2 } from 'lucide-react';
-import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
+import { useEffect, useState } from 'react';
+
 import { contractService } from '@/lib/services/ContractService';
-import { qualificationCardService, type QualificationCardResponse } from '@/lib/services/QualificationCardService';
+import { qualificationCardService } from '@/lib/services/QualificationCardService';
+import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 
 interface Document {
   id: string;
@@ -35,21 +36,21 @@ export default function Downloads() {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         // Get user's contracts (existing contracts from output directory)
         const contracts = await contractService.listMyContracts();
-        
+
         // Get user's qualification cards
         const qualificationCards = await qualificationCardService.listMyQualificationCards();
-        
+
         // Get user's reservations to get contract_status
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
         const reservationsMap = new Map(reservations.map(r => [r.id, r]));
-        
+
         // Group contracts and qualification cards by reservation_id to ensure only one of each per reservation
         const contractsByReservation = new Map<number, typeof contracts[0]>();
         const cardsByReservation = new Map<number, typeof qualificationCards[0]>();
-        
+
         // Keep only the most recent contract per reservation
         contracts.forEach((contract) => {
           const existing = contractsByReservation.get(contract.reservation_id);
@@ -57,7 +58,7 @@ export default function Downloads() {
             contractsByReservation.set(contract.reservation_id, contract);
           }
         });
-        
+
         // Keep only the most recent qualification card per reservation
         qualificationCards.forEach((card) => {
           const existing = cardsByReservation.get(card.reservation_id);
@@ -65,16 +66,16 @@ export default function Downloads() {
             cardsByReservation.set(card.reservation_id, card);
           }
         });
-        
+
         // Map contracts to documents (only one per reservation)
         const contractsList: Document[] = Array.from(contractsByReservation.values()).map((contract) => {
           const reservation = reservationsMap.get(contract.reservation_id);
           const participantName = contract.participant_first_name && contract.participant_last_name
             ? `${contract.participant_first_name} ${contract.participant_last_name}`
             : 'Brak danych';
-          
+
           const campName = contract.camp_name || 'Brak danych';
-          
+
           // Format date from contract created_at
           let dateStr = 'Brak daty';
           if (contract.created_at) {
@@ -83,11 +84,11 @@ export default function Downloads() {
               dateStr = date.toLocaleDateString('pl-PL', {
                 day: '2-digit',
                 month: '2-digit',
-                year: 'numeric'
+                year: 'numeric',
               });
             }
           }
-          
+
           return {
             id: `contract-${contract.reservation_id}`,
             type: 'contract' as const,
@@ -101,16 +102,16 @@ export default function Downloads() {
             contract_status: (reservation && reservation.contract_status) ? reservation.contract_status : null,
           };
         });
-        
+
         // Map qualification cards to documents (only one per reservation)
         const qualificationCardsList: Document[] = Array.from(cardsByReservation.values()).map((card) => {
           const reservation = reservationsMap.get(card.reservation_id);
           const participantName = card.participant_first_name && card.participant_last_name
             ? `${card.participant_first_name} ${card.participant_last_name}`
             : 'Brak danych';
-          
+
           const campName = card.camp_name || 'Brak danych';
-          
+
           // Format date from card created_at
           let dateStr = 'Brak daty';
           if (card.created_at) {
@@ -119,11 +120,11 @@ export default function Downloads() {
               dateStr = date.toLocaleDateString('pl-PL', {
                 day: '2-digit',
                 month: '2-digit',
-                year: 'numeric'
+                year: 'numeric',
               });
             }
           }
-          
+
           return {
             id: `qualification-card-${card.reservation_id}`,
             type: 'qualification_card' as const,
@@ -136,17 +137,17 @@ export default function Downloads() {
             status: 'available' as const, // Card exists, so it's available
           };
         });
-        
+
         // Combine all documents
         const documentsList: Document[] = [...contractsList, ...qualificationCardsList];
-        
+
         // Sort by date (newest first)
         documentsList.sort((a, b) => {
           const dateA = new Date(a.date.split('.').reverse().join('-'));
           const dateB = new Date(b.date.split('.').reverse().join('-'));
           return dateB.getTime() - dateA.getTime();
         });
-        
+
         setDocuments(documentsList);
       } catch (err) {
         console.error('Error loading documents:', err);
@@ -254,12 +255,12 @@ export default function Downloads() {
 
   // Group documents by reservation
   const documentsByReservation = new Map<number, { reservation: Document, documents: Document[] }>();
-  
+
   documents.forEach((doc) => {
     if (!documentsByReservation.has(doc.reservationId)) {
       documentsByReservation.set(doc.reservationId, {
         reservation: doc,
-        documents: []
+        documents: [],
       });
     }
     documentsByReservation.get(doc.reservationId)!.documents.push(doc);
@@ -272,7 +273,7 @@ export default function Downloads() {
         <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">
           Dokumenty do pobrania
         </h3>
-        
+
         {documentsByReservation.size === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
@@ -284,7 +285,7 @@ export default function Downloads() {
               const isExpanded = expandedReservations.has(reservationId);
               const hasContract = reservationDocs.some(d => d.type === 'contract');
               const hasCard = reservationDocs.some(d => d.type === 'qualification_card');
-              
+
               return (
                 <div key={reservationId} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
                   {/* Reservation Header - Clickable */}
@@ -326,7 +327,7 @@ export default function Downloads() {
                       </div>
                     </div>
                   </button>
-                  
+
                   {/* Expanded Content - Documents */}
                   {isExpanded && (
                     <div className="border-t border-gray-200 bg-gray-50">
@@ -338,8 +339,8 @@ export default function Downloads() {
                                 <div className="flex items-center gap-2 mb-2">
                                   <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                                   <span className="font-medium text-sm sm:text-base text-gray-900">
-                                    {document.type === 'contract' ? 'Umowa' : 
-                                     document.type === 'qualification_card' ? 'Karta kwalifikacyjna' : 
+                                    {document.type === 'contract' ? 'Umowa' :
+                                     document.type === 'qualification_card' ? 'Karta kwalifikacyjna' :
                                      'Inny dokument'}
                                   </span>
                                 </div>

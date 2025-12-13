@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { UserCog, Search, Edit, Trash2, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { UserCog, Search, Edit, Trash2, Plus, X } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface Group {
@@ -14,7 +15,7 @@ interface Group {
   user_count: number;
 }
 
-interface GroupWithUsers extends Group {
+interface _GroupWithUsers extends Group {
   users: Array<{
     id: number;
     login: string;
@@ -108,7 +109,7 @@ export default function GroupsManagement() {
         `${API_BASE_URL}/api/groups/${groupToDelete.id}`,
         {
           method: 'DELETE',
-        }
+        },
       );
 
       // Reload groups and close modal

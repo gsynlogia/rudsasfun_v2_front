@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Edit, Trash2, Power, PowerOff, Save, DollarSign, GripVertical } from 'lucide-react';
-import UniversalModal from './UniversalModal';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
+import Image from 'next/image';
+import { useState, useEffect, useCallback } from 'react';
+
 import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
 import { getApiBaseUrlRuntime, getStaticAssetUrl } from '@/utils/api-config';
+
+import DeleteConfirmationModal from './DeleteConfirmationModal';
+import UniversalModal from './UniversalModal';
 
 interface Addon {
   id: number;
@@ -49,7 +52,7 @@ export default function AddonsManagement() {
       setLoading(true);
       setError(null);
       const data = await authenticatedApiCall<{ addons: Addon[]; total: number }>(
-        '/api/addons/?include_inactive=true'
+        '/api/addons/?include_inactive=true',
       );
       // Sort by display_order
       const sorted = (data.addons || []).sort((a, b) => a.display_order - b.display_order);
@@ -108,7 +111,7 @@ export default function AddonsManagement() {
       // Use getStaticAssetUrl to properly handle all URL formats
       const fullUrl = getStaticAssetUrl(addon.icon_url);
       setIconUploadUrl(fullUrl || null);
-      
+
       // Extract relative path for database storage
       if (addon.icon_url.startsWith('http://') || addon.icon_url.startsWith('https://')) {
         // Full URL - extract path
@@ -146,15 +149,15 @@ export default function AddonsManagement() {
     try {
       setUploadingIcon(true);
       setError(null);
-      
+
       const formData = new FormData();
       formData.append('file', file);
-      
+
       // Use authenticatedFetch for FormData upload
       const API_BASE_URL = getApiBaseUrlRuntime();
       const url = `${API_BASE_URL}/api/addons/addon-icon-upload`;
       console.log('[AddonsManagement] Uploading icon to:', url);
-      
+
       const response = await authenticatedFetch(url, {
         method: 'POST',
         body: formData,
@@ -167,7 +170,7 @@ export default function AddonsManagement() {
         if (response.status === 401) {
           throw new Error('Sesja wygasła. Zaloguj się ponownie.');
         }
-        
+
         // Try to get error message from response
         let errorData: any = {};
         const contentType = response.headers.get('content-type');
@@ -188,14 +191,14 @@ export default function AddonsManagement() {
             console.error('[AddonsManagement] Failed to read error text:', e);
           }
         }
-        
+
         console.error('[AddonsManagement] Upload error:', {
           status: response.status,
           statusText: response.statusText,
           errorData,
-          contentType
+          contentType,
         });
-        
+
         const errorMessage = errorData.detail || errorData.message || `HTTP error! status: ${response.status}`;
         throw new Error(errorMessage);
       }
@@ -245,13 +248,13 @@ export default function AddonsManagement() {
       // Handle icon upload if file is selected
       // Always upload if new file is selected, even if iconRelativePath exists (user wants to replace old icon)
       let finalIconRelativePath: string | null = iconRelativePath;
-      
+
       if (iconMethod === 'upload' && iconFile) {
         try {
           const uploadResult = await handleIconUpload(iconFile);
           // uploadResult is { url, relative_path }
           finalIconRelativePath = uploadResult.relative_path;
-        } catch (uploadErr) {
+        } catch {
           // Error already set in handleIconUpload
           return; // Stop saving if upload fails
         }
@@ -402,7 +405,7 @@ export default function AddonsManagement() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Szukaj dodatków..."
+            placeholder={'Szukaj dodatków...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm"
@@ -474,16 +477,19 @@ export default function AddonsManagement() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {addon.icon_url ? (
-                        <img 
-                          src={getStaticAssetUrl(addon.icon_url) || ''} 
+                        <Image
+                          src={getStaticAssetUrl(addon.icon_url) || ''}
                           alt={addon.name}
-                          className="w-10 h-10 object-contain"
+                          width={40}
+                          height={40}
+                          className="object-contain"
+                          unoptimized
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
                           }}
                         />
                       ) : addon.icon_svg ? (
-                        <div 
+                        <div
                           className="w-10 h-10 flex items-center justify-center"
                           dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
                         />
@@ -639,7 +645,7 @@ export default function AddonsManagement() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Ikona dodatku <span className="text-gray-500 text-xs">(opcjonalna)</span>
               </label>
-              
+
               {/* Method selection */}
               <div className="flex gap-4 mb-4">
                 <label className="flex items-center">
@@ -707,10 +713,13 @@ export default function AddonsManagement() {
                     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                       <p className="text-xs text-gray-600 mb-2">Podgląd wgranej ikony:</p>
                       <div className="w-16 h-16 flex items-center justify-center border border-gray-300 rounded bg-white">
-                        <img
+                        <Image
                           src={getStaticAssetUrl(iconUploadUrl) || ''}
                           alt="Icon preview"
-                          className="w-full h-full object-contain"
+                          width={64}
+                          height={64}
+                          className="object-contain"
+                          unoptimized
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
                           }}
@@ -736,7 +745,7 @@ export default function AddonsManagement() {
                   {addonIconSvg && (
                     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                       <p className="text-xs text-gray-600 mb-2">Podgląd SVG:</p>
-                      <div 
+                      <div
                         className="w-16 h-16 flex items-center justify-center border border-gray-300 rounded bg-white"
                         dangerouslySetInnerHTML={{ __html: addonIconSvg }}
                       />

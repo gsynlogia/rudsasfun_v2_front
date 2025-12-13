@@ -10,10 +10,3 @@ export default function ProfileAuthWrapper({
   return <ProfileAuthGuard>{children}</ProfileAuthGuard>;
 }
 
-
-
-
-
-
-
-

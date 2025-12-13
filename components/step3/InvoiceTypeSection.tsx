@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Building2, User } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import { loadStep3FormData, saveStep3FormData } from '@/utils/sessionStorage';
 
 /**
@@ -29,7 +30,7 @@ export default function InvoiceTypeSection() {
     };
 
     window.addEventListener('focus', handleFocus);
-    
+
     return () => {
       window.removeEventListener('focus', handleFocus);
     };

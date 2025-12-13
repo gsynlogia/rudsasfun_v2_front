@@ -32,7 +32,7 @@ export default function HeaderSecondary() {
             </Link>
           ))}
         </nav>
-        
+
         {/* Mobile menu - scrollable horizontal */}
         <nav className="lg:hidden flex items-center gap-4 overflow-x-auto scrollbar-hide -mx-3 px-3">
           {menuItems.map((item, index) => (
@@ -49,15 +49,4 @@ export default function HeaderSecondary() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 

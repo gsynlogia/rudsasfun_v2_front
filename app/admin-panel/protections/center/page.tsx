@@ -1,8 +1,8 @@
 'use client';
 
 import AdminLayout from '@/components/admin/AdminLayout';
-import SectionGuard from '@/components/admin/SectionGuard';
 import CenterProtectionsManagement from '@/components/admin/CenterProtectionsManagement';
+import SectionGuard from '@/components/admin/SectionGuard';
 
 export default function CenterProtectionsPage() {
   return (

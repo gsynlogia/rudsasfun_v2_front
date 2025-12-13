@@ -37,7 +37,7 @@ export default function NavigationButtons({
       ) : (
         <div className="order-2 sm:order-1"></div>
       )}
-      
+
       {!isLastStep && (
         <button
           onClick={onNext}

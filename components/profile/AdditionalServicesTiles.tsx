@@ -1,12 +1,13 @@
 'use client';
 
+import { Info } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { API_BASE_URL } from '@/utils/api-config';
+
 import UniversalModal from '@/components/admin/UniversalModal';
 import { authService } from '@/lib/services/AuthService';
 import { paymentService, CreatePaymentRequest } from '@/lib/services/PaymentService';
-import { Phone, Info } from 'lucide-react';
 import { ReservationResponse } from '@/lib/services/ReservationService';
+import { API_BASE_URL } from '@/utils/api-config';
 
 interface AdditionalServicesTilesProps {
   selectedAddons?: string[] | null;
@@ -26,10 +27,10 @@ interface Addon {
  * Displays tiles for additional services (addons and protection)
  * Based on detailed design specification
  */
-export default function AdditionalServicesTiles({ 
-  selectedAddons = [], 
+export default function AdditionalServicesTiles({
+  selectedAddons = [],
   selectedProtection = [],
-  reservation = null
+  reservation = null,
 }: AdditionalServicesTilesProps) {
   const [addons, setAddons] = useState<Addon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +64,7 @@ export default function AdditionalServicesTiles({
   const handlePocketMoneyClick = async () => {
     setShowPocketMoneyModal(true);
     setLoadingBlinkConfig(true);
-    
+
     try {
       const token = authService.getToken();
       if (!token) {
@@ -122,8 +123,8 @@ export default function AdditionalServicesTiles({
 
     try {
       // Get payer data from reservation (first parent)
-      const firstParent = reservation.parents_data && reservation.parents_data.length > 0 
-        ? reservation.parents_data[0] 
+      const firstParent = reservation.parents_data && reservation.parents_data.length > 0
+        ? reservation.parents_data[0]
         : null;
 
       if (!firstParent || !firstParent.email) {
@@ -200,7 +201,7 @@ export default function AdditionalServicesTiles({
   const renderIcon = (addon: Addon, isActive: boolean) => {
     if (addon.icon_svg) {
       return (
-        <div 
+        <div
           className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'text-white' : 'text-gray-400'}`}
           dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
         />
@@ -305,12 +306,12 @@ export default function AdditionalServicesTiles({
       <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-3 sm:mb-4">Usługi dodatkowe</h5>
       <div className="flex gap-3 sm:gap-4 md:gap-5 w-full justify-start">
         {sortedTiles.map((tile) => {
-          const isActive = tile.isActive;
+          const { isActive } = tile;
           // Active = blue, Inactive = gray
           const bgColor = isActive ? '#3BAAF5' : '#F3F3F3';
           const textColor = isActive ? 'text-white' : 'text-gray-600';
           const iconColor = isActive ? 'text-white' : 'text-gray-400';
-          
+
           return (
             <div
               key={tile.id}
@@ -322,7 +323,7 @@ export default function AdditionalServicesTiles({
                 flex-shrink-0
                 cursor-pointer
               `}
-              style={{ 
+              style={{
                 borderRadius: '0px', // Perfect square, no rounded edges
                 backgroundColor: bgColor,
               }}

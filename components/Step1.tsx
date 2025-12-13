@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import Image from 'next/image';
-import DashedLine from './DashedLine';
-import type { StepComponentProps } from '@/types/reservation';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+
+
 import { useReservation } from '@/context/ReservationContext';
+import type { StepComponentProps } from '@/types/reservation';
 import { saveStep1FormData, loadStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
+
+import DashedLine from './DashedLine';
 import DietSection from './step1/DietSection';
 
 interface ParentData {
@@ -25,10 +27,10 @@ interface ParentData {
  * Step1 Component - Personal Data
  * Contains: Parent/Guardian data, Participant data, Diet, Accommodation request, Health status
  */
-export default function Step1({ onNext, onPrevious, disabled = false }: StepComponentProps) {
-  const { addReservationItem, removeReservationItemsByType, reservation } = useReservation();
+export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabled = false }: StepComponentProps) {
+  const { addReservationItem: _addReservationItem, removeReservationItemsByType: _removeReservationItemsByType, reservation } = useReservation();
   const pathname = usePathname();
-  
+
   // Calculate available birth years based on camp start date
   // Age must be 7-17 years old on camp start date
   // Logic: if camp starts on July 1, 2025:
@@ -38,7 +40,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   // But we need to account for edge cases where birthday hasn't passed yet
   const getAvailableBirthYears = (): number[] => {
     const birthYears: number[] = [];
-    
+
     // Interface for camp properties with default values
     interface CampProperties {
       start_date: string;
@@ -46,58 +48,58 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       period: string;
       city: string;
     }
-    
+
     interface CampData {
       properties: CampProperties;
     }
-    
+
     const defaultProperties: CampProperties = {
       start_date: '',
       end_date: '',
       period: '',
       city: '',
     };
-    
+
     const defaultCamp: CampData = {
       properties: defaultProperties,
     };
-    
+
     const campData: CampData = reservation.camp || defaultCamp;
     const startDateStr = campData.properties.start_date;
-    
+
     if (!startDateStr) {
       // If no camp data, return empty array (will show placeholder)
       return [];
     }
-    
+
     try {
       const startDate = new Date(startDateStr);
       const startYear = startDate.getFullYear();
-      
+
       // Calculate birth years for ages 7-17 on camp start date
       // For age 7: person born in (startYear - 7) or (startYear - 8) depending on exact birthday
       // For age 17: person born in (startYear - 17) or (startYear - 18) depending on exact birthday
       // To include all valid cases, we use range: (startYear - 17) to (startYear - 7)
       // This ensures that anyone born in these years will be 7-17 years old on the camp start date
       // (accounting for birthday edge cases)
-      
+
       const minBirthYear = startYear - 17; // Oldest participant (17 years old)
       const maxBirthYear = startYear - 7;  // Youngest participant (7 years old)
-      
+
       // Generate birth years from youngest to oldest (most recent first)
       for (let year = maxBirthYear; year >= minBirthYear; year--) {
         birthYears.push(year);
       }
-      
+
       return birthYears;
     } catch (error) {
       console.error('Error calculating birth years:', error);
       return [];
     }
   };
-  
+
   const availableBirthYears = getAvailableBirthYears();
-  
+
   const [parents, setParents] = useState<ParentData[]>([
     {
       id: '1',
@@ -122,7 +124,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
 
   const addParent = () => {
     if (parents.length >= 2) return;
-    
+
     const newParent: ParentData = {
       id: Date.now().toString(),
       firstName: '',
@@ -152,9 +154,9 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   // Update parent and clear errors for that field
   const updateParent = (id: string, field: keyof ParentData, value: string) => {
     setParents(
-      parents.map((p) => (p.id === id ? { ...p, [field]: value } : p))
+      parents.map((p) => (p.id === id ? { ...p, [field]: value } : p)),
     );
-    
+
     // Clear error for this field when user starts typing
     if (validationAttemptedRef.current && parentErrors[id] && parentErrors[id][field]) {
       setParentErrors((prev) => {
@@ -178,20 +180,20 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   const validateParent = (parent: ParentData, index: number): Record<string, string> => {
     const errors: Record<string, string> = {};
     const isFirstGuardian = index === 0;
-    
+
     // Always required for both guardians
     if (!parent.firstName || parent.firstName.trim() === '') {
       errors.firstName = 'Pole obowiązkowe';
     }
-    
+
     if (!parent.lastName || parent.lastName.trim() === '') {
       errors.lastName = 'Pole obowiązkowe';
     }
-    
+
     if (!parent.phoneNumber || parent.phoneNumber.trim() === '') {
       errors.phoneNumber = 'Pole obowiązkowe';
     }
-    
+
     // Email required only for first guardian
     if (isFirstGuardian) {
       if (!parent.email || parent.email.trim() === '') {
@@ -205,9 +207,9 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
         errors.email = 'Nieprawidłowy adres e-mail';
       }
     }
-    
+
     // Street, postalCode, city are optional for both guardians (no validation)
-    
+
     return errors;
   };
 
@@ -215,7 +217,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   const validateAllParents = (): boolean => {
     const allErrors: Record<string, Record<string, string>> = {};
     let isValid = true;
-    
+
     parents.forEach((parent, index) => {
       const errors = validateParent(parent, index);
       if (Object.keys(errors).length > 0) {
@@ -223,7 +225,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
         isValid = false;
       }
     });
-    
+
     setParentErrors(allErrors);
     return isValid;
   };
@@ -240,15 +242,15 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   // Validate participant fields - use useCallback to ensure it uses current participantData
   const validateParticipant = useCallback((): Record<string, string> => {
     const errors: Record<string, string> = {};
-    
+
     if (!participantData.firstName || participantData.firstName.trim() === '') {
       errors.firstName = 'Pole obowiązkowe';
     }
-    
+
     if (!participantData.lastName || participantData.lastName.trim() === '') {
       errors.lastName = 'Pole obowiązkowe';
     }
-    
+
     if (!participantData.age || participantData.age.trim() === '' || participantData.age === 'Wybierz z listy') {
       errors.age = 'Pole obowiązkowe';
     } else {
@@ -260,31 +262,31 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
         period: string;
         city: string;
       }
-      
+
       interface CampData {
         properties: CampProperties;
       }
-      
+
       const defaultProperties: CampProperties = {
         start_date: '',
         end_date: '',
         period: '',
         city: '',
       };
-      
+
       const defaultCamp: CampData = {
         properties: defaultProperties,
       };
-      
+
       const campData: CampData = reservation.camp || defaultCamp;
       const startDateStr = campData.properties.start_date;
-      
+
       if (startDateStr) {
         try {
           const startDate = new Date(startDateStr);
           const startYear = startDate.getFullYear();
           const birthYear = parseInt(participantData.age, 10);
-          
+
           if (isNaN(birthYear)) {
             errors.age = 'Nieprawidłowy rocznik';
           } else {
@@ -294,7 +296,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
             // Valid range: (startYear - 17) to (startYear - 7)
             const minBirthYear = startYear - 17;
             const maxBirthYear = startYear - 7;
-            
+
             if (birthYear < minBirthYear || birthYear > maxBirthYear) {
               errors.age = 'Uczestnik musi mieć 7-17 lat w dniu rozpoczęcia obozu';
             }
@@ -305,28 +307,28 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
         }
       }
     }
-    
+
     if (!participantData.gender || participantData.gender.trim() === '' || participantData.gender === 'Wybierz z listy') {
       errors.gender = 'Pole obowiązkowe';
     }
-    
+
     if (!participantData.city || participantData.city.trim() === '') {
       errors.city = 'Pole obowiązkowe';
     }
-    
+
     return errors;
   }, [participantData]);
 
   // Validate all (parents + participant)
-  const validateAll = (): boolean => {
+  const _validateAll = (): boolean => {
     // Always validate both parents and participant, even if one fails
     const parentsValid = validateAllParents();
     const participantErrors = validateParticipant();
     const participantValid = Object.keys(participantErrors).length === 0;
-    
+
     // Always set participant errors, even if parents validation failed
     setParticipantErrors(participantErrors);
-    
+
     return parentsValid && participantValid;
   };
 
@@ -351,10 +353,10 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     const parentsValid = validateAllParents();
     const participantErrors = validateParticipant();
     const participantValid = Object.keys(participantErrors).length === 0;
-    
+
     // Always set participant errors, even if parents validation failed
     setParticipantErrors(participantErrors);
-    
+
     return parentsValid && participantValid;
   }, [parents, participantData, validateParticipant]);
 
@@ -371,9 +373,9 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   const loadDataFromStorage = useCallback(() => {
     // Reset flag before loading
     isDataLoadedRef.current = false;
-    
+
     const savedData = loadStep1FormData();
-    
+
     if (savedData) {
       // Only update if data exists in sessionStorage
       if (savedData.parents && savedData.parents.length > 0) {
@@ -396,7 +398,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
         setAdditionalNotes(savedData.additionalNotes || '');
       }
     }
-    
+
     // Mark data as loaded after state updates are scheduled
     // Use requestAnimationFrame to ensure state updates are processed
     requestAnimationFrame(() => {
@@ -428,7 +430,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     if (!isDataLoadedRef.current) {
       return;
     }
-    
+
     const savedData = loadStep1FormData();
     const formData: Step1FormData = {
       parents,
@@ -1007,7 +1009,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
               <div>
                 <p className="text-sm font-bold text-gray-900 mb-1">Uwaga!</p>
                 <p className="text-xs sm:text-sm text-gray-700">
-                  Prosimy o dokładne wypełnienie wszystkich pól dotyczących stanu zdrowia uczestnika. 
+                  Prosimy o dokładne wypełnienie wszystkich pól dotyczących stanu zdrowia uczestnika.
                   Informacje te są niezbędne do zapewnienia odpowiedniej opieki podczas obozu.
                 </p>
               </div>

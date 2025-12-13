@@ -1,8 +1,3 @@
-import { Step1FormData } from './step1FormData';
-import { Step2FormData } from './step2FormData';
-import { Step3FormData } from './step3FormData';
-import { Step4FormData } from './step4FormData';
-
 export interface CreateReservationRequest {
   camp_id: number;
   property_id: number;

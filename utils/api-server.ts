@@ -4,11 +4,12 @@
  * This prevents hydration errors by ensuring data is available on initial render
  */
 
-import { getApiBaseUrl } from './api-config';
-import { CampProperty } from '@/types/campProperty';
-import { Camp } from '@/types/camp';
-import { CampWithProperty } from '@/types/campWithProperty';
 import { ApiErrorResponse } from '@/types/apiErrorResponse';
+import { Camp } from '@/types/camp';
+import { CampProperty } from '@/types/campProperty';
+import { CampWithProperty } from '@/types/campWithProperty';
+
+import { getApiBaseUrl } from './api-config';
 
 export type { CampProperty, Camp, CampWithProperty, ApiErrorResponse };
 
@@ -19,13 +20,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || g
 /**
  * Get camp edition by camp ID and edition ID
  * Used for routing: /camps/{campId}/edition/{editionId}
- * 
+ *
  * Returns data with exists flag - if camp/edition doesn't exist,
  * returns 200 OK with empty/default data (not an error)
  */
 export async function getCampEdition(
   campId: number,
-  editionId: number
+  editionId: number,
 ): Promise<CampWithProperty> {
   // Validate input parameters
   if (!campId || isNaN(campId) || campId < 1) {
@@ -33,23 +34,23 @@ export async function getCampEdition(
     return {
       camp: {
         id: 0,
-        name: "",
+        name: '',
         created_at: null,
         updated_at: null,
-        properties: null
+        properties: null,
       },
       property: {
         id: 0,
         camp_id: 0,
-        period: "",
-        city: "",
-        start_date: "1970-01-01",
-        end_date: "1970-01-01",
+        period: '',
+        city: '',
+        start_date: '1970-01-01',
+        end_date: '1970-01-01',
         days_count: 0,
         max_participants: 0,
         created_at: null,
-        updated_at: null
-      }
+        updated_at: null,
+      },
     };
   }
   if (!editionId || isNaN(editionId) || editionId < 1) {
@@ -57,29 +58,29 @@ export async function getCampEdition(
     return {
       camp: {
         id: 0,
-        name: "",
+        name: '',
         created_at: null,
         updated_at: null,
-        properties: null
+        properties: null,
       },
       property: {
         id: 0,
         camp_id: 0,
-        period: "",
-        city: "",
-        start_date: "1970-01-01",
-        end_date: "1970-01-01",
+        period: '',
+        city: '',
+        start_date: '1970-01-01',
+        end_date: '1970-01-01',
         days_count: 0,
         max_participants: 0,
         created_at: null,
-        updated_at: null
-      }
+        updated_at: null,
+      },
     };
   }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds max
-  
+
   try {
     const url = `${API_BASE_URL}/api/camps/${campId}/edition/${editionId}`;
     const response = await fetch(url, {
@@ -89,97 +90,97 @@ export async function getCampEdition(
         'Content-Type': 'application/json',
       },
     });
-    
+
     clearTimeout(timeoutId);
-    
+
     // Only treat 5xx as errors, 4xx and 200 are handled normally
     if (response.status >= 500) {
       throw new Error(`Server error: Unable to fetch camp data. Please try again later.`);
     }
-    
+
     const data: CampWithProperty = await response.json();
-    
+
     // Validate response structure
     if (!data || !data.camp || !data.property) {
       // Return empty data if structure is invalid (not an error)
       return {
         camp: {
           id: 0,
-          name: "",
+          name: '',
           created_at: null,
           updated_at: null,
-          properties: null
+          properties: null,
         },
         property: {
           id: 0,
           camp_id: 0,
-          period: "",
-          city: "",
-          start_date: "1970-01-01",
-          end_date: "1970-01-01",
+          period: '',
+          city: '',
+          start_date: '1970-01-01',
+          end_date: '1970-01-01',
           days_count: 0,
           max_participants: 0,
           created_at: null,
-          updated_at: null
-        }
+          updated_at: null,
+        },
       };
     }
-    
+
     // Check if camp/edition exists (id = 0 means doesn't exist)
     if (!data.camp.id || data.camp.id === 0 || !data.property.id || data.property.id === 0) {
       // Camp or edition doesn't exist - return empty data (not an error)
       return data;
     }
-    
+
     // Validate required fields for existing data
     if (!data.camp.name) {
       // Return empty data if name is missing (not an error)
       return {
         camp: {
           id: 0,
-          name: "",
+          name: '',
           created_at: null,
           updated_at: null,
-          properties: null
+          properties: null,
         },
         property: {
           id: 0,
           camp_id: 0,
-          period: "",
-          city: "",
-          start_date: "1970-01-01",
-          end_date: "1970-01-01",
+          period: '',
+          city: '',
+          start_date: '1970-01-01',
+          end_date: '1970-01-01',
           days_count: 0,
           max_participants: 0,
           created_at: null,
-          updated_at: null
-        }
+          updated_at: null,
+        },
       };
     }
-    
+
     // Ensure camp_id matches for existing data
     if (data.property.camp_id !== campId) {
       // Return empty data if mismatch (not an error)
       return {
         camp: {
           id: 0,
-          name: "",
+          name: '',
           created_at: null,
           updated_at: null,
-          properties: null
+          properties: null,
         },
         property: {
           id: 0,
           camp_id: 0,
-          period: "",
-          city: "",
-          start_date: "1970-01-01",
-          end_date: "1970-01-01",
+          period: '',
+          city: '',
+          start_date: '1970-01-01',
+          end_date: '1970-01-01',
           days_count: 0,
           max_participants: 0,
           created_at: null,
-          updated_at: null
-        }
+          updated_at: null,
+        },
       };
     }
     if (data.property.id !== editionId) {
@@ -187,26 +188,26 @@ export async function getCampEdition(
       return {
         camp: {
           id: 0,
-          name: "",
+          name: '',
           created_at: null,
           updated_at: null,
-          properties: null
+          properties: null,
         },
         property: {
           id: 0,
           camp_id: 0,
-          period: "",
-          city: "",
-          start_date: "1970-01-01",
-          end_date: "1970-01-01",
+          period: '',
+          city: '',
+          start_date: '1970-01-01',
+          end_date: '1970-01-01',
           days_count: 0,
           max_participants: 0,
           created_at: null,
-          updated_at: null
-        }
+          updated_at: null,
+        },
       };
     }
-    
+
     return data;
   } catch (error) {
     clearTimeout(timeoutId);
@@ -223,23 +224,23 @@ export async function getCampEdition(
     return {
       camp: {
         id: 0,
-        name: "",
+        name: '',
         created_at: null,
         updated_at: null,
-        properties: null
+        properties: null,
       },
       property: {
         id: 0,
         camp_id: 0,
-        period: "",
-        city: "",
-        start_date: "1970-01-01",
-        end_date: "1970-01-01",
+        period: '',
+        city: '',
+        start_date: '1970-01-01',
+        end_date: '1970-01-01',
         days_count: 0,
         max_participants: 0,
         created_at: null,
-        updated_at: null
-      }
+        updated_at: null,
+      },
     };
   }
 }
@@ -253,13 +254,13 @@ export async function getCampById(campId: number): Promise<Camp> {
       `${API_BASE_URL}/api/camps/${campId}`,
       {
         cache: 'no-store',
-      }
+      },
     );
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error(`Error fetching camp ${campId}:`, error);

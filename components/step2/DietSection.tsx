@@ -1,10 +1,12 @@
 'use client';
 
+import { Info } from 'lucide-react';
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
-import { Info, UtensilsCrossed } from 'lucide-react';
+
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
+import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 interface Diet {
   id: number;
@@ -21,7 +23,7 @@ interface Diet {
  */
 export default function DietSection() {
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
-  
+
   // Initialize with data from sessionStorage if available
   const getInitialSelectedDiets = (): Set<number> => {
     if (typeof window === 'undefined') return new Set();
@@ -31,7 +33,7 @@ export default function DietSection() {
     }
     return new Set();
   };
-  
+
   const [selectedDiets, setSelectedDiets] = useState<Set<number>>(getInitialSelectedDiets);
   const [diets, setDiets] = useState<Diet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,10 +95,10 @@ export default function DietSection() {
       const diet = diets.find(d => d.id === dietId);
       if (diet) {
         const reservationId = `diet-${dietId}`;
-        
+
         // Check if already exists in reservation
         const existing = reservation.items.find(
-          item => item.type === 'diet' && item.name === diet.name
+          item => item.type === 'diet' && item.name === diet.name,
         );
         if (!existing) {
           dietReservationIdsRef.current.set(dietId, reservationId);
@@ -111,7 +113,7 @@ export default function DietSection() {
         }
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [isInitialized, diets.length, reservation.items.length]);
 
   // Update reservation when diets change
@@ -136,7 +138,7 @@ export default function DietSection() {
           const diet = diets.find(d => d.id === dietId);
           if (diet) {
             const itemByName = reservation.items.find(
-              item => item.type === 'diet' && item.name === diet.name
+              item => item.type === 'diet' && item.name === diet.name,
             );
             if (itemByName) {
               removeReservationItem(itemByName.id);
@@ -152,9 +154,9 @@ export default function DietSection() {
       const diet = diets.find(d => d.id === dietId);
       if (diet) {
         const reservationId = `diet-${dietId}`;
-        
+
         const existingItem = reservation.items.find(item => item.id === reservationId);
-        
+
         if (!existingItem) {
           dietReservationIdsRef.current.set(dietId, reservationId);
           addReservationItem({
@@ -172,12 +174,12 @@ export default function DietSection() {
   // Save to sessionStorage whenever diets change
   useEffect(() => {
     if (!isInitialized) return;
-    
+
     const savedData = loadStep2FormData();
     const formData = {
       selectedAddons: savedData?.selectedAddons || [],
-      selectedProtection: Array.isArray(savedData?.selectedProtection) 
-        ? savedData.selectedProtection 
+      selectedProtection: Array.isArray(savedData?.selectedProtection)
+        ? savedData.selectedProtection
         : (savedData?.selectedProtection ? [savedData.selectedProtection] : []),
       selectedPromotion: savedData?.selectedPromotion || '',
       transportData: savedData?.transportData || {
@@ -262,10 +264,13 @@ export default function DietSection() {
                   {/* Icon or name in blue square */}
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center">
                     {diet.icon_url ? (
-                      <img
+                      <Image
                         src={getStaticAssetUrl(diet.icon_url) || ''}
                         alt={diet.name}
-                        className="w-full h-full object-contain"
+                        width={56}
+                        height={56}
+                        className="object-contain"
+                        unoptimized
                         onError={(e) => {
                           // If image fails to load, show name in blue square
                           const target = e.target as HTMLImageElement;

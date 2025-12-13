@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState, ReactNode } from 'react';
+
 import { authService } from '@/lib/services/AuthService';
 
 interface SectionGuardProps {
@@ -41,7 +42,7 @@ export default function SectionGuard({ children, section }: SectionGuardProps) {
 
       // Admin users have access to all sections
       const isAdmin = user.groups?.includes('admin') || false;
-      
+
       // Check if user has access to this section
       const hasAccess = isAdmin || user.accessible_sections?.includes(section) || false;
 
@@ -101,12 +102,4 @@ export default function SectionGuard({ children, section }: SectionGuardProps) {
 
   return <>{children}</>;
 }
-
-
-
-
-
-
-
-
 

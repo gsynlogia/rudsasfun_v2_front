@@ -18,7 +18,7 @@ interface DeleteConfirmationModalProps {
 /**
  * Universal Delete Confirmation Modal Component
  * Reusable component for confirming deletion of various items
- * 
+ *
  * @param isOpen - Whether the modal is visible
  * @param itemType - Type of item being deleted (camp, edition, etc.)
  * @param itemName - Name/title of the item being deleted
@@ -32,7 +32,7 @@ export default function DeleteConfirmationModal({
   isOpen,
   itemType,
   itemName,
-  itemId,
+  itemId: _itemId,
   additionalInfo,
   onConfirm,
   onCancel,

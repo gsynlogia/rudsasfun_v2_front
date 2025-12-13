@@ -1,9 +1,10 @@
 'use client';
 
+import { ArrowLeft, Save, Edit, MapPin, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
-import { ArrowLeft, Save, Edit, MapPin, Calendar, Plus } from 'lucide-react';
 import type { Camp, CampProperty } from '@/types/reservation';
 
 /**
@@ -67,13 +68,13 @@ export default function CampEditPage({ params }: { params: Promise<{ campId: str
       try {
         const resolvedParams = params instanceof Promise ? await params : params;
         const resolvedCampId = parseInt(resolvedParams.campId);
-        
+
         if (isNaN(resolvedCampId)) {
           setError('Nieprawidłowe parametry URL');
           setLoading(false);
           return;
         }
-        
+
         setCampId(resolvedCampId);
       } catch (err) {
         console.error('[CampEditPage] Error resolving params:', err);
@@ -81,7 +82,7 @@ export default function CampEditPage({ params }: { params: Promise<{ campId: str
         setLoading(false);
       }
     };
-    
+
     resolveParams();
   }, [params]);
 

@@ -1,14 +1,15 @@
 'use client';
 
-import AdminLayout from '@/components/admin/AdminLayout';
-import UsersManagement from '@/components/admin/UsersManagement';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+
+import AdminLayout from '@/components/admin/AdminLayout';
+import UsersManagement from '@/components/admin/UsersManagement';
 
 /**
  * Admin Panel - Settings Users Page
  * Route: /admin-panel/settings/users
- * 
+ *
  * Users management page with back button to settings
  */
 export default function SettingsUsersPage() {

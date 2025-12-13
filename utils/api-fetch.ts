@@ -3,8 +3,8 @@
  * Handles errors gracefully and provides default values when backend is unavailable
  */
 
+import { sendErrorToDiscord } from './api-auth';
 import { getApiBaseUrlRuntime } from './api-config';
-import { sendErrorToDiscord, BackendUnavailableError } from './api-auth';
 
 /**
  * Fetch data from API with default values fallback
@@ -13,7 +13,7 @@ import { sendErrorToDiscord, BackendUnavailableError } from './api-auth';
 export async function fetchWithDefaults<T>(
   endpoint: string,
   defaults: T,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const API_BASE_URL = getApiBaseUrlRuntime();
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
@@ -35,12 +35,12 @@ export async function fetchWithDefaults<T>(
     }
 
     const data = await response.json();
-    
+
     // If data is an array, return it; if it's an object with a list property, return that
     if (Array.isArray(data)) {
       return (data.length > 0 ? data : defaults) as T;
     }
-    
+
     if (data && typeof data === 'object') {
       // Check for common list properties
       if ('camps' in data && Array.isArray(data.camps)) {
@@ -58,7 +58,7 @@ export async function fetchWithDefaults<T>(
       if ('documents' in data && Array.isArray(data.documents)) {
         return (data.documents.length > 0 ? data : defaults) as T;
       }
-      
+
       // If object has data, return it; otherwise return defaults
       return (Object.keys(data).length > 0 ? data : defaults) as T;
     }
@@ -68,7 +68,7 @@ export async function fetchWithDefaults<T>(
     // Handle network errors (backend unavailable)
     if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
       console.error('[fetchWithDefaults] Backend unavailable:', endpoint);
-      
+
       // Send to Discord
       sendErrorToDiscord(error as Error, {
         endpoint,
@@ -102,9 +102,9 @@ export async function fetchWithDefaults<T>(
 export async function isBackendAvailable(): Promise<boolean> {
   const API_BASE_URL = getApiBaseUrlRuntime();
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, { 
+    const response = await fetch(`${API_BASE_URL}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(3000) // 3 second timeout
+      signal: AbortSignal.timeout(3000), // 3 second timeout
     });
     return response.ok;
   } catch {

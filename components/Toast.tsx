@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { useEffect } from 'react';
 
 export type ToastType = 'success' | 'warning' | 'error' | 'info';
 
@@ -110,11 +110,4 @@ export default function ToastComponent({ toast, onClose }: ToastProps) {
     </div>
   );
 }
-
-
-
-
-
-
-
 

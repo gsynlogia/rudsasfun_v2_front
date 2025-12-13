@@ -64,7 +64,7 @@ export default function RefundConfirmationModal({
               </p>
               <div className="bg-purple-50 border-l-4 border-purple-400 p-3 mb-4">
                 <p className="text-xs text-purple-700">
-                  Po potwierdzeniu element zostanie oznaczony jako "Zwrócone" i nie będzie można go już zmienić.
+                  Po potwierdzeniu element zostanie oznaczony jako &quot;Zwrócone&quot; i nie będzie można go już zmienić.
                 </p>
               </div>
             </>
@@ -81,7 +81,7 @@ export default function RefundConfirmationModal({
               </div>
               <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
                 <p className="text-xs text-blue-700">
-                  Element zostanie oznaczony jako "W trakcie zwrotu". Następnie będziesz mógł potwierdzić zwrot środków.
+                  Element zostanie oznaczony jako &quot;W trakcie zwrotu&quot;. Następnie będziesz mógł potwierdzić zwrot środków.
                 </p>
               </div>
             </>
@@ -141,14 +141,4 @@ export default function RefundConfirmationModal({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
 

@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { Info, Download } from 'lucide-react';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
+import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 interface Protection {
   id: string;  // Protection ID for compatibility
@@ -25,7 +27,7 @@ interface Protection {
 export default function ProtectionSection() {
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
   const pathname = usePathname();
-  
+
   // Initialize with data from sessionStorage if available
   const getInitialSelectedProtections = (): Set<string> => {
     if (typeof window === 'undefined') return new Set();
@@ -41,7 +43,7 @@ export default function ProtectionSection() {
     }
     return new Set();
   };
-  
+
   const [selectedProtections, setSelectedProtections] = useState<Set<string>>(getInitialSelectedProtections);
   const protectionReservationIdsRef = useRef<Map<string, string>>(new Map()); // Map: protectionId -> reservationItemId
   const [documents, setDocuments] = useState<Map<string, string>>(new Map()); // Map: document name -> file_url
@@ -55,12 +57,12 @@ export default function ProtectionSection() {
     const campIdIndex = pathParts.indexOf('camps');
     if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
       const campId = parseInt(pathParts[campIdIndex + 1], 10);
-      const propertyId = campIdIndex + 3 < pathParts.length 
-        ? parseInt(pathParts[campIdIndex + 3], 10) 
+      const propertyId = campIdIndex + 3 < pathParts.length
+        ? parseInt(pathParts[campIdIndex + 3], 10)
         : null;
-      return { 
-        campId: !isNaN(campId) ? campId : null, 
-        propertyId: propertyId && !isNaN(propertyId) ? propertyId : null 
+      return {
+        campId: !isNaN(campId) ? campId : null,
+        propertyId: propertyId && !isNaN(propertyId) ? propertyId : null,
       };
     }
     return { campId: null, propertyId: null };
@@ -70,7 +72,7 @@ export default function ProtectionSection() {
   useEffect(() => {
     const fetchProtections = async () => {
       const { campId, propertyId } = getCampIds();
-      
+
       if (!campId || !propertyId) {
         setLoading(false);
         return;
@@ -78,18 +80,18 @@ export default function ProtectionSection() {
 
       try {
         setLoading(true);
-        
+
         // Fetch protections assigned to this turnus
         const turnusProtectionsResponse = await fetch(
-          `${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/protections`
+          `${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/protections`,
         );
-        
+
         let protectionsList: any[] = [];
-        
+
         if (turnusProtectionsResponse.ok) {
           const turnusProtections = await turnusProtectionsResponse.json();
           protectionsList = Array.isArray(turnusProtections) ? turnusProtections : [];
-          
+
           // Filter out placeholders without relations
           protectionsList = protectionsList.filter((tp: any) => !tp.has_no_relations);
         } else if (turnusProtectionsResponse.status === 404) {
@@ -99,7 +101,7 @@ export default function ProtectionSection() {
             protectionsList = await generalProtectionsResponse.json();
           }
         }
-        
+
         // Map all protections from API
         const fetchedProtections: Protection[] = protectionsList.map((p: any, index: number) => ({
           id: `protection-${p.general_protection_id || p.id || index}`,
@@ -110,7 +112,7 @@ export default function ProtectionSection() {
           icon_svg: p.icon_svg,
           apiId: p.general_protection_id || p.id,
         }));
-        
+
         setProtections(fetchedProtections);
       } catch (err) {
         console.error('[ProtectionSection] Error fetching protections:', err);
@@ -165,8 +167,8 @@ export default function ProtectionSection() {
 
     const savedData = loadStep2FormData();
     const protectionsToRestore = savedData && savedData.selectedProtection
-      ? (Array.isArray(savedData.selectedProtection) 
-          ? savedData.selectedProtection 
+      ? (Array.isArray(savedData.selectedProtection)
+          ? savedData.selectedProtection
           : savedData.selectedProtection ? [savedData.selectedProtection] : [])
       : [];
 
@@ -175,15 +177,15 @@ export default function ProtectionSection() {
       const protection = protections.find(p => p.id === protectionId);
       if (protection) {
         const reservationId = `protection-${protectionId}`;
-        
+
         // Check if already exists in reservation
         const existing = reservation.items.find(
-          item => item.type === 'protection' && item.id === reservationId
+          item => item.type === 'protection' && item.id === reservationId,
         );
         if (!existing) {
           // Check if exists by name (for backward compatibility)
           const existingByName = reservation.items.find(
-            item => item.type === 'protection' && item.name === `Ochrona ${protection.name}`
+            item => item.type === 'protection' && item.name === `Ochrona ${protection.name}`,
           );
           if (!existingByName) {
             protectionReservationIdsRef.current.set(protectionId, reservationId);
@@ -202,7 +204,7 @@ export default function ProtectionSection() {
         }
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [isInitialized, reservation.items.length]);
 
   // Update reservation when protections change
@@ -227,7 +229,7 @@ export default function ProtectionSection() {
           const protection = protections.find(p => p.id === protectionId);
           if (protection) {
             const itemByName = reservation.items.find(
-              item => item.type === 'protection' && item.name === `Ochrona ${protection.name}`
+              item => item.type === 'protection' && item.name === `Ochrona ${protection.name}`,
             );
             if (itemByName) {
               removeReservationItem(itemByName.id);
@@ -243,9 +245,9 @@ export default function ProtectionSection() {
       const protection = protections.find(p => p.id === protectionId);
       if (protection) {
         const reservationId = `protection-${protectionId}`;
-        
+
         const existingItem = reservation.items.find(item => item.id === reservationId);
-        
+
         if (!existingItem) {
           protectionReservationIdsRef.current.set(protectionId, reservationId);
           addReservationItem({
@@ -263,7 +265,7 @@ export default function ProtectionSection() {
   // Save to sessionStorage whenever protections change
   useEffect(() => {
     if (!isInitialized) return;
-    
+
     const savedData = loadStep2FormData();
     const formData = {
       ...savedData,
@@ -317,22 +319,25 @@ export default function ProtectionSection() {
                 {/* Icon display from API */}
                 {protection.icon_url ? (
                   <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
-                    <img
+                    <Image
                       src={getStaticAssetUrl(protection.icon_url) || ''}
                       alt={protection.name}
-                      className={`w-full h-full object-contain max-w-full max-h-full ${
+                      width={40}
+                      height={40}
+                      className={`object-contain max-w-full max-h-full ${
                         isSelected ? 'brightness-0 invert' : ''
                       }`}
-                      style={{ 
-                        filter: isSelected ? 'brightness(0) invert(1)' : 'none'
+                      unoptimized
+                      style={{
+                        filter: isSelected ? 'brightness(0) invert(1)' : 'none',
                       }}
                     />
                   </div>
                 ) : protection.icon_svg ? (
-                  <div 
+                  <div
                     className="w-10 h-10 flex items-center justify-center flex-shrink-0 overflow-hidden"
-                    style={{ 
-                      filter: isSelected ? 'brightness(0) invert(1)' : 'none'
+                    style={{
+                      filter: isSelected ? 'brightness(0) invert(1)' : 'none',
                     }}
                     dangerouslySetInnerHTML={{
                       __html: protection.icon_svg.replace(
@@ -342,8 +347,8 @@ export default function ProtectionSection() {
                           attrs = attrs.replace(/\s*(width|height|style)=["'][^"']*["']/gi, '');
                           // Add fixed size and contain behavior
                           return `<svg${attrs} width="100%" height="100%" style="max-width: 100%; max-height: 100%; object-fit: contain;">`;
-                        }
-                      )
+                        },
+                      ),
                     }}
                   />
                 ) : (
@@ -397,13 +402,13 @@ export default function ProtectionSection() {
             // Map protection names to document keys
             const protectionNameUpper = protection.name.toUpperCase();
             let documentKey: string | null = null;
-            
+
             if (protectionNameUpper.includes('TARCZA') || protectionNameUpper.includes('SHIELD')) {
               documentKey = 'shield_protection';
             } else if (protectionNameUpper.includes('OAZA') || protectionNameUpper.includes('OASIS')) {
               documentKey = 'oasa_protection';
             }
-            
+
             if (documentKey && documents.has(documentKey)) {
               return (
                 <button

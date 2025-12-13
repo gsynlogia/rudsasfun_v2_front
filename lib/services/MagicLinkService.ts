@@ -3,10 +3,10 @@
  * Singleton service for handling passwordless authentication via email magic links
  */
 
-import { API_BASE_URL } from '@/utils/api-config';
 import { MagicLinkRequest } from '@/types/magicLinkRequest';
 import { MagicLinkResponse } from '@/types/magicLinkResponse';
 import { MagicLinkVerifyResponse } from '@/types/magicLinkVerifyResponse';
+import { API_BASE_URL } from '@/utils/api-config';
 
 export type { MagicLinkRequest, MagicLinkResponse, MagicLinkVerifyResponse };
 
@@ -62,8 +62,4 @@ class MagicLinkService {
 }
 
 export const magicLinkService = MagicLinkService.getInstance();
-
-
-
-
 

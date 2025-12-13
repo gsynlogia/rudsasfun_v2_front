@@ -4,12 +4,12 @@
  * Note: Magic link redirect is handled in utils/localStorage.ts
  */
 
+import { ReservationStorageState } from '@/types/reservationStorageState';
 import { Step1FormData } from '@/types/step1FormData';
 import { Step2FormData } from '@/types/step2FormData';
 import { Step3FormData } from '@/types/step3FormData';
 import { Step4FormData } from '@/types/step4FormData';
 import { Step5FormData } from '@/types/step5FormData';
-import { ReservationStorageState } from '@/types/reservationStorageState';
 
 export type { Step1FormData, Step2FormData, Step3FormData, Step4FormData, Step5FormData, ReservationStorageState };
 
@@ -41,7 +41,7 @@ function isStorageAvailable(): boolean {
  */
 export function saveStep1FormData(data: Step1FormData): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.setItem(STORAGE_KEYS.STEP1_FORM_DATA, JSON.stringify(data));
   } catch (error) {
@@ -54,7 +54,7 @@ export function saveStep1FormData(data: Step1FormData): void {
  */
 export function loadStep1FormData(): Step1FormData | null {
   if (!isStorageAvailable()) return null;
-  
+
   try {
     const data = sessionStorage.getItem(STORAGE_KEYS.STEP1_FORM_DATA);
     if (!data) return null;
@@ -70,7 +70,7 @@ export function loadStep1FormData(): Step1FormData | null {
  */
 export function clearStep1FormData(): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.removeItem(STORAGE_KEYS.STEP1_FORM_DATA);
   } catch (error) {
@@ -83,7 +83,7 @@ export function clearStep1FormData(): void {
  */
 export function saveReservationState(state: ReservationStorageState): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.setItem(STORAGE_KEYS.RESERVATION_STATE, JSON.stringify(state));
   } catch (error) {
@@ -96,7 +96,7 @@ export function saveReservationState(state: ReservationStorageState): void {
  */
 export function loadReservationState(): ReservationStorageState | null {
   if (!isStorageAvailable()) return null;
-  
+
   try {
     const data = sessionStorage.getItem(STORAGE_KEYS.RESERVATION_STATE);
     if (!data) return null;
@@ -112,7 +112,7 @@ export function loadReservationState(): ReservationStorageState | null {
  */
 export function clearReservationState(): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.removeItem(STORAGE_KEYS.RESERVATION_STATE);
   } catch (error) {
@@ -126,7 +126,7 @@ export function clearReservationState(): void {
  */
 export function saveStep2FormData(data: Step2FormData): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.setItem(STORAGE_KEYS.STEP2_FORM_DATA, JSON.stringify(data));
   } catch (error) {
@@ -139,7 +139,7 @@ export function saveStep2FormData(data: Step2FormData): void {
  */
 export function loadStep2FormData(): Step2FormData | null {
   if (!isStorageAvailable()) return null;
-  
+
   try {
     const data = sessionStorage.getItem(STORAGE_KEYS.STEP2_FORM_DATA);
     if (!data) return null;
@@ -155,7 +155,7 @@ export function loadStep2FormData(): Step2FormData | null {
  */
 export function clearStep2FormData(): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.removeItem(STORAGE_KEYS.STEP2_FORM_DATA);
   } catch (error) {
@@ -169,7 +169,7 @@ export function clearStep2FormData(): void {
  */
 export function saveStep3FormData(data: Step3FormData): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.setItem(STORAGE_KEYS.STEP3_FORM_DATA, JSON.stringify(data));
   } catch (error) {
@@ -182,7 +182,7 @@ export function saveStep3FormData(data: Step3FormData): void {
  */
 export function loadStep3FormData(): Step3FormData | null {
   if (!isStorageAvailable()) return null;
-  
+
   try {
     const data = sessionStorage.getItem(STORAGE_KEYS.STEP3_FORM_DATA);
     if (!data) return null;
@@ -198,7 +198,7 @@ export function loadStep3FormData(): Step3FormData | null {
  */
 export function clearStep3FormData(): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.removeItem(STORAGE_KEYS.STEP3_FORM_DATA);
   } catch (error) {
@@ -212,7 +212,7 @@ export function clearStep3FormData(): void {
  */
 export function saveStep4FormData(data: Step4FormData): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.setItem(STORAGE_KEYS.STEP4_FORM_DATA, JSON.stringify(data));
   } catch (error) {
@@ -225,7 +225,7 @@ export function saveStep4FormData(data: Step4FormData): void {
  */
 export function loadStep4FormData(): Step4FormData | null {
   if (!isStorageAvailable()) return null;
-  
+
   try {
     const data = sessionStorage.getItem(STORAGE_KEYS.STEP4_FORM_DATA);
     if (!data) return null;
@@ -241,7 +241,7 @@ export function loadStep4FormData(): Step4FormData | null {
  */
 export function clearStep4FormData(): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.removeItem(STORAGE_KEYS.STEP4_FORM_DATA);
   } catch (error) {
@@ -255,7 +255,7 @@ export function clearStep4FormData(): void {
  */
 export function saveStep5FormData(data: Step5FormData): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.setItem(STORAGE_KEYS.STEP5_FORM_DATA, JSON.stringify(data));
   } catch (error) {
@@ -268,7 +268,7 @@ export function saveStep5FormData(data: Step5FormData): void {
  */
 export function loadStep5FormData(): Step5FormData | null {
   if (!isStorageAvailable()) return null;
-  
+
   try {
     const data = sessionStorage.getItem(STORAGE_KEYS.STEP5_FORM_DATA);
     if (!data) return null;
@@ -284,7 +284,7 @@ export function loadStep5FormData(): Step5FormData | null {
  */
 export function clearStep5FormData(): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     sessionStorage.removeItem(STORAGE_KEYS.STEP5_FORM_DATA);
   } catch (error) {
@@ -303,6 +303,4 @@ export function clearAllSessionData(): void {
   clearStep5FormData();
   clearReservationState();
 }
-
-
 

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState, ReactNode } from 'react';
+
 import { authService } from '@/lib/services/AuthService';
 
 interface AuthGuardProps {
@@ -81,5 +82,4 @@ export default function AuthGuard({ children, requireAdmin = false }: AuthGuardP
 
   return <>{children}</>;
 }
-
 

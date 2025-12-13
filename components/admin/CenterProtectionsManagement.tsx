@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface GeneralProtectionRelation {
@@ -42,7 +43,7 @@ export default function CenterProtectionsManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProtection, setSelectedProtection] = useState<CenterProtection | null>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Form state
   const [protectionName, setProtectionName] = useState('');
   const [selectedGeneralProtectionIds, setSelectedGeneralProtectionIds] = useState<number[]>([]);
@@ -94,7 +95,7 @@ export default function CenterProtectionsManagement() {
     setSelectedProtection(protection);
     setProtectionName(protection.name);
     setProtectionDescription(protection.description || '');
-    
+
     // Set selected general protections and their prices
     const selectedIds: number[] = [];
     const prices: Record<number, number> = {};
@@ -104,7 +105,7 @@ export default function CenterProtectionsManagement() {
     });
     setSelectedGeneralProtectionIds(selectedIds);
     setGeneralProtectionPrices(prices);
-    
+
     setShowEditModal(true);
   };
 
@@ -130,7 +131,7 @@ export default function CenterProtectionsManagement() {
       // Build general protections list with prices
       const generalProtectionsList = selectedGeneralProtectionIds.map(generalProtectionId => ({
         general_protection_id: generalProtectionId,
-        price: Number(generalProtectionPrices[generalProtectionId]) || 0  // Cannot be negative
+        price: Number(generalProtectionPrices[generalProtectionId]) || 0,  // Cannot be negative
       }));
 
       const protectionData = {
@@ -226,7 +227,7 @@ export default function CenterProtectionsManagement() {
             {protections.length === 0 ? (
               <tr>
                 <td colSpan={3} className="px-6 py-8 text-center text-sm text-gray-500">
-                  Brak ochron dla ośrodków. Kliknij "Dodaj ochronę", aby utworzyć nową.
+                  Brak ochron dla ośrodków. Kliknij &quot;Dodaj ochronę&quot;, aby utworzyć nową.
                 </td>
               </tr>
             ) : (
@@ -336,7 +337,7 @@ export default function CenterProtectionsManagement() {
                                 setSelectedGeneralProtectionIds([...selectedGeneralProtectionIds, gp.id]);
                                 setGeneralProtectionPrices({
                                   ...generalProtectionPrices,
-                                  [gp.id]: gp.price  // Prefill with general protection's price
+                                  [gp.id]: gp.price,  // Prefill with general protection's price
                                 });
                               } else {
                                 setSelectedGeneralProtectionIds(selectedGeneralProtectionIds.filter(id => id !== gp.id));
@@ -382,7 +383,7 @@ export default function CenterProtectionsManagement() {
                               }
                               setGeneralProtectionPrices({
                                 ...generalProtectionPrices,
-                                [generalProtectionId]: price
+                                [generalProtectionId]: price,
                               });
                             }}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
@@ -445,9 +446,4 @@ export default function CenterProtectionsManagement() {
     </div>
   );
 }
-
-
-
-
-
 

@@ -18,7 +18,7 @@ export interface UniversalModalProps {
 /**
  * Universal Modal Component
  * Reusable modal component with consistent styling matching DeleteConfirmationModal
- * 
+ *
  * @param isOpen - Whether the modal is visible
  * @param title - Modal title
  * @param onClose - Callback when modal should be closed
@@ -41,7 +41,7 @@ export default function UniversalModal({
   // Handle Escape key - must be before early return
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
-    
+
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
@@ -130,14 +130,4 @@ export default function UniversalModal({
     </>
   );
 }
-
-
-
-
-
-
-
-
-
-
 

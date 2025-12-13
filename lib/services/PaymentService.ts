@@ -3,13 +3,13 @@
  * Singleton service for handling payment operations with Tpay integration
  */
 
-import { API_BASE_URL } from '@/utils/api-config';
 import { authService } from '@/lib/services/AuthService';
 import { CreatePaymentRequest } from '@/types/createPaymentRequest';
 import { CreatePaymentResponse } from '@/types/createPaymentResponse';
-import { PaymentStatusResponse } from '@/types/paymentStatusResponse';
-import { PaymentResponse } from '@/types/paymentResponse';
 import { PaymentMethodsResponse } from '@/types/paymentMethodsResponse';
+import { PaymentResponse } from '@/types/paymentResponse';
+import { PaymentStatusResponse } from '@/types/paymentStatusResponse';
+import { API_BASE_URL } from '@/utils/api-config';
 
 export type { CreatePaymentRequest, CreatePaymentResponse, PaymentStatusResponse, PaymentResponse, PaymentMethodsResponse };
 
@@ -66,7 +66,7 @@ class PaymentService {
   async getPaymentStatus(transactionId: string): Promise<PaymentStatusResponse> {
     // Get auth token for authenticated request
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated. Please log in to get payment status.');
     }
@@ -108,7 +108,7 @@ class PaymentService {
   async getPaymentMethods(): Promise<PaymentMethodsResponse> {
     // Get auth token for authenticated request
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated. Please log in to get payment methods.');
     }
@@ -151,7 +151,7 @@ class PaymentService {
   async syncPaymentStatus(transactionId: string): Promise<PaymentResponse> {
     // Get auth token for authenticated request
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated. Please log in to sync payment status.');
     }
@@ -191,7 +191,7 @@ class PaymentService {
     try {
       // Get auth token for authenticated request
       const token = authService.getToken();
-      
+
       if (!token) {
         throw new Error('Not authenticated. Please log in to list payments.');
       }

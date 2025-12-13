@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState, ReactNode } from 'react';
+
 import { authService } from '@/lib/services/AuthService';
 import { saveMagicLinkRedirect } from '@/utils/localStorage';
 

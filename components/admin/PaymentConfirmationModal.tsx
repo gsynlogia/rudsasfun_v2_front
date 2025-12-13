@@ -54,7 +54,7 @@ export default function PaymentConfirmationModal({
           <p className="text-sm text-gray-600 mb-4">
             Czy na pewno chcesz potwierdzić ręczną płatność dla rezerwacji <strong>{reservationName}</strong>?
           </p>
-          
+
           <div className="bg-gray-50 rounded p-3 mb-4">
             <p className="text-xs text-gray-500 mb-1">Uczestnik:</p>
             <p className="text-sm font-medium text-gray-900">{participantName}</p>
@@ -120,14 +120,4 @@ export default function PaymentConfirmationModal({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
 

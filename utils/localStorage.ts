@@ -28,7 +28,7 @@ function isStorageAvailable(): boolean {
  */
 export function saveMagicLinkRedirect(redirectUrl: string): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     localStorage.setItem(STORAGE_KEYS.MAGIC_LINK_REDIRECT, redirectUrl);
   } catch (error) {
@@ -42,7 +42,7 @@ export function saveMagicLinkRedirect(redirectUrl: string): void {
  */
 export function loadMagicLinkRedirect(): string | null {
   if (!isStorageAvailable()) return null;
-  
+
   try {
     return localStorage.getItem(STORAGE_KEYS.MAGIC_LINK_REDIRECT);
   } catch (error) {
@@ -57,18 +57,11 @@ export function loadMagicLinkRedirect(): string | null {
  */
 export function clearMagicLinkRedirect(): void {
   if (!isStorageAvailable()) return;
-  
+
   try {
     localStorage.removeItem(STORAGE_KEYS.MAGIC_LINK_REDIRECT);
   } catch (error) {
     console.error('Error clearing magic link redirect from localStorage:', error);
   }
 }
-
-
-
-
-
-
-
 

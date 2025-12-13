@@ -1,7 +1,9 @@
 'use client';
 
 import { ReactNode } from 'react';
+
 import HeaderTop from '../HeaderTop';
+
 import AdminSidebar from './AdminSidebar';
 
 interface AdminLayoutProps {
@@ -18,17 +20,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     <div className="min-h-screen w-full bg-gray-50">
       {/* Top Bar - Fixed position, stays at top when scrolling */}
       <HeaderTop fixed={true} />
-      
+
       {/* Sidebar positioned absolutely, starting from bottom edge of header (84px) */}
       <AdminSidebar />
 
       {/* Main Content Area - Add padding-top to account for fixed header (84px) */}
       <div className="flex" style={{ paddingTop: '84px' }}>
         {/* Spacer for sidebar width - fixed 256px */}
-        <div 
-          className="flex-shrink-0" 
-          style={{ 
-            width: '256px'
+        <div
+          className="flex-shrink-0"
+          style={{
+            width: '256px',
           }}
         />
 

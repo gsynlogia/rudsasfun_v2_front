@@ -1,21 +1,22 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { 
-  Tent, 
-  CreditCard, 
-  Calendar, 
+import {
+  Tent,
+  CreditCard,
+  Calendar,
   Truck,
   UtensilsCrossed,
   FileText,
-  Settings, 
+  Settings,
   LogOut,
   Tag,
   Shield,
-  Sparkles
+  Sparkles,
 } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
 import { authService } from '@/lib/services/AuthService';
 
 /**
@@ -145,22 +146,22 @@ export default function AdminSidebar() {
   // Filter menu items based on accessible sections
   // Admin users have access to all sections
   const user = authService.getCurrentUser();
-  
+
   // Interface with default values
   interface UserWithDefaults {
     groups: string[];
   }
-  
+
   const defaultUser: UserWithDefaults = {
     groups: [],
   };
-  
+
   const userWithDefaults: UserWithDefaults = user || defaultUser;
   const isAdmin = userWithDefaults.groups.includes('admin');
-  const baseMenuItems = isAdmin 
-    ? menuItemsWithSuperFunctions 
+  const baseMenuItems = isAdmin
+    ? menuItemsWithSuperFunctions
     : menuItemsWithSuperFunctions.filter(item => accessibleSections.includes(item.section));
-  
+
   // Filter out super-functions if not user ID 0
   const menuItems = baseMenuItems.filter(item => {
     if (item.key === 'super-functions') {
@@ -184,7 +185,7 @@ export default function AdminSidebar() {
   return (
     <div
       className="fixed left-0 bg-white border-r border-gray-200 z-40"
-      style={{ 
+      style={{
         borderRadius: 0,
         width: '256px',
         top: '84px',
@@ -202,14 +203,14 @@ export default function AdminSidebar() {
             menuItems.map((item, index) => {
               const Icon = item.icon;
               const active = isActive(item.href);
-              
+
               return (
                 <div key={item.key}>
                   {/* Separator - Full width */}
                   {index > 0 && (
                     <div className="h-px bg-gray-200 w-full" />
                   )}
-                  
+
                   <Link
                     href={item.href}
                     className={`flex items-center transition-colors ${
@@ -217,7 +218,7 @@ export default function AdminSidebar() {
                         ? 'bg-[#E0F2FF]'
                         : 'bg-white hover:bg-gray-50 active:bg-gray-100'
                     }`}
-                    style={{ 
+                    style={{
                       height: '60px',
                       paddingLeft: '24px',
                       paddingRight: '24px',
@@ -226,7 +227,7 @@ export default function AdminSidebar() {
                       cursor: 'pointer',
                     }}
                   >
-                    <Icon 
+                    <Icon
                       className="flex-shrink-0"
                       style={{
                         width: '22px',
@@ -235,7 +236,7 @@ export default function AdminSidebar() {
                         color: active ? '#0F172A' : '#9CA3AF',
                       }}
                     />
-                    <span 
+                    <span
                       className="flex-1 ml-4"
                       style={{
                         fontSize: '16px',
@@ -261,7 +262,7 @@ export default function AdminSidebar() {
           <button
             onClick={handleLogout}
             className="flex items-center w-full bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors"
-            style={{ 
+            style={{
               height: '60px',
               paddingLeft: '24px',
               paddingRight: '24px',
@@ -270,7 +271,7 @@ export default function AdminSidebar() {
               cursor: 'pointer',
             }}
           >
-            <LogOut 
+            <LogOut
               className="flex-shrink-0"
               style={{
                 width: '22px',
@@ -279,7 +280,7 @@ export default function AdminSidebar() {
                 color: '#9CA3AF',
               }}
             />
-            <span 
+            <span
               className="flex-1 ml-4"
               style={{
                 fontSize: '16px',

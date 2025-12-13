@@ -30,13 +30,13 @@ export default function AdditionalServicesGrid() {
       {services.map((service) => {
         const Icon = service.icon;
         const isKieszonkowe = service.id === 'kieszonkowe';
-        
+
         return (
           <div
             key={service.id}
             className={`
               p-2 sm:p-3 md:p-4 rounded-lg border-2 flex flex-col items-center gap-1.5 sm:gap-2 md:gap-3
-              ${service.active 
+              ${service.active
                 ? isKieszonkowe
                   ? 'bg-[#EAF6FE] border-[#03adf0]'
                   : 'bg-white border-[#03adf0]'
@@ -44,11 +44,11 @@ export default function AdditionalServicesGrid() {
               }
             `}
           >
-            <Icon 
+            <Icon
               className={`
                 w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8
                 ${service.active ? 'text-[#03adf0]' : 'text-gray-400'}
-              `} 
+              `}
             />
             <span className={`text-[10px] sm:text-xs text-center ${service.active ? 'text-gray-900' : 'text-gray-500'}`}>
               {service.name}

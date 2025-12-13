@@ -1,11 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { clearAllSessionData } from '@/utils/sessionStorage';
+
 import { reservationService } from '@/lib/services/ReservationService';
+import { clearAllSessionData } from '@/utils/sessionStorage';
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
@@ -20,19 +21,19 @@ function PaymentSuccessContent() {
     const reservationIdParam = searchParams.get('reservation_id');
     const serviceParam = searchParams.get('service'); // Addon ID or protection ID
     const typeParam = searchParams.get('type'); // 'addon' or 'protection'
-    
+
     setOrderId(orderIdParam);
     setTransactionId(trIdParam);
-    
+
     // Clear all session storage data after successful payment
     // This is the ONLY place where we clear session storage
     clearAllSessionData();
-    
+
     // If this is an addon payment, update selected_addons in reservation
     if (reservationIdParam && serviceParam && typeParam === 'addon') {
       const reservationId = parseInt(reservationIdParam, 10);
       const addonId = serviceParam;
-      
+
       if (!isNaN(reservationId) && addonId) {
         // Update reservation with addon (as backup if webhook didn't work)
         reservationService.addAddonToReservation(reservationId, addonId)
@@ -45,16 +46,16 @@ function PaymentSuccessContent() {
           });
       }
     }
-    
+
     // Automatically redirect to current reservations page
     // Wait a moment to show success message, then redirect
     const redirectTimer = setTimeout(() => {
-      const redirectUrl = reservationIdParam 
+      const redirectUrl = reservationIdParam
         ? `/profil/aktualne-rezerwacje?payment=success&reservation_id=${reservationIdParam}`
         : `/profil/aktualne-rezerwacje?payment=success`;
       router.push(redirectUrl);
     }, 2000); // 2 second delay to show success message
-    
+
     return () => clearTimeout(redirectTimer);
   }, [searchParams, router]);
 

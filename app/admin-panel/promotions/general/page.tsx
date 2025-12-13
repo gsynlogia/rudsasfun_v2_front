@@ -1,8 +1,8 @@
 'use client';
 
 import AdminLayout from '@/components/admin/AdminLayout';
-import SectionGuard from '@/components/admin/SectionGuard';
 import GeneralPromotionsManagement from '@/components/admin/GeneralPromotionsManagement';
+import SectionGuard from '@/components/admin/SectionGuard';
 
 export default function GeneralPromotionsPage() {
   return (
