@@ -5,59 +5,16 @@
  */
 
 import { getApiBaseUrl } from './api-config';
+import { CampProperty } from '@/types/campProperty';
+import { Camp } from '@/types/camp';
+import { CampWithProperty } from '@/types/campWithProperty';
+import { ApiErrorResponse } from '@/types/apiErrorResponse';
+
+export type { CampProperty, Camp, CampWithProperty, ApiErrorResponse };
 
 // Use NEXT_PUBLIC_ prefix for client-side, or direct URL for server-side
 // For server-side, we need to check environment differently
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || getApiBaseUrl();
-
-/**
- * CampProperty interface - 1:1 with backend CampPropertyResponse
- * All fields match exactly with backend JSON response
- */
-export interface CampProperty {
-  id: number;
-  camp_id: number;
-  period: string; // "lato" | "zima"
-  city: string;
-  start_date: string; // ISO date string
-  end_date: string; // ISO date string
-  days_count: number;
-  max_participants: number; // Maximum number of participants for this turnus
-  use_default_diet?: boolean; // Whether to use default diets for this turnus
-  registered_count?: number; // Number of registered participants (calculated dynamically)
-  is_full?: boolean; // Whether turnus is full (registered_count >= max_participants)
-  is_ended?: boolean; // Whether turnus has ended (end_date < today)
-  created_at?: string | null; // ISO datetime string or null
-  updated_at?: string | null; // ISO datetime string or null
-}
-
-/**
- * Camp interface - 1:1 with backend CampResponse
- * All fields match exactly with backend JSON response
- */
-export interface Camp {
-  id: number;
-  name: string;
-  created_at?: string | null; // ISO datetime string or null
-  updated_at?: string | null; // ISO datetime string or null
-  properties?: CampProperty[] | null; // Optional list of properties
-}
-
-/**
- * CampWithProperty interface - 1:1 with backend CampWithPropertyResponse
- * All fields match exactly with backend JSON response
- */
-export interface CampWithProperty {
-  camp: Camp;
-  property: CampProperty;
-}
-
-/**
- * API Error Response interface - matches backend error format
- */
-export interface ApiErrorResponse {
-  detail: string;
-}
 
 /**
  * Get camp edition by camp ID and edition ID

@@ -4,6 +4,15 @@
  * Note: Magic link redirect is handled in utils/localStorage.ts
  */
 
+import { Step1FormData } from '@/types/step1FormData';
+import { Step2FormData } from '@/types/step2FormData';
+import { Step3FormData } from '@/types/step3FormData';
+import { Step4FormData } from '@/types/step4FormData';
+import { Step5FormData } from '@/types/step5FormData';
+import { ReservationStorageState } from '@/types/reservationStorageState';
+
+export type { Step1FormData, Step2FormData, Step3FormData, Step4FormData, Step5FormData, ReservationStorageState };
+
 const STORAGE_KEYS = {
   STEP1_FORM_DATA: 'radsasfun_step1_form_data',
   STEP2_FORM_DATA: 'radsasfun_step2_form_data',
@@ -12,62 +21,6 @@ const STORAGE_KEYS = {
   STEP5_FORM_DATA: 'radsasfun_step5_form_data',
   RESERVATION_STATE: 'radsasfun_reservation_state', // Stays in sessionStorage
 } as const;
-
-export interface Step1FormData {
-  parents: Array<{
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    phoneNumber: string;
-    street: string;
-    postalCode: string;
-    city: string;
-  }>;
-  participantData: {
-    firstName: string;
-    lastName: string;
-    age: string;
-    gender: string;
-    city: string;
-    selectedParticipant: string;
-  };
-  selectedDietId: number | null; // ID of selected diet from database
-  accommodationRequest: string;
-  healthQuestions: {
-    chronicDiseases: string;
-    dysfunctions: string;
-    psychiatric: string;
-  };
-  healthDetails: {
-    chronicDiseases: string;
-    dysfunctions: string;
-    psychiatric: string;
-  };
-  additionalNotes: string;
-}
-
-export interface ReservationStorageState {
-  basePrice: number;
-  items: Array<{
-    id: string;
-    name: string;
-    price: number;
-    type: 'base' | 'diet' | 'accommodation' | 'addon' | 'protection' | 'promotion' | 'transport' | 'source' | 'other';
-  }>;
-  totalPrice: number;
-  camp?: {
-    id: number;
-    name: string;
-    properties: {
-      period: string;
-      city: string;
-      start_date: string;
-      end_date: string;
-    };
-  };
-}
 
 /**
  * Check if sessionStorage is available
@@ -167,24 +120,6 @@ export function clearReservationState(): void {
   }
 }
 
-export interface Step2FormData {
-  selectedDiets?: number[]; // Array of diet IDs
-  selectedAddons: string[];
-  selectedProtection: string[]; // Array of protection IDs (can select multiple) - for old ProtectionSection (Tarcza, Oaza)
-  selectedProtectionIds?: number[]; // Array of protection IDs from API (can select multiple) - for new ProtectionsSection
-  selectedPromotion: string;
-  promotionJustification?: Record<string, any>;  // JSON field for promotion justification
-  transportData: {
-    departureType: string;
-    departureCity: string;
-    returnType: string;
-    returnCity: string;
-    differentCities?: boolean;  // True if departure and return cities are different
-  };
-  transportModalConfirmed?: boolean; // Whether the different cities modal has been confirmed
-  selectedSource: string; // 'kolejna' | 'znajomi' | 'internet' | 'wycieczka' | 'inne' | ''
-  inneText: string;
-}
 
 /**
  * Save Step2 form data to sessionStorage
@@ -228,33 +163,6 @@ export function clearStep2FormData(): void {
   }
 }
 
-export interface Step3FormData {
-  invoiceType: 'private' | 'company';
-  privateData: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    street: string;
-    postalCode: string;
-    city: string;
-    nip: string;
-  };
-  companyData: {
-    companyName: string;
-    nip: string;
-    street: string;
-    postalCode: string;
-    city: string;
-  };
-  deliveryType: 'electronic' | 'paper';
-  differentAddress: boolean;
-  deliveryAddress: {
-    street: string;
-    postalCode: string;
-    city: string;
-  };
-}
 
 /**
  * Save Step3 form data to sessionStorage
@@ -298,13 +206,6 @@ export function clearStep3FormData(): void {
   }
 }
 
-export interface Step4FormData {
-  selectAllConsents: boolean;
-  consent1: boolean; // Regulamin portalu i Polityka prywatności
-  consent2: boolean; // Warunki uczestnictwa
-  consent3: boolean; // Zgoda na zdjęcia
-  consent4: boolean; // Składka na fundusze gwarancyjne
-}
 
 /**
  * Save Step4 form data to sessionStorage
@@ -348,12 +249,6 @@ export function clearStep4FormData(): void {
   }
 }
 
-export interface Step5FormData {
-  payNow: boolean; // Keep for backward compatibility
-  paymentMethod: 'online' | 'transfer' | 'blik' | '';
-  paymentAmount: 'full' | 'deposit' | '';
-  paymentInstallments?: 'full' | '2' | '3';
-}
 
 /**
  * Save Step5 form data to sessionStorage

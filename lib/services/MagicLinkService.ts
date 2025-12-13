@@ -1,35 +1,26 @@
 /**
  * Magic Link Service
- * Handles passwordless authentication via email magic links
+ * Singleton service for handling passwordless authentication via email magic links
  */
 
 import { API_BASE_URL } from '@/utils/api-config';
+import { MagicLinkRequest } from '@/types/magicLinkRequest';
+import { MagicLinkResponse } from '@/types/magicLinkResponse';
+import { MagicLinkVerifyResponse } from '@/types/magicLinkVerifyResponse';
 
-export interface MagicLinkRequest {
-  email: string;
-}
-
-export interface MagicLinkResponse {
-  message: string;
-  success: boolean;
-}
-
-export interface MagicLinkVerifyResponse {
-  access_token: string;
-  token_type: string;
-  user: {
-    id: number;
-    login: string;
-    email?: string;
-    user_type: string;
-    groups: string[];
-    accessible_sections: string[];
-    created_at?: string;
-    updated_at?: string;
-  };
-}
+export type { MagicLinkRequest, MagicLinkResponse, MagicLinkVerifyResponse };
 
 class MagicLinkService {
+  private static instance: MagicLinkService;
+
+  private constructor() {}
+
+  static getInstance(): MagicLinkService {
+    if (!MagicLinkService.instance) {
+      MagicLinkService.instance = new MagicLinkService();
+    }
+    return MagicLinkService.instance;
+  }
   /**
    * Request a magic link to be sent to the provided email
    */
@@ -70,7 +61,7 @@ class MagicLinkService {
   }
 }
 
-export const magicLinkService = new MagicLinkService();
+export const magicLinkService = MagicLinkService.getInstance();
 
 
 

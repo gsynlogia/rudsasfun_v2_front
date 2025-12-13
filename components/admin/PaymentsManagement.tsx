@@ -410,7 +410,7 @@ const generatePaymentItems = async (
           total: installmentCount,
           amount: actualAmount, // Use actual amount from database for paid, calculated for unpaid
           paid: isPaid,
-          paidDate: isPaid && installmentPaymentData?.payment?.paid_at 
+          paidDate: isPaid && installmentPaymentData?.payment && installmentPaymentData.payment.paid_at
             ? installmentPaymentData.payment.paid_at.split('T')[0] 
             : undefined,
           paymentMethod: isPaid && installmentPaymentData?.payment
@@ -483,7 +483,7 @@ const generatePaymentItems = async (
           total: installmentCount,
           amount: actualAmount, // Use actual amount from database for paid, calculated for unpaid
           paid: isPaid,
-          paidDate: isPaid && installmentPaymentData?.payment?.paid_at 
+          paidDate: isPaid && installmentPaymentData?.payment && installmentPaymentData.payment.paid_at
             ? installmentPaymentData.payment.paid_at.split('T')[0] 
             : undefined,
           paymentMethod: isPaid && installmentPaymentData?.payment

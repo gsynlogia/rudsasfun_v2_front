@@ -67,7 +67,7 @@ export default function Layout({
           ) : error ? (
             'Błąd ładowania danych obozu'
           ) : camp ? (
-            `Rezerwacja obozu "${camp.name}" - ${camp.period === 'lato' ? 'Lato' : 'Zima'} ${new Date(camp.start_date).getFullYear()} - ${camp.city} - ${formatDateRange(camp.start_date, camp.end_date)} (${camp.days_count} ${camp.days_count === 1 ? 'dzień' : 'dni'})`
+            `Rezerwacja obozu "${camp.name}" - ${(camp.period || 'lato') === 'lato' ? 'Lato' : 'Zima'} ${camp.start_date ? new Date(camp.start_date).getFullYear() : ''} - ${camp.city || ''} - ${camp.start_date && camp.end_date ? formatDateRange(camp.start_date, camp.end_date) : ''} ${camp.days_count ? `(${camp.days_count} ${camp.days_count === 1 ? 'dzień' : 'dni'})` : ''}`
           ) : (
             'Rezerwacja obozu'
           )}

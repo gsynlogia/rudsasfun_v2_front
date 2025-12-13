@@ -1,178 +1,32 @@
 /**
  * Reservation Service
- * Service for handling reservation operations with backend API
+ * Singleton service for handling reservation operations with backend API
  */
 
 import { API_BASE_URL } from '@/utils/api-config';
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { Step1FormData } from '@/types/step1FormData';
+import { Step2FormData } from '@/types/step2FormData';
+import { Step3FormData } from '@/types/step3FormData';
+import { Step4FormData } from '@/types/step4FormData';
+import { CreateReservationRequest } from '@/types/createReservationRequest';
+import { ReservationResponse } from '@/types/reservationResponse';
+import { ValidationErrorDetail } from '@/types/validationErrorDetail';
+import { ValidationErrorResponse } from '@/types/validationErrorResponse';
 
-// Import types from sessionStorage
-import type {
-  Step1FormData,
-  Step2FormData,
-  Step3FormData,
-  Step4FormData,
-} from '@/utils/sessionStorage';
-import { authService } from '@/lib/services/AuthService';
-
-export interface CreateReservationRequest {
-  camp_id: number;
-  property_id: number;
-  step1: {
-    parents: Array<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string | null; // null for second parent if email not provided
-      phone: string;
-      phoneNumber: string;
-      street: string;
-      postalCode: string;
-      city: string;
-    }>;
-    participantData: {
-      firstName: string;
-      lastName: string;
-      age: string;
-      gender: string;
-      city: string;
-      selectedParticipant?: string;
-    };
-    selectedDietId: number | null;
-    accommodationRequest?: string;
-    healthQuestions?: {
-      chronicDiseases: string;
-      dysfunctions: string;
-      psychiatric: string;
-    };
-    healthDetails?: {
-      chronicDiseases: string;
-      dysfunctions: string;
-      psychiatric: string;
-    };
-    additionalNotes?: string;
-  };
-  step2: {
-    selectedDiets?: number[];
-    selectedAddons?: string[];
-    selectedProtection?: string[]; // Array of protection IDs
-    selectedPromotion?: string;
-    promotionJustification?: Record<string, any> | null;
-    transportData: {
-      departureType: 'zbiorowy' | 'wlasny';
-      departureCity?: string;
-      returnType: 'zbiorowy' | 'wlasny';
-      returnCity?: string;
-      differentCities?: boolean;
-    };
-    selectedSource: string;
-    inneText?: string;
-  };
-  step3: {
-    invoiceType: 'private' | 'company';
-    privateData?: {
-      firstName: string;
-      lastName: string;
-      email: string;
-      phone: string;
-      street: string;
-      postalCode: string;
-      city: string;
-      nip?: string;
-    };
-    companyData?: {
-      companyName: string;
-      nip: string;
-      street: string;
-      postalCode: string;
-      city: string;
-    };
-    deliveryType: 'electronic' | 'paper';
-    deliveryDifferentAddress: boolean;
-    deliveryStreet?: string;
-    deliveryPostalCode?: string;
-    deliveryCity?: string;
-  };
-  step4: {
-    consent1: boolean;
-    consent2: boolean;
-    consent3: boolean;
-    consent4: boolean;
-  };
-  total_price: number;
-  deposit_amount?: number;
-}
-
-export interface ReservationResponse {
-  id: number;
-  camp_id: number;
-  property_id: number;
-  status: string;
-  total_price: number;
-  deposit_amount: number | null;
-  created_at: string;
-  updated_at: string;
-  camp_name: string | null;
-  property_name: string | null;
-  property_city: string | null;
-  property_period: string | null;
-  property_start_date?: string | null;
-  property_end_date?: string | null;
-  participant_first_name: string | null;
-  participant_last_name: string | null;
-  participant_age: string | null;
-  participant_gender: string | null;
-  participant_city: string | null;
-  parents_data: Array<{
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    phoneNumber: string;
-    street: string;
-    postalCode: string;
-    city: string;
-  }> | null;
-  invoice_type: string | null;
-  invoice_first_name: string | null;
-  invoice_last_name: string | null;
-  invoice_email: string | null;
-  invoice_phone: string | null;
-  invoice_company_name: string | null;
-  invoice_nip: string | null;
-  invoice_street: string | null;
-  invoice_postal_code: string | null;
-  invoice_city: string | null;
-  departure_type: string | null;
-  departure_city: string | null;
-  return_type: string | null;
-  return_city: string | null;
-  diet: number | null;
-  diet_name: string | null;
-  accommodation_request: string | null;
-  selected_source: string | null;
-  source_name: string | null;
-  selected_addons?: string[] | null;
-  selected_protection?: string[] | null;
-  contract_status?: string | null;
-  contract_rejection_reason?: string | null;
-  qualification_card_status?: string | null;
-  qualification_card_rejection_reason?: string | null;
-  payment_plan?: string | null; // 'full', '2', '3' - selected payment method
-}
-
-export interface ValidationErrorDetail {
-  field: string;
-  message: string;
-}
-
-export interface ValidationErrorResponse {
-  error: string;
-  details: ValidationErrorDetail[];
-}
+export type { CreateReservationRequest, ReservationResponse, ValidationErrorDetail, ValidationErrorResponse };
 
 class ReservationService {
+  private static instance: ReservationService;
+
+  private constructor() {}
+
+  static getInstance(): ReservationService {
+    if (!ReservationService.instance) {
+      ReservationService.instance = new ReservationService();
+    }
+    return ReservationService.instance;
+  }
   private API_URL = `${API_BASE_URL}/api/reservations`;
 
   /**
@@ -300,9 +154,9 @@ class ReservationService {
         // Email is optional for second parent according to schema
         if (index === 1) {
           const hasRequiredFields = 
-            !!(parent.firstName?.trim()) && 
-            !!(parent.lastName?.trim()) && 
-            !!(parent.phoneNumber?.trim());
+            !!(parent.firstName && parent.firstName.trim()) && 
+            !!(parent.lastName && parent.lastName.trim()) && 
+            !!(parent.phoneNumber && parent.phoneNumber.trim());
           
           // Include second parent if has required fields (email is optional)
           return hasRequiredFields;
@@ -313,7 +167,7 @@ class ReservationService {
         // For second parent (index 1), if email is empty, null, undefined, or "BRAK", set it to null
         // This ensures backend doesn't try to validate "BRAK" or empty string as email
         if (index === 1) {
-          const email = parent.email?.trim();
+          const email = (parent.email || '').trim();
           if (!email || email === '' || email === 'BRAK') {
             return {
               ...parent,
@@ -359,13 +213,13 @@ class ReservationService {
         deliveryType: step3Data.deliveryType,
         deliveryDifferentAddress: step3Data.differentAddress || false,
         deliveryStreet: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
-          ? step3Data.deliveryAddress?.street 
+          ? (step3Data.deliveryAddress?.street || undefined)
           : undefined,
         deliveryPostalCode: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
-          ? step3Data.deliveryAddress?.postalCode 
+          ? (step3Data.deliveryAddress?.postalCode || undefined)
           : undefined,
         deliveryCity: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
-          ? step3Data.deliveryAddress?.city 
+          ? (step3Data.deliveryAddress?.city || undefined)
           : undefined,
       },
       step4: {
@@ -380,7 +234,7 @@ class ReservationService {
   }
 }
 
-export const reservationService = new ReservationService();
+export const reservationService = ReservationService.getInstance();
 
 // Export class for static methods
 export { ReservationService };

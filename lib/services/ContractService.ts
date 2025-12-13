@@ -1,11 +1,21 @@
 /**
  * Contract Service
- * Service for handling contract operations with backend API
+ * Singleton service for handling contract operations with backend API
  */
 
 import { API_BASE_URL } from '@/utils/api-config';
 
 class ContractService {
+  private static instance: ContractService;
+
+  private constructor() {}
+
+  static getInstance(): ContractService {
+    if (!ContractService.instance) {
+      ContractService.instance = new ContractService();
+    }
+    return ContractService.instance;
+  }
   private API_URL = `${API_BASE_URL}/api/contracts`;
 
   /**
@@ -327,5 +337,5 @@ class ContractService {
   }
 }
 
-export const contractService = new ContractService();
+export const contractService = ContractService.getInstance();
 

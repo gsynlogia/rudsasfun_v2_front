@@ -493,7 +493,7 @@ export default function Step5({ onNext, onPrevious, disabled = false }: StepComp
               // Also show all parents data that were sent to backend
               let allParentsInfo = '';
               step1DataForError.parents.forEach((parent, index) => {
-                const parentEmail = parent?.email?.trim() || 'BRAK';
+                const parentEmail = (parent?.email || '').trim() || 'BRAK';
                 const parentName = `${parent?.firstName || 'BRAK'} ${parent?.lastName || 'BRAK'}`.trim();
                 allParentsInfo += `\nOpiekun ${index + 1}: ${parentName}, Email: ${parentEmail}`;
               });

@@ -3,8 +3,13 @@
  * Replaces optional chaining with interfaces that have default values
  */
 
+import { Step1FormData } from './step1FormData';
+import { Step2FormData } from './step2FormData';
+import { Step3FormData } from './step3FormData';
+import { ReservationStorageState } from './reservationStorageState';
+
 // Default values for Step1FormData
-export const defaultStep1FormData = {
+export const defaultStep1FormData: Step1FormData = {
   parents: [] as Array<{
     id: string;
     firstName: string;
@@ -40,7 +45,7 @@ export const defaultStep1FormData = {
 };
 
 // Default values for Step2FormData
-export const defaultStep2FormData = {
+export const defaultStep2FormData: Step2FormData = {
   selectedDiets: [] as number[],
   selectedAddons: [] as string[],
   selectedProtection: [] as string[],
@@ -60,7 +65,7 @@ export const defaultStep2FormData = {
 };
 
 // Default values for Step3FormData
-export const defaultStep3FormData = {
+export const defaultStep3FormData: Step3FormData = {
   invoiceType: 'private' as 'private' | 'company',
   privateData: {
     firstName: '',
@@ -89,7 +94,7 @@ export const defaultStep3FormData = {
 };
 
 // Default values for ReservationStorageState
-export const defaultReservationState = {
+export const defaultReservationState: ReservationStorageState = {
   basePrice: 0,
   items: [] as Array<{
     id: string;

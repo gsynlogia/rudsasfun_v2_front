@@ -3,37 +3,11 @@
  * Singleton service for managing JWT tokens and authentication state
  */
 import { API_BASE_URL } from '@/utils/api-config';
+import { LoginRequest } from '@/types/loginRequest';
+import { LoginResponse } from '@/types/loginResponse';
+import { User } from '@/types/user';
 
-export interface LoginRequest {
-  login: string;
-  password: string;
-}
-
-export interface LoginResponse {
-  access_token: string;
-  token_type: string;
-  user: {
-    id: number;
-    login: string;
-    email?: string;
-    user_type?: string;
-    groups: string[];
-    accessible_sections?: string[];
-    created_at?: string;
-    updated_at?: string;
-  };
-}
-
-export interface User {
-  id: number;
-  login: string;
-  email?: string;
-  user_type?: string;
-  groups: string[];
-  accessible_sections?: string[];
-  created_at?: string;
-  updated_at?: string;
-}
+export type { LoginRequest, LoginResponse, User };
 
 class AuthService {
   private static instance: AuthService;
@@ -142,21 +116,8 @@ class AuthService {
    */
   isAdmin(): boolean {
     const user = this.getCurrentUser();
-    
-    // Interface with default values
-    const defaultUser: User = {
-      id: 0,
-      login: '',
-      email: '',
-      user_type: '',
-      groups: [],
-      accessible_sections: [],
-      created_at: '',
-      updated_at: '',
-    };
-    
-    const userWithDefaults: User = user || defaultUser;
-    return userWithDefaults.user_type === 'admin' || userWithDefaults.groups.includes('admin');
+    if (!user) return false;
+    return user.user_type === 'admin' || (user.groups || []).includes('admin');
   }
 
   /**
@@ -164,7 +125,8 @@ class AuthService {
    */
   isClient(): boolean {
     const user = this.getCurrentUser();
-    return user?.user_type === 'client' || false;
+    if (!user) return false;
+    return user.user_type === 'client';
   }
 
   /**

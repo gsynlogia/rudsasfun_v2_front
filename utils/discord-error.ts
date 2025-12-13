@@ -3,16 +3,9 @@
  * Sends frontend errors to Discord webhook with "FRONT" flag
  */
 
-const DISCORD_WEBHOOK_URL = process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL || '';
+import { DiscordErrorPayload } from '@/types/discordErrorPayload';
 
-interface DiscordErrorPayload {
-  error: string;
-  errorType: string;
-  context?: Record<string, any>;
-  url?: string;
-  userAgent?: string;
-  timestamp?: string;
-}
+const DISCORD_WEBHOOK_URL = process.env.NEXT_PUBLIC_DISCORD_WEBHOOK_URL || '';
 
 /**
  * Send error to Discord webhook

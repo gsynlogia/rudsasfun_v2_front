@@ -1,22 +1,24 @@
 /**
  * Qualification Card Service
- * Service for handling qualification card operations with backend API
+ * Singleton service for handling qualification card operations with backend API
  */
 
 import { API_BASE_URL } from '@/utils/api-config';
+import { QualificationCardResponse } from '@/types/qualificationCardResponse';
 
-export interface QualificationCardResponse {
-  reservation_id: number;
-  card_filename: string;
-  card_path: string;
-  created_at: string;
-  camp_name: string | null;
-  property_name: string | null;
-  participant_first_name: string | null;
-  participant_last_name: string | null;
-}
+export type { QualificationCardResponse };
 
 class QualificationCardService {
+  private static instance: QualificationCardService;
+
+  private constructor() {}
+
+  static getInstance(): QualificationCardService {
+    if (!QualificationCardService.instance) {
+      QualificationCardService.instance = new QualificationCardService();
+    }
+    return QualificationCardService.instance;
+  }
   private API_URL = `${API_BASE_URL}/api/qualification-cards`;
 
   /**
@@ -277,4 +279,4 @@ class QualificationCardService {
   }
 }
 
-export const qualificationCardService = new QualificationCardService();
+export const qualificationCardService = QualificationCardService.getInstance();

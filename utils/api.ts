@@ -4,23 +4,10 @@
  */
 
 import { API_BASE_URL } from './api-config';
+import { Camp } from '@/types/camp';
+import { CampListResponse } from '@/types/campListResponse';
 
-export interface Camp {
-  id: number;
-  name: string;
-  period: string; // "lato" | "zima"
-  city: string;
-  start_date: string; // ISO date string
-  end_date: string; // ISO date string
-  days_count: number;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface CampListResponse {
-  camps: Camp[];
-  total: number;
-}
+export type { Camp, CampListResponse };
 
 /**
  * Format date to Polish format (DD.MM.YYYY)

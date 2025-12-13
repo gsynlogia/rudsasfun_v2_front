@@ -1055,12 +1055,12 @@ export default function ReservationDetailPage() {
                   onClick={handleRejectContract}
                   disabled={isUpdatingContract || !rejectionReason.trim()}
                   className={`px-4 py-2 text-white rounded transition-colors text-sm font-medium disabled:opacity-50 ${
-                    reservation?.contract_status?.toLowerCase() === 'rejected'
+                    (reservation?.contract_status || '').toLowerCase() === 'rejected'
                       ? 'bg-yellow-500 hover:bg-yellow-600'
                       : 'bg-red-600 hover:bg-red-700'
                   }`}
                 >
-                  {isUpdatingContract ? 'Zapisywanie...' : reservation?.contract_status?.toLowerCase() === 'rejected' ? 'Zmień' : 'Odrzuć'}
+                  {isUpdatingContract ? 'Zapisywanie...' : (reservation?.contract_status || '').toLowerCase() === 'rejected' ? 'Zmień' : 'Odrzuć'}
                 </button>
               </div>
             </div>
@@ -1101,12 +1101,12 @@ export default function ReservationDetailPage() {
                   onClick={handleRejectQualificationCard}
                   disabled={isUpdatingQualificationCard || !qualificationCardRejectionReason.trim()}
                   className={`px-4 py-2 text-white rounded transition-colors text-sm font-medium disabled:opacity-50 ${
-                    reservation?.qualification_card_status?.toLowerCase() === 'rejected'
+                    (reservation?.qualification_card_status || '').toLowerCase() === 'rejected'
                       ? 'bg-yellow-500 hover:bg-yellow-600'
                       : 'bg-red-600 hover:bg-red-700'
                   }`}
                 >
-                  {isUpdatingQualificationCard ? 'Zapisywanie...' : reservation?.qualification_card_status?.toLowerCase() === 'rejected' ? 'Zmień' : 'Odrzuć'}
+                  {isUpdatingQualificationCard ? 'Zapisywanie...' : (reservation?.qualification_card_status || '').toLowerCase() === 'rejected' ? 'Zmień' : 'Odrzuć'}
                 </button>
               </div>
             </div>

@@ -1,99 +1,29 @@
 /**
  * Payment Service
- * Service for handling payment operations with Tpay integration
+ * Singleton service for handling payment operations with Tpay integration
  */
 
 import { API_BASE_URL } from '@/utils/api-config';
 import { authService } from '@/lib/services/AuthService';
+import { CreatePaymentRequest } from '@/types/createPaymentRequest';
+import { CreatePaymentResponse } from '@/types/createPaymentResponse';
+import { PaymentStatusResponse } from '@/types/paymentStatusResponse';
+import { PaymentResponse } from '@/types/paymentResponse';
+import { PaymentMethodsResponse } from '@/types/paymentMethodsResponse';
 
-export interface CreatePaymentRequest {
-  amount: number;
-  description: string;
-  order_id: string;
-  payer_email: string;
-  payer_name?: string;
-  channel_id?: number; // 64 for BLIK, 53 for cards, undefined for pay-by-link
-  blik_code?: string; // 6-digit BLIK code
-  success_url?: string;
-  error_url?: string;
-}
-
-export interface CreatePaymentResponse {
-  transaction_id: string;
-  status: string;
-  payment_url: string | null;
-  title: string;
-  order_id: string;
-}
-
-export interface PaymentStatusResponse {
-  transaction_id: string;
-  order_id: string | null;
-  status: string;
-  amount: number | null;
-  paid_amount: number | null;
-  payer_email: string | null;
-  created_at: string | null;
-  paid_at: string | null;
-}
-
-export interface PaymentResponse {
-  id: number;
-  transaction_id: string;
-  order_id: string;
-  amount: number;
-  paid_amount: number | null;
-  description: string | null;
-  status: string;
-  payer_email: string;
-  payer_name: string | null;
-  channel_id: number | null;
-  payment_url: string | null;
-  title: string | null;
-  created_at: string;
-  paid_at: string | null;
-  webhook_received_at: string | null;
-}
-
-export interface PaymentMethodsResponse {
-  banks: Array<{
-    id: number;
-    name: string;
-    full_name: string;
-    image: Record<string, string> | null;
-    instant_redirection: boolean;
-  }>;
-  cards: Array<{
-    id: number;
-    name: string;
-    full_name: string;
-    image: Record<string, string> | null;
-    instant_redirection: boolean;
-  }>;
-  wallets: Array<{
-    id: number;
-    name: string;
-    full_name: string;
-    image: Record<string, string> | null;
-    instant_redirection: boolean;
-  }>;
-  installments: Array<{
-    id: number;
-    name: string;
-    full_name: string;
-    image: Record<string, string> | null;
-    instant_redirection: boolean;
-  }>;
-  other: Array<{
-    id: number;
-    name: string;
-    full_name: string;
-    image: Record<string, string> | null;
-    instant_redirection: boolean;
-  }>;
-}
+export type { CreatePaymentRequest, CreatePaymentResponse, PaymentStatusResponse, PaymentResponse, PaymentMethodsResponse };
 
 class PaymentService {
+  private static instance: PaymentService;
+
+  private constructor() {}
+
+  static getInstance(): PaymentService {
+    if (!PaymentService.instance) {
+      PaymentService.instance = new PaymentService();
+    }
+    return PaymentService.instance;
+  }
   /**
    * Create a new payment
    */
@@ -308,5 +238,5 @@ class PaymentService {
   }
 }
 
-export const paymentService = new PaymentService();
+export const paymentService = PaymentService.getInstance();
 

@@ -1,34 +1,26 @@
 /**
  * Certificate Service
- * Service for managing certificates via API
+ * Singleton service for managing certificates via API
  */
 import { API_BASE_URL } from '@/utils/api-config';
 import { authService } from './AuthService';
+import { CertificateResponse } from '@/types/certificateResponse';
+import { CertificateUploadResponse } from '@/types/certificateUploadResponse';
+import { CertificateListResponse } from '@/types/certificateListResponse';
 
-export interface CertificateResponse {
-  id: number;
-  reservation_id: number;
-  file_path: string;
-  file_name: string;
-  uploaded_at: string;
-  updated_at: string;
-  file_url: string;
-}
-
-export interface CertificateUploadResponse {
-  id: number;
-  reservation_id: number;
-  file_name: string;
-  file_url: string;
-  uploaded_at: string;
-}
-
-export interface CertificateListResponse {
-  certificates: CertificateResponse[];
-  total: number;
-}
+export type { CertificateResponse, CertificateUploadResponse, CertificateListResponse };
 
 class CertificateService {
+  private static instance: CertificateService;
+
+  private constructor() {}
+
+  static getInstance(): CertificateService {
+    if (!CertificateService.instance) {
+      CertificateService.instance = new CertificateService();
+    }
+    return CertificateService.instance;
+  }
   /**
    * Upload certificate PDF for a reservation
    */
@@ -128,5 +120,5 @@ class CertificateService {
   }
 }
 
-export const certificateService = new CertificateService();
+export const certificateService = CertificateService.getInstance();
 
