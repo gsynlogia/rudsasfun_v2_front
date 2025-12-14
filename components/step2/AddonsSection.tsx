@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Info } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import type { ReservationItem } from '@/types/reservation';
 
 /**
@@ -79,13 +79,31 @@ export default function AddonsSection() {
           name: string;
           description: string | null;
           price: number;
-          icon_svg: string | null;
+          icon_url?: string | null;
+          icon_svg?: string | null;
         }) => ({
           id: addon.id.toString(),
           name: addon.name,
           description: addon.description || '',
           price: addon.price,
-          icon: addon.icon_svg ? (
+          icon: addon.icon_url ? (
+            <img
+              src={getStaticAssetUrl(addon.icon_url) || ''}
+              alt={addon.name}
+              className="w-12 h-12 object-contain"
+              onError={(e) => {
+                // If image fails to load, show SVG or fallback
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent && addon.icon_svg) {
+                  parent.innerHTML = addon.icon_svg;
+                } else if (parent) {
+                  parent.innerHTML = '<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+                }
+              }}
+            />
+          ) : addon.icon_svg ? (
             <div 
               className="w-12 h-12" 
               dangerouslySetInnerHTML={{ __html: addon.icon_svg }}

@@ -4,13 +4,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Edit, Trash2, Power, PowerOff, Save, DollarSign, GripVertical } from 'lucide-react';
 import UniversalModal from './UniversalModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
-import { authenticatedApiCall } from '@/utils/api-auth';
+import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
+import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 interface Addon {
   id: number;
   name: string;
   description?: string | null;
   price: number;
+  icon_url?: string | null;
   icon_svg?: string | null;
   display_order: number;
   is_active: boolean;
@@ -36,6 +38,11 @@ export default function AddonsManagement() {
   const [addonDescription, setAddonDescription] = useState('');
   const [addonPrice, setAddonPrice] = useState<number | ''>(0);
   const [addonIconSvg, setAddonIconSvg] = useState('');
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconUploadUrl, setIconUploadUrl] = useState<string | null>(null);
+  const [iconRelativePath, setIconRelativePath] = useState<string | null>(null);
+  const [iconMethod, setIconMethod] = useState<'upload' | 'paste'>('upload');
+  const [uploadingIcon, setUploadingIcon] = useState(false);
 
   const fetchAddons = useCallback(async () => {
     try {
@@ -76,6 +83,10 @@ export default function AddonsManagement() {
     setAddonDescription('');
     setAddonPrice(0);
     setAddonIconSvg('');
+    setIconFile(null);
+    setIconUploadUrl(null);
+    setIconRelativePath(null);
+    setIconMethod('upload');
     setSelectedAddon(null);
   };
 
@@ -92,6 +103,28 @@ export default function AddonsManagement() {
     setAddonDescription(addon.description || '');
     setAddonPrice(addon.price);
     setAddonIconSvg(addon.icon_svg || '');
+    // If addon has icon_url, construct full URL for preview
+    if (addon.icon_url) {
+      const API_BASE_URL = getApiBaseUrlRuntime();
+      // Check if icon_url is already a full URL or just a relative path
+      if (addon.icon_url.startsWith('http://') || addon.icon_url.startsWith('https://')) {
+        // Already a full URL, use it directly
+        setIconUploadUrl(addon.icon_url);
+        // Extract relative path from full URL
+        const urlObj = new URL(addon.icon_url);
+        const relativePath = urlObj.pathname.replace('/static/', '');
+        setIconRelativePath(relativePath);
+      } else {
+        // Relative path, construct full URL
+        setIconUploadUrl(`${API_BASE_URL}/static/${addon.icon_url}`);
+        setIconRelativePath(addon.icon_url);
+      }
+    } else {
+      setIconUploadUrl(null);
+      setIconRelativePath(null);
+    }
+    setIconFile(null); // Clear any file selection
+    setIconMethod(addon.icon_svg ? 'paste' : (addon.icon_url ? 'upload' : 'upload'));
     setShowEditModal(true);
   };
 
@@ -99,6 +132,49 @@ export default function AddonsManagement() {
   const handleDelete = (addon: Addon) => {
     setSelectedAddon(addon);
     setShowDeleteModal(true);
+  };
+
+  // Handle icon upload
+  const handleIconUpload = async (file: File) => {
+    try {
+      setUploadingIcon(true);
+      setError(null);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Use authenticatedFetch for FormData upload
+      const API_BASE_URL = getApiBaseUrlRuntime();
+      const response = await authenticatedFetch(`${API_BASE_URL}/api/addons/addon-icon-upload`, {
+        method: 'POST',
+        body: formData,
+        // authenticatedFetch will handle Authorization header and Content-Type for FormData
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Sesja wygasła. Zaloguj się ponownie.');
+        }
+        const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      // Backend returns relative_path and url (relative path with /static/)
+      const fullUrl = data.url.startsWith('http') ? data.url : `${API_BASE_URL}${data.url}`;
+      setIconUploadUrl(fullUrl);
+      setIconRelativePath(data.relative_path);
+      setIconFile(null); // Clear file input
+      // Return both URL (for preview) and relative_path (for database)
+      return { url: fullUrl, relative_path: data.relative_path };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Błąd podczas uploadu ikony';
+      setError(errorMessage);
+      console.error('[AddonsManagement] Error uploading icon:', err);
+      throw err;
+    } finally {
+      setUploadingIcon(false);
+    }
   };
 
   // Handle save (create or update)
@@ -117,14 +193,40 @@ export default function AddonsManagement() {
       setSaving(true);
       setError(null);
 
-      const addonData = {
+      // Upload icon file if method is upload and file is selected
+      let finalIconRelativePath: string | null = iconRelativePath;
+      
+      if (iconMethod === 'upload' && iconFile && !iconRelativePath) {
+        try {
+          const uploadResult = await handleIconUpload(iconFile);
+          // uploadResult is { url, relative_path }
+          finalIconRelativePath = uploadResult.relative_path;
+        } catch (uploadErr) {
+          // Error already set in handleIconUpload
+          return; // Stop saving if upload fails
+        }
+      }
+
+      const addonData: any = {
         name: addonName.trim(),
         description: addonDescription.trim() || null,
         price: Number(addonPrice),
-        icon_svg: addonIconSvg.trim() || null,
         is_active: true,
         display_order: 0, // Will be set to max + 1 on backend if 0
       };
+      
+      // Add icon based on selected method
+      if (iconMethod === 'paste' && addonIconSvg.trim()) {
+        addonData.icon_svg = addonIconSvg.trim();
+        addonData.icon_url = null; // Clear icon_url if using SVG
+      } else if (iconMethod === 'upload' && finalIconRelativePath) {
+        addonData.icon_url = finalIconRelativePath; // Store relative path in database
+        addonData.icon_svg = null; // Clear icon_svg if using upload
+      } else {
+        // No icon provided - clear both
+        addonData.icon_url = null;
+        addonData.icon_svg = null;
+      }
 
       if (selectedAddon) {
         await authenticatedApiCall<Addon>(`/api/addons/${selectedAddon.id}`, {
@@ -293,6 +395,7 @@ export default function AddonsManagement() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8"></th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kolejność</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ikona</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nazwa</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opis</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cena</th>
@@ -318,6 +421,27 @@ export default function AddonsManagement() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{addon.display_order + 1}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {addon.icon_svg ? (
+                        <div 
+                          className="w-10 h-10 flex items-center justify-center"
+                          dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
+                        />
+                      ) : addon.icon_url ? (
+                        <img 
+                          src={addon.icon_url.startsWith('http') ? addon.icon_url : `${getApiBaseUrlRuntime()}/static/${addon.icon_url}`}
+                          alt={addon.name}
+                          className="w-10 h-10 object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
+                          Brak
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-gray-900">{addon.name}</div>
@@ -460,23 +584,122 @@ export default function AddonsManagement() {
               </div>
             </div>
 
-            {/* Icon SVG */}
+            {/* Icon */}
             <div>
-              <label htmlFor="addon-icon-svg" className="block text-sm font-medium text-gray-700 mb-2">
-                Kod SVG ikony <span className="text-gray-500 text-xs">(opcjonalny)</span>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ikona (opcjonalne)
               </label>
-              <textarea
-                id="addon-icon-svg"
-                value={addonIconSvg}
-                onChange={(e) => setAddonIconSvg(e.target.value)}
-                rows={5}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent transition-all resize-none font-mono text-xs"
-                placeholder="<svg>...</svg>"
-                disabled={saving}
-              />
-              <p className="mt-2 text-xs text-gray-500">
-                Wklej kod SVG ikony dla tego dodatku.
-              </p>
+              
+              {/* Method selection */}
+              <div className="mb-3 flex gap-4">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="iconMethod"
+                    value="upload"
+                    checked={iconMethod === 'upload'}
+                    onChange={(e) => setIconMethod(e.target.value as 'upload' | 'paste')}
+                    className="mr-2"
+                    disabled={saving}
+                  />
+                  <span className="text-sm">Upload pliku</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="iconMethod"
+                    value="paste"
+                    checked={iconMethod === 'paste'}
+                    onChange={(e) => setIconMethod(e.target.value as 'upload' | 'paste')}
+                    className="mr-2"
+                    disabled={saving}
+                  />
+                  <span className="text-sm">Wklej kod SVG</span>
+                </label>
+              </div>
+
+              {/* Upload method */}
+              {iconMethod === 'upload' && (
+                <div>
+                  <input
+                    type="file"
+                    accept=".svg,.png,.jpg,.jpeg,.gif,.webp"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setIconFile(file);
+                        setAddonIconSvg(''); // Clear SVG when uploading file
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm"
+                    disabled={saving || uploadingIcon}
+                  />
+                  {iconFile && (
+                    <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                      <p className="text-xs text-gray-600 mb-1">Wybrany plik: {iconFile.name}</p>
+                      {iconFile.type.startsWith('image/') && (
+                        <img 
+                          src={URL.createObjectURL(iconFile)} 
+                          alt="Preview"
+                          className="w-20 h-20 object-contain bg-white border border-gray-300 rounded"
+                        />
+                      )}
+                    </div>
+                  )}
+                  {iconUploadUrl && (
+                    <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
+                      <p className="text-xs text-green-600 mb-1">Ikona została załadowana:</p>
+                      <img 
+                        src={iconUploadUrl} 
+                        alt="Uploaded icon"
+                        className="w-20 h-20 object-contain bg-white border border-gray-300 rounded"
+                      />
+                    </div>
+                  )}
+                  {uploadingIcon && (
+                    <p className="mt-1 text-xs text-blue-600">Przesyłanie ikony...</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Obsługiwane formaty: SVG, PNG, JPG, JPEG, GIF, WEBP
+                  </p>
+                </div>
+              )}
+
+              {/* Paste SVG method */}
+              {iconMethod === 'paste' && (
+                <div>
+                  <textarea
+                    id="addon-icon-svg"
+                    value={addonIconSvg}
+                    onChange={(e) => {
+                      setAddonIconSvg(e.target.value);
+                      setIconFile(null); // Clear file when pasting SVG
+                      setIconUploadUrl(null);
+                      setIconRelativePath(null);
+                    }}
+                    rows={8}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent font-mono text-xs"
+                    placeholder="Wklej kod SVG tutaj, np. &lt;svg width=&quot;24&quot; height=&quot;24&quot; viewBox=&quot;0 0 24 24&quot;&gt;...&lt;/svg&gt;"
+                    disabled={saving}
+                  />
+                  {addonIconSvg && addonIconSvg.trim() && (
+                    <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
+                      <p className="text-xs text-gray-600 mb-2">Podgląd ikony:</p>
+                      <div 
+                        className="flex items-center justify-center w-20 h-20 bg-white border border-gray-300 rounded"
+                        style={{ 
+                          minWidth: '80px',
+                          minHeight: '80px'
+                        }}
+                        dangerouslySetInnerHTML={{ __html: addonIconSvg }}
+                      />
+                    </div>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Wklej pełny kod SVG. Ikona będzie wyświetlana w tle i używana w następnym kroku.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
