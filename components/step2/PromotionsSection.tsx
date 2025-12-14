@@ -225,7 +225,7 @@ export default function PromotionsSection() {
                 }}
                 className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10"
               >
-                <option value="">Rezygnuję z promocji</option>
+                <option value="">Brak promocji</option>
                 {promotions.map((promo) => (
                   <option key={promo.id || promo.relation_id} value={String(promo.id || promo.relation_id)}>
                     {promo.name} {promo.price < 0
