@@ -132,15 +132,29 @@ export default function PromotionsSection() {
 
   // Load data from sessionStorage on mount
   useEffect(() => {
-    const savedData = loadStep2FormData();
-    if (savedData && savedData.selectedPromotion) {
-      setSelectedPromotionId(savedData.selectedPromotion);
-      prevPromotionRef.current = savedData.selectedPromotion;
-    }
-    if (savedData && savedData.promotionJustification) {
-      setPromotionJustification(savedData.promotionJustification || {});
-    }
+    const syncData = () => {
+      const savedData = loadStep2FormData();
+      if (savedData && savedData.selectedPromotion) {
+        setSelectedPromotionId(savedData.selectedPromotion);
+        prevPromotionRef.current = savedData.selectedPromotion;
+      }
+      if (savedData && savedData.promotionJustification) {
+        setPromotionJustification(savedData.promotionJustification || {});
+      }
+    };
+    
+    syncData();
     setIsInitialized(true);
+    
+    // Listen for fake data loaded event
+    const handleFakeDataLoaded = () => {
+      setTimeout(syncData, 100); // Small delay to ensure sessionStorage is updated
+    };
+    window.addEventListener('fakeDataLoaded', handleFakeDataLoaded);
+    
+    return () => {
+      window.removeEventListener('fakeDataLoaded', handleFakeDataLoaded);
+    };
   }, []);
 
   // Update reservation when promotion changes

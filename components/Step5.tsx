@@ -246,9 +246,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
   // Get protection labels (can be multiple)
   const getProtectionLabels = (): string[] => {
-    if (!step2Data.selectedProtection) return [];
-
-    // Get all protection items from reservation
+    // First priority: Get protection items from reservation (most reliable)
     const protectionItems = reservation.items.filter((item: ReservationItem) => item.type === 'protection');
     if (protectionItems.length > 0) {
       return protectionItems.map((item: ReservationItem) => {
@@ -257,20 +255,49 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
       });
     }
 
-    // Fallback to step2Data
-    const protections: Record<string, { name: string; price: number }> = {
-      tarcza: { name: 'Tarcza', price: 50 },
-      oaza: { name: 'Oaza', price: 100 },
-    };
+    // Second priority: Use step2Data.selectedProtection if available
+    if (step2Data.selectedProtection && Array.isArray(step2Data.selectedProtection) && step2Data.selectedProtection.length > 0) {
+      // Extract numeric IDs from "protection-{id}" format
+      const protectionIds = step2Data.selectedProtection
+        .map((id: string) => {
+          const match = id.match(/^protection-(\d+)$/);
+          return match ? parseInt(match[1], 10) : null;
+        })
+        .filter((id): id is number => id !== null);
 
-    const selectedProtections = Array.isArray(step2Data.selectedProtection)
-      ? step2Data.selectedProtection
-      : step2Data.selectedProtection ? [step2Data.selectedProtection] : [];
+      // Try to get protection names from reservation items by matching IDs
+      // If we have selectedProtectionIds, we can use them to find names
+      if (step2Data.selectedProtectionIds && Array.isArray(step2Data.selectedProtectionIds)) {
+        // Use selectedProtectionIds to match with reservation items
+        const matchedItems = step2Data.selectedProtectionIds
+          .map((id: number) => {
+            // Try to find in reservation items by ID
+            const item = reservation.items.find((item: ReservationItem) => {
+              const itemIdMatch = item.id?.match(/^protection-(\d+)$/);
+              return itemIdMatch && parseInt(itemIdMatch[1], 10) === id;
+            });
+            return item;
+          })
+          .filter(Boolean) as ReservationItem[];
 
-    return selectedProtections
-      .map((id: string) => protections[id])
-      .filter(Boolean)
-      .map(p => `${p.name} (${formatPrice(p.price)}zł)`);
+        if (matchedItems.length > 0) {
+          return matchedItems.map((item: ReservationItem) => {
+            const name = item.name.replace(/^Ochrona /, '');
+            return `${name} (${formatPrice(item.price)}zł)`;
+          });
+        }
+      }
+
+      // Fallback: Show protection IDs if we can't find names
+      return step2Data.selectedProtection.map((id: string) => {
+        const match = id.match(/^protection-(\d+)$/);
+        const displayId = match ? match[1] : id;
+        return `Ochrona ${displayId}`;
+      });
+    }
+
+    // No protections selected
+    return [];
   };
 
   // Get promotion label
@@ -838,32 +865,48 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
           {/* Segment 6: Invoice Data */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-4 sm:pt-6">
-            {/* Left: Invoice/Account Data */}
+            {/* Left: Invoice Request Status */}
             <div>
               <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
-                {step3Data.invoiceType === 'private' ? 'Dane do rachunku' : 'Dane do faktury'}
+                Faktura
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 {step3Data ? (
                   <>
-                    {step3Data.invoiceType === 'private' && step3Data.privateData ? (
+                    <div>
+                      <strong>Czy klient chce fakturę:</strong>{' '}
+                      {step3Data.wantsInvoice ? 'Tak' : 'Nie'}
+                    </div>
+                    {step3Data.wantsInvoice && (
                       <>
-                        <div>{getValueOrNotSet(step3Data.privateData.firstName)} {getValueOrNotSet(step3Data.privateData.lastName)}</div>
-                        {step3Data.privateData.nip && step3Data.privateData.nip.trim() !== '' && (
-                          <div>{step3Data.privateData.nip}</div>
-                        )}
-                        <div>{getValueOrNotSet(step3Data.privateData.street)}</div>
-                        <div>{getValueOrNotSet(step3Data.privateData.postalCode)} {getValueOrNotSet(step3Data.privateData.city)}</div>
+                        <div>
+                          <strong>Typ faktury:</strong>{' '}
+                          {step3Data.invoiceType === 'private' ? 'Osoba prywatna' : step3Data.invoiceType === 'company' ? 'Firma' : 'Nie wybrano'}
+                        </div>
+                        {step3Data.invoiceType === 'private' && step3Data.privateData ? (
+                          <>
+                            <div className="mt-2">
+                              <strong>Dane do rachunku:</strong>
+                            </div>
+                            <div>{getValueOrNotSet(step3Data.privateData.firstName)} {getValueOrNotSet(step3Data.privateData.lastName)}</div>
+                            {step3Data.privateData.nip && step3Data.privateData.nip.trim() !== '' && (
+                              <div>{step3Data.privateData.nip}</div>
+                            )}
+                            <div>{getValueOrNotSet(step3Data.privateData.street)}</div>
+                            <div>{getValueOrNotSet(step3Data.privateData.postalCode)} {getValueOrNotSet(step3Data.privateData.city)}</div>
+                          </>
+                        ) : step3Data.invoiceType === 'company' && step3Data.companyData ? (
+                          <>
+                            <div className="mt-2">
+                              <strong>Dane do faktury:</strong>
+                            </div>
+                            <div>{getValueOrNotSet(step3Data.companyData.companyName)}</div>
+                            <div>{getValueOrNotSet(step3Data.companyData.nip)}</div>
+                            <div>{getValueOrNotSet(step3Data.companyData.street)}</div>
+                            <div>{getValueOrNotSet(step3Data.companyData.postalCode)} {getValueOrNotSet(step3Data.companyData.city)}</div>
+                          </>
+                        ) : null}
                       </>
-                    ) : step3Data.invoiceType === 'company' && step3Data.companyData ? (
-                      <>
-                        <div>{getValueOrNotSet(step3Data.companyData.companyName)}</div>
-                        <div>{getValueOrNotSet(step3Data.companyData.nip)}</div>
-                        <div>{getValueOrNotSet(step3Data.companyData.street)}</div>
-                        <div>{getValueOrNotSet(step3Data.companyData.postalCode)} {getValueOrNotSet(step3Data.companyData.city)}</div>
-                      </>
-                    ) : (
-                      <div className="text-gray-500 italic">Nie ustawiono</div>
                     )}
                   </>
                 ) : (
@@ -873,13 +916,13 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
             </div>
 
             {/* Right: Invoice Form - Only show for company */}
-            {step3Data.invoiceType === 'company' && (
+            {step3Data && step3Data.wantsInvoice && step3Data.invoiceType === 'company' && (
               <div>
                 <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
                   Forma faktury
                 </h3>
                 <div className="text-xs sm:text-sm text-gray-700">
-                  {step3Data ? getInvoiceDeliveryLabel() : 'Nie wybrano'}
+                  {getInvoiceDeliveryLabel()}
                 </div>
               </div>
             )}

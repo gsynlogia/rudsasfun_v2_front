@@ -51,6 +51,7 @@ interface PaymentDetails {
   paidAmount: number;
   remainingAmount: number;
   items: PaymentItem[];
+  wantsInvoice: boolean; // Whether client wants an invoice
   invoiceNumber?: string;
   invoiceLink?: string;
   invoicePaid: boolean; // Status faktury (opłacona/nieopłacona)
@@ -650,6 +651,7 @@ const generatePaymentDetails = async (
     paidAmount: paidAmount,
     remainingAmount: remainingAmount,
     items,
+    wantsInvoice: reservation.wants_invoice || false,  // Whether client wants an invoice
     invoiceNumber: `FV-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(4, '0')}`,
     invoiceLink: `/invoices/FV-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(4, '0')}.pdf`,
     invoicePaid: isFullPayment && !hasCanceledItems && hasSuccessfulPayment,
@@ -2034,6 +2036,20 @@ export default function PaymentsManagement() {
 
                                 {/* Invoice Status and Actions */}
                                 <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                                  {/* Wants Invoice Info */}
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="text-xs text-gray-500 mb-1">Czy klient chce fakturę</p>
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                        reservation.paymentDetails.wantsInvoice
+                                          ? 'bg-blue-100 text-blue-800'
+                                          : 'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {reservation.paymentDetails.wantsInvoice ? 'Tak' : 'Nie'}
+                                      </span>
+                                    </div>
+                                  </div>
+
                                   {/* Invoice Status */}
                                   <div className="flex items-center justify-between">
                                     <div>

@@ -8,6 +8,7 @@ import UniversalModal from '@/components/admin/UniversalModal';
 import { useReservation } from '@/context/ReservationContext';
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
+import { isFakeDataEnabled } from '@/utils/fakeData';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
 
@@ -79,38 +80,54 @@ export default function TransportSection() {
 
   // Load data from sessionStorage on mount
   useEffect(() => {
-    const savedData = loadStep2FormData();
-    if (savedData && savedData.transportData) {
-      setTransportData({
-        ...savedData.transportData,
-        differentCities: savedData.transportData.differentCities ?? false,
-      });
-    } else {
-      // Set default values if no saved data - default to collective transport
-      setTransportData({
-        departureType: 'zbiorowy',
-        departureCity: '',
-        returnType: 'zbiorowy',
-        returnCity: '',
-        differentCities: false,
-      });
-      // Save default values to sessionStorage
-      const formData = {
-        ...savedData,
-        transportData: {
+    const syncData = () => {
+      const savedData = loadStep2FormData();
+      if (savedData && savedData.transportData) {
+        setTransportData({
+          ...savedData.transportData,
+          differentCities: savedData.transportData.differentCities ?? false,
+        });
+      } else {
+        // Set default values if no saved data - default to collective transport
+        setTransportData({
           departureType: 'zbiorowy',
           departureCity: '',
           returnType: 'zbiorowy',
           returnCity: '',
           differentCities: false,
-        },
-      };
-      saveStep2FormData(formData as any);
-    }
-    // Load modal confirmation status
-    if (savedData && savedData.transportModalConfirmed) {
-      setTransportModalConfirmed(savedData.transportModalConfirmed);
-    }
+        });
+        // Save default values to sessionStorage only if not fake data
+        if (!process.env.NEXT_PUBLIC_FAKE_DATA || process.env.NEXT_PUBLIC_FAKE_DATA !== 'true') {
+          const formData = {
+            ...savedData,
+            transportData: {
+              departureType: 'zbiorowy',
+              departureCity: '',
+              returnType: 'zbiorowy',
+              returnCity: '',
+              differentCities: false,
+            },
+          };
+          saveStep2FormData(formData as any);
+        }
+      }
+      // Load modal confirmation status
+      if (savedData && savedData.transportModalConfirmed) {
+        setTransportModalConfirmed(savedData.transportModalConfirmed);
+      }
+    };
+    
+    syncData();
+    
+    // Listen for fake data loaded event
+    const handleFakeDataLoaded = () => {
+      setTimeout(syncData, 100); // Small delay to ensure sessionStorage is updated
+    };
+    window.addEventListener('fakeDataLoaded', handleFakeDataLoaded);
+    
+    return () => {
+      window.removeEventListener('fakeDataLoaded', handleFakeDataLoaded);
+    };
   }, []);
 
   // Check if transport exists for this turnus and fetch cities
@@ -178,6 +195,21 @@ export default function TransportSection() {
     setDeparturePrice(depPrice);
     setReturnPrice(retPrice);
   }, [transportData, cities]);
+
+  // If fake data has departureCity but it's not in cities list, try to use first available city
+  useEffect(() => {
+    if (isFakeDataEnabled() && transportData.departureType === 'zbiorowy' && transportData.departureCity && cities.length > 0) {
+      const cityExists = cities.some(c => c.city === transportData.departureCity);
+      if (!cityExists && cities[0]) {
+        // City from fake data doesn't exist, use first available city
+        setTransportData(prev => ({
+          ...prev,
+          departureCity: cities[0].city,
+          returnCity: prev.returnCity || cities[0].city,
+        }));
+      }
+    }
+  }, [cities, transportData.departureCity, transportData.departureType]);
 
   // Check for different cities and show modal immediately when different cities are selected
   useEffect(() => {

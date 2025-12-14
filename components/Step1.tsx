@@ -8,6 +8,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react
 import { useReservation } from '@/context/ReservationContext';
 import type { StepComponentProps } from '@/types/reservation';
 import { saveStep1FormData, loadStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
+import { isFakeDataEnabled, getFakeStep1Data } from '@/utils/fakeData';
 
 import DashedLine from './DashedLine';
 import DietSection from './step1/DietSection';
@@ -370,17 +371,58 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     };
   }, [validateAllMemoized]);
 
-  // Function to load data from sessionStorage
-  const loadDataFromStorage = useCallback(() => {
+  // Function to load data from sessionStorage or fake data
+  const loadDataFromStorage = useCallback(async () => {
     // Reset flag before loading
     isDataLoadedRef.current = false;
 
-    const savedData = loadStep1FormData();
+    let savedData = loadStep1FormData();
+
+    // If fake data is enabled and no saved data exists, load fake data
+    if (isFakeDataEnabled() && (!savedData || !savedData.parents || savedData.parents.length === 0)) {
+      const fakeData = await getFakeStep1Data();
+      if (fakeData) {
+        // Merge fake data with saved data (fake data takes priority)
+        // Ensure all required fields are defined
+        const mergedData: Step1FormData = {
+          parents: fakeData.parents || savedData?.parents || [],
+          participantData: fakeData.participantData || savedData?.participantData || {
+            firstName: '',
+            lastName: '',
+            age: '',
+            gender: '',
+            city: '',
+            selectedParticipant: '',
+          },
+          selectedDietId: fakeData.selectedDietId !== undefined ? fakeData.selectedDietId : (savedData?.selectedDietId ?? null),
+          accommodationRequest: fakeData.accommodationRequest !== undefined ? fakeData.accommodationRequest : (savedData?.accommodationRequest ?? ''),
+          healthQuestions: fakeData.healthQuestions || savedData?.healthQuestions || {
+            chronicDiseases: 'Nie',
+            dysfunctions: 'Nie',
+            psychiatric: 'Nie',
+          },
+          healthDetails: fakeData.healthDetails || savedData?.healthDetails || {
+            chronicDiseases: '',
+            dysfunctions: '',
+            psychiatric: '',
+          },
+          additionalNotes: fakeData.additionalNotes !== undefined ? fakeData.additionalNotes : (savedData?.additionalNotes ?? ''),
+        };
+        savedData = mergedData;
+        // Save fake data to sessionStorage
+        saveStep1FormData(savedData);
+      }
+    }
 
     if (savedData) {
       // Only update if data exists in sessionStorage
       if (savedData.parents && savedData.parents.length > 0) {
-        setParents(savedData.parents);
+        // Ensure parents have IDs
+        const parentsWithIds = savedData.parents.map((p, idx) => ({
+          ...p,
+          id: p.id || (idx + 1).toString(),
+        }));
+        setParents(parentsWithIds);
       }
       if (savedData.participantData) {
         setParticipantData(savedData.participantData);
@@ -414,14 +456,15 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   useLayoutEffect(() => {
     loadDataFromStorage();
   }, []); // Empty deps - will run on every mount (which happens when key changes)
-
-  // Also load data when pathname changes to Step1 (handles case when component doesn't remount)
+  
+  // Also load fake data when pathname changes to Step1 (handles case when component doesn't remount)
   useEffect(() => {
     if (pathname && pathname.includes('/step/1')) {
-      // Reload data when navigating back to Step1
+      // Reload data when navigating back to Step1 (including fake data)
       loadDataFromStorage();
     }
   }, [pathname, loadDataFromStorage]);
+
 
   // Save data to sessionStorage whenever any field changes
   // Note: selectedDietId is saved by DietSection component

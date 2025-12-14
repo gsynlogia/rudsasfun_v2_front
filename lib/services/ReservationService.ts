@@ -66,7 +66,8 @@ export interface CreateReservationRequest {
     inneText?: string;
   };
   step3: {
-    invoiceType: 'private' | 'company';
+    wantsInvoice: boolean;  // Whether client wants an invoice
+    invoiceType?: 'private' | 'company';  // Only required if wantsInvoice === true
     privateData?: {
       firstName: string;
       lastName: string;
@@ -84,8 +85,8 @@ export interface CreateReservationRequest {
       postalCode: string;
       city: string;
     };
-    deliveryType: 'electronic' | 'paper';
-    differentAddress: boolean;
+    deliveryType?: 'electronic' | 'paper';  // Only required if wantsInvoice === true
+    differentAddress?: boolean;
     deliveryAddress?: {
       street: string;
       postalCode: string;
@@ -133,6 +134,7 @@ export interface ReservationResponse {
     postalCode: string;
     city: string;
   }> | null;
+  wants_invoice: boolean | null;
   invoice_type: string | null;
   invoice_first_name: string | null;
   invoice_last_name: string | null;
@@ -417,12 +419,13 @@ class ReservationService {
         inneText: step2Data.inneText,
       },
       step3: {
-        invoiceType: step3Data.invoiceType,
-        privateData: step3Data.invoiceType === 'private' ? step3Data.privateData : undefined,
-        companyData: step3Data.invoiceType === 'company' ? step3Data.companyData : undefined,
-        deliveryType: step3Data.deliveryType,
-        differentAddress: step3Data.differentAddress,
-        deliveryAddress: step3Data.deliveryType === 'paper' && step3Data.differentAddress 
+        wantsInvoice: step3Data.wantsInvoice || false,
+        invoiceType: step3Data.wantsInvoice ? step3Data.invoiceType : undefined,
+        privateData: step3Data.wantsInvoice && step3Data.invoiceType === 'private' ? step3Data.privateData : undefined,
+        companyData: step3Data.wantsInvoice && step3Data.invoiceType === 'company' ? step3Data.companyData : undefined,
+        deliveryType: step3Data.wantsInvoice ? (step3Data.deliveryType || 'electronic') : undefined,
+        differentAddress: step3Data.wantsInvoice ? (step3Data.differentAddress || false) : false,
+        deliveryAddress: step3Data.wantsInvoice && step3Data.deliveryType === 'paper' && step3Data.differentAddress 
           ? step3Data.deliveryAddress 
           : undefined,
       },

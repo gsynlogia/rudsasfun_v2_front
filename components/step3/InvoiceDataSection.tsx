@@ -68,16 +68,16 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
         if (savedData.privateData) {
           setPrivateData(prev => {
             // Only update if there's actual data in sessionStorage
-            const hasData = Object.values(savedData.privateData).some(val => val && val.trim() !== '');
-            return hasData ? savedData.privateData : prev;
+            const hasData = Object.values(savedData.privateData!).some(val => val && val.trim() !== '');
+            return hasData ? savedData.privateData! : prev;
           });
         }
         // Load company data if it exists
         if (savedData.companyData) {
           setCompanyData(prev => {
             // Only update if there's actual data in sessionStorage
-            const hasData = Object.values(savedData.companyData).some(val => val && val.trim() !== '');
-            return hasData ? savedData.companyData : prev;
+            const hasData = Object.values(savedData.companyData!).some(val => val && val.trim() !== '');
+            return hasData ? savedData.companyData! : prev;
           });
         }
       }
@@ -127,9 +127,10 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
   useEffect(() => {
     const savedData = loadStep3FormData() || {} as any;
     const formData = {
+      wantsInvoice: savedData.wantsInvoice ?? true,  // If invoice data is being filled, wantsInvoice should be true
       invoiceType,
       privateData: invoiceType === 'private' ? privateData : (savedData.privateData || privateData),
-      companyData: invoiceType === 'company' ? companyData : (savedData.companyData || companyData),
+      companyData: invoiceType === 'company' ? companyData : (savedData.companyData || companyData || undefined),
       deliveryType: savedData.deliveryType || 'electronic',
       differentAddress: savedData.differentAddress || false,
       deliveryAddress: savedData.deliveryAddress || { street: '', postalCode: '', city: '' },

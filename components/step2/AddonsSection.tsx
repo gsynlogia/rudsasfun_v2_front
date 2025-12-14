@@ -128,18 +128,32 @@ export default function AddonsSection() {
 
   // Sync with sessionStorage on mount (in case it changed)
   useEffect(() => {
-    const savedData = loadStep2FormData();
-    if (savedData && savedData.selectedAddons && Array.isArray(savedData.selectedAddons) && savedData.selectedAddons.length > 0) {
-      const savedSet = new Set(savedData.selectedAddons);
-      // Only update if different from current state
-      const currentArray = Array.from(selectedAddons).sort();
-      const savedArray = Array.from(savedSet).sort();
-      if (JSON.stringify(currentArray) !== JSON.stringify(savedArray)) {
-        setSelectedAddons(savedSet);
+    const syncData = () => {
+      const savedData = loadStep2FormData();
+      if (savedData && savedData.selectedAddons && Array.isArray(savedData.selectedAddons) && savedData.selectedAddons.length > 0) {
+        const savedSet = new Set(savedData.selectedAddons);
+        // Only update if different from current state
+        const currentArray = Array.from(selectedAddons).sort();
+        const savedArray = Array.from(savedSet).sort();
+        if (JSON.stringify(currentArray) !== JSON.stringify(savedArray)) {
+          setSelectedAddons(savedSet);
+        }
       }
-    }
+    };
+    
+    syncData();
     setIsInitialized(true);
-  }, []);
+    
+    // Listen for fake data loaded event
+    const handleFakeDataLoaded = () => {
+      setTimeout(syncData, 100); // Small delay to ensure sessionStorage is updated
+    };
+    window.addEventListener('fakeDataLoaded', handleFakeDataLoaded);
+    
+    return () => {
+      window.removeEventListener('fakeDataLoaded', handleFakeDataLoaded);
+    };
+  }, [selectedAddons]);
 
   // Restore reservation items when initialized, reservation is available, and addons are loaded
   useEffect(() => {

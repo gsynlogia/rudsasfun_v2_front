@@ -22,6 +22,16 @@ interface Addon {
   price: number;
 }
 
+interface Protection {
+  id: number;
+  name: string;
+  display_name?: string;
+  price: number;
+  icon_url?: string | null;
+  icon_svg?: string | null;
+  description?: string;
+}
+
 /**
  * AdditionalServicesTiles Component
  * Displays tiles for additional services (addons and protection)
@@ -33,6 +43,7 @@ export default function AdditionalServicesTiles({
   reservation = null,
 }: AdditionalServicesTilesProps) {
   const [addons, setAddons] = useState<Addon[]>([]);
+  const [protections, setProtections] = useState<Protection[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPocketMoneyModal, setShowPocketMoneyModal] = useState(false);
   const [blinkPhoneNumber, setBlinkPhoneNumber] = useState<string | null>(null);
@@ -40,24 +51,38 @@ export default function AdditionalServicesTiles({
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [processingServiceId, setProcessingServiceId] = useState<string | null>(null);
 
-  // Fetch addons from API
+  // Fetch addons and protections from API
   useEffect(() => {
-    const fetchAddons = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/addons/public`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        setLoading(true);
+        
+        // Fetch addons
+        const addonsResponse = await fetch(`${API_BASE_URL}/api/addons/public`);
+        if (addonsResponse.ok) {
+          const addonsData = await addonsResponse.json();
+          setAddons(addonsData.addons || []);
+        } else {
+          setAddons([]);
         }
-        const data = await response.json();
-        setAddons(data.addons || []);
+
+        // Fetch general protections
+        const protectionsResponse = await fetch(`${API_BASE_URL}/api/general-protections/public`);
+        if (protectionsResponse.ok) {
+          const protectionsData = await protectionsResponse.json();
+          setProtections(Array.isArray(protectionsData) ? protectionsData : []);
+        } else {
+          setProtections([]);
+        }
       } catch (error) {
-        console.error('Error fetching addons:', error);
+        console.error('Error fetching data:', error);
         setAddons([]);
+        setProtections([]);
       } finally {
         setLoading(false);
       }
     };
-    fetchAddons();
+    fetchData();
   }, []);
 
   // Fetch Blink configuration when modal opens
@@ -108,7 +133,7 @@ export default function AdditionalServicesTiles({
 
   // Map addon IDs to check if they're selected
   const selectedAddonIds = new Set(selectedAddons?.map(id => id.toString()) || []);
-  const selectedProtectionIds = new Set(selectedProtection || []);
+  // selectedProtectionIds is now calculated below after protections are loaded
 
   // Handle service payment (addon or protection)
   const handleServicePayment = async (serviceId: string, serviceName: string, price: number, serviceType: 'addon' | 'protection') => {
@@ -168,8 +193,68 @@ export default function AdditionalServicesTiles({
     }
   };
 
-  // Define protection items with proper icons
-  const protections = [
+  // Extract numeric IDs from selectedProtection (format: "protection-{id}")
+  const selectedProtectionNumericIds = new Set(
+    (selectedProtection || [])
+      .map((id: string) => {
+        const match = id.match(/^protection-(\d+)$/);
+        return match ? parseInt(match[1], 10) : null;
+      })
+      .filter((id): id is number => id !== null)
+  );
+
+  // Map protections from API to display format
+  const protectionTiles = protections
+    .filter((p) => selectedProtectionNumericIds.has(p.id))
+    .map((protection) => {
+      const isActive = selectedProtectionNumericIds.has(protection.id);
+      return {
+        id: `protection-${protection.id}`,
+        name: protection.display_name || protection.name,
+        price: protection.price,
+        icon: (isActive: boolean) => {
+          if (protection.icon_svg) {
+            return (
+              <div
+                className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'text-white' : 'text-gray-400'}`}
+                dangerouslySetInnerHTML={{
+                  __html: protection.icon_svg.replace(
+                    /<svg([^>]*?)>/i,
+                    (match, attrs) => {
+                      attrs = attrs.replace(/\s*(width|height|style)=["'][^"']*["']/gi, '');
+                      return `<svg${attrs} class="w-full h-full" style="fill: currentColor;">`;
+                    }
+                  ),
+                }}
+              />
+            );
+          } else if (protection.icon_url) {
+            return (
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'opacity-100' : 'opacity-50'}`}>
+                <img
+                  src={protection.icon_url}
+                  alt={protection.name}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            );
+          } else {
+            // Fallback icon
+            return (
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'text-white' : 'text-gray-400'}`}>
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  <circle cx="12" cy="12" r="3" fill="currentColor" />
+                </svg>
+              </div>
+            );
+          }
+        },
+      };
+    });
+
+  // Legacy hardcoded protections (fallback if API fails)
+  const legacyProtections = [
     {
       id: 'tarcza',
       name: 'Tarcza',
@@ -263,22 +348,44 @@ export default function AdditionalServicesTiles({
         onClick: () => handleServicePayment(addon.id.toString(), addon.name, addon.price, 'addon'),
       };
     }),
-    // Protection - always show both Tarcza and Oaza
-    ...protections.map(protection => {
-      const isActive = selectedProtectionIds.has(protection.id);
-      return {
-        type: 'protection' as const,
-        id: protection.id,
-        name: protection.name,
-        price: (protection as any).price || undefined,
-        icon: protection.icon(isActive),
-        isActive,
-        hasButton: !isActive, // Button only for inactive (not in reservation)
-        buttonText: 'domów',
-        buttonColor: '#3BAAF5',
-        onClick: () => handleServicePayment(protection.id, protection.name, (protection as any).price || 0, 'protection'),
-      };
-    }),
+    // Protection - show protections from API (matching selectedProtection)
+    ...(protectionTiles.length > 0
+      ? protectionTiles.map((protection) => {
+          const isActive = selectedProtectionNumericIds.has(parseInt(protection.id.replace('protection-', ''), 10));
+          return {
+            type: 'protection' as const,
+            id: protection.id,
+            name: protection.name,
+            price: protection.price,
+            icon: protection.icon(isActive),
+            isActive,
+            hasButton: !isActive, // Button only for inactive (not in reservation)
+            buttonText: 'domów',
+            buttonColor: '#3BAAF5',
+            onClick: () => handleServicePayment(protection.id, protection.name, protection.price, 'protection'),
+          };
+        })
+      : // Fallback to legacy protections if API failed
+        legacyProtections
+          .filter((p) => {
+            // Only show if selectedProtection contains matching ID
+            return selectedProtection?.some((id: string) => id === p.id || id === `protection-${p.id}`);
+          })
+          .map((protection) => {
+            const isActive = selectedProtection?.some((id: string) => id === protection.id || id === `protection-${protection.id}`) || false;
+            return {
+              type: 'protection' as const,
+              id: protection.id,
+              name: protection.name,
+              price: protection.price,
+              icon: protection.icon(isActive),
+              isActive,
+              hasButton: !isActive,
+              buttonText: 'domów',
+              buttonColor: '#3BAAF5',
+              onClick: () => handleServicePayment(protection.id, protection.name, protection.price, 'protection'),
+            };
+          })),
   ];
 
   // Sort by name for consistent display (Kieszonkowe always first)

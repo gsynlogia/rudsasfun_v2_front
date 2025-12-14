@@ -189,9 +189,12 @@ export default function ProtectionsSection() {
     // Save to sessionStorage
     const savedData = loadStep2FormData();
     if (savedData) {
+      // Convert selectedProtectionIds (numbers) to selectedProtection (strings) for compatibility
+      const selectedProtectionStrings = selectedProtectionIds.map(id => `protection-${id}`);
       const formData = {
         ...savedData,
-        selectedProtectionIds: selectedProtectionIds,  // Array of IDs, not single ID
+        selectedProtectionIds: selectedProtectionIds,  // Array of numeric IDs
+        selectedProtection: selectedProtectionStrings,  // Array of string IDs (for Step5 and backend)
       };
       saveStep2FormData(formData as any);
     }

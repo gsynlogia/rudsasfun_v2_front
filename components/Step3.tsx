@@ -9,8 +9,10 @@ import { loadStep1FormData } from '@/utils/sessionStorage';
 
 import DashedLine from './DashedLine';
 import InvoiceDataSection from './step3/InvoiceDataSection';
+import PrivateInvoiceDataSection from './step3/PrivateInvoiceDataSection';
 import InvoiceDeliverySection from './step3/InvoiceDeliverySection';
 import InvoiceTypeSection from './step3/InvoiceTypeSection';
+import WantsInvoiceSection from './step3/WantsInvoiceSection';
 
 /**
  * Step3 Component - Invoices
@@ -18,26 +20,37 @@ import InvoiceTypeSection from './step3/InvoiceTypeSection';
  * For private person: only type selection is shown, no invoice data fields
  */
 export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabled: _disabled = false }: StepComponentProps) {
+  const [wantsInvoice, setWantsInvoice] = useState<boolean>(false);
   const [invoiceType, setInvoiceType] = useState<'private' | 'company'>('private');
   const { reservation, removeReservationItem } = useReservation();
 
-  // Load invoice type from sessionStorage
+  // Load wantsInvoice and invoiceType from sessionStorage
   useEffect(() => {
     const savedData = loadStep3FormData();
-    if (savedData && savedData.invoiceType) {
-      setInvoiceType(savedData.invoiceType);
+    if (savedData) {
+      if (savedData.wantsInvoice !== undefined) {
+        setWantsInvoice(savedData.wantsInvoice);
+      }
+      if (savedData.invoiceType) {
+        setInvoiceType(savedData.invoiceType);
+      }
     }
   }, []);
 
-  // Monitor invoice type changes from InvoiceTypeSection (via sessionStorage)
+  // Monitor wantsInvoice and invoiceType changes from components (via sessionStorage)
   // Also auto-fill private person data when switching to private
   useEffect(() => {
-    const checkInvoiceType = () => {
+    const checkInvoiceData = () => {
       const savedData = loadStep3FormData();
-      if (savedData && savedData.invoiceType && savedData.invoiceType !== invoiceType) {
-        setInvoiceType(savedData.invoiceType);
+      if (savedData) {
+        if (savedData.wantsInvoice !== undefined && savedData.wantsInvoice !== wantsInvoice) {
+          setWantsInvoice(savedData.wantsInvoice);
+        }
+        if (savedData.invoiceType && savedData.invoiceType !== invoiceType) {
+          setInvoiceType(savedData.invoiceType);
+        }
 
-        // If switching to private, auto-fill from Step1 and clear company data
+        // If switching to private, clear company data (but don't auto-fill private data)
         if (savedData.invoiceType === 'private') {
           // Remove paper invoice (30 PLN) from reservation when switching to private person
           const paperInvoiceItem = reservation.items.find(
@@ -47,78 +60,57 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
             removeReservationItem(paperInvoiceItem.id);
           }
 
-          const step1Data = loadStep1FormData();
-          if (step1Data && step1Data.parents && step1Data.parents.length > 0) {
-            const firstParent = step1Data.parents[0];
-            const privateData = {
-              firstName: firstParent.firstName || '',
-              lastName: firstParent.lastName || '',
-              email: firstParent.email || '',
-              phone: firstParent.phone || '+48',
-              street: firstParent.street || '',
-              postalCode: firstParent.postalCode || '',
-              city: firstParent.city || '',
-              nip: '', // NIP is optional for private person
-            };
+          // Clear company data when switching to private (but don't auto-fill private data)
+          const formData: Step3FormData = {
+            ...savedData,
+            wantsInvoice: savedData?.wantsInvoice ?? false,
+            invoiceType: 'private',
+            // Keep existing privateData if it exists, otherwise leave it undefined
+            privateData: savedData.privateData || undefined,
+            // Clear company data when switching to private
+            companyData: {
+              companyName: '',
+              nip: '',
+              street: '',
+              postalCode: '',
+              city: '',
+            },
+            // Reset delivery type to electronic (no paper invoice for private person)
+            deliveryType: 'electronic',
+            differentAddress: false,
+            deliveryAddress: { street: '', postalCode: '', city: '' },
+          };
 
-            const formData: Step3FormData = {
-              ...savedData,
-              invoiceType: 'private',
-              privateData,
-              // Clear company data when switching to private
-              companyData: {
-                companyName: '',
-                nip: '',
-                street: '',
-                postalCode: '',
-                city: '',
-              },
-              // Reset delivery type to electronic (no paper invoice for private person)
-              deliveryType: 'electronic',
-              differentAddress: false,
-              deliveryAddress: { street: '', postalCode: '', city: '' },
-            };
-
-            saveStep3FormData(formData);
-          } else {
-            // Even if no Step1 data, clear company data and reset delivery
-            const formData: Step3FormData = {
-              ...savedData,
-              invoiceType: 'private',
-              companyData: {
-                companyName: '',
-                nip: '',
-                street: '',
-                postalCode: '',
-                city: '',
-              },
-              deliveryType: 'electronic',
-              differentAddress: false,
-              deliveryAddress: { street: '', postalCode: '', city: '' },
-            };
-            saveStep3FormData(formData);
-          }
+          saveStep3FormData(formData);
         }
       }
     };
 
     // Check periodically for changes
-    const interval = setInterval(checkInvoiceType, 500);
+    const interval = setInterval(checkInvoiceData, 500);
 
     return () => clearInterval(interval);
-  }, [invoiceType, reservation.items, removeReservationItem]);
+  }, [wantsInvoice, invoiceType, reservation.items, removeReservationItem]);
 
   // Combined validation function for Step3 (InvoiceData + InvoiceDelivery)
+  // If wantsInvoice is false, no validation needed
   // For company: validate invoice data and delivery sections
-  // For private person: only validate delivery if paper version is selected
+  // For private person: validate invoice data (required fields only) and delivery if paper version is selected
   const validateStep3 = useCallback((): boolean => {
+    // If client doesn't want invoice, no validation needed
+    if (!wantsInvoice) {
+      return true;
+    }
+
     // Always validate delivery section (for both private and company, if paper version is selected)
     const validateDelivery = (window as any).validateInvoiceDeliverySection;
     const deliveryValid = validateDelivery ? validateDelivery() : true;
 
-    // If private person, only validate delivery (no invoice data required)
+    // If private person, validate private invoice data section
     if (invoiceType === 'private') {
-      return deliveryValid;
+      const validatePrivateInvoiceData = (window as any).validatePrivateInvoiceDataSection;
+      const privateInvoiceDataValid = validatePrivateInvoiceData ? validatePrivateInvoiceData() : true;
+      return privateInvoiceDataValid && deliveryValid;
     }
 
     // If company, validate both invoice data and delivery sections
@@ -126,7 +118,7 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
     const invoiceDataValid = validateInvoiceData ? validateInvoiceData() : true;
 
     return invoiceDataValid && deliveryValid;
-  }, [invoiceType]);
+  }, [wantsInvoice, invoiceType]);
 
   // Expose combined validation function
   useEffect(() => {
@@ -150,70 +142,40 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
     }
   }, [invoiceType, reservation.items, removeReservationItem]);
 
-  // Load data from sessionStorage on mount and auto-fill private person data from Step1
-  useEffect(() => {
-    const savedData = loadStep3FormData();
-    const step1Data = loadStep1FormData();
-
-    // If private person is selected and we have Step1 data, auto-fill from first parent
-    if (invoiceType === 'private' && step1Data && step1Data.parents && step1Data.parents.length > 0) {
-      const firstParent = step1Data.parents[0];
-
-      // Only update if privateData is not already filled
-      const currentPrivateData = savedData ? savedData.privateData : null;
-      const needsUpdate = !currentPrivateData ||
-        !currentPrivateData.firstName ||
-        !currentPrivateData.lastName ||
-        !currentPrivateData.email;
-
-      if (needsUpdate) {
-        const privateData = {
-          firstName: firstParent.firstName || '',
-          lastName: firstParent.lastName || '',
-          email: firstParent.email || '',
-          phone: firstParent.phone || '+48',
-          street: firstParent.street || '',
-          postalCode: firstParent.postalCode || '',
-          city: firstParent.city || '',
-          nip: '', // NIP is optional for private person
-        };
-
-        const formData: Step3FormData = {
-          ...savedData,
-          invoiceType: 'private',
-          privateData,
-          companyData: (savedData && savedData.companyData) ? savedData.companyData : {
-            companyName: '',
-            nip: '',
-            street: '',
-            postalCode: '',
-            city: '',
-          },
-          deliveryType: (savedData && savedData.deliveryType) ? savedData.deliveryType : 'electronic',
-          differentAddress: (savedData && savedData.differentAddress !== undefined) ? savedData.differentAddress : false,
-          deliveryAddress: (savedData && savedData.deliveryAddress) ? savedData.deliveryAddress : { street: '', postalCode: '', city: '' },
-        };
-
-        saveStep3FormData(formData);
-      }
-    }
-  }, [invoiceType]);
+  // Note: Private person data is NOT auto-filled from Step1
+  // User can manually fill it using the button in PrivateInvoiceDataSection
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Invoice Type Section */}
-      <InvoiceTypeSection />
+      {/* Wants Invoice Section - Always shown first */}
+      <WantsInvoiceSection />
 
-      {/* Invoice Data Section - Only show for company */}
-      {invoiceType === 'company' && (
+      {/* Invoice Type Section - Only show if wantsInvoice is true */}
+      {wantsInvoice && (
+        <>
+          <DashedLine />
+          <InvoiceTypeSection />
+        </>
+      )}
+
+      {/* Invoice Data Section - Show for both private and company if wantsInvoice is true */}
+      {wantsInvoice && invoiceType === 'private' && (
+        <>
+          <DashedLine />
+          <PrivateInvoiceDataSection />
+        </>
+      )}
+
+      {/* Invoice Data Section - Only show for company and if wantsInvoice is true */}
+      {wantsInvoice && invoiceType === 'company' && (
         <>
           <DashedLine />
           <InvoiceDataSection invoiceType={invoiceType} />
         </>
       )}
 
-      {/* Invoice Delivery Section - Only show for company */}
-      {invoiceType === 'company' && (
+      {/* Invoice Delivery Section - Only show for company and if wantsInvoice is true */}
+      {wantsInvoice && invoiceType === 'company' && (
         <>
           <DashedLine />
           <InvoiceDeliverySection />

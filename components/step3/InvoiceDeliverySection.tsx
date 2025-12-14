@@ -143,6 +143,7 @@ export default function InvoiceDeliverySection() {
     const savedData = loadStep3FormData();
     const formData = {
       ...savedData,
+      wantsInvoice: savedData?.wantsInvoice ?? true,  // If delivery is being set, wantsInvoice should be true
       deliveryType,
       differentAddress,
       deliveryAddress,
