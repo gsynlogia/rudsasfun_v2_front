@@ -1,6 +1,4 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-
 import LayoutClient from '@/components/LayoutClient';
 import Step1 from '@/components/Step1';
 import Step2 from '@/components/Step2';
@@ -21,13 +19,13 @@ interface PageProps {
 /**
  * Dynamic route page for reservation steps
  * Route: /camps/[campId]/edition/[editionId]/step/[step]
- *
+ * 
  * Fetches camp data on server side before rendering to avoid hydration errors
  * This is a Server Component - data is fetched before mount
  */
 export default async function ReservationStepPage({ params }: PageProps) {
   const { campId, editionId, step } = await params;
-
+  
   // Validate step number
   const stepNumber = parseInt(step, 10);
   if (isNaN(stepNumber) || stepNumber < 1 || stepNumber > 5) {
@@ -37,12 +35,12 @@ export default async function ReservationStepPage({ params }: PageProps) {
   // Validate campId and editionId
   const parsedCampId = parseInt(campId, 10);
   const parsedEditionId = parseInt(editionId, 10);
-
+  
   if (isNaN(parsedCampId) || parsedCampId < 1) {
     console.error('[ReservationStepPage] Invalid camp ID:', campId);
     notFound();
   }
-
+  
   if (isNaN(parsedEditionId) || parsedEditionId < 1) {
     console.error('[ReservationStepPage] Invalid edition ID:', editionId);
     notFound();
@@ -53,7 +51,7 @@ export default async function ReservationStepPage({ params }: PageProps) {
   let campData: CampWithProperty;
   try {
     campData = await getCampEdition(parsedCampId, parsedEditionId);
-
+    
     // Check if camp/edition exists (id = 0 means doesn't exist)
     // This is NOT an error - just information that resource doesn't exist
     if (!campData || !campData.camp || !campData.property) {
@@ -61,53 +59,53 @@ export default async function ReservationStepPage({ params }: PageProps) {
       campData = {
         camp: {
           id: 0,
-          name: '',
+          name: "",
           created_at: null,
           updated_at: null,
-          properties: null,
+          properties: null
         },
         property: {
           id: 0,
           camp_id: 0,
-          period: '',
-          city: '',
-          start_date: '1970-01-01',
-          end_date: '1970-01-01',
+          period: "",
+          city: "",
+          start_date: "1970-01-01",
+          end_date: "1970-01-01",
           days_count: 0,
           max_participants: 0,
           created_at: null,
-          updated_at: null,
-        },
+          updated_at: null
+        }
       };
     } else if (campData.camp.id === 0 || campData.property.id === 0) {
       // Camp or edition doesn't exist - this is OK, not an error
       // Keep the data as is - LayoutClient will handle displaying message
     } else {
       // Verify IDs match for existing data
-      if (campData.camp.id !== parsedCampId ||
-          campData.property.id !== parsedEditionId ||
+      if (campData.camp.id !== parsedCampId || 
+          campData.property.id !== parsedEditionId || 
           campData.property.camp_id !== parsedCampId) {
         // IDs don't match - treat as not found (not an error)
         campData = {
           camp: {
             id: 0,
-            name: '',
+            name: "",
             created_at: null,
             updated_at: null,
-            properties: null,
+            properties: null
           },
           property: {
             id: 0,
             camp_id: 0,
-            period: '',
-            city: '',
-            start_date: '1970-01-01',
-            end_date: '1970-01-01',
+            period: "",
+            city: "",
+            start_date: "1970-01-01",
+            end_date: "1970-01-01",
             days_count: 0,
             max_participants: 0,
             created_at: null,
-            updated_at: null,
-          },
+            updated_at: null
+          }
         };
       }
     }
@@ -118,38 +116,9 @@ export default async function ReservationStepPage({ params }: PageProps) {
     throw error;
   }
 
-  // Define default property interface
-  interface DefaultProperty {
-    is_full: boolean;
-    is_ended: boolean;
-    registered_count: number;
-    max_participants: number;
-    id: number;
-  }
-
-  const defaultProperty: DefaultProperty = {
-    is_full: false,
-    is_ended: false,
-    registered_count: 0,
-    max_participants: 0,
-    id: 0,
-  };
-
-  // Define default camp interface
-  interface DefaultCamp {
-    id: number;
-  }
-
-  const defaultCamp: DefaultCamp = {
-    id: 0,
-  };
-
-  const property = campData?.property || defaultProperty;
-  const camp = campData?.camp || defaultCamp;
-
   // Check if turnus is full or ended (only if camp and property exist)
-  const isTurnusFull = property.is_full === true;
-  const isTurnusEnded = property.is_ended === true;
+  const isTurnusFull = campData?.property?.is_full === true;
+  const isTurnusEnded = campData?.property?.is_ended === true;
   const isTurnusUnavailable = isTurnusFull || isTurnusEnded;
 
   // Calculate completed steps (all previous steps)
@@ -165,11 +134,11 @@ export default async function ReservationStepPage({ params }: PageProps) {
       onNext: undefined,
       onPrevious: undefined,
     };
-
+    
     // Use pathname as key to force remount when navigating between steps
     // This ensures sessionStorage data is loaded correctly
     const stepKey = `${campId}-${editionId}-${currentStep}`;
-
+    
     switch (currentStep) {
       case 1:
         return <Step1 key={stepKey} {...stepProps} />;
@@ -191,30 +160,30 @@ export default async function ReservationStepPage({ params }: PageProps) {
       currentStep={currentStep}
       completedSteps={completedSteps}
       campData={campData}
-      isDisabled={isTurnusUnavailable || camp.id === 0 || property.id === 0}
+      isDisabled={isTurnusUnavailable || campData?.camp?.id === 0 || campData?.property?.id === 0}
     >
-      {isTurnusUnavailable && camp.id !== 0 && property.id !== 0 ? (
+      {isTurnusUnavailable && campData?.camp?.id !== 0 && campData?.property?.id !== 0 ? (
         <div className="max-w-2xl mx-auto px-4 py-8">
           <div className="bg-red-50 border-l-4 border-red-400 p-6 rounded-lg">
             <h2 className="text-xl font-bold text-red-800 mb-2">
               {isTurnusFull ? 'Turnus wyprzedany' : 'Turnus zakończony'}
             </h2>
             <p className="text-red-700 mb-4">
-              {isTurnusFull
+              {isTurnusFull 
                 ? 'Przepraszamy, wszystkie miejsca na ten turnus zostały zarezerwowane.'
                 : 'Przepraszamy, ten turnus się już zakończył. Nie można dokonać rezerwacji.'}
             </p>
-            {property.registered_count !== undefined && property.max_participants !== undefined && (
+            {campData?.property?.registered_count !== undefined && campData?.property?.max_participants !== undefined && (
               <p className="text-sm text-red-600">
-                Zarejestrowanych uczestników: {property.registered_count}/{property.max_participants}
+                Zarejestrowanych uczestników: {campData.property.registered_count}/{campData.property.max_participants}
               </p>
             )}
-            <Link
+            <a
               href="/"
               className="inline-block mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               Powrót do listy obozów
-            </Link>
+            </a>
           </div>
         </div>
       ) : (

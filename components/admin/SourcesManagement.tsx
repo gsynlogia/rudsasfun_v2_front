@@ -142,7 +142,7 @@ export default function SourcesManagement() {
       setSaving(true);
       setError(null);
 
-      const _response = await authenticatedApiCall(`/api/sources/${selectedSource.id}`, {
+      const response = await authenticatedApiCall(`/api/sources/${selectedSource.id}`, {
         method: 'DELETE',
       });
 
@@ -425,7 +425,7 @@ export default function SourcesManagement() {
                   disabled={saving}
                 />
                 <span className="text-sm text-gray-700">
-                  To opcja &quot;Inne&quot; (wymaga dodatkowego pola tekstowego)
+                  To opcja "Inne" (wymaga dodatkowego pola tekstowego)
                 </span>
               </label>
             </div>

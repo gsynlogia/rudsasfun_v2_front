@@ -4,4 +4,3 @@ export interface ReservationCampProperties {
   start_date: string;
   end_date: string;
 }
-

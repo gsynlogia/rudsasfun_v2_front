@@ -1,5 +1,5 @@
-import { CampWithProperty } from './campWithProperty';
 import { StepNumber } from './stepNumber';
+import { CampWithProperty } from './campWithProperty';
 
 export interface LayoutProps {
   currentStep: StepNumber;
@@ -9,4 +9,3 @@ export interface LayoutProps {
   campData?: CampWithProperty;
   isDisabled?: boolean;
 }
-

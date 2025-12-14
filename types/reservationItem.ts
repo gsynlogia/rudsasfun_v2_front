@@ -4,4 +4,3 @@ export interface ReservationItem {
   price: number;
   type: 'base' | 'diet' | 'accommodation' | 'addon' | 'protection' | 'promotion' | 'transport' | 'source' | 'other';
 }
-

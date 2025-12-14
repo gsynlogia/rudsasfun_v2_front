@@ -5,4 +5,3 @@ export interface ReservationCamp {
   name: string;
   properties: ReservationCampProperties;
 }
-

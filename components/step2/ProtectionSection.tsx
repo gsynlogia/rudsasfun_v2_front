@@ -1,13 +1,13 @@
 'use client';
 
 import { Info, Download } from 'lucide-react';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
+import type { ReservationItem } from '@/types/reservation';
 
 interface Protection {
   id: string;  // Protection ID for compatibility
@@ -180,12 +180,12 @@ export default function ProtectionSection() {
 
         // Check if already exists in reservation
         const existing = reservation.items.find(
-          item => item.type === 'protection' && item.id === reservationId,
+          (item: ReservationItem) => item.type === 'protection' && item.id === reservationId,
         );
         if (!existing) {
           // Check if exists by name (for backward compatibility)
           const existingByName = reservation.items.find(
-            item => item.type === 'protection' && item.name === `Ochrona ${protection.name}`,
+            (item: ReservationItem) => item.type === 'protection' && item.name === `Ochrona ${protection.name}`,
           );
           if (!existingByName) {
             protectionReservationIdsRef.current.set(protectionId, reservationId);
@@ -204,7 +204,7 @@ export default function ProtectionSection() {
         }
       }
     });
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, reservation.items.length]);
 
   // Update reservation when protections change
@@ -222,14 +222,14 @@ export default function ProtectionSection() {
     removed.forEach(protectionId => {
       const reservationId = protectionReservationIdsRef.current.get(protectionId);
       if (reservationId) {
-        const item = reservation.items.find(item => item.id === reservationId);
+        const item = reservation.items.find((item: ReservationItem) => item.id === reservationId);
         if (item) {
           removeReservationItem(item.id);
         } else {
           const protection = protections.find(p => p.id === protectionId);
           if (protection) {
             const itemByName = reservation.items.find(
-              item => item.type === 'protection' && item.name === `Ochrona ${protection.name}`,
+              (item: ReservationItem) => item.type === 'protection' && item.name === `Ochrona ${protection.name}`,
             );
             if (itemByName) {
               removeReservationItem(itemByName.id);
@@ -246,7 +246,7 @@ export default function ProtectionSection() {
       if (protection) {
         const reservationId = `protection-${protectionId}`;
 
-        const existingItem = reservation.items.find(item => item.id === reservationId);
+        const existingItem = reservation.items.find((item: ReservationItem) => item.id === reservationId);
 
         if (!existingItem) {
           protectionReservationIdsRef.current.set(protectionId, reservationId);
@@ -319,15 +319,12 @@ export default function ProtectionSection() {
                 {/* Icon display from API */}
                 {protection.icon_url ? (
                   <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
-                    <Image
+                    <img
                       src={getStaticAssetUrl(protection.icon_url) || ''}
                       alt={protection.name}
-                      width={40}
-                      height={40}
-                      className={`object-contain max-w-full max-h-full ${
+                      className={`w-full h-full object-contain max-w-full max-h-full ${
                         isSelected ? 'brightness-0 invert' : ''
                       }`}
-                      unoptimized
                       style={{
                         filter: isSelected ? 'brightness(0) invert(1)' : 'none',
                       }}

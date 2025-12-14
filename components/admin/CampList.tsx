@@ -27,9 +27,9 @@ export default function CampList({
   onSelectCamp,
   onEditCamp,
   onDeleteCamp,
-  onCreateProperty: _onCreateProperty,
-  onEditProperty: _onEditProperty,
-  onDeleteProperty: _onDeleteProperty,
+  onCreateProperty,
+  onEditProperty,
+  onDeleteProperty,
 }: CampListProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -125,7 +125,7 @@ export default function CampList({
             </div>
           ) : (
             <div className="px-4 py-6 text-center text-gray-500">
-              <p>Brak edycji dla tego obozu. Kliknij &quot;Zarządzaj edycjami&quot;, aby dodać pierwszą edycję.</p>
+              <p>Brak edycji dla tego obozu. Kliknij "Zarządzaj edycjami", aby dodać pierwszą edycję.</p>
             </div>
           )}
         </div>

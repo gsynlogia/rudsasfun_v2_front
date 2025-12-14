@@ -5,6 +5,5 @@ export interface CertificateResponse {
   file_name: string;
   uploaded_at: string;
   updated_at: string;
-  file_url: string;
+  file_url?: string | null;
 }
-

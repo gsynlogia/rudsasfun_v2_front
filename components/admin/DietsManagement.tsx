@@ -1,14 +1,10 @@
 'use client';
 
-import { UtensilsCrossed, Plus, Search, Edit, Trash2, Power, PowerOff, Save, DollarSign, FileText, ChevronDown, Check, X } from 'lucide-react';
-import Image from 'next/image';
 import { useState, useEffect, useRef, useMemo } from 'react';
-
-import { authenticatedApiCall } from '@/utils/api-auth';
-import { getStaticAssetUrl } from '@/utils/api-config';
-
-import DeleteConfirmationModal from './DeleteConfirmationModal';
+import { UtensilsCrossed, Plus, Search, Edit, Trash2, Power, PowerOff, Save, DollarSign, FileText, ChevronDown, Check, X } from 'lucide-react';
 import UniversalModal from './UniversalModal';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface TurnusInfo {
   turnus_id: number;
@@ -41,35 +37,35 @@ export default function DietsManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDiet, setSelectedDiet] = useState<Diet | null>(null);
   const [saving, setSaving] = useState(false);
-
+  
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
-
+  
   // Filter state
   const [nameFilters, setNameFilters] = useState<string[]>([]); // Multi-select for names
   const [priceMinFilter, setPriceMinFilter] = useState<number | ''>('');
   const [priceMaxFilter, setPriceMaxFilter] = useState<number | ''>('');
   const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'active', 'inactive'
-
+  
   // Multi-select state for names
   const [isNameSelectOpen, setIsNameSelectOpen] = useState(false);
   const [nameSearchQuery, setNameSearchQuery] = useState('');
   const nameSelectRef = useRef<HTMLDivElement>(null);
-
+  
   // Store all available diet names (for multi-select)
   const [allDietNames, setAllDietNames] = useState<string[]>([]);
-
+  
   // Also update names from currently loaded diets as a backup
   // This ensures names are available even if initial fetch fails
   useEffect(() => {
     if (diets.length > 0 && allDietNames.length === 0) {
       // Only update if we don't have names yet (fallback scenario)
       const namesFromCurrentDiets = Array.from(new Set(
-        diets.map(d => d?.name).filter(Boolean),
+        diets.map(d => d?.name).filter(Boolean)
       )).sort();
-
+      
       if (namesFromCurrentDiets.length > 0) {
         setAllDietNames(namesFromCurrentDiets);
         console.log('[DietsManagement] Using names from table as fallback:', namesFromCurrentDiets.length);
@@ -92,9 +88,9 @@ export default function DietsManagement() {
       try {
         // Use dedicated endpoint that returns all unique names without pagination
         const names = await authenticatedApiCall<string[]>(
-          '/api/diets/names',
+          '/api/diets/names'
         );
-
+        
         console.log('[DietsManagement] Loaded diet names from API:', names.length, 'unique names');
         setAllDietNames(names || []);
       } catch (err) {
@@ -102,7 +98,7 @@ export default function DietsManagement() {
         // Fallback: try to extract names from currently loaded diets
         if (diets.length > 0) {
           const namesFromDiets = Array.from(new Set(
-            diets.map(d => d.name).filter(Boolean),
+            diets.map(d => d.name).filter(Boolean)
           )).sort();
           setAllDietNames(namesFromDiets);
         }
@@ -125,26 +121,26 @@ export default function DietsManagement() {
     const params = new URLSearchParams();
     params.append('page', currentPage.toString());
     params.append('limit', itemsPerPage.toString());
-
+    
     if (nameFilters.length > 0) {
       params.append('names', nameFilters.join(','));
     }
-
+    
     if (priceMinFilter !== '') {
       params.append('price_min', priceMinFilter.toString());
     }
-
+    
     if (priceMaxFilter !== '') {
       params.append('price_max', priceMaxFilter.toString());
     }
-
+    
     if (statusFilter === 'active') {
       params.append('is_active', 'true');
     } else if (statusFilter === 'inactive') {
       params.append('is_active', 'false');
     }
     // 'all' means no is_active parameter
-
+    
     return params.toString();
   };
 
@@ -155,7 +151,7 @@ export default function DietsManagement() {
       setError(null);
       const queryParams = buildQueryParams();
       const data = await authenticatedApiCall<{ diets: Diet[]; total: number }>(
-        `/api/diets/?${queryParams}`,
+        `/api/diets/?${queryParams}`
       );
       setDiets(data.diets || []);
       setTotalCount(data.total || 0);
@@ -165,7 +161,7 @@ export default function DietsManagement() {
       setError(errorMessage);
       setDiets([]);
       setTotalCount(0);
-
+      
       // If it's an authentication error, the SectionGuard should handle redirect
       if (errorMessage.includes('Not authenticated') || errorMessage.includes('Session expired')) {
         // Don't set error, let SectionGuard handle it
@@ -218,7 +214,7 @@ export default function DietsManagement() {
     if (!diet.turnus_info || diet.turnus_info.length === 0) {
       return diet.name;
     }
-
+    
     // If diet is assigned to turnuses, show turnus info
     if (diet.turnus_info.length === 1) {
       const turnus = diet.turnus_info[0];
@@ -307,7 +303,7 @@ export default function DietsManagement() {
         {
           method: 'POST',
           body: formData,
-        },
+        }
       );
 
       // Return the full URL for display, but we'll store relative_path in database
@@ -711,13 +707,10 @@ export default function DietsManagement() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         {diet.icon_url ? (
                           <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded">
-                            <Image
-                              src={getStaticAssetUrl(diet.icon_url) || ''}
+                            <img 
+                              src={diet.icon_url} 
                               alt={diet.name}
-                              width={24}
-                              height={24}
-                              className="object-contain"
-                              unoptimized
+                              className="w-6 h-6 object-contain"
                               onError={(e) => {
                                 // Fallback if image fails to load
                                 (e.target as HTMLImageElement).style.display = 'none';
@@ -738,7 +731,7 @@ export default function DietsManagement() {
                         <div className="text-sm font-medium text-gray-900">{formatDietName(diet)}</div>
                         {diet.turnus_info && diet.turnus_info.length > 0 && (
                           <div className="text-xs text-blue-600 mt-1">
-                            {diet.turnus_info.length === 1
+                            {diet.turnus_info.length === 1 
                               ? `Turnus: ${diet.turnus_info[0].camp_name || 'N/A'}`
                               : `Przypisana do ${diet.turnus_info.length} turnusów`
                             }
@@ -758,8 +751,8 @@ export default function DietsManagement() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          diet.is_active
-                            ? 'bg-green-100 text-green-800'
+                          diet.is_active 
+                            ? 'bg-green-100 text-green-800' 
                             : 'bg-gray-100 text-gray-800'
                         }`}>
                           {diet.is_active ? 'Aktywna' : 'Nieaktywna'}
@@ -948,13 +941,10 @@ export default function DietsManagement() {
                 {dietIconUrl && (
                   <div className="flex items-center gap-3 p-3 bg-blue-50 border-2 border-[#03adf0] rounded-lg">
                     <div className="flex items-center justify-center w-12 h-12 bg-white rounded-lg border border-[#03adf0]">
-                      <Image
-                        src={dietIconUrl}
+                      <img 
+                        src={dietIconUrl} 
                         alt="Preview"
-                        width={32}
-                        height={32}
-                        className="object-contain"
-                        unoptimized
+                        className="w-8 h-8 object-contain"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}

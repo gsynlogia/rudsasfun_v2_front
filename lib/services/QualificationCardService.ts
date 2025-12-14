@@ -35,8 +35,9 @@ class QualificationCardService {
    * Download qualification card PDF
    * Downloads the card that was automatically generated when reservation was created
    * @param reservationId Reservation ID
+   * @returns Blob of the PDF file
    */
-  async downloadQualificationCard(reservationId: number): Promise<void> {
+  async downloadQualificationCard(reservationId: number): Promise<Blob> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
 
@@ -66,6 +67,7 @@ class QualificationCardService {
       // Get blob and create download link
       const blob = await response.blob();
       this._downloadBlob(blob, reservationId);
+      return blob;
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
@@ -291,20 +293,67 @@ class QualificationCardService {
       throw new Error('Not authenticated');
     }
 
-    const response = await fetch(`${this.API_URL}/${reservationId}/data`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    try {
+      const url = `${this.API_URL}/${reservationId}/data`;
+      console.log('[QualificationCardService] Fetching data from:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      console.log('[QualificationCardService] Response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorText = await response.text();
+          console.log('[QualificationCardService] Error response text:', errorText);
+          
+          if (errorText) {
+            try {
+              const error = JSON.parse(errorText);
+              errorMessage = error.detail || error.message || errorMessage;
+            } catch {
+              // If JSON parsing fails, use the text as is
+              errorMessage = errorText || errorMessage;
+            }
+          }
+        } catch (parseError) {
+          console.error('[QualificationCardService] Error parsing error response:', parseError);
+          // If JSON parsing fails, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const responseText = await response.text();
+      console.log('[QualificationCardService] Response text:', responseText);
+      
+      if (!responseText) {
+        throw new Error('Empty response from server');
+      }
+
+      try {
+        const data = JSON.parse(responseText);
+        console.log('[QualificationCardService] Parsed data:', data);
+        return data;
+      } catch (parseError) {
+        console.error('[QualificationCardService] Error parsing response JSON:', parseError);
+        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+      }
+    } catch (error) {
+      console.error('[QualificationCardService] Error in getQualificationCardData:', error);
+      // Re-throw if it's already an Error with a message
+      if (error instanceof Error) {
+        throw error;
+      }
+      // Otherwise wrap in Error
+      throw new Error(`Failed to fetch qualification card data: ${String(error)}`);
     }
-
-    return await response.json();
   }
 
   /**

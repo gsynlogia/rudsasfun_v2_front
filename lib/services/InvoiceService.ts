@@ -1,27 +1,46 @@
 /**
  * Invoice Service
- * Singleton service for managing invoices via API
+ * Service for managing invoices via API
  */
-import { InvoiceGenerateRequest } from '@/types/invoiceGenerateRequest';
-import { InvoiceListResponse } from '@/types/invoiceListResponse';
-import { InvoiceResponse } from '@/types/invoiceResponse';
 import { API_BASE_URL } from '@/utils/api-config';
-
 import { authService } from './AuthService';
 
-export type { InvoiceResponse, InvoiceListResponse, InvoiceGenerateRequest };
+export interface InvoiceResponse {
+  id: number;
+  reservation_id: number;
+  user_id: number;
+  fakturownia_invoice_id: number;
+  invoice_number: string;
+  invoice_pdf_path: string | null;
+  total_amount: number;
+  net_amount: number;
+  tax_amount: number;
+  is_paid: boolean;
+  paid_at: string | null;
+  issue_date: string;
+  sell_date: string;
+  payment_to: string;
+  buyer_name: string;
+  buyer_tax_no: string | null;
+  buyer_email: string | null;
+  is_canceled?: boolean;
+  canceled_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceListResponse {
+  invoices: InvoiceResponse[];
+  total: number;
+}
+
+export interface InvoiceGenerateRequest {
+  reservation_id: number;
+  selected_items: string[];
+  buyer_tax_no?: string;
+}
 
 class InvoiceService {
-  private static instance: InvoiceService;
-
-  private constructor() {}
-
-  static getInstance(): InvoiceService {
-    if (!InvoiceService.instance) {
-      InvoiceService.instance = new InvoiceService();
-    }
-    return InvoiceService.instance;
-  }
   /**
    * Generate invoice for selected payment items
    */
@@ -105,7 +124,7 @@ class InvoiceService {
   }
 
   /**
-   * Get all invoices for a specific reservation (admin only)
+   * Get invoices by reservation ID
    */
   async getInvoicesByReservation(reservationId: number): Promise<InvoiceListResponse> {
     const token = authService.getToken();
@@ -129,7 +148,7 @@ class InvoiceService {
   }
 
   /**
-   * Cancel an invoice (admin only)
+   * Cancel an invoice
    */
   async cancelInvoice(invoiceId: number): Promise<void> {
     const token = authService.getToken();
@@ -151,5 +170,5 @@ class InvoiceService {
   }
 }
 
-export const invoiceService = InvoiceService.getInstance();
+export const invoiceService = new InvoiceService();
 

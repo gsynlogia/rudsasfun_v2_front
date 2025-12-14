@@ -1,32 +1,30 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-
-import type { StepComponentProps } from '@/types/reservation';
-import { loadStep2FormData } from '@/utils/sessionStorage';
-
 import DashedLine from './DashedLine';
 import AddonsSection from './step2/AddonsSection';
-import PromotionsSection from './step2/PromotionsSection';
 import ProtectionSection from './step2/ProtectionSection';
-import SourceSection from './step2/SourceSection';
+import PromotionsSection from './step2/PromotionsSection';
 import TransportSection from './step2/TransportSection';
+import SourceSection from './step2/SourceSection';
+import type { StepComponentProps } from '@/types/reservation';
+import { saveStep2FormData, loadStep2FormData, type Step2FormData } from '@/utils/sessionStorage';
 
 /**
  * Step2 Component - Reservation Details
  * Contains: Addons, Protection, Promotions, Transport, Source information
  */
-export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabled: _disabled = false }: StepComponentProps) {
+export default function Step2({ onNext, onPrevious, disabled = false }: StepComponentProps) {
   // Combined validation function for Step2 (Transport + Source)
   const validateStep2 = useCallback((): boolean => {
     // Validate transport section
     const validateTransport = (window as any).validateStep2;
     const transportValid = validateTransport ? validateTransport() : true;
-
+    
     // Validate source section
     const validateSource = (window as any).validateSourceSection;
     const sourceValid = validateSource ? validateSource() : true;
-
+    
     return transportValid && sourceValid;
   }, []);
 
@@ -54,7 +52,7 @@ export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabl
       <AddonsSection />
       <DashedLine />
 
-      {/* Protection Section (from API) */}
+      {/* Protection Section */}
       <ProtectionSection />
       <DashedLine />
 

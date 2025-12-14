@@ -1,7 +1,6 @@
 'use client';
 
 import { Info, Check } from 'lucide-react';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
@@ -29,7 +28,7 @@ interface Protection {
  * NOTE: Multiple selection allowed (checkboxes), NO justification required
  */
 export default function ProtectionsSection() {
-  const { reservation: _reservation, addReservationItem, removeReservationItemsByType } = useReservation();
+  const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
   const [protections, setProtections] = useState<Protection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,15 +248,12 @@ export default function ProtectionsSection() {
                       {/* Icon display */}
                       {protection.icon_url ? (
                         <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center flex-shrink-0">
-                          <Image
+                          <img
                             src={getStaticAssetUrl(protection.icon_url) || ''}
                             alt={protection.name}
-                            width={48}
-                            height={48}
-                            className={`object-contain max-w-full max-h-full ${
+                            className={`w-full h-full object-contain max-w-full max-h-full ${
                               isSelected ? 'brightness-0 invert' : ''
                             }`}
-                            unoptimized
                             style={{
                               filter: isSelected ? 'brightness(0) invert(1)' : 'none',
                             }}

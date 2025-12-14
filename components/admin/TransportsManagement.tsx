@@ -1,13 +1,12 @@
 'use client';
 
-import { Truck, Plus, MapPin, Search, Edit, Trash2, AlertCircle, ExternalLink } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-
-import { API_BASE_URL } from '@/utils/api-config';
-
-import DeleteConfirmationModal from './DeleteConfirmationModal';
+import { useRouter } from 'next/navigation';
+import { Truck, Plus, MapPin, Copy, Search, Edit, Trash2, AlertCircle, ExternalLink } from 'lucide-react';
 import UniversalModal from './UniversalModal';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
+import type { Camp, CampProperty } from '@/types/reservation';
+import { API_BASE_URL } from '@/utils/api-config';
 
 interface TransportCity {
   id: number;
@@ -56,13 +55,14 @@ export default function TransportsManagement() {
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingTransportId, setEditingTransportId] = useState<number | null>(null);
-  const [_editingTransportName, _setEditingTransportName] = useState('');
+  const [editingTransportName, setEditingTransportName] = useState('');
 
   // Form state
   const [transportName, setTransportName] = useState('');
+  const [campId, setCampId] = useState<number | ''>('');
   const [departureType, setDepartureType] = useState<'collective' | 'own'>('collective');
   const [returnType, setReturnType] = useState<'collective' | 'own'>('collective');
-
+  
   // Cities state - array of {city: string, departure_price: number | '', return_price: number | ''}
   interface CityFormData {
     id: string; // Temporary ID for React keys
@@ -133,8 +133,8 @@ export default function TransportsManagement() {
 
   // Update city field
   const updateCity = (id: string, field: 'city' | 'departure_price' | 'return_price', value: string | number) => {
-    setCities(cities.map(c =>
-      c.id === id ? { ...c, [field]: value } : c,
+    setCities(cities.map(c => 
+      c.id === id ? { ...c, [field]: value } : c
     ));
   };
 
@@ -181,7 +181,7 @@ export default function TransportsManagement() {
       const transportData = {
         name: transportName.trim() || null,
         property_id: null,  // Independent transport
-        // camp_ids removed - transport can only be assigned to camps during turnus editing
+        camp_id: campId !== '' ? Number(campId) : null,
         departure_type: departureType,
         return_type: returnType,
         cities: citiesData,
@@ -195,7 +195,7 @@ export default function TransportsManagement() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(transportData),
-        },
+        }
       );
 
       if (!response.ok) {
@@ -205,6 +205,7 @@ export default function TransportsManagement() {
 
       // Reset form
       setTransportName('');
+      setCampId('');
       setDepartureType('collective');
       setReturnType('collective');
       setCities([]);
@@ -239,7 +240,7 @@ export default function TransportsManagement() {
           headers: {
             'Content-Type': 'application/json',
           },
-        },
+        }
       );
 
       if (!response.ok) {
@@ -260,10 +261,10 @@ export default function TransportsManagement() {
   const handleDeleteClick = async (transport: Transport, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedTransport(transport);
-
+    
     // Check if transport is assigned to any turnus
     const usage = await checkTransportUsage(transport.id);
-
+    
     if (usage.length > 0) {
       // Transport is assigned - show usage modal
       setTransportUsage(usage);
@@ -292,7 +293,7 @@ export default function TransportsManagement() {
           headers: {
             'Content-Type': 'application/json',
           },
-        },
+        }
       );
 
       if (!response.ok) {
@@ -323,7 +324,7 @@ export default function TransportsManagement() {
   };
 
   // Handle edit transport name
-  const _handleEditTransportName = async (transportId: number, newName: string) => {
+  const handleEditTransportName = async (transportId: number, newName: string) => {
     try {
       setSaving(true);
       setError(null);
@@ -348,7 +349,7 @@ export default function TransportsManagement() {
             headers: {
               'Content-Type': 'application/json',
             },
-          },
+          }
         );
         if (turnusResponse.ok) {
           const turnusData = await turnusResponse.json();
@@ -365,7 +366,7 @@ export default function TransportsManagement() {
             headers: {
               'Content-Type': 'application/json',
             },
-          },
+          }
         );
 
         if (!getResponse.ok) {
@@ -392,7 +393,7 @@ export default function TransportsManagement() {
                 return_price: city.return_price,
               })) || [],
             }),
-          },
+          }
         );
 
         if (!updateResponse.ok) {
@@ -411,7 +412,7 @@ export default function TransportsManagement() {
             body: JSON.stringify({
               name: newName.trim() || null,
             }),
-          },
+          }
         );
 
         if (!updateResponse.ok) {
@@ -421,7 +422,7 @@ export default function TransportsManagement() {
       }
 
       setEditingTransportId(null);
-      _setEditingTransportName('');
+      setEditingTransportName('');
 
       // Refresh transports list
       await fetchTransports();
@@ -489,7 +490,7 @@ export default function TransportsManagement() {
             {transports.length === 0 ? 'Brak zadeklarowanych transportów' : 'Brak wyników wyszukiwania'}
           </p>
           <p className="text-xs text-gray-500">
-            {transports.length === 0
+            {transports.length === 0 
               ? 'Kliknij "Dodaj transport" aby utworzyć nowy transport.'
               : 'Spróbuj zmienić kryteria wyszukiwania.'}
           </p>
@@ -633,6 +634,7 @@ export default function TransportsManagement() {
           setShowCreateModal(false);
           setError(null);
           setTransportName('');
+          setCampId('');
           setDepartureType('collective');
           setReturnType('collective');
           setCities([]);
@@ -661,11 +663,23 @@ export default function TransportsManagement() {
             </p>
           </div>
 
-          {/* Note: Camp assignment removed - transport can only be assigned to camps during turnus editing */}
-          <div className="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-            <p className="text-sm text-blue-700">
-              <strong>Uwaga:</strong> Transport może być przypisany do obozu tylko podczas edycji turnusu.
-              Aby przypisać transport do obozu, edytuj turnus i wybierz transport z listy dostępnych transportów.
+          {/* Camp ID (Optional) */}
+          <div className="mb-6">
+            <label htmlFor="camp-id" className="block text-sm font-medium text-gray-700 mb-2">
+              ID obozu <span className="text-xs text-gray-500">(opcjonalne)</span>
+            </label>
+            <input
+              id="camp-id"
+              type="number"
+              value={campId}
+              onChange={(e) => setCampId(e.target.value === '' ? '' : Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+              style={{ borderRadius: 0 }}
+              placeholder="np. 1"
+              disabled={saving}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Możesz przypisać transport do obozu (wszystkie turnusy tego obozu będą mogły używać tego transportu)
             </p>
           </div>
 
@@ -751,7 +765,7 @@ export default function TransportsManagement() {
 
               {cities.length === 0 ? (
                 <div className="text-center py-4 text-sm text-gray-500 border border-gray-200" style={{ borderRadius: 0 }}>
-                  Kliknij &quot;Dodaj miasto&quot; aby dodać pierwsze miasto
+                  Kliknij "Dodaj miasto" aby dodać pierwsze miasto
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -839,6 +853,7 @@ export default function TransportsManagement() {
                 setShowCreateModal(false);
                 setError(null);
                 setTransportName('');
+                setCampId('');
                 setDepartureType('collective');
                 setReturnType('collective');
                 setCities([]);
@@ -902,7 +917,7 @@ export default function TransportsManagement() {
                 <div className="text-center text-gray-500 py-8">Brak przypisanych turnusów</div>
               ) : (
                 <div className="space-y-3">
-                  {transportUsage.map((usage, _index) => (
+                  {transportUsage.map((usage, index) => (
                     <div
                       key={`${usage.camp_id}-${usage.turnus_id}`}
                       onClick={() => handleNavigateToTurnus(usage.camp_id, usage.turnus_id)}

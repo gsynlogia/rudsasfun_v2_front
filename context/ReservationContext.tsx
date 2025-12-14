@@ -55,7 +55,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
   }, [reservation, isHydrated]);
 
   const addReservationItem = useCallback((item: Omit<ReservationItem, 'id'>, customId?: string) => {
-    setReservation((prev) => {
+    setReservation((prev: ReservationState) => {
       // Don't add base if it already exists
       if (item.type === 'base') {
         return prev;
@@ -63,7 +63,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
 
       // If customId is provided, check if item with that ID already exists
       if (customId) {
-        const existingItemIndex = prev.items.findIndex(i => i.id === customId);
+        const existingItemIndex = prev.items.findIndex((i: ReservationItem) => i.id === customId);
         if (existingItemIndex !== -1) {
           // Item already exists with this ID, don't add duplicate
           return prev;
@@ -77,7 +77,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
         // For protection/addon without customId, check by name to avoid duplicates
         if (!customId) {
           const existingItem = prev.items.find(
-            i => i.type === item.type && i.name === item.name,
+            (i: ReservationItem) => i.type === item.type && i.name === item.name,
           );
           if (existingItem) {
             // Item already exists, don't add duplicate
@@ -89,12 +89,12 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
       } else {
         // For non-addon, non-protection types, replace existing item of the same type
         const existingItemIndex = prev.items.findIndex(
-          (i) => i.type === item.type,
+          (i: ReservationItem) => i.type === item.type,
         );
         if (existingItemIndex !== -1) {
           const newItems = [...prev.items];
           newItems[existingItemIndex] = { ...item, id: prev.items[existingItemIndex].id };
-          const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
+          const totalPrice = newItems.reduce((sum: number, item: ReservationItem) => sum + item.price, 0);
           return {
             ...prev,
             items: newItems,
@@ -106,7 +106,7 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
       // Add new item with custom ID or generate one
       const itemId = customId || `${item.type}-${Date.now()}`;
       const newItems = [...prev.items, { ...item, id: itemId }];
-      const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
+      const totalPrice = newItems.reduce((sum: number, item: ReservationItem) => sum + item.price, 0);
 
       return {
         ...prev,
@@ -117,12 +117,12 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
   }, []);
 
   const removeReservationItem = useCallback((id: string) => {
-    setReservation((prev) => {
+    setReservation((prev: ReservationState) => {
       // Don't allow removing base price
       if (id === 'base') return prev;
 
-      const newItems = prev.items.filter((item) => item.id !== id);
-      const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
+      const newItems = prev.items.filter((item: ReservationItem) => item.id !== id);
+      const totalPrice = newItems.reduce((sum: number, item: ReservationItem) => sum + item.price, 0);
 
       return {
         ...prev,
@@ -133,12 +133,12 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
   }, []);
 
   const removeReservationItemsByType = useCallback((type: ReservationItem['type']) => {
-    setReservation((prev) => {
+    setReservation((prev: ReservationState) => {
       // Don't allow removing base price by type
       if (type === 'base') return prev;
 
-      const newItems = prev.items.filter((item) => item.type !== type);
-      const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
+      const newItems = prev.items.filter((item: ReservationItem) => item.type !== type);
+      const totalPrice = newItems.reduce((sum: number, item: ReservationItem) => sum + item.price, 0);
 
       return {
         ...prev,
@@ -149,11 +149,11 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
   }, []);
 
   const updateReservationItem = useCallback((id: string, item: Partial<ReservationItem>) => {
-    setReservation((prev) => {
-      const newItems = prev.items.map((i) =>
+    setReservation((prev: ReservationState) => {
+      const newItems = prev.items.map((i: ReservationItem) =>
         i.id === id ? { ...i, ...item } : i,
       );
-      const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
+      const totalPrice = newItems.reduce((sum: number, item: ReservationItem) => sum + item.price, 0);
 
       return {
         ...prev,
@@ -164,24 +164,24 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
   }, []);
 
   const updateReservationCamp = useCallback((camp: ReservationCamp) => {
-    setReservation((prev) => ({
+    setReservation((prev: ReservationState) => ({
       ...prev,
       camp,
     }));
   }, []);
 
   const setBasePrice = useCallback((price: number) => {
-    setReservation((prev) => {
+    setReservation((prev: ReservationState) => {
       // Update basePrice
       const newBasePrice = price;
 
       // Update base item price
-      const newItems = prev.items.map((item) =>
+      const newItems = prev.items.map((item: ReservationItem) =>
         item.id === 'base' ? { ...item, price: newBasePrice } : item,
       );
 
       // Recalculate total price
-      const totalPrice = newItems.reduce((sum, item) => sum + item.price, 0);
+      const totalPrice = newItems.reduce((sum: number, item: ReservationItem) => sum + item.price, 0);
 
       return {
         ...prev,

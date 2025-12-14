@@ -24,7 +24,7 @@ interface Promotion {
  * Displays promotions from API for the selected turnus with justification fields
  */
 export default function PromotionsSection() {
-  const { reservation: _reservation, addReservationItem, removeReservationItemsByType } = useReservation();
+  const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +138,7 @@ export default function PromotionsSection() {
       prevPromotionRef.current = savedData.selectedPromotion;
     }
     if (savedData && savedData.promotionJustification) {
-      setPromotionJustification(savedData.promotionJustification);
+      setPromotionJustification(savedData.promotionJustification || {});
     }
     setIsInitialized(true);
   }, []);

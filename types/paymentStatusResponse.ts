@@ -7,5 +7,5 @@ export interface PaymentStatusResponse {
   payer_email: string | null;
   created_at: string | null;
   paid_at: string | null;
+  payment_date: string | null;
 }
-

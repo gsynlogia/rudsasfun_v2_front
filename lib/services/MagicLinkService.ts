@@ -1,26 +1,35 @@
 /**
  * Magic Link Service
- * Singleton service for handling passwordless authentication via email magic links
+ * Handles passwordless authentication via email magic links
  */
 
-import { MagicLinkRequest } from '@/types/magicLinkRequest';
-import { MagicLinkResponse } from '@/types/magicLinkResponse';
-import { MagicLinkVerifyResponse } from '@/types/magicLinkVerifyResponse';
 import { API_BASE_URL } from '@/utils/api-config';
 
-export type { MagicLinkRequest, MagicLinkResponse, MagicLinkVerifyResponse };
+export interface MagicLinkRequest {
+  email: string;
+}
+
+export interface MagicLinkResponse {
+  message: string;
+  success: boolean;
+}
+
+export interface MagicLinkVerifyResponse {
+  access_token: string;
+  token_type: string;
+  user: {
+    id: number;
+    login: string;
+    email?: string;
+    user_type: string;
+    groups: string[];
+    accessible_sections: string[];
+    created_at?: string;
+    updated_at?: string;
+  };
+}
 
 class MagicLinkService {
-  private static instance: MagicLinkService;
-
-  private constructor() {}
-
-  static getInstance(): MagicLinkService {
-    if (!MagicLinkService.instance) {
-      MagicLinkService.instance = new MagicLinkService();
-    }
-    return MagicLinkService.instance;
-  }
   /**
    * Request a magic link to be sent to the provided email
    */
@@ -34,8 +43,8 @@ class MagicLinkService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas wysyłania linku logowania' }));
-      throw new Error(error.detail || 'Błąd podczas wysyłania linku logowania');
+      const error = await response.json().catch(() => ({ detail: 'Błąd podczas wysyłania magic link' }));
+      throw new Error(error.detail || 'Błąd podczas wysyłania magic link');
     }
 
     return response.json();
@@ -53,13 +62,17 @@ class MagicLinkService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Nieprawidłowy lub wygasły link logowania' }));
-      throw new Error(error.detail || 'Nieprawidłowy lub wygasły link logowania');
+      const error = await response.json().catch(() => ({ detail: 'Nieprawidłowy lub wygasły magic link' }));
+      throw new Error(error.detail || 'Nieprawidłowy lub wygasły magic link');
     }
 
     return response.json();
   }
 }
 
-export const magicLinkService = MagicLinkService.getInstance();
+export const magicLinkService = new MagicLinkService();
+
+
+
+
 

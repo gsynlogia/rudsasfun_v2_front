@@ -1,9 +1,7 @@
 export interface PaymentMethod {
   id: number;
   name: string;
-  full_name: string;
-  image: Record<string, string> | null;
-  instant_redirection: boolean;
+  [key: string]: any;
 }
 
 export interface PaymentMethodsResponse {
@@ -13,4 +11,3 @@ export interface PaymentMethodsResponse {
   installments: PaymentMethod[];
   other: PaymentMethod[];
 }
-

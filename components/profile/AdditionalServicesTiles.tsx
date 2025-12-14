@@ -1,6 +1,6 @@
 'use client';
 
-import { Info } from 'lucide-react';
+import { Phone, Info } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 import UniversalModal from '@/components/admin/UniversalModal';

@@ -1,5 +1,5 @@
-import { ReservationCamp } from './reservationCamp';
 import { ReservationItem } from './reservationItem';
+import { ReservationCamp } from './reservationCamp';
 
 export interface ReservationState {
   basePrice: number;
@@ -7,4 +7,3 @@ export interface ReservationState {
   totalPrice: number;
   camp?: ReservationCamp;
 }
-

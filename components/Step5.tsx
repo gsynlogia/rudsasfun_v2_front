@@ -8,7 +8,7 @@ import UniversalModal from '@/components/admin/UniversalModal';
 import { useReservation } from '@/context/ReservationContext';
 import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { reservationService, ReservationService } from '@/lib/services/ReservationService';
-import type { StepComponentProps } from '@/types/reservation';
+import type { StepComponentProps, ReservationItem } from '@/types/reservation';
 import {
   defaultStep1FormData,
   defaultStep2FormData,
@@ -136,8 +136,8 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const baseDepositAmount = 600;
 
   // Calculate protection prices (OASA and TARCZA) from reservation items
-  const protectionItems = reservation.items.filter(item => item.type === 'protection');
-  const protectionTotal = protectionItems.reduce((sum, item) => {
+  const protectionItems = reservation.items.filter((item: ReservationItem) => item.type === 'protection');
+  const protectionTotal = protectionItems.reduce((sum: number, item: ReservationItem) => {
     // Check if it's OASA or TARCZA protection
     const name = item.name.toLowerCase();
     if (name.includes('oaza') || name.includes('oasa')) {
@@ -191,7 +191,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     if (!dietId) return 'Nie wybrano';
 
     // First, try to find diet in reservation items (for paid diets)
-    const dietItem = reservation.items.find(item => item.type === 'diet');
+      const dietItem = reservation.items.find((item: ReservationItem) => item.type === 'diet');
     if (dietItem) {
       return `${dietItem.name} (${formatPrice(dietItem.price)}zł)`;
     }
@@ -224,11 +224,11 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     }
 
     // Get addon items from reservation
-    const addonItems = reservation.items.filter(item => item.type === 'addon');
+    const addonItems = reservation.items.filter((item: ReservationItem) => item.type === 'addon');
 
     return step2Data.selectedAddons.map(addonId => {
       // Find the reservation item for this addon
-      const reservationItem = addonItems.find(item => item.id === `addon-${addonId}`);
+      const reservationItem = addonItems.find((item: ReservationItem) => item.id === `addon-${addonId}`);
       if (reservationItem) {
         return `${reservationItem.name} (${formatPrice(reservationItem.price)}zł)`;
       }
@@ -249,9 +249,9 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     if (!step2Data.selectedProtection) return [];
 
     // Get all protection items from reservation
-    const protectionItems = reservation.items.filter(item => item.type === 'protection');
+    const protectionItems = reservation.items.filter((item: ReservationItem) => item.type === 'protection');
     if (protectionItems.length > 0) {
-      return protectionItems.map(item => {
+      return protectionItems.map((item: ReservationItem) => {
         const name = item.name.replace(/^Ochrona /, '');
         return `${name} (${formatPrice(item.price)}zł)`;
       });
@@ -278,7 +278,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     if (!step2Data.selectedPromotion) return '';
 
     // Get promotion item from reservation
-    const promotionItem = reservation.items.find(item => item.type === 'promotion');
+    const promotionItem = reservation.items.find((item: ReservationItem) => item.type === 'promotion');
     if (promotionItem) {
       return `${promotionItem.name} (${formatPrice(promotionItem.price)}zł)`;
     }

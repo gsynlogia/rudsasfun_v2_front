@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
-import type { StepNumber } from '@/types/reservation';
+import type { StepNumber, ReservationItem } from '@/types/reservation';
 import { loadStep5FormData } from '@/utils/sessionStorage';
 
 const DEFAULT_BASE_PRICE = 2200; // Fallback for SSR only
@@ -39,8 +39,8 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
   const baseDepositAmount = 600;
 
   // Calculate protection prices (OASA and TARCZA) from reservation items
-  const protectionItems = reservation.items.filter(item => item.type === 'protection');
-  const protectionTotal = protectionItems.reduce((sum, item) => {
+  const protectionItems = reservation.items.filter((item: ReservationItem) => item.type === 'protection');
+  const protectionTotal = protectionItems.reduce((sum: number, item: ReservationItem) => {
     // Check if it's OASA or TARCZA protection
     const name = item.name.toLowerCase();
     if (name.includes('oaza') || name.includes('oasa')) {
@@ -144,8 +144,8 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
   };
 
   // Separate base price from other items
-  const baseItem = reservation.items.find((item) => item.type === 'base');
-  const additionalItems = reservation.items.filter((item) => item.type !== 'base');
+  const baseItem = reservation.items.find((item: ReservationItem) => item.type === 'base');
+  const additionalItems = reservation.items.filter((item: ReservationItem) => item.type !== 'base');
 
   // Render default state during SSR to avoid hydration mismatch
   if (!isMounted) {
@@ -213,7 +213,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
         {/* Additional items (diet, accommodation, etc.) */}
         {additionalItems.length > 0 && (
           <div className="w-full mb-2">
-            {additionalItems.map((item) => (
+            {additionalItems.map((item: ReservationItem) => (
               <div
                 key={item.id}
                 className="text-sm text-gray-600 mb-1 flex items-center justify-between w-full"
@@ -243,14 +243,14 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
             {/* All reservation items - exclude protections if deposit is selected (they'll be shown in deposit breakdown) */}
             <div className="space-y-1 mb-2">
               {reservation.items
-                .filter(item => {
+                .filter((item: ReservationItem) => {
                   // If deposit is selected, hide protection items (they'll be shown in deposit breakdown)
                   if (paymentAmount === 'deposit' && item.type === 'protection') {
                     return false;
                   }
                   return true;
                 })
-                .map((item) => (
+                .map((item: ReservationItem) => (
                   <div
                     key={item.id}
                     className="text-xs sm:text-sm text-gray-600 flex items-center justify-between"
@@ -288,7 +288,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                 </div>
 
                 {/* Protection items breakdown */}
-                {protectionItems.map((item) => {
+                {protectionItems                .map((item: ReservationItem) => {
                   const name = item.name.toLowerCase();
                   const isOasa = name.includes('oaza') || name.includes('oasa');
                   const isTarcza = name.includes('tarcza') || name.includes('shield');

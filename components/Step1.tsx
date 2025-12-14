@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 
@@ -27,8 +28,8 @@ interface ParentData {
  * Step1 Component - Personal Data
  * Contains: Parent/Guardian data, Participant data, Diet, Accommodation request, Health status
  */
-export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabled = false }: StepComponentProps) {
-  const { addReservationItem: _addReservationItem, removeReservationItemsByType: _removeReservationItemsByType, reservation } = useReservation();
+export default function Step1({ onNext, onPrevious, disabled = false }: StepComponentProps) {
+  const { addReservationItem, removeReservationItemsByType, reservation } = useReservation();
   const pathname = usePathname();
 
   // Calculate available birth years based on camp start date
@@ -320,7 +321,7 @@ export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabl
   }, [participantData]);
 
   // Validate all (parents + participant)
-  const _validateAll = (): boolean => {
+  const validateAll = (): boolean => {
     // Always validate both parents and participant, even if one fails
     const parentsValid = validateAllParents();
     const participantErrors = validateParticipant();

@@ -4,4 +4,3 @@ export interface CertificateListResponse {
   certificates: CertificateResponse[];
   total: number;
 }
-

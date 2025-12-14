@@ -5,4 +5,3 @@ export interface CreatePaymentResponse {
   title: string;
   order_id: string;
 }
-

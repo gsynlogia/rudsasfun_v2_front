@@ -5,4 +5,3 @@ export interface CertificateUploadResponse {
   file_url: string;
   uploaded_at: string;
 }
-

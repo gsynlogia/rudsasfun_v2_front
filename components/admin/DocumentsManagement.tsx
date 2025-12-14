@@ -1,10 +1,8 @@
 'use client';
 
-import { FileText, Check, Eye, EyeOff, Trash2 } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
-
+import { useState, useEffect, useCallback } from 'react';
+import { FileText, Upload, Check, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { authenticatedApiCall } from '@/utils/api-auth';
-
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 interface Document {
@@ -28,20 +26,15 @@ export default function DocumentsManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
 
-  // Fetch all documents (excluding tourist_regulations_insurance and watt_input_regulation)
+  // Fetch all documents
   const fetchDocuments = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await authenticatedApiCall<{ documents: Document[]; total: number }>(
-        '/api/documents/',
+        '/api/documents/'
       );
-      // Filter out documents that should not be displayed in admin panel
-      const excludedDocuments = ['tourist_regulations_insurance', 'watt_input_regulation'];
-      const filteredDocuments = (data.documents || []).filter(
-        doc => !excludedDocuments.includes(doc.name),
-      );
-      setDocuments(filteredDocuments);
+      setDocuments(data.documents || []);
     } catch (err) {
       console.error('[DocumentsManagement] Error fetching documents:', err);
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas ładowania dokumentów';
@@ -75,7 +68,7 @@ export default function DocumentsManagement() {
         {
           method: 'POST',
           body: formData,
-        },
+        }
       );
 
       // Refresh documents list

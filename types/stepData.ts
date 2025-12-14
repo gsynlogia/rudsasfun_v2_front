@@ -1,26 +1,32 @@
 /**
- * Type definitions with default values for step data
- * Replaces optional chaining with interfaces that have default values
+ * Default form data for reservation steps
+ * Used to initialize forms and merge with saved data
  */
 
-import { ReservationStorageState } from './reservationStorageState';
-import { Step1FormData } from './step1FormData';
-import { Step2FormData } from './step2FormData';
-import { Step3FormData } from './step3FormData';
+import type { Step1FormData, Step2FormData, Step3FormData } from '@/utils/sessionStorage';
+import type { ReservationState } from '@/types/reservation';
+import { withDefaults } from '@/types/defaults';
 
-// Default values for Step1FormData
+// Re-export withDefaults from defaults.ts
+export { withDefaults };
+
+/**
+ * Default Step1 form data
+ */
 export const defaultStep1FormData: Step1FormData = {
-  parents: [] as Array<{
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    phoneNumber: string;
-    street: string;
-    postalCode: string;
-    city: string;
-  }>,
+  parents: [
+    {
+      id: '1',
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '+48',
+      phoneNumber: '',
+      street: '',
+      postalCode: '',
+      city: '',
+    },
+  ],
   participantData: {
     firstName: '',
     lastName: '',
@@ -29,7 +35,7 @@ export const defaultStep1FormData: Step1FormData = {
     city: '',
     selectedParticipant: '',
   },
-  selectedDietId: null as number | null,
+  selectedDietId: null,
   accommodationRequest: '',
   healthQuestions: {
     chronicDiseases: '',
@@ -44,29 +50,30 @@ export const defaultStep1FormData: Step1FormData = {
   additionalNotes: '',
 };
 
-// Default values for Step2FormData
+/**
+ * Default Step2 form data
+ */
 export const defaultStep2FormData: Step2FormData = {
-  selectedDiets: [] as number[],
-  selectedAddons: [] as string[],
-  selectedProtection: [] as string[],
-  selectedProtectionIds: [] as number[],
+  selectedDiets: [],
+  selectedAddons: [],
+  selectedProtection: [],
   selectedPromotion: '',
-  promotionJustification: {} as Record<string, any>,
   transportData: {
-    departureType: 'zbiorowy',
+    departureType: '',
     departureCity: '',
-    returnType: 'zbiorowy',
+    returnType: '',
     returnCity: '',
-    differentCities: false,
   },
   transportModalConfirmed: false,
   selectedSource: '',
   inneText: '',
 };
 
-// Default values for Step3FormData
+/**
+ * Default Step3 form data
+ */
 export const defaultStep3FormData: Step3FormData = {
-  invoiceType: 'private' as 'private' | 'company',
+  invoiceType: 'private',
   privateData: {
     firstName: '',
     lastName: '',
@@ -84,7 +91,7 @@ export const defaultStep3FormData: Step3FormData = {
     postalCode: '',
     city: '',
   },
-  deliveryType: 'electronic' as 'electronic' | 'paper',
+  deliveryType: 'electronic',
   differentAddress: false,
   deliveryAddress: {
     street: '',
@@ -93,31 +100,18 @@ export const defaultStep3FormData: Step3FormData = {
   },
 };
 
-// Default values for ReservationStorageState
-export const defaultReservationState: ReservationStorageState = {
-  basePrice: 0,
-  items: [] as Array<{
-    id: string;
-    name: string;
-    price: number;
-    type: 'base' | 'diet' | 'accommodation' | 'addon' | 'protection' | 'promotion' | 'transport' | 'source' | 'other';
-  }>,
-  totalPrice: 0,
-  camp: {
-    id: 0,
-    name: '',
-    properties: {
-      period: '',
-      city: '',
-      start_date: '',
-      end_date: '',
+/**
+ * Default reservation state
+ */
+export const defaultReservationState: ReservationState = {
+  basePrice: 2200,
+  items: [
+    {
+      id: 'base',
+      name: 'Cena podstawowa',
+      price: 2200,
+      type: 'base',
     },
-  },
+  ],
+  totalPrice: 2200,
 };
-
-// Helper function to merge with defaults
-export function withDefaults<T>(data: T | null, defaults: T): T {
-  if (!data) return defaults;
-  return { ...defaults, ...data };
-}
-

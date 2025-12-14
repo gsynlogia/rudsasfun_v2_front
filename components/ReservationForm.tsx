@@ -577,7 +577,7 @@ export default function ReservationForm() {
               <div className="text-xs sm:text-sm text-gray-700">
                 <p className="font-bold mb-1 text-gray-900">Uwaga!</p>
                 <p>
-                  Z uwagi na brak możliwości zapewnienia pełnej opieki osobom z zaburzeniami ze spektrum autyzmu (Autyzm, Zespół Aspergera, Zespół Retta, Zespół Hellera, Zespół Tourette&apos;a) oraz chorobą autoimmunologiczną - Celiakia, nie przyjmujemy uczestników z tymi schorzeniami.
+                  Z uwagi na brak możliwości zapewnienia pełnej opieki osobom z zaburzeniami ze spektrum autyzmu (Autyzm, Zespół Aspergera, Zespół Retta, Zespół Hellera, Zespół Tourette'a) oraz chorobą autoimmunologiczną - Celiakia, nie przyjmujemy uczestników z tymi schorzeniami.
                 </p>
               </div>
             </div>

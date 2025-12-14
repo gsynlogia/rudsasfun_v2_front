@@ -5,4 +5,3 @@ export interface CampWithProperty {
   camp: Camp;
   property: CampProperty;
 }
-

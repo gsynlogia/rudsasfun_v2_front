@@ -1,11 +1,10 @@
 'use client';
 
+import AdminLayout from '@/components/admin/AdminLayout';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-
-import AdminLayout from '@/components/admin/AdminLayout';
+import { useRouter, useParams } from 'next/navigation';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface Group {
@@ -32,7 +31,7 @@ interface User {
 /**
  * Admin Panel - Edit Group Page
  * Route: /admin-panel/settings/groups/[id]/edit
- *
+ * 
  * Separate page for editing group and assigning users
  */
 export default function EditGroupPage() {
@@ -65,7 +64,7 @@ export default function EditGroupPage() {
   const loadAvailableSections = async () => {
     try {
       const sectionsData = await authenticatedApiCall<{ sections: string[]; section_labels: { [key: string]: string } }>(
-        `${API_BASE_URL}/api/groups/available-sections`,
+        `${API_BASE_URL}/api/groups/available-sections`
       );
       if (sectionsData && sectionsData.section_labels) {
         setAvailableSections(sectionsData.section_labels);
@@ -76,11 +75,6 @@ export default function EditGroupPage() {
           'camps': 'Obozy',
           'payments': 'Płatności',
           'transports': 'Transport',
-          'diets': 'Diety',
-          'promotions': 'Promocje',
-          'protections': 'Ochrony',
-          'cms': 'CMS',
-          'settings': 'Ustawienia',
         });
       }
     } catch (err) {
@@ -91,11 +85,6 @@ export default function EditGroupPage() {
         'camps': 'Obozy',
         'payments': 'Płatności',
         'transports': 'Transport',
-        'diets': 'Diety',
-        'promotions': 'Promocje',
-        'protections': 'Ochrony',
-        'cms': 'CMS',
-        'settings': 'Ustawienia',
       });
     }
   };
@@ -104,12 +93,12 @@ export default function EditGroupPage() {
     try {
       setLoading(true);
       const groupWithUsers = await authenticatedApiCall<GroupWithUsers>(`${API_BASE_URL}/api/groups/${groupId}`);
-
+      
       setFormData({
         name: groupWithUsers.name,
         description: groupWithUsers.description || '',
       });
-
+      
       setSelectedUserIds(groupWithUsers.users.map(u => u.id));
       setSelectedSections(groupWithUsers.permissions || []);
       setIsDefaultGroup(defaultGroups.includes(groupWithUsers.name.toLowerCase()));
@@ -147,21 +136,21 @@ export default function EditGroupPage() {
             name: formData.name,
             description: formData.description || null,
           }),
-        },
+        }
       );
 
       // Update user assignments - remove from all groups first, then add to selected
       const allGroups = await authenticatedApiCall<Group[]>(`${API_BASE_URL}/api/groups`);
       for (const group of allGroups) {
         if (group.id === groupId) continue; // Skip current group
-
+        
         for (const userId of selectedUserIds) {
           try {
             await authenticatedApiCall(
               `${API_BASE_URL}/api/groups/${group.id}/users/${userId}`,
-              { method: 'DELETE' },
+              { method: 'DELETE' }
             ).catch(() => {}); // Ignore errors if user not in group
-          } catch {
+          } catch (err) {
             // Ignore
           }
         }
@@ -179,7 +168,7 @@ export default function EditGroupPage() {
             body: JSON.stringify({
               user_ids: selectedUserIds,
             }),
-          },
+          }
         );
       } else {
         // Remove all users from group if none selected
@@ -188,9 +177,9 @@ export default function EditGroupPage() {
           try {
             await authenticatedApiCall(
               `${API_BASE_URL}/api/groups/${groupId}/users/${user.id}`,
-              { method: 'DELETE' },
+              { method: 'DELETE' }
             ).catch(() => {});
-          } catch {
+          } catch (err) {
             // Ignore
           }
         }
@@ -207,7 +196,7 @@ export default function EditGroupPage() {
           body: JSON.stringify({
             sections: selectedSections,
           }),
-        },
+        }
       );
 
       // Redirect back to groups page

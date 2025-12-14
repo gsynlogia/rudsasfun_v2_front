@@ -4,4 +4,3 @@ export interface CampListResponse {
   camps: Camp[];
   total: number;
 }
-

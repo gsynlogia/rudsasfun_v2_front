@@ -21,7 +21,7 @@ export default function CurrentReservations() {
   // Check for payment status in query params
   useEffect(() => {
     const paymentStatus = searchParams.get('payment');
-    const _reservationId = searchParams.get('reservation_id');
+    const reservationId = searchParams.get('reservation_id');
 
     if (paymentStatus === 'success') {
       showSuccess('Płatność została pomyślnie zarezerwowana. Twoja rezerwacja jest teraz aktywna.', 8000);
@@ -49,7 +49,7 @@ export default function CurrentReservations() {
         const data = await reservationService.getMyReservations(0, 100);
 
         // Map backend data to frontend format
-        const _mappedReservations = data.map((reservation: ReservationResponse) => {
+        const mappedReservations = data.map((reservation: ReservationResponse) => {
           // Format dates - use property start_date and end_date if available
           let startDate: Date | null = null;
           let endDate: Date | null = null;
@@ -84,7 +84,7 @@ export default function CurrentReservations() {
             }
           }
 
-          let _datesStr = 'Brak dat';
+          let datesStr = 'Brak dat';
           if (startDate && endDate && !isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
             const formatDate = (date: Date) => {
               if (isNaN(date.getTime())) {
@@ -95,28 +95,28 @@ export default function CurrentReservations() {
               const year = date.getFullYear();
               return `${day}.${month}.${year}`;
             };
-            _datesStr = `${formatDate(startDate)} – ${formatDate(endDate)} (${daysCount} dni)`;
+            datesStr = `${formatDate(startDate)} – ${formatDate(endDate)} (${daysCount} dni)`;
           }
 
           // Get participant name
-          const _participantName = reservation.participant_first_name && reservation.participant_last_name
+          const participantName = reservation.participant_first_name && reservation.participant_last_name
             ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
             : 'Brak danych';
 
           // Get age
-          const _age = reservation.participant_age ? `${reservation.participant_age} lat` : 'Brak danych';
+          const age = reservation.participant_age ? `${reservation.participant_age} lat` : 'Brak danych';
 
           // Get gender
-          const _gender = reservation.participant_gender || 'Brak danych';
+          const gender = reservation.participant_gender || 'Brak danych';
 
           // Get city
-          const _city = reservation.participant_city || reservation.property_city || 'Brak danych';
+          const city = reservation.participant_city || reservation.property_city || 'Brak danych';
 
           // Get camp name
-          const _campName = reservation.camp_name || 'Brak danych';
+          const campName = reservation.camp_name || 'Brak danych';
 
           // Get resort
-          const _resort = reservation.property_name ? `Ośrodek: ${reservation.property_name}` : 'Brak danych';
+          const resort = reservation.property_name ? `Ośrodek: ${reservation.property_name}` : 'Brak danych';
 
           // Map status
           const statusMap: Record<string, string> = {
@@ -125,10 +125,10 @@ export default function CurrentReservations() {
             'cancelled': 'Anulowana',
             'completed': 'Zakończona',
           };
-          const _status = statusMap[reservation.status] || reservation.status;
+          const status = statusMap[reservation.status] || reservation.status;
 
           // Get parents/guardians data
-          const _parentsData = reservation.parents_data || [];
+          const parentsData = reservation.parents_data || [];
 
           // Return full reservation data
           return reservation;

@@ -1,12 +1,11 @@
 'use client';
 
-import { Info } from 'lucide-react';
-import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
-
+import { Info } from 'lucide-react';
 import { useReservation } from '@/context/ReservationContext';
-import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
+import { API_BASE_URL } from '@/utils/api-config';
+import type { ReservationItem } from '@/types/reservation';
 
 /**
  * AddonsSection Component
@@ -14,7 +13,7 @@ import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
  */
 export default function AddonsSection() {
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
-
+  
   // Initialize with data from sessionStorage if available
   const getInitialSelectedAddons = (): Set<string> => {
     if (typeof window === 'undefined') return new Set();
@@ -24,7 +23,7 @@ export default function AddonsSection() {
     }
     return new Set();
   };
-
+  
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(getInitialSelectedAddons);
   const [addonDescription, setAddonDescription] = useState<string>('');
   const [infoHeader, setInfoHeader] = useState<string>('');
@@ -58,7 +57,6 @@ export default function AddonsSection() {
         // Fallback to empty string if API fails
         setAddonDescription('');
         setInfoHeader('');
-        // Backend unavailable - description will be empty, user can still proceed
       } finally {
         setLoadingDescription(false);
       }
@@ -81,38 +79,15 @@ export default function AddonsSection() {
           name: string;
           description: string | null;
           price: number;
-          icon_url: string | null;
           icon_svg: string | null;
         }) => ({
           id: addon.id.toString(),
           name: addon.name,
           description: addon.description || '',
           price: addon.price,
-          icon: addon.icon_url ? (
-            <Image
-              src={getStaticAssetUrl(addon.icon_url) || ''}
-              alt={addon.name}
-              width={48}
-              height={48}
-              className="object-contain"
-              unoptimized
-              onError={(e) => {
-                // Fallback to SVG if image fails
-                const target = e.target as HTMLImageElement;
-                if (addon.icon_svg) {
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent) {
-                    parent.innerHTML = addon.icon_svg;
-                  }
-                } else {
-                  target.style.display = 'none';
-                }
-              }}
-            />
-          ) : addon.icon_svg ? (
-            <div
-              className="w-12 h-12"
+          icon: addon.icon_svg ? (
+            <div 
+              className="w-12 h-12" 
               dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
             />
           ) : (
@@ -126,7 +101,6 @@ export default function AddonsSection() {
         console.error('[AddonsSection] Error fetching addons:', err);
         // Fallback to empty array if API fails
         setAddons([]);
-        // Backend unavailable - addons will be empty, user can still proceed
       } finally {
         setLoadingAddons(false);
       }
@@ -163,10 +137,10 @@ export default function AddonsSection() {
       const addon = addons.find(a => a.id === addonId);
       if (addon) {
         const reservationId = `addon-${addonId}`;
-
+        
         // Check if already exists in reservation
         const existing = reservation.items.find(
-          item => item.type === 'addon' && item.name === addon.name,
+          (item: ReservationItem) => item.type === 'addon' && item.name === addon.name
         );
         if (!existing) {
           addonReservationIdsRef.current.set(addonId, reservationId);
@@ -181,7 +155,7 @@ export default function AddonsSection() {
         }
       }
     });
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, addons.length, reservation.items.length]);
 
   // Update reservation when addons change
@@ -200,7 +174,7 @@ export default function AddonsSection() {
       const reservationId = addonReservationIdsRef.current.get(addonId);
       if (reservationId) {
         // Try to find by stored ID first
-        const item = reservation.items.find(item => item.id === reservationId);
+        const item = reservation.items.find((item: ReservationItem) => item.id === reservationId);
         if (item) {
           removeReservationItem(item.id);
         } else {
@@ -208,7 +182,7 @@ export default function AddonsSection() {
           const addon = addons.find(a => a.id === addonId);
           if (addon) {
             const itemByName = reservation.items.find(
-              item => item.type === 'addon' && item.name === addon.name,
+              (item: ReservationItem) => item.type === 'addon' && item.name === addon.name
             );
             if (itemByName) {
               removeReservationItem(itemByName.id);
@@ -225,10 +199,10 @@ export default function AddonsSection() {
       if (addon) {
         // Use predictable ID format: addon-{addonId}
         const reservationId = `addon-${addonId}`;
-
+        
         // Check if item with this ID already exists
-        const existingItem = reservation.items.find(item => item.id === reservationId);
-
+        const existingItem = reservation.items.find((item: ReservationItem) => item.id === reservationId);
+        
         if (!existingItem) {
           addonReservationIdsRef.current.set(addonId, reservationId);
           // Use the predictable ID when adding
@@ -248,7 +222,7 @@ export default function AddonsSection() {
   // Save to sessionStorage whenever addons change
   useEffect(() => {
     if (!isInitialized) return; // Don't save during initial load
-
+    
     const savedData = loadStep2FormData();
     const formData = {
       selectedDiets: savedData?.selectedDiets || [],
@@ -314,7 +288,7 @@ export default function AddonsSection() {
               <button
                 key={addon.id}
                 onClick={() => toggleAddon(addon.id)}
-                className={`w-28 h-28 sm:w-32 sm:h-32 flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer ${
+                className={`w-28 h-28 sm:w-32 sm:h-32 flex flex-col items-center justify-center gap-2 transition-colors ${
                   isSelected
                     ? 'bg-[#03adf0] text-white'
                     : 'bg-gray-100 text-gray-600'
@@ -353,7 +327,7 @@ export default function AddonsSection() {
             <Info className="w-5 h-5 text-[#03adf0] flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               {infoHeader && (
-                <div
+                <div 
                   className="text-xs sm:text-sm font-medium text-gray-800 mb-2"
                   dangerouslySetInnerHTML={{ __html: infoHeader }}
                 />

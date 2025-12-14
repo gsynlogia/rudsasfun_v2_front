@@ -109,7 +109,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               type: 'certificate',
               name: cert.file_name,
               date: cert.uploaded_at,
-              fileUrl: cert.file_url,
+              fileUrl: cert.file_url || undefined,
             });
           });
         }
@@ -688,7 +688,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                               type: 'certificate',
                               name: cert.file_name,
                               date: cert.uploaded_at,
-                              fileUrl: cert.file_url,
+                              fileUrl: cert.file_url || undefined,
                             });
                           });
                         }

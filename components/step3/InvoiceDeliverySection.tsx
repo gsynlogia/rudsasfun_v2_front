@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
 import { loadStep3FormData, saveStep3FormData } from '@/utils/sessionStorage';
+import type { ReservationItem } from '@/types/reservation';
 
 /**
  * InvoiceDeliverySection Component
@@ -70,7 +71,7 @@ export default function InvoiceDeliverySection() {
     if (savedData && savedData.deliveryType === 'paper' && savedData.invoiceType === 'company') {
       // Check if already exists in reservation
       const existing = reservation.items.find(
-        item => item.type === 'other' && item.name === 'Faktura papierowa',
+        (item: ReservationItem) => item.type === 'other' && item.name === 'Faktura papierowa',
       );
       if (!existing) {
         addReservationItem({
@@ -85,7 +86,7 @@ export default function InvoiceDeliverySection() {
     } else if (savedData && savedData.invoiceType === 'private') {
       // Remove paper invoice if switching to private person
       const paperInvoiceItem = reservation.items.find(
-        item => item.type === 'other' && item.name === 'Faktura papierowa',
+        (item: ReservationItem) => item.type === 'other' && item.name === 'Faktura papierowa',
       );
       if (paperInvoiceItem) {
         removeReservationItem(paperInvoiceItem.id);
@@ -106,7 +107,7 @@ export default function InvoiceDeliverySection() {
     if (deliveryType === 'paper' && invoiceType === 'company') {
       // Add paper invoice fee (only for company)
       const existing = reservation.items.find(
-        item => item.type === 'other' && item.name === 'Faktura papierowa',
+        (item: ReservationItem) => item.type === 'other' && item.name === 'Faktura papierowa',
       );
       if (!existing) {
         addReservationItem({
@@ -126,7 +127,7 @@ export default function InvoiceDeliverySection() {
       } else {
         // Fallback: find and remove by name
         const paperInvoiceItem = reservation.items.find(
-          item => item.type === 'other' && item.name === 'Faktura papierowa',
+          (item: ReservationItem) => item.type === 'other' && item.name === 'Faktura papierowa',
         );
         if (paperInvoiceItem) {
           removeReservationItem(paperInvoiceItem.id);

@@ -2,12 +2,38 @@
  * Authentication Service
  * Singleton service for managing JWT tokens and authentication state
  */
-import { LoginRequest } from '@/types/loginRequest';
-import { LoginResponse } from '@/types/loginResponse';
-import { User } from '@/types/user';
 import { API_BASE_URL } from '@/utils/api-config';
 
-export type { LoginRequest, LoginResponse, User };
+export interface LoginRequest {
+  login: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  user: {
+    id: number;
+    login: string;
+    email?: string;
+    user_type?: string;
+    groups: string[];
+    accessible_sections?: string[];
+    created_at?: string;
+    updated_at?: string;
+  };
+}
+
+export interface User {
+  id: number;
+  login: string;
+  email?: string;
+  user_type?: string;
+  groups: string[];
+  accessible_sections?: string[];
+  created_at?: string;
+  updated_at?: string;
+}
 
 class AuthService {
   private static instance: AuthService;
@@ -41,7 +67,7 @@ class AuthService {
     }
 
     const data: LoginResponse = await response.json();
-
+    
     // Store token and user info
     if (typeof window !== 'undefined') {
       localStorage.setItem(this.tokenKey, data.access_token);
@@ -58,7 +84,7 @@ class AuthService {
    */
   async logout(): Promise<void> {
     const token = this.getToken();
-
+    
     // Call backend logout endpoint if token exists (optional, for logging)
     if (token) {
       try {
@@ -74,7 +100,7 @@ class AuthService {
         // Ignore errors
       }
     }
-
+    
     // Clear local storage
     if (typeof window !== 'undefined') {
       localStorage.removeItem(this.tokenKey);
@@ -116,8 +142,7 @@ class AuthService {
    */
   isAdmin(): boolean {
     const user = this.getCurrentUser();
-    if (!user) return false;
-    return user.user_type === 'admin' || (user.groups || []).includes('admin');
+    return user?.user_type === 'admin' || user?.groups?.includes('admin') || false;
   }
 
   /**
@@ -125,8 +150,7 @@ class AuthService {
    */
   isClient(): boolean {
     const user = this.getCurrentUser();
-    if (!user) return false;
-    return user.user_type === 'client';
+    return user?.user_type === 'client' || false;
   }
 
   /**
@@ -142,7 +166,7 @@ class AuthService {
   /**
    * Get authorization header for API requests
    */
-  getAuthHeader(): { Authorization: string } | Record<string, never> {
+  getAuthHeader(): { Authorization: string } | {} {
     const token = this.getToken();
     if (!token) return {};
     return { Authorization: `Bearer ${token}` };
@@ -168,7 +192,7 @@ class AuthService {
       }
 
       const user: User = await response.json();
-
+      
       // Update stored user info
       if (typeof window !== 'undefined') {
         localStorage.setItem(this.userKey, JSON.stringify(user));
@@ -184,4 +208,5 @@ class AuthService {
 
 // Export singleton instance
 export const authService = AuthService.getInstance();
+
 

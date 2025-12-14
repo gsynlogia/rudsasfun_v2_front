@@ -1,23 +1,20 @@
 'use client';
 
-import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-
-
-import type { StepComponentProps } from '@/types/reservation';
-import { API_BASE_URL } from '@/utils/api-config';
-import { saveStep4FormData, loadStep4FormData, type Step4FormData } from '@/utils/sessionStorage';
-
+import { useRouter, usePathname } from 'next/navigation';
 import DashedLine from './DashedLine';
+import type { StepComponentProps } from '@/types/reservation';
+import { saveStep4FormData, loadStep4FormData, type Step4FormData } from '@/utils/sessionStorage';
+import { API_BASE_URL } from '@/utils/api-config';
 
 /**
  * Step4 Component - Consents and Regulations
  * Contains: Consent checkboxes and downloadable documents
  */
-export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabled = false }: StepComponentProps) {
+export default function Step4({ onNext, onPrevious, disabled = false }: StepComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
-
+  
   // Initialize state from sessionStorage or defaults
   const getInitialState = (): Step4FormData => {
     const savedData = loadStep4FormData();
@@ -191,7 +188,7 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
   // Get list of documents to display (only public ones)
   const getDocumentsList = () => {
-    const docNames = ['portal_regulation', 'privacy_policy', 'tourist_events_regulations'];
+    const docNames = ['portal_regulation', 'privacy_policy', 'tourist_events_regulations', 'tourist_regulations_insurance', 'watt_input_regulation'];
     return docNames
       .filter(name => documents.has(name))
       .map(name => ({
@@ -272,10 +269,10 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
                         handleDocumentDownload('privacy_policy');
                       }}
                     >
-                      Polityką prywatności RODO
+                      Polityką prywatności
                     </a>
                   ) : (
-                    <span className="text-gray-500">Polityką prywatności RODO</span>
+                    <span className="text-gray-500">Polityką prywatności</span>
                   )}{' '}
                   i akceptuję ich postanowienia.
                   <span className="text-red-500 ml-1">*</span>

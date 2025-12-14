@@ -1,13 +1,11 @@
 'use client';
 
-import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, AlertCircle, Download } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
-
-import { certificateService, CertificateResponse } from '@/lib/services/CertificateService';
-import { contractService } from '@/lib/services/ContractService';
-import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
+import { useRouter } from 'next/navigation';
+import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, Clock, AlertCircle, Download } from 'lucide-react';
 import { reservationService } from '@/lib/services/ReservationService';
+import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
+import { certificateService, CertificateResponse } from '@/lib/services/CertificateService';
 
 /**
  * Reservations Management Component
@@ -25,17 +23,6 @@ interface ReservationDetails {
   parentName: string;
   parentEmail: string;
   parentPhone: string;
-  parents: Array<{
-    id: string;
-    firstName: string;
-    lastName: string;
-    email?: string;
-    phone: string;
-    phoneNumber: string;
-    street?: string;
-    postalCode?: string;
-    city?: string;
-  }>;
   paymentStatus: string;
   paymentMethod: string;
   totalAmount: number;
@@ -59,7 +46,6 @@ interface Reservation {
   details: ReservationDetails;
   hasQualificationCard?: boolean;
   qualificationCard?: QualificationCardResponse | null;
-  backendData?: BackendReservation; // Store full backend data for detailed view
 }
 
 // Backend reservation response interface
@@ -102,53 +88,36 @@ interface BackendReservation {
   invoice_street: string | null;
   invoice_postal_code: string | null;
   invoice_city: string | null;
-  delivery_type?: string | null;
-  delivery_different_address?: boolean | null;
-  delivery_street?: string | null;
-  delivery_postal_code?: string | null;
-  delivery_city?: string | null;
   departure_type: string | null;
   departure_city: string | null;
   return_type: string | null;
   return_city: string | null;
-  transport_different_cities?: boolean | null;
   diet: number | null;
   diet_name?: string | null;
-  selected_diets?: number[] | null;
   accommodation_request: string | null;
   selected_source: string | null;
   source_name?: string | null;
-  source_inne_text?: string | null;
   selected_addons?: string[] | null;
-  selected_protection?: string[] | number[] | null;
-  selected_promotion?: string | null;
-  promotion_justification?: Record<string, any> | null;
-  consent1?: boolean | null;
-  consent2?: boolean | null;
-  consent3?: boolean | null;
-  consent4?: boolean | null;
-  health_questions?: Record<string, string> | null;
-  health_details?: Record<string, string> | null;
-  additional_notes?: string | null;
+  selected_protection?: string[] | null;
 }
 
 // Map backend reservation to frontend format
 const mapBackendToFrontend = (backendReservation: BackendReservation): Reservation => {
-  const firstParent = backendReservation.parents_data && backendReservation.parents_data.length > 0
-    ? backendReservation.parents_data[0]
+  const firstParent = backendReservation.parents_data && backendReservation.parents_data.length > 0 
+    ? backendReservation.parents_data[0] 
     : null;
-
+  
   const participantName = `${backendReservation.participant_first_name || ''} ${backendReservation.participant_last_name || ''}`.trim();
-  const email = (firstParent && firstParent.email) ? firstParent.email : (backendReservation.invoice_email || '');
+  const email = firstParent?.email || backendReservation.invoice_email || '';
   const campName = backendReservation.camp_name || 'Nieznany obóz';
   const tripName = backendReservation.property_name || `${backendReservation.property_period || ''} - ${backendReservation.property_city || ''}`.trim() || 'Nieznany turnus';
-
+  
   // Map status
   let status = backendReservation.status || 'pending';
   if (status === 'pending') status = 'aktywna';
   if (status === 'cancelled') status = 'anulowana';
   if (status === 'completed') status = 'zakończona';
-
+  
   // Calculate payment status
   const totalAmount = backendReservation.total_price || 0;
   const paidAmount = backendReservation.deposit_amount || 0;
@@ -158,26 +127,23 @@ const mapBackendToFrontend = (backendReservation: BackendReservation): Reservati
   } else if (paidAmount > 0) {
     paymentStatus = 'Częściowo opłacona';
   }
-
+  
   // Get parent name
-  const parentName = firstParent
+  const parentName = firstParent 
     ? `${firstParent.firstName} ${firstParent.lastName}`
-    : (backendReservation.invoice_type === 'private'
+    : (backendReservation.invoice_type === 'private' 
       ? `${backendReservation.invoice_first_name || ''} ${backendReservation.invoice_last_name || ''}`.trim()
       : backendReservation.invoice_company_name || 'Brak danych');
-
-  const parentEmail = (firstParent && firstParent.email) ? firstParent.email : (backendReservation.invoice_email || '');
-  const parentPhone = (firstParent && firstParent.phoneNumber) ? firstParent.phoneNumber : (backendReservation.invoice_phone || '');
-
-  // Get all parents data
-  const allParents = backendReservation.parents_data || [];
-
+  
+  const parentEmail = firstParent?.email || backendReservation.invoice_email || '';
+  const parentPhone = firstParent?.phoneNumber || backendReservation.invoice_phone || '';
+  
   // Calculate age from participant_age string
   const age = backendReservation.participant_age ? parseInt(backendReservation.participant_age) : 0;
   const currentYear = new Date().getFullYear();
   const birthYear = currentYear - age;
   const birthDate = new Date(birthYear, 0, 1).toISOString().split('T')[0];
-
+  
   return {
     id: backendReservation.id,
     reservationName: `REZ-${new Date(backendReservation.created_at).getFullYear()}-${String(backendReservation.id).padStart(3, '0')}`,
@@ -188,63 +154,46 @@ const mapBackendToFrontend = (backendReservation: BackendReservation): Reservati
     status: status,
     createdAt: backendReservation.created_at.split('T')[0],
     details: {
-      phone: (firstParent && firstParent.phoneNumber) ? firstParent.phoneNumber : (backendReservation.invoice_phone || ''),
-      address: (firstParent && firstParent.street) ? firstParent.street : (backendReservation.invoice_street || ''),
-      city: (firstParent && firstParent.city) ? firstParent.city : (backendReservation.invoice_city || backendReservation.participant_city || ''),
-      postalCode: (firstParent && firstParent.postalCode) ? firstParent.postalCode : (backendReservation.invoice_postal_code || ''),
+      phone: firstParent?.phoneNumber || backendReservation.invoice_phone || '',
+      address: firstParent?.street || backendReservation.invoice_street || '',
+      city: firstParent?.city || backendReservation.invoice_city || backendReservation.participant_city || '',
+      postalCode: firstParent?.postalCode || backendReservation.invoice_postal_code || '',
       birthDate: birthDate,
       age: age,
       parentName: parentName || 'Brak danych',
       parentEmail: parentEmail,
       parentPhone: parentPhone,
-      parents: allParents.map(parent => ({
-        id: parent.id || '',
-        firstName: parent.firstName || '',
-        lastName: parent.lastName || '',
-        email: parent.email || undefined,
-        phone: parent.phone || '+48',
-        phoneNumber: parent.phoneNumber || '',
-        street: parent.street || undefined,
-        postalCode: parent.postalCode || undefined,
-        city: parent.city || undefined,
-      })),
       paymentStatus: paymentStatus,
       paymentMethod: 'Online', // Default, could be enhanced with payment data
       totalAmount: totalAmount,
       paidAmount: paidAmount,
       notes: backendReservation.accommodation_request || 'Brak uwag',
       specialRequests: backendReservation.accommodation_request || 'Brak',
-      dietaryRestrictions: backendReservation.diet_name || (backendReservation.diet !== null ? `Dieta ID: ${backendReservation.diet}` : 'Standardowa'),
+      dietaryRestrictions: backendReservation.diet_name || (backendReservation.diet !== null ? 'Dieta ID: ' + backendReservation.diet : 'Standardowa'),
       medicalInfo: 'Brak informacji', // Could be enhanced with health_questions data
     },
-    // Store all backend data for detailed view
-    backendData: backendReservation,
   };
 };
 
 export default function ReservationsManagement() {
   const router = useRouter();
-
+  
   // State for reservations from API
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  
   // State for expanded rows
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-
+  
   // State for delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
-
+  
   // State for qualification cards
   const [qualificationCards, setQualificationCards] = useState<Map<number, QualificationCardResponse | null>>(new Map());
   const [loadingCards, setLoadingCards] = useState<Set<number>>(new Set());
-
-  // State for contracts
-  const [contracts, setContracts] = useState<Map<number, any>>(new Map());
-  const [loadingContracts, setLoadingContracts] = useState<Set<number>>(new Set());
-
+  
   // State for certificates
   const [certificates, setCertificates] = useState<Map<number, CertificateResponse[]>>(new Map());
   const [loadingCertificates, setLoadingCertificates] = useState<Set<number>>(new Set());
@@ -252,7 +201,7 @@ export default function ReservationsManagement() {
   // Fetch qualification card for a reservation
   const fetchQualificationCard = async (reservationId: number) => {
     if (loadingCards.has(reservationId)) return;
-
+    
     try {
       setLoadingCards(prev => new Set(prev).add(reservationId));
       const card = await qualificationCardService.getQualificationCard(reservationId);
@@ -272,33 +221,10 @@ export default function ReservationsManagement() {
     }
   };
 
-  // Fetch contract for a reservation
-  const fetchContract = async (reservationId: number) => {
-    if (loadingContracts.has(reservationId)) return;
-
-    try {
-      setLoadingContracts(prev => new Set(prev).add(reservationId));
-      const contract = await contractService.getContract(reservationId);
-      setContracts(prev => new Map(prev).set(reservationId, contract));
-    } catch (error: any) {
-      // 404 is expected if contract doesn't exist
-      if (error.message && !error.message.includes('404')) {
-        console.error(`Error loading contract for reservation ${reservationId}:`, error);
-      }
-      setContracts(prev => new Map(prev).set(reservationId, null));
-    } finally {
-      setLoadingContracts(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(reservationId);
-        return newSet;
-      });
-    }
-  };
-
   // Fetch certificates for a reservation
   const fetchCertificates = async (reservationId: number) => {
     if (loadingCertificates.has(reservationId)) return;
-
+    
     try {
       setLoadingCertificates(prev => new Set(prev).add(reservationId));
       const response = await certificateService.getCertificates(reservationId);
@@ -327,11 +253,10 @@ export default function ReservationsManagement() {
         const backendReservations = await reservationService.listReservations(0, 1000);
         const mappedReservations = backendReservations.map(mapBackendToFrontend);
         setAllReservations(mappedReservations);
-
-        // Fetch qualification cards, contracts and certificates for all reservations
+        
+        // Fetch qualification cards and certificates for all reservations
         for (const reservation of mappedReservations) {
           fetchQualificationCard(reservation.id);
-          fetchContract(reservation.id);
           fetchCertificates(reservation.id);
         }
       } catch (err) {
@@ -341,10 +266,10 @@ export default function ReservationsManagement() {
         setIsLoading(false);
       }
     };
-
+    
     fetchReservations();
   }, []);
-
+  
   // Toggle row expansion with animation
   const toggleRowExpansion = (reservationId: number) => {
     setExpandedRows(prev => {
@@ -357,24 +282,24 @@ export default function ReservationsManagement() {
       return newSet;
     });
   };
-
+  
   // Handle edit click - navigate to edit page
   const handleEditClick = (reservation: Reservation, e: React.MouseEvent) => {
     e.stopPropagation();
     router.push(`/admin-panel/reservations/${reservation.id}/edit`);
   };
-
+  
   // Handle delete click
   const handleDeleteClick = (reservation: Reservation, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedReservation(reservation);
     setDeleteModalOpen(true);
   };
-
+  
   // Handle certificate download
   const handleDownloadCertificate = async (certificate: CertificateResponse, e: React.MouseEvent) => {
     e.stopPropagation();
-
+    
     try {
       const blob = await certificateService.downloadCertificate(certificate.id);
       const url = window.URL.createObjectURL(blob);
@@ -399,9 +324,9 @@ export default function ReservationsManagement() {
   // Handle qualification card download
   const handleDownloadQualificationCard = async (reservation: Reservation, e: React.MouseEvent) => {
     e.stopPropagation();
-
+    
     let card = qualificationCards.get(reservation.id);
-
+    
     // If card not loaded yet, try to fetch it
     if (!card && !qualificationCards.has(reservation.id)) {
       await fetchQualificationCard(reservation.id);
@@ -409,36 +334,37 @@ export default function ReservationsManagement() {
       await new Promise(resolve => setTimeout(resolve, 100));
       card = qualificationCards.get(reservation.id);
     }
-
+    
     if (!card) {
       alert('Karta kwalifikacyjna nie została znaleziona');
       return;
     }
-
+    
     try {
-      await qualificationCardService.downloadQualificationCard(reservation.id);
+      const blob = await qualificationCardService.downloadQualificationCard(card.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = card.file_name;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        if (document.body.contains(a)) {
+          document.body.removeChild(a);
+        }
+      }, 100);
     } catch (error) {
       console.error('Error downloading qualification card:', error);
       alert('Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
     }
   };
-
-  // Handle contract download
-  const handleDownloadContract = async (reservation: Reservation, e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    try {
-      await contractService.downloadContract(reservation.id);
-    } catch (error) {
-      console.error('Error downloading contract:', error);
-      alert('Nie udało się pobrać umowy. Spróbuj ponownie.');
-    }
-  };
-
+  
   // Handle delete confirmation (without actual deletion)
   const handleDeleteConfirm = () => {
     // TODO: Implement actual deletion when backend is ready
-    console.log('Delete reservation:', selectedReservation ? selectedReservation.id : null);
+    console.log('Delete reservation:', selectedReservation?.id);
     setDeleteModalOpen(false);
     setSelectedReservation(null);
   };
@@ -448,11 +374,11 @@ export default function ReservationsManagement() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [tripFilter, setTripFilter] = useState<string | null>(null);
   const [campFilters, setCampFilters] = useState<string[]>([]); // Changed to array for multi-select
-  const [sortColumn, setSortColumn] = useState<string | null>('reservationName');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-
+  
   // Multi-select state
   const [isCampSelectOpen, setIsCampSelectOpen] = useState(false);
   const [campSearchQuery, setCampSearchQuery] = useState('');
@@ -465,7 +391,7 @@ export default function ReservationsManagement() {
   }, [allReservations]);
 
   // Extract unique trips from reservations
-  const _availableTrips = useMemo(() => {
+  const availableTrips = useMemo(() => {
     const trips = new Set(allReservations.map(r => r.tripName));
     return Array.from(trips).sort();
   }, [allReservations]);
@@ -483,7 +409,7 @@ export default function ReservationsManagement() {
           r.participantName.toLowerCase().includes(query) ||
           r.email.toLowerCase().includes(query) ||
           r.campName.toLowerCase().includes(query) ||
-          r.tripName.toLowerCase().includes(query),
+          r.tripName.toLowerCase().includes(query)
       );
     }
 
@@ -510,13 +436,8 @@ export default function ReservationsManagement() {
 
         switch (sortColumn) {
           case 'reservationName':
-            // Extract numeric part from reservation name (e.g., "REZ-2025-004" -> 4)
-            const extractReservationNumber = (name: string): number => {
-              const match = name.match(/-(\d+)$/);
-              return match ? parseInt(match[1], 10) : 0;
-            };
-            aValue = extractReservationNumber(a.reservationName);
-            bValue = extractReservationNumber(b.reservationName);
+            aValue = a.reservationName;
+            bValue = b.reservationName;
             break;
           case 'participantName':
             aValue = a.participantName;
@@ -625,7 +546,7 @@ export default function ReservationsManagement() {
       return availableCamps;
     }
     return availableCamps.filter(camp =>
-      camp.toLowerCase().includes(campSearchQuery.toLowerCase()),
+      camp.toLowerCase().includes(campSearchQuery.toLowerCase())
     );
   }, [availableCamps, campSearchQuery]);
 
@@ -956,16 +877,6 @@ export default function ReservationsManagement() {
                 </th>
                 <th
                   className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('createdAt')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="flex items-center gap-1">
-                    Data utworzenia
-                    <SortIcon column="createdAt" />
-                  </div>
-                </th>
-                <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('participantName')}
                   style={{ cursor: 'pointer' }}
                 >
@@ -1014,6 +925,16 @@ export default function ReservationsManagement() {
                     <SortIcon column="status" />
                   </div>
                 </th>
+                <th
+                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('createdAt')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="flex items-center gap-1">
+                    Data utworzenia
+                    <SortIcon column="createdAt" />
+                  </div>
+                </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                   Akcje
                 </th>
@@ -1024,11 +945,11 @@ export default function ReservationsManagement() {
                 paginatedReservations.map((reservation) => {
                   const isExpanded = expandedRows.has(reservation.id);
                   const hasQualificationCard = qualificationCards.has(reservation.id) && qualificationCards.get(reservation.id) !== null;
-                  const _qualificationCard = qualificationCards.get(reservation.id);
-
+                  const qualificationCard = qualificationCards.get(reservation.id);
+                  
                   return (
                     <Fragment key={reservation.id}>
-                      <tr
+                      <tr 
                         className={`hover:bg-gray-50 transition-all duration-200 ${
                           isExpanded ? 'bg-blue-50' : ''
                         } ${
@@ -1044,9 +965,6 @@ export default function ReservationsManagement() {
                               {reservation.reservationName}
                             </span>
                           </div>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(reservation.createdAt)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2">
@@ -1083,22 +1001,17 @@ export default function ReservationsManagement() {
                         <td className="px-4 py-2 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                              reservation.status,
+                              reservation.status
                             )}`}
                           >
                             {reservation.status}
                           </span>
                         </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(reservation.createdAt)}
+                        </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={(e) => handleDownloadContract(reservation, e)}
-                              className="p-1.5 text-[#03adf0] hover:bg-blue-50 transition-colors"
-                              title="Pobierz umowę"
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <FileText className="w-4 h-4" />
-                            </button>
                             {hasQualificationCard && (
                               <button
                                 onClick={(e) => handleDownloadQualificationCard(reservation, e)}
@@ -1155,76 +1068,29 @@ export default function ReservationsManagement() {
                                   </div>
                                 </div>
                               </div>
-
-                              {/* Parents Details */}
+                              
+                              {/* Parent Details */}
                               <div className="space-y-2">
-                                <h4 className="font-semibold text-sm text-gray-900 mb-2">
-                                  {reservation.details.parents && reservation.details.parents.length > 1
-                                    ? 'Dane opiekunów'
-                                    : 'Dane opiekuna'}
-                                </h4>
-                                {reservation.details.parents && reservation.details.parents.length > 0 ? (
-                                  <div className="space-y-3">
-                                    {reservation.details.parents.map((parent, index) => (
-                                      <div key={parent.id || index} className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                                        <div className="text-xs font-medium text-gray-700 mb-1.5">
-                                          {reservation.details.parents.length > 1
-                                            ? `Opiekun ${index + 1}`
-                                            : 'Opiekun'}
-                                        </div>
-                                        <div className="space-y-1 text-xs">
-                                          <div className="flex items-center gap-2">
-                                            <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                                            <span className="text-gray-600">Imię i nazwisko:</span>
-                                            <span className="text-gray-900">{parent.firstName} {parent.lastName}</span>
-                                          </div>
-                                          {parent.email && (
-                                            <div className="flex items-center gap-2">
-                                              <Mail className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                                              <span className="text-gray-600">Email:</span>
-                                              <span className="text-gray-900">{parent.email}</span>
-                                            </div>
-                                          )}
-                                          <div className="flex items-center gap-2">
-                                            <Phone className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                                            <span className="text-gray-600">Telefon:</span>
-                                            <span className="text-gray-900">{parent.phone || '+48'} {parent.phoneNumber}</span>
-                                          </div>
-                                          {parent.street && (
-                                            <div className="flex items-center gap-2">
-                                              <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                                              <span className="text-gray-600">Adres:</span>
-                                              <span className="text-gray-900">
-                                                {parent.street}
-                                                {parent.postalCode && parent.city && `, ${parent.postalCode} ${parent.city}`}
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
+                                <h4 className="font-semibold text-sm text-gray-900 mb-2">Dane opiekuna</h4>
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <User className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Imię i nazwisko:</span>
+                                    <span className="text-gray-900">{reservation.details.parentName}</span>
                                   </div>
-                                ) : (
-                                  <div className="space-y-1 text-xs">
-                                    <div className="flex items-center gap-2">
-                                      <User className="w-3 h-3 text-gray-400" />
-                                      <span className="text-gray-600">Imię i nazwisko:</span>
-                                      <span className="text-gray-900">{reservation.details.parentName}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Mail className="w-3 h-3 text-gray-400" />
-                                      <span className="text-gray-600">Email:</span>
-                                      <span className="text-gray-900">{reservation.details.parentEmail}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Phone className="w-3 h-3 text-gray-400" />
-                                      <span className="text-gray-600">Telefon:</span>
-                                      <span className="text-gray-900">{reservation.details.parentPhone}</span>
-                                    </div>
+                                  <div className="flex items-center gap-2">
+                                    <Mail className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Email:</span>
+                                    <span className="text-gray-900">{reservation.details.parentEmail}</span>
                                   </div>
-                                )}
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="w-3 h-3 text-gray-400" />
+                                    <span className="text-gray-600">Telefon:</span>
+                                    <span className="text-gray-900">{reservation.details.parentPhone}</span>
+                                  </div>
+                                </div>
                               </div>
-
+                              
                               {/* Payment Details */}
                               <div className="space-y-2">
                                 <h4 className="font-semibold text-sm text-gray-900 mb-2">Płatności</h4>
@@ -1246,44 +1112,7 @@ export default function ReservationsManagement() {
                                   </div>
                                 </div>
                               </div>
-
-                              {/* Contract Section */}
-                              {(() => {
-                                const contract = contracts.get(reservation.id);
-                                const isLoadingContract = loadingContracts.has(reservation.id);
-                                return (
-                                  <div className="space-y-2 md:col-span-2 lg:col-span-3">
-                                    <h4 className="font-semibold text-sm text-gray-900 mb-2">Umowa</h4>
-                                    {isLoadingContract ? (
-                                      <div className="text-sm text-gray-500 p-3 bg-gray-50 border border-gray-200 rounded">Sprawdzanie...</div>
-                                    ) : contract ? (
-                                      <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded">
-                                        <FileText className="w-4 h-4 text-green-600" />
-                                        <span className="text-sm text-gray-900">{contract.contract_filename || 'Umowa'}</span>
-                                        <span className="text-xs text-gray-500 ml-auto">
-                                          Utworzono: {formatDate(contract.created_at)}
-                                        </span>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDownloadContract(reservation, e);
-                                          }}
-                                          className="ml-2 px-2 py-1 text-xs text-green-700 bg-green-100 hover:bg-green-200 transition-colors flex items-center gap-1"
-                                          style={{ borderRadius: 0 }}
-                                        >
-                                          <Download className="w-3 h-3" />
-                                          Pobierz
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <div className="text-sm text-gray-500 p-3 bg-gray-50 border border-gray-200 rounded">
-                                        Umowa nie została jeszcze wygenerowana
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
-
+                              
                               {/* Qualification Card */}
                               {(() => {
                                 const expandedCard = qualificationCards.get(reservation.id);
@@ -1292,9 +1121,9 @@ export default function ReservationsManagement() {
                                     <h4 className="font-semibold text-sm text-gray-900 mb-2">Karta kwalifikacyjna</h4>
                                     <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded">
                                       <FileText className="w-4 h-4 text-green-600" />
-                                      <span className="text-sm text-gray-900">{expandedCard.card_filename || 'Karta kwalifikacyjna'}</span>
+                                      <span className="text-sm text-gray-900">{expandedCard.file_name}</span>
                                       <span className="text-xs text-gray-500 ml-auto">
-                                        Utworzono: {formatDate(expandedCard.created_at)}
+                                        Przesłano: {formatDate(expandedCard.uploaded_at)}
                                       </span>
                                       <button
                                         onClick={(e) => {
@@ -1311,7 +1140,7 @@ export default function ReservationsManagement() {
                                   </div>
                                 ) : null;
                               })()}
-
+                              
                               {/* Certificates */}
                               {(() => {
                                 const reservationCertificates = certificates.get(reservation.id) || [];
@@ -1343,7 +1172,7 @@ export default function ReservationsManagement() {
                                   </div>
                                 ) : null;
                               })()}
-
+                              
                               {/* Additional Info */}
                               <div className="space-y-2 md:col-span-2 lg:col-span-3">
                                 <h4 className="font-semibold text-sm text-gray-900 mb-2">Dodatkowe informacje</h4>
@@ -1364,22 +1193,6 @@ export default function ReservationsManagement() {
                                     <span className="text-gray-600">Uwagi:</span>
                                     <span className="text-gray-900 ml-2">{reservation.details.notes}</span>
                                   </div>
-                                </div>
-                              </div>
-
-                              {/* Quick View - Link to Full Details */}
-                              <div className="space-y-2 md:col-span-2 lg:col-span-3">
-                                <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded">
-                                  <span className="text-sm text-gray-700">Zobacz pełne szczegóły rezerwacji</span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/admin-panel/reservations/${reservation.id}`);
-                                    }}
-                                    className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded"
-                                  >
-                                    Szczegóły
-                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -1456,9 +1269,9 @@ export default function ReservationsManagement() {
 
       {/* Delete Confirmation Modal - Professional with transparent background */}
       {deleteModalOpen && selectedReservation && (
-        <div
+        <div 
           className="fixed inset-0 flex items-center justify-center z-50 p-4 animate-fadeIn"
-          style={{
+          style={{ 
             backgroundColor: 'rgba(0, 0, 0, 0.3)',
             backdropFilter: 'blur(2px)',
           }}
@@ -1467,7 +1280,7 @@ export default function ReservationsManagement() {
             setSelectedReservation(null);
           }}
         >
-          <div
+          <div 
             className="bg-white shadow-2xl max-w-md w-full animate-scaleIn"
             style={{ borderRadius: 0 }}
             onClick={(e) => e.stopPropagation()}
@@ -1481,14 +1294,14 @@ export default function ReservationsManagement() {
                   <h2 className="text-xl font-bold text-gray-900">Potwierdź usunięcie</h2>
                 </div>
               </div>
-
+              
               <p className="text-sm text-gray-600 mb-6">
                 Czy na pewno chcesz usunąć rezerwację <strong>{selectedReservation.reservationName}</strong> dla uczestnika <strong>{selectedReservation.participantName}</strong>?
               </p>
               <p className="text-xs text-gray-500 mb-6">
                 Ta operacja jest nieodwracalna. (Uwaga: To jest tylko modal potwierdzenia - faktyczne usunięcie będzie zaimplementowane później)
               </p>
-
+              
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => {

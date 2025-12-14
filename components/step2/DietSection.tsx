@@ -1,12 +1,12 @@
 'use client';
 
-import { Info } from 'lucide-react';
-import Image from 'next/image';
+import { Info, UtensilsCrossed } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
+import type { ReservationItem } from '@/types/reservation';
 
 interface Diet {
   id: number;
@@ -98,7 +98,7 @@ export default function DietSection() {
 
         // Check if already exists in reservation
         const existing = reservation.items.find(
-          item => item.type === 'diet' && item.name === diet.name,
+          (item: ReservationItem) => item.type === 'diet' && item.name === diet.name,
         );
         if (!existing) {
           dietReservationIdsRef.current.set(dietId, reservationId);
@@ -113,7 +113,7 @@ export default function DietSection() {
         }
       }
     });
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, diets.length, reservation.items.length]);
 
   // Update reservation when diets change
@@ -131,14 +131,14 @@ export default function DietSection() {
     removed.forEach(dietId => {
       const reservationId = dietReservationIdsRef.current.get(dietId);
       if (reservationId) {
-        const item = reservation.items.find(item => item.id === reservationId);
+        const item = reservation.items.find((item: ReservationItem) => item.id === reservationId);
         if (item) {
           removeReservationItem(item.id);
         } else {
           const diet = diets.find(d => d.id === dietId);
           if (diet) {
             const itemByName = reservation.items.find(
-              item => item.type === 'diet' && item.name === diet.name,
+              (item: ReservationItem) => item.type === 'diet' && item.name === diet.name,
             );
             if (itemByName) {
               removeReservationItem(itemByName.id);
@@ -155,7 +155,7 @@ export default function DietSection() {
       if (diet) {
         const reservationId = `diet-${dietId}`;
 
-        const existingItem = reservation.items.find(item => item.id === reservationId);
+        const existingItem = reservation.items.find((item: ReservationItem) => item.id === reservationId);
 
         if (!existingItem) {
           dietReservationIdsRef.current.set(dietId, reservationId);
@@ -264,13 +264,10 @@ export default function DietSection() {
                   {/* Icon or name in blue square */}
                   <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center">
                     {diet.icon_url ? (
-                      <Image
+                      <img
                         src={getStaticAssetUrl(diet.icon_url) || ''}
                         alt={diet.name}
-                        width={56}
-                        height={56}
-                        className="object-contain"
-                        unoptimized
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           // If image fails to load, show name in blue square
                           const target = e.target as HTMLImageElement;

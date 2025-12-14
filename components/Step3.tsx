@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useState } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
-import type { StepComponentProps } from '@/types/reservation';
+import type { StepComponentProps, ReservationItem } from '@/types/reservation';
 import { saveStep3FormData, loadStep3FormData, type Step3FormData } from '@/utils/sessionStorage';
 import { loadStep1FormData } from '@/utils/sessionStorage';
 
@@ -41,7 +41,7 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
         if (savedData.invoiceType === 'private') {
           // Remove paper invoice (30 PLN) from reservation when switching to private person
           const paperInvoiceItem = reservation.items.find(
-            item => item.type === 'other' && item.name === 'Faktura papierowa',
+            (item: ReservationItem) => item.type === 'other' && item.name === 'Faktura papierowa',
           );
           if (paperInvoiceItem) {
             removeReservationItem(paperInvoiceItem.id);
@@ -142,7 +142,7 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
     if (invoiceType === 'private') {
       // Remove paper invoice (30 PLN) from reservation when invoiceType is private
       const paperInvoiceItem = reservation.items.find(
-        item => item.type === 'other' && item.name === 'Faktura papierowa',
+        (item: ReservationItem) => item.type === 'other' && item.name === 'Faktura papierowa',
       );
       if (paperInvoiceItem) {
         removeReservationItem(paperInvoiceItem.id);

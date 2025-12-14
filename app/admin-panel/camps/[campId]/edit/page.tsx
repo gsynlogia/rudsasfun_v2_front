@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Save, Edit, MapPin, Calendar } from 'lucide-react';
+import { ArrowLeft, Save, Edit, MapPin, Calendar, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 

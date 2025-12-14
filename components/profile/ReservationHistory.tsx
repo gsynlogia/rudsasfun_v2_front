@@ -6,6 +6,29 @@ import { reservationService, type ReservationResponse } from '@/lib/services/Res
 
 import ReservationCard from './ReservationCard';
 
+interface Reservation {
+  id: string;
+  participantName: string;
+  status: string;
+  age: string;
+  gender: string;
+  city: string;
+  campName: string;
+  dates: string;
+  resort: string;
+  parentsData?: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    phoneNumber: string;
+    street: string;
+    postalCode: string;
+    city: string;
+  }>;
+}
+
 /**
  * ReservationHistory Component
  * Displays completed/past reservations and cancelled reservations
@@ -59,7 +82,7 @@ export default function ReservationHistory() {
             }
           }
 
-          let _datesStr = 'Brak dat';
+          let datesStr = 'Brak dat';
           if (startDate && endDate && !isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
             const formatDate = (date: Date) => {
               if (isNaN(date.getTime())) {
@@ -70,28 +93,28 @@ export default function ReservationHistory() {
               const year = date.getFullYear();
               return `${day}.${month}.${year}`;
             };
-            _datesStr = `${formatDate(startDate)} – ${formatDate(endDate)} (${daysCount} dni)`;
+            datesStr = `${formatDate(startDate)} – ${formatDate(endDate)} (${daysCount} dni)`;
           }
 
           // Get participant name
-          const _participantName = reservation.participant_first_name && reservation.participant_last_name
+          const participantName = reservation.participant_first_name && reservation.participant_last_name
             ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
             : 'Brak danych';
 
           // Get age
-          const _age = reservation.participant_age ? `${reservation.participant_age} lat` : 'Brak danych';
+          const age = reservation.participant_age ? `${reservation.participant_age} lat` : 'Brak danych';
 
           // Get gender
-          const _gender = reservation.participant_gender || 'Brak danych';
+          const gender = reservation.participant_gender || 'Brak danych';
 
           // Get city
-          const _city = reservation.participant_city || reservation.property_city || 'Brak danych';
+          const city = reservation.participant_city || reservation.property_city || 'Brak danych';
 
           // Get camp name
-          const _campName = reservation.camp_name || 'Brak danych';
+          const campName = reservation.camp_name || 'Brak danych';
 
           // Get resort
-          const _resort = reservation.property_name ? `Ośrodek: ${reservation.property_name}` : 'Brak danych';
+          const resort = reservation.property_name ? `Ośrodek: ${reservation.property_name}` : 'Brak danych';
 
           // Return original reservation data (ReservationResponse)
           return reservation;
