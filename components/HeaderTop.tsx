@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
 import { authService } from '@/lib/services/AuthService';
-import { clearMagicLinkRedirect } from '@/utils/localStorage';
 
 /**
  * Header Top Component
@@ -49,9 +48,6 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
   const handleLogout = async () => {
     // Clear authentication (calls backend logout endpoint)
     await authService.logout();
-
-    // Clear magic link redirect from localStorage
-    clearMagicLinkRedirect();
 
     // Update state
     setIsAuthenticated(false);

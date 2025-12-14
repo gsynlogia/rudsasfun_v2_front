@@ -11,7 +11,6 @@ import { formatDateRange } from '@/utils/api';
 import { BackendUnavailableError } from '@/utils/api-auth';
 import { API_BASE_URL } from '@/utils/api-config';
 import { fetchWithDefaults } from '@/utils/api-fetch';
-import { saveMagicLinkRedirect } from '@/utils/localStorage';
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -96,10 +95,7 @@ export default function CampsList() {
     // Create reservation URL
     const reservationUrl = `/camps/${campId}/edition/${editionId}/step/1`;
 
-    // Save redirect URL to localStorage BEFORE redirecting to login
-    saveMagicLinkRedirect(reservationUrl);
-
-    // Redirect to login with reservation URL as redirect parameter
+    // Redirect to login with reservation URL as redirect parameter (will be saved in database)
     router.push(`/login?redirect=${encodeURIComponent(reservationUrl)}`);
   };
 

@@ -4,7 +4,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, ReactNode } from 'react';
 
 import { authService } from '@/lib/services/AuthService';
-import { saveMagicLinkRedirect } from '@/utils/localStorage';
 
 interface ReservationAuthGuardProps {
   children: ReactNode;
@@ -28,9 +27,7 @@ export default function ReservationAuthGuard({ children }: ReservationAuthGuardP
       // Check if user is authenticated
       if (!authService.isAuthenticated()) {
         if (isMounted) {
-          // Save current path to localStorage for magic link redirect
-          saveMagicLinkRedirect(pathname);
-          // Redirect to login with current path as redirect
+          // Redirect to login with current path as redirect (will be saved in database)
           router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
         }
         return;

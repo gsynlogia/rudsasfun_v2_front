@@ -1,7 +1,7 @@
 /**
  * Session Storage Utilities
  * Handles saving and loading form data and reservation state to sessionStorage
- * Note: Magic link redirect is handled in utils/localStorage.ts
+ * Note: Magic link redirect is now handled in database (via API)
  */
 
 const STORAGE_KEYS = {

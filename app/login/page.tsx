@@ -7,7 +7,6 @@ import Footer from '@/components/Footer';
 import HeaderTop from '@/components/HeaderTop';
 import { authService } from '@/lib/services/AuthService';
 import { magicLinkService } from '@/lib/services/MagicLinkService';
-import { saveMagicLinkRedirect, loadMagicLinkRedirect, clearMagicLinkRedirect } from '@/utils/localStorage';
 
 function LoginContent() {
   const router = useRouter();
@@ -20,35 +19,16 @@ function LoginContent() {
   // Get redirect URL from query params
   const redirectUrl = searchParams.get('redirect') || '/';
 
-  // Save redirect URL to localStorage when component mounts
-  useEffect(() => {
-    if (redirectUrl && redirectUrl !== '/') {
-      // Save redirect URL to localStorage for use after magic link login
-      saveMagicLinkRedirect(redirectUrl);
-    }
-  }, [redirectUrl]);
-
   // Redirect if already authenticated
   useEffect(() => {
     const checkAuth = async () => {
       if (authService.isAuthenticated()) {
         const user = await authService.verifyToken();
         if (user) {
-          // User is authenticated - check for redirect URL in localStorage
-          const savedRedirect = loadMagicLinkRedirect();
-
-          // Use saved redirect if exists and is valid, otherwise use query param, otherwise home
-          let finalRedirect = '/';
-          if (savedRedirect && savedRedirect !== '/' && savedRedirect.startsWith('/')) {
-            finalRedirect = savedRedirect;
-          } else if (redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')) {
-            finalRedirect = redirectUrl;
-          }
-
-          // Clear redirect from localStorage after reading
-          clearMagicLinkRedirect();
-
           // User is authenticated, redirect to intended page or home
+          const finalRedirect = redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/') 
+            ? redirectUrl 
+            : '/';
           router.replace(finalRedirect);
         } else {
           authService.logout();
@@ -65,7 +45,8 @@ function LoginContent() {
     setLoading(true);
 
     try {
-      await magicLinkService.requestMagicLink(email);
+      // Pass redirect URL to magic link service (will be stored in database)
+      await magicLinkService.requestMagicLink(email, redirectUrl);
       setSuccess(true);
       setEmail(''); // Clear email for security
     } catch (err) {

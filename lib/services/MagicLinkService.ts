@@ -7,6 +7,7 @@ import { API_BASE_URL } from '@/utils/api-config';
 
 export interface MagicLinkRequest {
   email: string;
+  redirect_url?: string;
 }
 
 export interface MagicLinkResponse {
@@ -27,19 +28,27 @@ export interface MagicLinkVerifyResponse {
     created_at?: string;
     updated_at?: string;
   };
+  redirect_url?: string;
 }
 
 class MagicLinkService {
   /**
    * Request a magic link to be sent to the provided email
+   * @param email - Email address to send magic link to
+   * @param redirectUrl - Optional redirect URL after successful login
    */
-  async requestMagicLink(email: string): Promise<MagicLinkResponse> {
+  async requestMagicLink(email: string, redirectUrl?: string): Promise<MagicLinkResponse> {
+    const body: MagicLinkRequest = { email };
+    if (redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')) {
+      body.redirect_url = redirectUrl;
+    }
+    
     const response = await fetch(`${API_BASE_URL}/api/auth/magic-link/request`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

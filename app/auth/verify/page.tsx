@@ -4,7 +4,6 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { magicLinkService } from '@/lib/services/MagicLinkService';
 import { authService } from '@/lib/services/AuthService';
-import { loadMagicLinkRedirect, clearMagicLinkRedirect } from '@/utils/localStorage';
 import HeaderTop from '@/components/HeaderTop';
 import Footer from '@/components/Footer';
 
@@ -34,11 +33,8 @@ function VerifyContent() {
         setStatus('success');
         setMessage('Logowanie zakończone sukcesem! Przekierowywanie...');
         
-        // Get redirect URL from localStorage (saved when user requested magic link)
-        const redirectUrl = loadMagicLinkRedirect();
-        
-        // Clear redirect from localStorage immediately after reading
-        clearMagicLinkRedirect();
+        // Get redirect URL from API response (stored in database)
+        const redirectUrl = response.redirect_url;
         
         // Redirect to saved URL if valid, otherwise go to home page
         // User is already logged in at this point
