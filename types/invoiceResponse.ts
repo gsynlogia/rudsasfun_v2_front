@@ -10,6 +10,7 @@ export interface InvoiceResponse {
   tax_amount: number;
   is_paid: boolean;
   paid_at: string | null;
+  payment_date: string | null;  // Data wpłaty z Tpay
   is_canceled: boolean;
   canceled_at: string | null;
   issue_date: string;

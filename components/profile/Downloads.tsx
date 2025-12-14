@@ -166,6 +166,9 @@ export default function Downloads() {
       try {
         setDownloadingIds(prev => new Set(prev).add(document.id));
         await contractService.downloadContract(document.reservationId);
+
+        // Show important information about contract signing
+        alert('WAŻNE:\n\n• Masz 2 dni na wgranie podpisanej umowy do systemu.\n• Możesz podpisać umowę odręcznie lub podpisem zaufanym.\n• MUSISZ odesłać PODPISANĄ umowę.');
       } catch (error) {
         console.error('Error downloading contract:', error);
         alert('Nie udało się pobrać dokumentu. Spróbuj ponownie.');
@@ -180,6 +183,20 @@ export default function Downloads() {
       try {
         setDownloadingIds(prev => new Set(prev).add(document.id));
         await qualificationCardService.downloadQualificationCard(document.reservationId);
+
+        // Show important information about qualification card
+        // Get reservation to check if has second parent
+        const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
+        const reservation = reservations.find(r => r.id === document.reservationId);
+        const hasSecondParent = reservation?.parents_data && Array.isArray(reservation.parents_data) && reservation.parents_data.length > 1;
+
+        alert(`WAŻNE INFORMACJE O KARCIE KWALIFIKACYJNEJ:\n\n` +
+              `• Karta jest uzupełniona na podstawie rezerwacji.\n` +
+              `• MUSISZ uzupełnić pozostałe dane: PESEL (jeśli nie został podany) oraz informacje o chorobach/zdrowiu.\n` +
+              `• MUSISZ odesłać PODPISANĄ kartę kwalifikacyjną.\n` +
+              `• Masz 2 dni na wgranie podpisanej karty do systemu.\n` +
+              `• Możesz podpisać kartę odręcznie lub podpisem zaufanym.\n${
+              hasSecondParent ? '• W karcie muszą być dane obojga rodziców/opiekunów.\n' : ''}`);
       } catch (error) {
         console.error('Error downloading qualification card:', error);
         alert('Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');

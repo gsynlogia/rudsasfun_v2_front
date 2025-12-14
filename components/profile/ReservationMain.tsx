@@ -165,6 +165,10 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     try {
       _setDownloadingContract(true);
       await contractService.downloadContract(reservation.id);
+
+      // Show important information about contract signing
+      alert('WAŻNE:\n\n• Masz 2 dni na wgranie podpisanej umowy do systemu.\n• Możesz podpisać umowę odręcznie lub podpisem zaufanym.\n• MUSISZ odesłać PODPISANĄ umowę.');
+
       // Reload contract status after download
       await loadDocuments();
     } catch (error: any) {
@@ -179,6 +183,17 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     try {
       _setDownloadingCard(true);
       await qualificationCardService.downloadQualificationCard(reservation.id);
+
+      // Show important information about qualification card
+      const hasSecondParent = reservation.parents_data && Array.isArray(reservation.parents_data) && reservation.parents_data.length > 1;
+      alert(`WAŻNE INFORMACJE O KARCIE KWALIFIKACYJNEJ:\n\n` +
+            `• Karta jest uzupełniona na podstawie rezerwacji.\n` +
+            `• MUSISZ uzupełnić pozostałe dane: PESEL (jeśli nie został podany) oraz informacje o chorobach/zdrowiu.\n` +
+            `• MUSISZ odesłać PODPISANĄ kartę kwalifikacyjną.\n` +
+            `• Masz 2 dni na wgranie podpisanej karty do systemu.\n` +
+            `• Możesz podpisać kartę odręcznie lub podpisem zaufanym.\n${
+            hasSecondParent ? '• W karcie muszą być dane obojga rodziców/opiekunów.\n' : ''}`);
+
       // Reload card status after download
       await loadDocuments();
     } catch (error: any) {

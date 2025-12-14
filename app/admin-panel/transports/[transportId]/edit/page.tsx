@@ -403,7 +403,7 @@ export default function TransportEditPage({
 
                   {cities.length === 0 ? (
                     <div className="text-center py-4 text-sm text-gray-500 border border-gray-200" style={{ borderRadius: 0 }}>
-                      Kliknij "Dodaj miasto" aby dodać pierwsze miasto
+                      Kliknij &quot;Dodaj miasto&quot; aby dodać pierwsze miasto
                     </div>
                   ) : (
                     <div className="space-y-3">

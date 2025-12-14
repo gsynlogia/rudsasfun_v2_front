@@ -14,6 +14,8 @@ import { ReservationResponse } from '@/lib/services/ReservationService';
 import UniversalModal from '../admin/UniversalModal';
 import DashedLine from '../DashedLine';
 
+import QualificationCardModal from './QualificationCardModal';
+
 interface ReservationSidebarProps {
   reservationId: string;
   reservation: ReservationResponse;
@@ -51,6 +53,8 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
   const qualificationCardInputRef = useRef<HTMLInputElement>(null);
   const [uploadingContract, setUploadingContract] = useState(false);
   const [uploadingCard, setUploadingCard] = useState(false);
+  const [showQualificationCardModal, setShowQualificationCardModal] = useState(false);
+  const [cardDataCompleted, setCardDataCompleted] = useState(false);
 
   const reservationIdNum = parseInt(reservationId);
   const isValidReservationId = !isNaN(reservationIdNum);
@@ -170,10 +174,19 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       setLoadingCard(true);
       const card = await qualificationCardService.getQualificationCard(reservationIdNum);
       setQualificationCard(card); // Will be null if card doesn't exist
+
+      // Check if card data is completed
+      try {
+        const canGen = await qualificationCardService.canGenerateQualificationCard(reservationIdNum);
+        setCardDataCompleted(canGen.can_generate);
+      } catch {
+        setCardDataCompleted(false);
+      }
     } catch (error: any) {
       // Only log unexpected errors
       console.error('Error loading qualification card:', error);
       setQualificationCard(null);
+      setCardDataCompleted(false);
     } finally {
       setLoadingCard(false);
     }
@@ -201,6 +214,9 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       // Now download the contract
       await contractService.downloadContract(reservationIdNum);
 
+      // Show important information about contract signing
+      alert('WAŻNE:\n\n• Masz 2 dni na wgranie podpisanej umowy do systemu.\n• Możesz podpisać umowę odręcznie lub podpisem zaufanym.\n• MUSISZ odesłać PODPISANĄ umowę.');
+
       // After successful generation and download, reload status
       await loadContractStatus();
     } catch (error) {
@@ -218,8 +234,14 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
     }
 
     try {
-      // If card doesn't exist, generate it first
-      if (!qualificationCard) {
+      // If card doesn't exist and data is not completed, open modal
+      if (!qualificationCard && !cardDataCompleted) {
+        setShowQualificationCardModal(true);
+        return;
+      }
+
+      // If card doesn't exist but data is completed, generate it first
+      if (!qualificationCard && cardDataCompleted) {
         setGeneratingCard(true);
         try {
           await qualificationCardService.generateQualificationCard(reservationIdNum);
@@ -227,8 +249,8 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           await loadQualificationCard();
         } catch (generateError: any) {
           console.error('Error generating qualification card:', generateError);
-          // If generation fails, try to download anyway (maybe it was just created)
-          console.log('Qualification card generation returned error, trying download anyway:', generateError);
+          alert(generateError.message || 'Nie udało się wygenerować karty kwalifikacyjnej. Upewnij się, że wszystkie wymagane pola są wypełnione.');
+          return;
         } finally {
           setGeneratingCard(false);
         }
@@ -237,6 +259,17 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       // Now download the card
       setDownloadingCard(true);
       await qualificationCardService.downloadQualificationCard(reservationIdNum);
+
+      // Show important information about qualification card
+      const hasSecondParent = reservation.parents_data && Array.isArray(reservation.parents_data) && reservation.parents_data.length > 1;
+      alert(`WAŻNE INFORMACJE O KARCIE KWALIFIKACYJNEJ:\n\n` +
+            `• Karta jest uzupełniona na podstawie rezerwacji.\n` +
+            `• MUSISZ uzupełnić pozostałe dane: PESEL (jeśli nie został podany) oraz informacje o chorobach/zdrowiu.\n` +
+            `• MUSISZ odesłać PODPISANĄ kartę kwalifikacyjną.\n` +
+            `• Masz 2 dni na wgranie podpisanej karty do systemu.\n` +
+            `• Możesz podpisać kartę odręcznie lub podpisem zaufanym.\n${
+            hasSecondParent ? '• W karcie muszą być dane obojga rodziców/opiekunów.\n' : ''}`);
+
       // Reload card status after download
       await loadQualificationCard();
     } catch (error: any) {
@@ -245,6 +278,11 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
     } finally {
       setDownloadingCard(false);
     }
+  };
+
+  const handleQualificationCardModalSuccess = async () => {
+    // Reload card data after modal success
+    await loadQualificationCard();
   };
 
   return (
@@ -439,10 +477,15 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                           <Download className="w-3 h-3" />
                           <span>Pobierz</span>
                         </>
+                      ) : cardDataCompleted ? (
+                        <>
+                          <FileText className="w-3 h-3" />
+                          <span>Pobierz kartę</span>
+                        </>
                       ) : (
                         <>
                           <FileText className="w-3 h-3" />
-                          <span>Generuj kartę</span>
+                          <span>Wypełnij kartę</span>
                         </>
                       )}
                     </>
@@ -715,6 +758,13 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         </div>
       </UniversalModal>
 
+      {/* Qualification Card Modal */}
+      <QualificationCardModal
+        reservation={reservation}
+        isOpen={showQualificationCardModal}
+        onClose={() => setShowQualificationCardModal(false)}
+        onSuccess={handleQualificationCardModalSuccess}
+      />
     </div>
   );
 }

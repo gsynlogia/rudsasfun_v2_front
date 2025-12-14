@@ -3,6 +3,7 @@
  * Singleton service for handling qualification card operations with backend API
  */
 
+import type { QualificationCardDataResponse, QualificationCardDataUpdate } from '@/types/qualificationCardDataResponse';
 import { QualificationCardResponse } from '@/types/qualificationCardResponse';
 import { API_BASE_URL } from '@/utils/api-config';
 
@@ -263,6 +264,95 @@ class QualificationCardService {
     }
 
     const response = await fetch(`${this.API_URL}/${reservationId}/files`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get qualification card data for a reservation
+   * @param reservationId Reservation ID
+   */
+  async getQualificationCardData(reservationId: number): Promise<QualificationCardDataResponse> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/data`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Create or update qualification card data for a reservation
+   * @param reservationId Reservation ID
+   * @param data Qualification card data
+   */
+  async saveQualificationCardData(
+    reservationId: number,
+    data: QualificationCardDataUpdate,
+  ): Promise<QualificationCardDataResponse> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/data`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Check if qualification card can be generated
+   * @param reservationId Reservation ID
+   */
+  async canGenerateQualificationCard(reservationId: number): Promise<{ can_generate: boolean; message: string }> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/can-generate`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

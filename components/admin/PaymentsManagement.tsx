@@ -730,6 +730,7 @@ export default function PaymentsManagement() {
   const [reservationInvoices, setReservationInvoices] = useState<Map<number, InvoiceResponse[]>>(new Map()); // reservationId -> invoices
   const [loadingInvoices, setLoadingInvoices] = useState<Set<number>>(new Set()); // reservation IDs being loaded
   const [cancelingInvoice, setCancelingInvoice] = useState<number | null>(null); // invoice ID being canceled
+  const [reservationPaymentsHistory, setReservationPaymentsHistory] = useState<Map<number, PaymentResponse[]>>(new Map()); // reservationId -> payments history
 
   // Load protections and addons data
   useEffect(() => {
@@ -947,8 +948,9 @@ export default function PaymentsManagement() {
         newSet.delete(reservationId);
       } else {
         newSet.add(reservationId);
-        // Load invoices when expanding
+        // Load invoices and payment history when expanding
         loadInvoicesForReservation(reservationId);
+        loadPaymentHistoryForReservation(reservationId);
       }
       return newSet;
     });
@@ -982,6 +984,47 @@ export default function PaymentsManagement() {
         const newSet = new Set(prev);
         newSet.delete(reservationId);
         return newSet;
+      });
+    }
+  };
+
+  // Load payment history for a reservation
+  const loadPaymentHistoryForReservation = async (reservationId: number) => {
+    // Don't load if already loaded
+    if (reservationPaymentsHistory.has(reservationId)) {
+      return;
+    }
+
+    try {
+      const allPayments = await paymentService.listPayments(0, 1000);
+      // Filter payments for this reservation (order_id format: "RES-{id}" or just "{id}" or "RES-{id}-{timestamp}")
+      const reservationPayments = allPayments.filter(p => {
+        const orderId = p.order_id || '';
+        if (orderId === String(reservationId)) return true;
+        if (orderId === `RES-${reservationId}`) return true;
+        const match = orderId.match(/^RES-(\d+)(?:-|$)/);
+        if (match && parseInt(match[1], 10) === reservationId) return true;
+        return false;
+      });
+
+      // Sort by payment_date or created_at (newest first)
+      const sortedPayments = reservationPayments.sort((a, b) => {
+        const dateA = a.payment_date ? new Date(a.payment_date).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+        const dateB = b.payment_date ? new Date(b.payment_date).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+        return dateB - dateA;
+      });
+
+      setReservationPaymentsHistory(prev => {
+        const newMap = new Map(prev);
+        newMap.set(reservationId, sortedPayments);
+        return newMap;
+      });
+    } catch (error) {
+      console.error('Error loading payment history:', error);
+      setReservationPaymentsHistory(prev => {
+        const newMap = new Map(prev);
+        newMap.set(reservationId, []);
+        return newMap;
       });
     }
   };
@@ -2085,114 +2128,192 @@ export default function PaymentsManagement() {
                                   </div>
                                 </div>
 
-                                {/* Invoices Section */}
+                                {/* Invoices and Payment History Section - Two Column Layout */}
                                 <div className="mt-6 pt-4 border-t border-gray-200">
-                                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Faktury dla tej rezerwacji</h4>
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Left Column: Invoices */}
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Faktury dla tej rezerwacji</h4>
 
-                                  {loadingInvoices.has(reservation.id) ? (
-                                    <div className="text-center py-4">
-                                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#03adf0]"></div>
-                                      <p className="text-xs text-gray-500 mt-2">Ładowanie faktur...</p>
-                                    </div>
-                                  ) : (
-                                    (() => {
-                                      const invoices = reservationInvoices.get(reservation.id) || [];
+                                      {loadingInvoices.has(reservation.id) ? (
+                                        <div className="text-center py-4">
+                                          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#03adf0]"></div>
+                                          <p className="text-xs text-gray-500 mt-2">Ładowanie faktur...</p>
+                                        </div>
+                                      ) : (
+                                        (() => {
+                                          const invoices = reservationInvoices.get(reservation.id) || [];
 
-                                      if (invoices.length === 0) {
-                                        return (
-                                          <div className="bg-gray-50 rounded-lg p-4 text-center">
-                                            <p className="text-sm text-gray-500">Brak faktur dla tej rezerwacji</p>
-                                          </div>
-                                        );
-                                      }
+                                          if (invoices.length === 0) {
+                                            return (
+                                              <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                                <p className="text-sm text-gray-500">Brak faktur dla tej rezerwacji</p>
+                                              </div>
+                                            );
+                                          }
 
-                                      return (
-                                        <div className="space-y-2">
-                                          {invoices.map((invoice) => (
-                                            <div
-                                              key={invoice.id}
-                                              className={`flex items-center justify-between p-3 rounded border ${
-                                                invoice.is_canceled
-                                                  ? 'bg-red-50 border-red-200'
-                                                  : invoice.is_paid
-                                                  ? 'bg-green-50 border-green-200'
-                                                  : 'bg-white border-gray-200'
-                                              }`}
-                                            >
-                                              <div className="flex items-center gap-3 flex-1">
-                                                <FileText className={`w-4 h-4 ${
-                                                  invoice.is_canceled ? 'text-red-600' :
-                                                  invoice.is_paid ? 'text-green-600' :
-                                                  'text-gray-600'
-                                                }`} />
-                                                <div className="flex-1">
-                                                  <p className={`text-sm font-medium ${
-                                                    invoice.is_canceled ? 'text-red-700 line-through' : 'text-gray-900'
-                                                  }`}>
-                                                    {invoice.invoice_number}
-                                                  </p>
-                                                  <p className="text-xs text-gray-500">
-                                                    {formatDate(invoice.issue_date)} • {formatCurrency(invoice.total_amount)}
-                                                    {invoice.is_canceled && invoice.canceled_at && (
-                                                      <span className="text-red-600 ml-2">
-                                                        • Anulowana: {formatDate(invoice.canceled_at)}
+                                          return (
+                                            <div className="space-y-2">
+                                              {invoices.map((invoice) => (
+                                                <div
+                                                  key={invoice.id}
+                                                  className={`flex items-center justify-between p-3 rounded border ${
+                                                    invoice.is_canceled
+                                                      ? 'bg-red-50 border-red-200'
+                                                      : invoice.is_paid
+                                                      ? 'bg-green-50 border-green-200'
+                                                      : 'bg-white border-gray-200'
+                                                  }`}
+                                                >
+                                                  <div className="flex items-center gap-3 flex-1">
+                                                    <FileText className={`w-4 h-4 ${
+                                                      invoice.is_canceled ? 'text-red-600' :
+                                                      invoice.is_paid ? 'text-green-600' :
+                                                      'text-gray-600'
+                                                    }`} />
+                                                    <div className="flex-1">
+                                                      <p className={`text-sm font-medium ${
+                                                        invoice.is_canceled ? 'text-red-700 line-through' : 'text-gray-900'
+                                                      }`}>
+                                                        {invoice.invoice_number}
+                                                      </p>
+                                                      <p className="text-xs text-gray-500">
+                                                        {formatDate(invoice.issue_date)} • {formatCurrency(invoice.total_amount)}
+                                                        {invoice.is_canceled && invoice.canceled_at && (
+                                                          <span className="text-red-600 ml-2">
+                                                            • Anulowana: {formatDate(invoice.canceled_at)}
+                                                          </span>
+                                                        )}
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                    {invoice.is_canceled ? (
+                                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                        <XCircle className="w-3 h-3 mr-1" />
+                                                        Anulowana
+                                                      </span>
+                                                    ) : invoice.is_paid ? (
+                                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        <Check className="w-3 h-3 mr-1" />
+                                                        Opłacona
+                                                      </span>
+                                                    ) : (
+                                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                        Nieopłacona
                                                       </span>
                                                     )}
-                                                  </p>
-                                                </div>
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                {invoice.is_canceled ? (
-                                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                    <XCircle className="w-3 h-3 mr-1" />
-                                                    Anulowana
-                                                  </span>
-                                                ) : invoice.is_paid ? (
-                                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                    <Check className="w-3 h-3 mr-1" />
-                                                    Opłacona
-                                                  </span>
-                                                ) : (
-                                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                                    Nieopłacona
-                                                  </span>
-                                                )}
 
-                                                {!invoice.is_canceled && (
-                                                  <>
-                                                    <button
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        window.open(invoiceService.getInvoicePdfUrl(invoice.id), '_blank');
-                                                      }}
-                                                      className="p-1.5 text-[#03adf0] hover:bg-blue-50 transition-all duration-200"
-                                                      title="Pobierz fakturę"
-                                                      style={{ borderRadius: 0, cursor: 'pointer' }}
-                                                    >
-                                                      <Download className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                      onClick={(e) => handleCancelInvoice(invoice, reservation.id, e)}
-                                                      disabled={cancelingInvoice === invoice.id}
-                                                      className="p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                                                      title="Anuluj fakturę"
-                                                      style={{ borderRadius: 0, cursor: cancelingInvoice === invoice.id ? 'not-allowed' : 'pointer' }}
-                                                    >
-                                                      {cancelingInvoice === invoice.id ? (
-                                                        <RefreshCw className="w-4 h-4 animate-spin" />
-                                                      ) : (
-                                                        <Trash2 className="w-4 h-4" />
-                                                      )}
-                                                    </button>
-                                                  </>
-                                                )}
-                                              </div>
+                                                    {!invoice.is_canceled && (
+                                                      <>
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            window.open(invoiceService.getInvoicePdfUrl(invoice.id), '_blank');
+                                                          }}
+                                                          className="p-1.5 text-[#03adf0] hover:bg-blue-50 transition-all duration-200"
+                                                          title="Pobierz fakturę"
+                                                          style={{ borderRadius: 0, cursor: 'pointer' }}
+                                                        >
+                                                          <Download className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                          onClick={(e) => handleCancelInvoice(invoice, reservation.id, e)}
+                                                          disabled={cancelingInvoice === invoice.id}
+                                                          className="p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                                                          title="Anuluj fakturę"
+                                                          style={{ borderRadius: 0, cursor: cancelingInvoice === invoice.id ? 'not-allowed' : 'pointer' }}
+                                                        >
+                                                          {cancelingInvoice === invoice.id ? (
+                                                            <RefreshCw className="w-4 h-4 animate-spin" />
+                                                          ) : (
+                                                            <Trash2 className="w-4 h-4" />
+                                                          )}
+                                                        </button>
+                                                      </>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              ))}
                                             </div>
-                                          ))}
-                                        </div>
-                                      );
-                                    })()
-                                  )}
+                                          );
+                                        })()
+                                      )}
+                                    </div>
+
+                                    {/* Right Column: Payment History */}
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Historia wpłat</h4>
+
+                                      {(() => {
+                                        const payments = reservationPaymentsHistory.get(reservation.id) || [];
+                                        const successfulPayments = payments.filter(p =>
+                                          p.status === 'success' || (p.status === 'pending' && p.amount && p.amount > 0),
+                                        );
+
+                                        if (successfulPayments.length === 0) {
+                                          return (
+                                            <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                              <p className="text-sm text-gray-500">Brak wpłat dla tej rezerwacji</p>
+                                            </div>
+                                          );
+                                        }
+
+                                        return (
+                                          <div className="space-y-2">
+                                            {successfulPayments.map((payment) => {
+                                              const paymentDate = payment.payment_date
+                                                ? formatDate(payment.payment_date)
+                                                : (payment.paid_at
+                                                    ? formatDate(payment.paid_at)
+                                                    : (payment.created_at
+                                                        ? formatDate(payment.created_at)
+                                                        : 'Brak daty'));
+                                              const paymentAmount = payment.paid_amount || payment.amount || 0;
+                                              const paymentMethod = payment.channel_id === 64 ? 'BLIK' :
+                                                                    payment.channel_id === 53 ? 'Karta' : 'Online';
+
+                                              return (
+                                                <div
+                                                  key={payment.id}
+                                                  className="flex items-center justify-between p-3 rounded border bg-white border-gray-200"
+                                                >
+                                                  <div className="flex items-center gap-3 flex-1">
+                                                    <CreditCard className="w-4 h-4 text-gray-600" />
+                                                    <div className="flex-1">
+                                                      <p className="text-sm font-medium text-gray-900">
+                                                        {formatCurrency(paymentAmount)}
+                                                      </p>
+                                                      <p className="text-xs text-gray-500">
+                                                        {paymentDate} • {paymentMethod}
+                                                      </p>
+                                                      {payment.transaction_id && (
+                                                        <p className="text-xs text-gray-400 mt-0.5">
+                                                          ID: {payment.transaction_id}
+                                                        </p>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                    {payment.status === 'success' ? (
+                                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        <Check className="w-3 h-3 mr-1" />
+                                                        Zrealizowana
+                                                      </span>
+                                                    ) : (
+                                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                        Oczekująca
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
