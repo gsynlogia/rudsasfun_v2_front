@@ -168,10 +168,11 @@ export default function GeneralProtectionsManagement() {
       setSaving(true);
       setError(null);
 
-      // Upload icon file if method is upload and file is selected
+      // Upload icon file if method is upload and a new file is selected
       let finalIconRelativePath: string | null = iconRelativePath;
       
-      if (iconMethod === 'upload' && iconFile && !iconRelativePath) {
+      // If user selected a new file, upload it (this handles both new protections and editing existing ones)
+      if (iconMethod === 'upload' && iconFile) {
         try {
           const uploadResult = await handleIconUpload(iconFile);
           // uploadResult is { url, relative_path }
@@ -191,11 +192,20 @@ export default function GeneralProtectionsManagement() {
       
       // Add icon based on selected method
       if (iconMethod === 'paste' && iconSvg.trim()) {
+        // User is using SVG paste method
         protectionData.icon_svg = iconSvg.trim();
         protectionData.icon_url = null; // Clear icon_url if using SVG
-      } else if (iconMethod === 'upload' && finalIconRelativePath) {
-        protectionData.icon_url = finalIconRelativePath; // Store relative path in database
-        protectionData.icon_svg = null; // Clear icon_svg if using upload
+      } else if (iconMethod === 'upload') {
+        // User is using upload method
+        if (finalIconRelativePath) {
+          // Either new upload or existing icon
+          protectionData.icon_url = finalIconRelativePath; // Store relative path in database
+          protectionData.icon_svg = null; // Clear icon_svg if using upload
+        } else {
+          // No icon provided - clear both
+          protectionData.icon_url = null;
+          protectionData.icon_svg = null;
+        }
       } else {
         // No icon provided - clear both
         protectionData.icon_url = null;
@@ -462,6 +472,9 @@ export default function GeneralProtectionsManagement() {
                         if (file) {
                           setIconFile(file);
                           setIconSvg(''); // Clear SVG when uploading file
+                          // Clear existing icon paths when new file is selected
+                          setIconUploadUrl(null);
+                          setIconRelativePath(null);
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
