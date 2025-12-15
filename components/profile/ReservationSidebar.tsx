@@ -200,9 +200,19 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         throw new Error('Invalid reservation ID');
       }
 
-      // Check if contract exists and generate if needed
-      if (!hasContract) {
-        // Contract doesn't exist, generate it first
+      // Always check directly if contract exists before redirecting
+      // This ensures we have the most up-to-date status
+      let contractExists = false;
+      try {
+        const contracts = await contractService.listMyContracts();
+        contractExists = contracts.some(c => c.reservation_id === reservationIdNum);
+      } catch (error) {
+        console.error('Error checking contract status:', error);
+        // If check fails, assume contract doesn't exist and try to generate
+      }
+
+      // If contract doesn't exist, generate it first
+      if (!contractExists) {
         try {
           await contractService.generateContract(reservationIdNum);
           // Reload contract status after generation
