@@ -40,6 +40,7 @@ export default function AddonsSection() {
   const [addons, setAddons] = useState<Addon[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(true);
   const addonReservationIdsRef = useRef<Map<string, string>>(new Map()); // Map: addonId -> reservationItemId
+  const selectedAddonsRef = useRef<Set<string>>(getInitialSelectedAddons());
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -104,14 +105,19 @@ export default function AddonsSection() {
     fetchAddons();
   }, []);
 
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedAddonsRef.current = selectedAddons;
+  }, [selectedAddons]);
+
   // Sync with sessionStorage on mount (in case it changed)
   useEffect(() => {
     const syncData = () => {
       const savedData = loadStep2FormData();
       if (savedData && savedData.selectedAddons && Array.isArray(savedData.selectedAddons) && savedData.selectedAddons.length > 0) {
         const savedSet = new Set(savedData.selectedAddons);
-        // Only update if different from current state
-        const currentArray = Array.from(selectedAddons).sort();
+        // Only update if different from current state (using ref to avoid dependency)
+        const currentArray = Array.from(selectedAddonsRef.current).sort();
         const savedArray = Array.from(savedSet).sort();
         if (JSON.stringify(currentArray) !== JSON.stringify(savedArray)) {
           setSelectedAddons(savedSet);
@@ -131,7 +137,7 @@ export default function AddonsSection() {
     return () => {
       window.removeEventListener('fakeDataLoaded', handleFakeDataLoaded);
     };
-  }, [selectedAddons]);
+  }, []); // Empty dependency array - only run on mount
 
   // Restore reservation items when initialized, reservation is available, and addons are loaded
   useEffect(() => {

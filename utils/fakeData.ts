@@ -64,3 +64,4 @@ export async function getFakeStep2Data(): Promise<Partial<Step2FormData> | null>
   const fakeData = await loadFakeData();
   return fakeData?.step2 || null;
 }
+
