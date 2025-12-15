@@ -313,7 +313,7 @@ export default function GeneralDietsManagement() {
                     />
                   ) : diet.icon_url ? (
                     <img 
-                      src={getStaticAssetUrl(diet.icon_url) || diet.icon_url} 
+                      src={getStaticAssetUrl(diet.icon_url) || ''} 
                       alt={diet.name}
                       className="w-10 h-10 object-contain"
                       onError={(e) => {

@@ -5,6 +5,7 @@ import { UtensilsCrossed, Plus, Search, Edit, Trash2, Power, PowerOff, Save, Dol
 import UniversalModal from './UniversalModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { getStaticAssetUrl } from '@/utils/api-config';
 
 interface TurnusInfo {
   turnus_id: number;
@@ -708,7 +709,7 @@ export default function DietsManagement() {
                         {diet.icon_url ? (
                           <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded">
                             <img 
-                              src={diet.icon_url} 
+                              src={getStaticAssetUrl(diet.icon_url) || ''} 
                               alt={diet.name}
                               className="w-6 h-6 object-contain"
                               onError={(e) => {

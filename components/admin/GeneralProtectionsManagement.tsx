@@ -312,7 +312,7 @@ export default function GeneralProtectionsManagement() {
                     />
                   ) : protection.icon_url ? (
                     <img
-                      src={getStaticAssetUrl(protection.icon_url) || protection.icon_url}
+                      src={getStaticAssetUrl(protection.icon_url) || ''}
                       alt={protection.display_name}
                       className="w-8 h-8 object-contain"
                       onError={(e) => {

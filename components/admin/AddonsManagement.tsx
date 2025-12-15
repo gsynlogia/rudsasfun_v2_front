@@ -5,7 +5,7 @@ import { Plus, Search, Edit, Trash2, Power, PowerOff, Save, DollarSign, GripVert
 import UniversalModal from './UniversalModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
-import { getApiBaseUrlRuntime } from '@/utils/api-config';
+import { getApiBaseUrlRuntime, getStaticAssetUrl } from '@/utils/api-config';
 
 interface Addon {
   id: number;
@@ -440,7 +440,7 @@ export default function AddonsManagement() {
                         />
                       ) : addon.icon_url ? (
                         <img 
-                          src={addon.icon_url.startsWith('http') ? addon.icon_url : `${getApiBaseUrlRuntime()}/static/${addon.icon_url}`}
+                          src={getStaticAssetUrl(addon.icon_url) || ''}
                           alt={addon.name}
                           className="w-10 h-10 object-contain"
                           onError={(e) => {
