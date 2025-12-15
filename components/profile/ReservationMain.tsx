@@ -395,6 +395,11 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
       <div>
         <h4 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
           {campName}
+          {reservation.property_city && (
+            <span className="text-xs sm:text-sm font-normal text-gray-600 ml-2">
+              - {reservation.property_city}
+            </span>
+          )}
         </h4>
         <div className="text-xs sm:text-sm text-gray-600 space-y-1">
           <div className="flex items-center gap-1.5 sm:gap-2">
