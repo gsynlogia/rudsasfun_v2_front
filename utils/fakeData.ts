@@ -26,3 +26,17 @@ export async function getFakeStep1Data(): Promise<any | null> {
   return null;
 }
 
+/**
+ * Get fake Step2 data for development/testing
+ * Returns null if fake data is disabled
+ */
+export async function getFakeStep2Data(): Promise<any | null> {
+  if (!isFakeDataEnabled()) {
+    return null;
+  }
+  
+  // Return null - fake data not implemented
+  // This is just a placeholder to prevent build errors
+  return null;
+}
+
