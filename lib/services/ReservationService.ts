@@ -398,6 +398,36 @@ class ReservationService {
   }
 
   /**
+   * Add protection to reservation after payment or when online payments are disabled
+   * @param reservationId Reservation ID
+   * @param protectionId Protection ID (string, format: 'protection-{id}' or numeric ID)
+   * @returns Updated reservation response
+   */
+  async addProtectionToReservation(reservationId: number, protectionId: string): Promise<ReservationResponse> {
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated. Please log in.');
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/protections`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ protection_id: protectionId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
    * Convert frontend form data to backend request format
    * @param step1Data Step 1 form data
    * @param step2Data Step 2 form data

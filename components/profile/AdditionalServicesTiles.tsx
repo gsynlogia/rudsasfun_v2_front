@@ -6,13 +6,14 @@ import { useState, useEffect } from 'react';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { authService } from '@/lib/services/AuthService';
 import { paymentService, CreatePaymentRequest } from '@/lib/services/PaymentService';
-import { ReservationResponse } from '@/lib/services/ReservationService';
-import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
+import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
+import { API_BASE_URL, getStaticAssetUrl, getApiBaseUrlRuntime } from '@/utils/api-config';
 
 interface AdditionalServicesTilesProps {
   selectedAddons?: string[] | null;
   selectedProtection?: string[] | null;
   reservation?: ReservationResponse | null;
+  onReservationUpdate?: (updatedReservation: ReservationResponse) => void;
 }
 
 interface Addon {
@@ -42,6 +43,7 @@ export default function AdditionalServicesTiles({
   selectedAddons = [],
   selectedProtection = [],
   reservation = null,
+  onReservationUpdate,
 }: AdditionalServicesTilesProps) {
   const [addons, setAddons] = useState<Addon[]>([]);
   const [protections, setProtections] = useState<Protection[]>([]);
@@ -51,6 +53,28 @@ export default function AdditionalServicesTiles({
   const [loadingBlinkConfig, setLoadingBlinkConfig] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [processingServiceId, setProcessingServiceId] = useState<string | null>(null);
+  const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
+  const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
+
+  // Fetch online payments status
+  useEffect(() => {
+    const loadOnlinePaymentsStatus = async () => {
+      try {
+        setLoadingOnlinePaymentsStatus(true);
+        const API_BASE_URL_RUNTIME = getApiBaseUrlRuntime();
+        const response = await fetch(`${API_BASE_URL_RUNTIME}/api/system-settings/online-payments/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setOnlinePaymentsEnabled(data.enabled);
+        }
+      } catch (err) {
+        console.error('Error loading online payments status:', err);
+      } finally {
+        setLoadingOnlinePaymentsStatus(false);
+      }
+    };
+    loadOnlinePaymentsStatus();
+  }, []);
 
   // Fetch addons and protections from API
   useEffect(() => {
@@ -156,6 +180,45 @@ export default function AdditionalServicesTiles({
       return;
     }
 
+    // If online payments are disabled, add directly to database after confirmation
+    if (!onlinePaymentsEnabled) {
+      const confirmed = window.confirm(`Czy jesteś pewien, że chcesz dokupić "${serviceName}" za ${price.toFixed(2)} PLN?\n\nUsługa zostanie dodana do rezerwacji i będzie uwzględniona w zaliczce.`);
+      
+      if (!confirmed) {
+        return;
+      }
+
+      setIsProcessingPayment(true);
+      setProcessingServiceId(serviceId);
+
+      try {
+        let updatedReservation: ReservationResponse;
+        
+        if (serviceType === 'addon') {
+          updatedReservation = await reservationService.addAddonToReservation(reservation.id, serviceId);
+        } else {
+          // For protection, normalize ID format
+          const protectionId = serviceId.startsWith('protection-') ? serviceId : `protection-${serviceId}`;
+          updatedReservation = await reservationService.addProtectionToReservation(reservation.id, protectionId);
+        }
+
+        // Notify parent component to refresh reservation data
+        if (onReservationUpdate) {
+          onReservationUpdate(updatedReservation);
+        }
+
+        alert(`Usługa "${serviceName}" została dodana do rezerwacji.`);
+      } catch (error) {
+        console.error(`Błąd podczas dodawania ${serviceName}:`, error);
+        alert(error instanceof Error ? error.message : `Wystąpił błąd podczas dodawania ${serviceName}`);
+      } finally {
+        setIsProcessingPayment(false);
+        setProcessingServiceId(null);
+      }
+      return;
+    }
+
+    // Online payments enabled - proceed with payment flow
     setIsProcessingPayment(true);
     setProcessingServiceId(serviceId);
 

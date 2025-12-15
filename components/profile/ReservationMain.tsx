@@ -476,6 +476,19 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             selectedAddons={reservation.selected_addons || []}
             selectedProtection={reservation.selected_protection || []}
             reservation={reservation}
+            onReservationUpdate={async (updatedReservation) => {
+              // Reload reservation data to reflect changes
+              try {
+                const refreshedReservation = await reservationService.getReservation(reservation.id);
+                // Force re-render by updating parent state if needed
+                // For now, we'll reload the page to show updated data
+                window.location.reload();
+              } catch (error) {
+                console.error('Error refreshing reservation:', error);
+                // Still reload to show changes
+                window.location.reload();
+              }
+            }}
           />
 
           <DashedLine />
