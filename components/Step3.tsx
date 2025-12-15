@@ -11,6 +11,7 @@ import DashedLine from './DashedLine';
 import InvoiceDataSection from './step3/InvoiceDataSection';
 import InvoiceDeliverySection from './step3/InvoiceDeliverySection';
 import InvoiceTypeSection from './step3/InvoiceTypeSection';
+import WantsInvoiceSection from './step3/WantsInvoiceSection';
 
 /**
  * Step3 Component - Invoices
@@ -19,15 +20,36 @@ import InvoiceTypeSection from './step3/InvoiceTypeSection';
  */
 export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabled: _disabled = false }: StepComponentProps) {
   const [invoiceType, setInvoiceType] = useState<'private' | 'company'>('private');
+  const [wantsInvoice, setWantsInvoice] = useState<boolean>(false);
   const { reservation, removeReservationItem } = useReservation();
 
-  // Load invoice type from sessionStorage
+  // Load invoice type and wantsInvoice from sessionStorage
   useEffect(() => {
     const savedData = loadStep3FormData();
-    if (savedData && savedData.invoiceType) {
-      setInvoiceType(savedData.invoiceType);
+    if (savedData) {
+      if (savedData.invoiceType) {
+        setInvoiceType(savedData.invoiceType);
+      }
+      if (savedData.wantsInvoice !== undefined) {
+        setWantsInvoice(savedData.wantsInvoice);
+      }
     }
   }, []);
+
+  // Monitor wantsInvoice changes from WantsInvoiceSection (via sessionStorage)
+  useEffect(() => {
+    const checkWantsInvoice = () => {
+      const savedData = loadStep3FormData();
+      if (savedData && savedData.wantsInvoice !== undefined && savedData.wantsInvoice !== wantsInvoice) {
+        setWantsInvoice(savedData.wantsInvoice);
+      }
+    };
+
+    // Check periodically for changes
+    const interval = setInterval(checkWantsInvoice, 500);
+
+    return () => clearInterval(interval);
+  }, [wantsInvoice]);
 
   // Monitor invoice type changes from InvoiceTypeSection (via sessionStorage)
   // Also auto-fill private person data when switching to private
@@ -202,22 +224,32 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Invoice Type Section */}
-      <InvoiceTypeSection />
+      {/* First: Ask if client wants invoice */}
+      <WantsInvoiceSection />
 
-      {/* Invoice Data Section - Only show for company */}
-      {invoiceType === 'company' && (
+      {/* Only show invoice sections if wantsInvoice is true */}
+      {wantsInvoice && (
         <>
           <DashedLine />
-          <InvoiceDataSection invoiceType={invoiceType} />
-        </>
-      )}
+          
+          {/* Invoice Type Section */}
+          <InvoiceTypeSection />
 
-      {/* Invoice Delivery Section - Only show for company */}
-      {invoiceType === 'company' && (
-        <>
-          <DashedLine />
-          <InvoiceDeliverySection />
+          {/* Invoice Data Section - Only show for company */}
+          {invoiceType === 'company' && (
+            <>
+              <DashedLine />
+              <InvoiceDataSection invoiceType={invoiceType} />
+            </>
+          )}
+
+          {/* Invoice Delivery Section - Only show for company */}
+          {invoiceType === 'company' && (
+            <>
+              <DashedLine />
+              <InvoiceDeliverySection />
+            </>
+          )}
         </>
       )}
     </div>
