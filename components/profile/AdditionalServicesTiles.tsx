@@ -554,17 +554,9 @@ export default function AdditionalServicesTiles({
                     <h4 className="text-sm font-semibold text-blue-900 mb-2">
                       Kieszonkowe dla dziecka
                     </h4>
-                    {blinkPhoneNumber ? (
-                      <p className="text-sm text-blue-800">
-                        W celu przesłania kieszonkowych dla dziecka proszę wykonać blik na numer{' '}
-                        <span className="font-semibold text-blue-900">{blinkPhoneNumber}</span>
-                      </p>
-                    ) : (
-                      <p className="text-sm text-blue-800">
-                        W celu przesłania kieszonkowych dla dziecka proszę wykonać blik na numer telefonu.
-                        Numer telefonu nie został jeszcze skonfigurowany w systemie.
-                      </p>
-                    )}
+                    <p className="text-sm text-blue-800">
+                      Funkcja będzie aktywna podczas trwania turnusu
+                    </p>
                   </div>
                 </div>
               </div>
