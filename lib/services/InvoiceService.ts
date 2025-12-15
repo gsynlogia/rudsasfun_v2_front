@@ -60,8 +60,19 @@ class InvoiceService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas generowania faktury' }));
-      throw new Error(error.detail || 'Błąd podczas generowania faktury');
+      let errorMessage = 'Błąd podczas generowania faktury';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.detail || error.message || `HTTP ${response.status}: ${response.statusText}`;
+        } else {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+      } catch (parseError) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas generowania faktury'}`;
+      }
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -76,19 +87,48 @@ class InvoiceService {
       throw new Error('Brak autoryzacji');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/invoices/my`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/invoices/my`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas pobierania faktur' }));
-      throw new Error(error.detail || 'Błąd podczas pobierania faktur');
+      if (!response.ok) {
+        // Try to parse error response, but handle cases where response is not JSON
+        let errorMessage = 'Błąd podczas pobierania faktur';
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const error = await response.json();
+            errorMessage = error.detail || error.message || `HTTP ${response.status}: ${response.statusText}`;
+          } else {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          }
+        } catch (parseError) {
+          // If parsing fails, use status-based message
+          errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktur'}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Check if response has content before trying to parse JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // Return empty response if not JSON
+        return { invoices: [], total: 0 };
+      }
+
+      return await response.json();
+    } catch (error) {
+      // Re-throw if it's already an Error with message
+      if (error instanceof Error) {
+        throw error;
+      }
+      // Otherwise wrap in Error
+      throw new Error('Błąd podczas pobierania faktur');
     }
-
-    return response.json();
   }
 
   /**
@@ -108,8 +148,19 @@ class InvoiceService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas pobierania faktury' }));
-      throw new Error(error.detail || 'Błąd podczas pobierania faktury');
+      let errorMessage = 'Błąd podczas pobierania faktury';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.detail || error.message || `HTTP ${response.status}: ${response.statusText}`;
+        } else {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+      } catch (parseError) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktury'}`;
+      }
+      throw new Error(errorMessage);
     }
 
     return response.blob();
@@ -140,8 +191,19 @@ class InvoiceService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas pobierania faktur' }));
-      throw new Error(error.detail || 'Błąd podczas pobierania faktur');
+      let errorMessage = 'Błąd podczas pobierania faktur';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.detail || error.message || `HTTP ${response.status}: ${response.statusText}`;
+        } else {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+      } catch (parseError) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktur'}`;
+      }
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -164,8 +226,19 @@ class InvoiceService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Błąd podczas anulowania faktury' }));
-      throw new Error(error.detail || 'Błąd podczas anulowania faktury');
+      let errorMessage = 'Błąd podczas anulowania faktury';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.detail || error.message || `HTTP ${response.status}: ${response.statusText}`;
+        } else {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+      } catch (parseError) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas anulowania faktury'}`;
+      }
+      throw new Error(errorMessage);
     }
   }
 }
