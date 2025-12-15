@@ -19,6 +19,7 @@ interface Addon {
   id: number;
   name: string;
   icon_svg: string | null;
+  icon_url?: string | null;
   price: number;
 }
 
@@ -216,7 +217,7 @@ export default function AdditionalServicesTiles({
           if (protection.icon_svg) {
             return (
               <div
-                className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'text-white' : 'text-gray-400'}`}
+                className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'text-white' : 'text-black'}`}
                 dangerouslySetInnerHTML={{
                   __html: protection.icon_svg.replace(
                     /<svg([^>]*?)>/i,
@@ -230,11 +231,14 @@ export default function AdditionalServicesTiles({
             );
           } else if (protection.icon_url) {
             return (
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'opacity-100' : 'opacity-50'}`}>
+              <div className="w-10 h-10 sm:w-12 sm:h-12">
                 <img
                   src={getStaticAssetUrl(protection.icon_url) || ''}
                   alt={protection.name}
                   className="w-full h-full object-contain"
+                  style={{
+                    filter: isActive ? 'brightness(0) invert(1)' : 'brightness(0)',
+                  }}
                 />
               </div>
             );
@@ -287,14 +291,27 @@ export default function AdditionalServicesTiles({
     if (addon.icon_svg) {
       return (
         <div
-          className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'text-white' : 'text-gray-400'}`}
+          className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'text-white' : 'text-black'}`}
           dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
         />
+      );
+    } else if (addon.icon_url) {
+      return (
+        <div className="w-10 h-10 sm:w-12 sm:h-12">
+          <img
+            src={getStaticAssetUrl(addon.icon_url) || ''}
+            alt={addon.name}
+            className="w-full h-full object-contain"
+            style={{
+              filter: isActive ? 'brightness(0) invert(1)' : 'brightness(0)',
+            }}
+          />
+        </div>
       );
     }
     // Fallback icon
     return (
-      <svg className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'text-white' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'text-white' : 'text-black'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     );

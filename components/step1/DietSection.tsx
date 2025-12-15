@@ -382,15 +382,14 @@ export default function DietSection() {
                         <img
                           src={getStaticAssetUrl(diet.icon_url) || ''}
                           alt={diet.name}
-                          className={`w-full h-full object-contain max-w-full max-h-full ${
-                            isSelected ? 'brightness-0 invert' : ''
-                          }`}
+                          className="w-full h-full object-contain max-w-full max-h-full"
                           style={{
                             width: '100%',
                             height: '100%',
                             objectFit: 'contain',
                             maxWidth: '100%',
                             maxHeight: '100%',
+                            filter: isSelected ? 'brightness(0) invert(1)' : 'brightness(0)',
                           }}
                         />
                       </div>

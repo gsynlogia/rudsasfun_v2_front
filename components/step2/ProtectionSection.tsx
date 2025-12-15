@@ -322,11 +322,9 @@ export default function ProtectionSection() {
                     <img
                       src={getStaticAssetUrl(protection.icon_url) || ''}
                       alt={protection.name}
-                      className={`w-full h-full object-contain max-w-full max-h-full ${
-                        isSelected ? 'brightness-0 invert' : ''
-                      }`}
+                      className="w-full h-full object-contain max-w-full max-h-full"
                       style={{
-                        filter: isSelected ? 'brightness(0) invert(1)' : 'none',
+                        filter: isSelected ? 'brightness(0) invert(1)' : 'brightness(0)',
                       }}
                     />
                   </div>
@@ -334,7 +332,7 @@ export default function ProtectionSection() {
                   <div
                     className="w-10 h-10 flex items-center justify-center flex-shrink-0 overflow-hidden"
                     style={{
-                      filter: isSelected ? 'brightness(0) invert(1)' : 'none',
+                      filter: isSelected ? 'brightness(0) invert(1)' : 'brightness(0)',
                     }}
                     dangerouslySetInnerHTML={{
                       __html: protection.icon_svg.replace(

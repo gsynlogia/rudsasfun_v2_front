@@ -7,6 +7,15 @@ import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import type { ReservationItem } from '@/types/reservation';
 
+interface Addon {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  icon_url?: string | null;
+  icon_svg?: string | null;
+}
+
 /**
  * AddonsSection Component
  * Displays addon description from database, addon selection tiles, and info block from database
@@ -28,13 +37,7 @@ export default function AddonsSection() {
   const [addonDescription, setAddonDescription] = useState<string>('');
   const [infoHeader, setInfoHeader] = useState<string>('');
   const [loadingDescription, setLoadingDescription] = useState(true);
-  const [addons, setAddons] = useState<Array<{
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-    icon: React.ReactNode;
-  }>>([]);
+  const [addons, setAddons] = useState<Addon[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(true);
   const addonReservationIdsRef = useRef<Map<string, string>>(new Map()); // Map: addonId -> reservationItemId
 
@@ -86,33 +89,8 @@ export default function AddonsSection() {
           name: addon.name,
           description: addon.description || '',
           price: addon.price,
-          icon: addon.icon_url ? (
-            <img
-              src={getStaticAssetUrl(addon.icon_url) || ''}
-              alt={addon.name}
-              className="w-12 h-12 object-contain"
-              onError={(e) => {
-                // If image fails to load, show SVG or fallback
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent && addon.icon_svg) {
-                  parent.innerHTML = addon.icon_svg;
-                } else if (parent) {
-                  parent.innerHTML = '<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
-                }
-              }}
-            />
-          ) : addon.icon_svg ? (
-            <div 
-              className="w-12 h-12" 
-              dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
-            />
-          ) : (
-            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ),
+          icon_url: addon.icon_url,
+          icon_svg: addon.icon_svg,
         }));
         setAddons(addonsFromApi);
       } catch (err) {
@@ -326,8 +304,44 @@ export default function AddonsSection() {
                     : 'bg-gray-100 text-gray-600'
                 }`}
               >
-                <div className={isSelected ? 'text-white' : 'text-gray-600'}>
-                  {addon.icon}
+                <div className="w-12 h-12 flex items-center justify-center">
+                  {addon.icon_url ? (
+                    <img
+                      src={getStaticAssetUrl(addon.icon_url) || ''}
+                      alt={addon.name}
+                      className="w-full h-full object-contain"
+                      style={{
+                        filter: isSelected ? 'brightness(0) invert(1)' : 'brightness(0)',
+                      }}
+                      onError={(e) => {
+                        // If image fails to load, show SVG or fallback
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent && addon.icon_svg) {
+                          parent.innerHTML = addon.icon_svg;
+                          const svgElement = parent.querySelector('svg');
+                          if (svgElement) {
+                            svgElement.style.filter = isSelected ? 'brightness(0) invert(1)' : 'brightness(0)';
+                          }
+                        } else if (parent) {
+                          parent.innerHTML = '<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+                        }
+                      }}
+                    />
+                  ) : addon.icon_svg ? (
+                    <div
+                      className={`w-12 h-12 ${isSelected ? 'text-white' : 'text-black'}`}
+                      style={{
+                        filter: isSelected ? 'brightness(0) invert(1)' : 'brightness(0)',
+                      }}
+                      dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
+                    />
+                  ) : (
+                    <svg className={`w-12 h-12 ${isSelected ? 'text-white' : 'text-black'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
                 </div>
                 <span className={`text-[10px] sm:text-xs text-center font-medium ${
                   isSelected ? 'text-white' : 'text-gray-600'

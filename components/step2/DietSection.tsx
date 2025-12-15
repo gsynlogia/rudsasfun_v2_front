@@ -268,6 +268,9 @@ export default function DietSection() {
                         src={getStaticAssetUrl(diet.icon_url) || ''}
                         alt={diet.name}
                         className="w-full h-full object-contain"
+                        style={{
+                          filter: isSelected ? 'brightness(0) invert(1)' : 'brightness(0)',
+                        }}
                         onError={(e) => {
                           // If image fails to load, show name in blue square
                           const target = e.target as HTMLImageElement;
