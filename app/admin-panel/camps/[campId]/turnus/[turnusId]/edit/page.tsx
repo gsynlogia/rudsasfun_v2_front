@@ -225,6 +225,8 @@ export default function CampTurnusEditPage({
   const [endDate, setEndDate] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number>(50);
   const [basePrice, setBasePrice] = useState<number>(2200);
+  const [minAge, setMinAge] = useState<number | ''>('');
+  const [maxAge, setMaxAge] = useState<number | ''>('');
 
   // Transport state
   const [transport, setTransport] = useState<CampPropertyTransport | null>(null);
@@ -351,6 +353,8 @@ export default function CampTurnusEditPage({
             setEndDate(propertyData.end_date.split('T')[0]);
             setMaxParticipants(propertyData.max_participants || 50);
             setBasePrice(propertyData.base_price || 2200);
+            setMinAge(propertyData.min_age ?? '');
+            setMaxAge(propertyData.max_age ?? '');
 
             // Populate transport data if exists - map cities to transport fields
             if (transportData) {
@@ -404,6 +408,18 @@ export default function CampTurnusEditPage({
       return;
     }
 
+    // Validate age range if both are provided
+    if (minAge !== '' && maxAge !== '' && typeof minAge === 'number' && typeof maxAge === 'number') {
+      if (minAge > maxAge) {
+        setError('Minimalny wiek nie może być większy niż maksymalny wiek');
+        return;
+      }
+      if (minAge < 0 || maxAge < 0) {
+        setError('Wiek nie może być ujemny');
+        return;
+      }
+    }
+
     // Validate dates
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -448,6 +464,8 @@ export default function CampTurnusEditPage({
           end_date: endDate,
           max_participants: maxParticipants,
           base_price: basePrice,
+          min_age: minAge === '' ? null : minAge,
+          max_age: maxAge === '' ? null : maxAge,
         }),
       });
 
@@ -1749,6 +1767,71 @@ export default function CampTurnusEditPage({
                   >
                     Wybierz ochronę
                   </button>
+                </div>
+              )}
+            </div>
+
+            {/* Age Range Section - Under Protections */}
+            <div className="pt-6 border-t border-gray-200">
+              <div className="flex items-center gap-2 mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Zakres wieku uczestników</h2>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-4">
+                <p className="text-sm text-blue-800 mb-2">
+                  <strong>Uwaga:</strong> Wiek jest obliczany na dzień rozpoczęcia turnusu, nie na dzień obecny.
+                </p>
+                <p className="text-xs text-blue-700">
+                  Przykład: Jeśli turnus rozpoczyna się w lipcu 2026, a dziecko ma teraz 17 lat, 
+                  to w dniu rozpoczęcia turnusu będzie miało 18 lat i może być poza zakresem wieku.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="min_age" className="block text-sm font-medium text-gray-700 mb-1">
+                    Minimalny wiek
+                  </label>
+                  <input
+                    type="number"
+                    id="min_age"
+                    min="0"
+                    max="100"
+                    value={minAge}
+                    onChange={(e) => setMinAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+                    style={{ borderRadius: 0 }}
+                    placeholder="np. 8"
+                    disabled={saving || loading}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Minimalny wiek uczestnika w dniu rozpoczęcia turnusu
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="max_age" className="block text-sm font-medium text-gray-700 mb-1">
+                    Maksymalny wiek
+                  </label>
+                  <input
+                    type="number"
+                    id="max_age"
+                    min="0"
+                    max="100"
+                    value={maxAge}
+                    onChange={(e) => setMaxAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+                    style={{ borderRadius: 0 }}
+                    placeholder="np. 17"
+                    disabled={saving || loading}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Maksymalny wiek uczestnika w dniu rozpoczęcia turnusu
+                  </p>
+                </div>
+              </div>
+              {(minAge !== '' && maxAge !== '' && typeof minAge === 'number' && typeof maxAge === 'number' && minAge > maxAge) && (
+                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                  <p className="text-xs text-red-700">
+                    Minimalny wiek nie może być większy niż maksymalny wiek
+                  </p>
                 </div>
               )}
             </div>

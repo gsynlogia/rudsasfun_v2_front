@@ -187,14 +187,16 @@ export default function LayoutClient({
   useLayoutEffect(() => {
     if (campExists && campData) {
       // Check if camp info needs to be updated (avoid unnecessary updates)
-      const currentCamp = reservation.camp;
-      const shouldUpdate = !currentCamp ||
-        currentCamp.id !== campData.camp.id ||
-        currentCamp.name !== campData.camp.name ||
-        currentCamp.properties.period !== campData.property.period ||
-        currentCamp.properties.city !== campData.property.city ||
-        currentCamp.properties.start_date !== campData.property.start_date ||
-        currentCamp.properties.end_date !== campData.property.end_date;
+        const currentCamp = reservation.camp;
+        const shouldUpdate = !currentCamp ||
+          currentCamp.id !== campData.camp.id ||
+          currentCamp.name !== campData.camp.name ||
+          currentCamp.properties.period !== campData.property.period ||
+          currentCamp.properties.city !== campData.property.city ||
+          currentCamp.properties.start_date !== campData.property.start_date ||
+          currentCamp.properties.end_date !== campData.property.end_date ||
+          currentCamp.properties.min_age !== (campData.property.min_age ?? null) ||
+          currentCamp.properties.max_age !== (campData.property.max_age ?? null);
 
       if (shouldUpdate) {
         const reservationCamp: ReservationCamp = {
@@ -205,6 +207,8 @@ export default function LayoutClient({
             city: campData.property.city,
             start_date: campData.property.start_date,
             end_date: campData.property.end_date,
+            min_age: campData.property.min_age ?? null,
+            max_age: campData.property.max_age ?? null,
           },
         };
         updateReservationCamp(reservationCamp);
@@ -218,7 +222,7 @@ export default function LayoutClient({
         }
       }
     }
-  }, [campData?.camp.id, campData?.property.id, campData?.camp.name, campData?.property.period, campData?.property.city, campData?.property.start_date, campData?.property.end_date, campData?.property.base_price, campExists, updateReservationCamp, setBasePrice, reservation.camp, reservation.basePrice]);
+  }, [campData?.camp.id, campData?.property.id, campData?.camp.name, campData?.property.period, campData?.property.city, campData?.property.start_date, campData?.property.end_date, campData?.property.min_age, campData?.property.max_age, campData?.property.base_price, campExists, updateReservationCamp, setBasePrice, reservation.camp, reservation.basePrice]);
 
   return (
     <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>

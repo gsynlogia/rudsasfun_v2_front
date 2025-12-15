@@ -33,13 +33,13 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   const { addReservationItem, removeReservationItemsByType, reservation } = useReservation();
   const pathname = usePathname();
 
-  // Calculate available birth years based on camp start date
-  // Age must be 7-17 years old on camp start date
-  // Logic: if camp starts on July 1, 2025:
-  // - Age 7: born between July 2, 2017 and July 1, 2018 (rocznik 2017 or 2018)
-  // - Age 17: born between July 2, 2007 and July 1, 2008 (rocznik 2007 or 2008)
-  // To include all valid cases, we use: (startYear - 17) to (startYear - 7)
-  // But we need to account for edge cases where birthday hasn't passed yet
+  // Calculate available birth years based on camp start date and turnus age range
+  // Age range is defined per turnus (min_age and max_age)
+  // If age range is not set, fallback to default 7-17
+  // Logic: if camp starts on July 1, 2025 and min_age=8, max_age=14:
+  // - Age 8: born between July 2, 2016 and July 1, 2017 (rocznik 2016 or 2017)
+  // - Age 14: born between July 2, 2010 and July 1, 2011 (rocznik 2010 or 2011)
+  // To include all valid cases, we use range: (startYear - max_age) to (startYear - min_age)
   const getAvailableBirthYears = (): number[] => {
     const birthYears: number[] = [];
 
@@ -49,6 +49,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       end_date: string;
       period: string;
       city: string;
+      min_age?: number | null;
+      max_age?: number | null;
     }
 
     interface CampData {
@@ -60,6 +62,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       end_date: '',
       period: '',
       city: '',
+      min_age: null,
+      max_age: null,
     };
 
     const defaultCamp: CampData = {
@@ -68,6 +72,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
 
     const campData: CampData = reservation.camp || defaultCamp;
     const startDateStr = campData.properties.start_date;
+    const minAge = campData.properties.min_age;
+    const maxAge = campData.properties.max_age;
 
     if (!startDateStr) {
       // If no camp data, return empty array (will show placeholder)
@@ -78,15 +84,19 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       const startDate = new Date(startDateStr);
       const startYear = startDate.getFullYear();
 
-      // Calculate birth years for ages 7-17 on camp start date
-      // For age 7: person born in (startYear - 7) or (startYear - 8) depending on exact birthday
-      // For age 17: person born in (startYear - 17) or (startYear - 18) depending on exact birthday
-      // To include all valid cases, we use range: (startYear - 17) to (startYear - 7)
-      // This ensures that anyone born in these years will be 7-17 years old on the camp start date
+      // Use turnus age range if available, otherwise fallback to default 7-17
+      const minAgeValue = minAge !== null && minAge !== undefined ? minAge : 7;
+      const maxAgeValue = maxAge !== null && maxAge !== undefined ? maxAge : 17;
+
+      // Calculate birth years for the age range on camp start date
+      // For age minAge: person born in (startYear - minAge) or (startYear - minAge - 1) depending on exact birthday
+      // For age maxAge: person born in (startYear - maxAge) or (startYear - maxAge - 1) depending on exact birthday
+      // To include all valid cases, we use range: (startYear - maxAge) to (startYear - minAge)
+      // This ensures that anyone born in these years will be within the age range on the camp start date
       // (accounting for birthday edge cases)
 
-      const minBirthYear = startYear - 17; // Oldest participant (17 years old)
-      const maxBirthYear = startYear - 7;  // Youngest participant (7 years old)
+      const minBirthYear = startYear - maxAgeValue; // Oldest participant (maxAge years old)
+      const maxBirthYear = startYear - minAgeValue;  // Youngest participant (minAge years old)
 
       // Generate birth years from youngest to oldest (most recent first)
       for (let year = maxBirthYear; year >= minBirthYear; year--) {
@@ -256,13 +266,15 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     if (!participantData.age || participantData.age.trim() === '' || participantData.age === 'Wybierz z listy') {
       errors.age = 'Pole obowiązkowe';
     } else {
-      // Validate that selected birth year gives age 7-17 on camp start date
+      // Validate that selected birth year gives age within turnus age range on camp start date
       // Use same interface as in getAvailableBirthYears
       interface CampProperties {
         start_date: string;
         end_date: string;
         period: string;
         city: string;
+        min_age?: number | null;
+        max_age?: number | null;
       }
 
       interface CampData {
@@ -274,6 +286,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
         end_date: '',
         period: '',
         city: '',
+        min_age: null,
+        max_age: null,
       };
 
       const defaultCamp: CampData = {
@@ -282,6 +296,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
 
       const campData: CampData = reservation.camp || defaultCamp;
       const startDateStr = campData.properties.start_date;
+      const minAge = campData.properties.min_age;
+      const maxAge = campData.properties.max_age;
 
       if (startDateStr) {
         try {
@@ -292,15 +308,19 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
           if (isNaN(birthYear)) {
             errors.age = 'Nieprawidłowy rocznik';
           } else {
+            // Use turnus age range if available, otherwise fallback to default 7-17
+            const minAgeValue = minAge !== null && minAge !== undefined ? minAge : 7;
+            const maxAgeValue = maxAge !== null && maxAge !== undefined ? maxAge : 17;
+
             // Calculate age on camp start date
             // Age = startYear - birthYear (if birthday has passed) or startYear - birthYear - 1 (if not)
             // For validation, we check if birthYear is in the valid range
-            // Valid range: (startYear - 17) to (startYear - 7)
-            const minBirthYear = startYear - 17;
-            const maxBirthYear = startYear - 7;
+            // Valid range: (startYear - maxAge) to (startYear - minAge)
+            const minBirthYear = startYear - maxAgeValue;
+            const maxBirthYear = startYear - minAgeValue;
 
             if (birthYear < minBirthYear || birthYear > maxBirthYear) {
-              errors.age = 'Uczestnik musi mieć 7-17 lat w dniu rozpoczęcia obozu';
+              errors.age = `Uczestnik musi mieć ${minAgeValue}-${maxAgeValue} lat w dniu rozpoczęcia obozu`;
             }
           }
         } catch (error) {
