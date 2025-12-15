@@ -16,6 +16,7 @@ interface Addon {
   icon_svg?: string | null;
   display_order: number;
   is_active: boolean;
+  centers?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +44,10 @@ export default function AddonsManagement() {
   const [iconRelativePath, setIconRelativePath] = useState<string | null>(null);
   const [iconMethod, setIconMethod] = useState<'upload' | 'paste'>('upload');
   const [uploadingIcon, setUploadingIcon] = useState(false);
+  const [selectedCenters, setSelectedCenters] = useState<string[]>([]);
+  
+  // Available centers
+  const availableCenters = ['SAWA', 'BEAVER', 'LIMBA'];
 
   const fetchAddons = useCallback(async () => {
     try {
@@ -88,6 +93,7 @@ export default function AddonsManagement() {
     setIconRelativePath(null);
     setIconMethod('upload');
     setSelectedAddon(null);
+    setSelectedCenters([]);
   };
 
   // Open create modal
@@ -103,6 +109,7 @@ export default function AddonsManagement() {
     setAddonDescription(addon.description || '');
     setAddonPrice(addon.price);
     setAddonIconSvg(addon.icon_svg || '');
+    setSelectedCenters(addon.centers || []);
     // If addon has icon_url, construct full URL for preview
     if (addon.icon_url) {
       const API_BASE_URL = getApiBaseUrlRuntime();
@@ -214,6 +221,7 @@ export default function AddonsManagement() {
         price: Number(addonPrice),
         is_active: true,
         display_order: 0, // Will be set to max + 1 on backend if 0
+        centers: selectedCenters, // Include selected centers
       };
       
       // Add icon based on selected method
@@ -713,6 +721,36 @@ export default function AddonsManagement() {
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* Centers Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Miasta/Ośrodki <span className="text-gray-500 text-xs">(opcjonalne)</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Wybierz miasta/ośrodki, dla których ten dodatek będzie dostępny podczas rezerwacji.
+              </p>
+              <div className="space-y-2">
+                {availableCenters.map((center) => (
+                  <label key={center} className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedCenters.includes(center)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedCenters([...selectedCenters, center]);
+                        } else {
+                          setSelectedCenters(selectedCenters.filter(c => c !== center));
+                        }
+                      }}
+                      className="mr-2 w-4 h-4 text-[#03adf0] border-gray-300 rounded focus:ring-[#03adf0]"
+                      disabled={saving}
+                    />
+                    <span className="text-sm text-gray-700">{center}</span>
+                  </label>
+                ))}
+              </div>
             </div>
 
             {/* Actions */}

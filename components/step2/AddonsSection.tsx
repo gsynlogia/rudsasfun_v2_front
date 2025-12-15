@@ -73,7 +73,21 @@ export default function AddonsSection() {
     const fetchAddons = async () => {
       try {
         setLoadingAddons(true);
-        const response = await fetch(`${API_BASE_URL}/api/addons/public`);
+        // Get the selected city from reservation context
+        const selectedCity = reservation.camp?.properties?.city;
+        
+        // Always require city to be present - if not, don't fetch addons
+        if (!selectedCity) {
+          console.warn('[AddonsSection] No city found in reservation context, not fetching addons');
+          setAddons([]);
+          setLoadingAddons(false);
+          return;
+        }
+        
+        // Build URL with city filter (always required)
+        const url = `${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(selectedCity)}`;
+        
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -103,7 +117,7 @@ export default function AddonsSection() {
       }
     };
     fetchAddons();
-  }, []);
+  }, [reservation.camp?.properties?.city]);
 
   // Keep ref in sync with state
   useEffect(() => {
