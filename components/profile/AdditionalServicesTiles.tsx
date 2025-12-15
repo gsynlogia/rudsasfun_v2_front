@@ -437,7 +437,7 @@ export default function AdditionalServicesTiles({
   return (
     <div className="mb-6">
       <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-3 sm:mb-4">Usługi dodatkowe</h5>
-      <div className="flex gap-3 sm:gap-4 md:gap-5 w-full justify-start">
+      <div className="grid grid-cols-4 gap-3 sm:gap-4 md:gap-5 w-full">
         {sortedTiles.map((tile) => {
           const { isActive } = tile;
           // Active = blue, Inactive = gray
