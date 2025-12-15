@@ -58,8 +58,20 @@ export default function AdditionalServicesTiles({
       try {
         setLoading(true);
         
-        // Fetch addons
-        const addonsResponse = await fetch(`${API_BASE_URL}/api/addons/public`);
+        // Get city from reservation (required for filtering addons by center)
+        const city = reservation?.property_city;
+        
+        if (!city) {
+          console.warn('[AdditionalServicesTiles] No city found in reservation, cannot fetch addons');
+          setAddons([]);
+          setProtections([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Fetch addons filtered by city (only addons available for this center)
+        const addonsUrl = `${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(city)}`;
+        const addonsResponse = await fetch(addonsUrl);
         if (addonsResponse.ok) {
           const addonsData = await addonsResponse.json();
           setAddons(addonsData.addons || []);
@@ -84,7 +96,7 @@ export default function AdditionalServicesTiles({
       }
     };
     fetchData();
-  }, []);
+  }, [reservation?.property_city]);
 
   // Fetch Blink configuration when modal opens
   const handlePocketMoneyClick = async () => {
