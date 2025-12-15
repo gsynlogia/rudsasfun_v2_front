@@ -10,6 +10,7 @@ interface GeneralPromotion {
   price: number;  // Can be negative for discounts
   description?: string | null;
   is_active: boolean;
+  does_not_reduce_price?: boolean;  // If true, promotion does not reduce camp price (e.g., vouchers/bons)
   display_name: string;
 }
 
@@ -26,6 +27,7 @@ export default function GeneralPromotionsManagement() {
   const [promotionName, setPromotionName] = useState('');
   const [promotionPrice, setPromotionPrice] = useState<number | ''>(0);
   const [promotionDescription, setPromotionDescription] = useState('');
+  const [doesNotReducePrice, setDoesNotReducePrice] = useState(false);
 
   useEffect(() => {
     fetchPromotions();
@@ -60,6 +62,7 @@ export default function GeneralPromotionsManagement() {
     setPromotionName('');
     setPromotionPrice(0);
     setPromotionDescription('');
+    setDoesNotReducePrice(false);
     setSelectedPromotion(null);
   };
 
@@ -73,6 +76,7 @@ export default function GeneralPromotionsManagement() {
     setPromotionName(promotion.name);
     setPromotionPrice(promotion.price);
     setPromotionDescription(promotion.description || '');
+    setDoesNotReducePrice(promotion.does_not_reduce_price || false);
     setShowEditModal(true);
   };
 
@@ -91,6 +95,7 @@ export default function GeneralPromotionsManagement() {
         price: Number(promotionPrice),  // Can be negative
         description: promotionDescription.trim() || null,
         is_active: true,
+        does_not_reduce_price: doesNotReducePrice,
         // NO icon fields
       };
 
@@ -292,6 +297,22 @@ export default function GeneralPromotionsManagement() {
                   placeholder="Szczegółowy opis promocji..."
                 />
               </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="doesNotReducePrice"
+                  checked={doesNotReducePrice}
+                  onChange={(e) => setDoesNotReducePrice(e.target.checked)}
+                  className="w-4 h-4 text-[#03adf0] border-gray-300 rounded focus:ring-[#03adf0]"
+                />
+                <label htmlFor="doesNotReducePrice" className="ml-2 text-sm font-medium text-gray-700">
+                  Nie obniża ceny
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Zaznacz, jeśli promocja nie obniża ceny obozu (np. bony do wykorzystania na obozie)
+              </p>
 
               {/* NO icon fields (unlike GeneralDietsManagement) */}
             </div>

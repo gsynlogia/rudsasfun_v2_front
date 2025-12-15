@@ -250,17 +250,34 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                   }
                   return true;
                 })
-                .map((item: ReservationItem) => (
-                  <div
-                    key={item.id}
-                    className="text-xs sm:text-sm text-gray-600 flex items-center justify-between"
-                  >
-                    <span>{item.name}</span>
-                    <span className="font-medium text-gray-900">
-                      {item.price > 0 ? '+' : ''}{item.price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
-                    </span>
-                  </div>
-                ))}
+                .map((item: ReservationItem) => {
+                  // For promotions that don't reduce price, show original price but don't add to total
+                  const isPromotionNotReducingPrice = item.type === 'promotion' && item.metadata?.doesNotReducePrice;
+                  const displayPrice = isPromotionNotReducingPrice && item.metadata?.originalPrice !== undefined
+                    ? item.metadata.originalPrice
+                    : item.price;
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      className="text-xs sm:text-sm text-gray-600 flex items-center justify-between"
+                    >
+                      <span>{item.name}</span>
+                      <span className="font-medium text-gray-900">
+                        {isPromotionNotReducingPrice ? (
+                          <span className="text-gray-500">
+                            {displayPrice > 0 ? '+' : ''}{displayPrice.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                            <span className="text-xs ml-1">(nie obniża ceny)</span>
+                          </span>
+                        ) : (
+                          <span>
+                            {displayPrice > 0 ? '+' : ''}{displayPrice.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
 
             <div className="w-full h-px bg-gray-300 my-2"></div>

@@ -10,6 +10,7 @@ interface GeneralPromotionRelation {
   general_promotion_name: string;
   general_promotion_price: number;  // Can be negative
   price: number;  // Center-specific price (can be negative)
+  does_not_reduce_price?: boolean;  // If true, promotion does not reduce camp price (e.g., vouchers/bons)
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +31,7 @@ interface GeneralPromotion {
   id: number;
   name: string;
   price: number;  // Can be negative
+  does_not_reduce_price?: boolean;  // If true, promotion does not reduce camp price (e.g., vouchers/bons)
   display_name: string;
 }
 
@@ -235,6 +237,11 @@ export default function CenterPromotionsManagement() {
                               ? `+${rel.price.toFixed(2)} PLN` 
                               : '0.00 PLN'
                           }
+                          {rel.does_not_reduce_price && (
+                            <span className="ml-2 text-xs text-orange-600 font-medium">
+                              (nie obniża ceny)
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -348,6 +355,11 @@ export default function CenterPromotionsManagement() {
                                 ? `+${gp.price.toFixed(2)} PLN` 
                                 : '0.00 PLN'
                             })
+                            {gp.does_not_reduce_price && (
+                              <span className="ml-2 text-xs text-orange-600 font-medium">
+                                (nie obniża ceny)
+                              </span>
+                            )}
                           </label>
                         </div>
                       );

@@ -17,6 +17,7 @@ interface Promotion {
   description?: string;
   is_center_promotion_relation?: boolean;
   relation_id?: number;
+  does_not_reduce_price?: boolean; // If true, promotion does not reduce camp price (e.g., vouchers/bons)
 }
 
 /**
@@ -172,12 +173,19 @@ export default function PromotionsSection() {
 
       if (selectedPromotion) {
         const displayName = selectedPromotion.name;
-        const { price } = selectedPromotion;
+        const { price, does_not_reduce_price } = selectedPromotion;
 
+        // Add promotion to reservation items
+        // If does_not_reduce_price is true, set price to 0 so it doesn't affect total price
         addReservationItem({
           name: displayName,
-          price: price,
+          price: does_not_reduce_price ? 0 : price,
           type: 'promotion',
+          // Store original price and flag in item metadata for display purposes
+          metadata: {
+            originalPrice: price,
+            doesNotReducePrice: does_not_reduce_price || false,
+          },
         });
       }
     }
