@@ -163,14 +163,14 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
           </div>
           <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">Twoja rezerwacja</h3>
           <div className="text-base sm:text-lg font-medium text-gray-700 mb-2">
-            {DEFAULT_BASE_PRICE.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+            {(totalPrice || reservation.totalPrice || DEFAULT_BASE_PRICE).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
           </div>
           <div className="w-full h-px bg-gray-300 mb-3 sm:mb-4"></div>
           <Link href="#" className="text-[#03adf0] hover:underline text-xs sm:text-sm font-medium mb-3 sm:mb-4">
             Podsumowanie kosztów
           </Link>
           <div className="text-xl sm:text-2xl font-bold text-[#03adf0] mb-4 sm:mb-6">
-            {DEFAULT_BASE_PRICE.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+            {(totalPrice || reservation.totalPrice || DEFAULT_BASE_PRICE).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
           </div>
         </div>
         <button
