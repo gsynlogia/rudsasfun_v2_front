@@ -211,6 +211,22 @@ export default function PromotionsSection() {
 
   const promotionType = selectedPromotion ? getPromotionType(selectedPromotion.name) : null;
 
+  // Auto-fill justification for First Minute promotion
+  useEffect(() => {
+    if (selectedPromotion && promotionType === 'first_minute') {
+      // Automatically fill reason for First Minute promotion
+      setPromotionJustification((prev) => {
+        if (!prev.reason || prev.reason.trim() === '') {
+          return {
+            ...prev,
+            reason: 'Promocja - First Minute',
+          };
+        }
+        return prev;
+      });
+    }
+  }, [selectedPromotion, promotionType]);
+
   return (
     <div>
       <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-800">
@@ -263,7 +279,7 @@ export default function PromotionsSection() {
 
             {/* Justification fields based on promotion type */}
             {selectedPromotion && requiresJustification(selectedPromotion.name) && (
-              <div className="mb-4 sm:mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className={`mb-4 sm:mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg ${promotionType === 'first_minute' ? 'hidden' : ''}`}>
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">
                   Uzasadnienie promocji *
                 </h3>
