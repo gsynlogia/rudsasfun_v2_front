@@ -47,9 +47,10 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     if (savedData) {
       return savedData;
     }
+    // Default to transfer if online payments are disabled (will be updated when status loads)
     return {
       payNow: true, // Keep for backward compatibility, but not used in UI
-      paymentMethod: 'online',
+      paymentMethod: 'transfer', // Default to transfer (will be set to 'online' if enabled)
       paymentAmount: 'full', // Default: Full payment
     };
   };
@@ -78,18 +79,38 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
           const data = await response.json();
           setOnlinePaymentsEnabled(data.enabled);
           
-          // If online payments are disabled, automatically select transfer and allow proceeding without payment
+          // If online payments are disabled, automatically select transfer
+          // If enabled, check if we have saved data with 'online', otherwise keep 'transfer'
           if (!data.enabled) {
             setFormData(prev => ({
               ...prev,
               paymentMethod: 'transfer',
             }));
+          } else {
+            // If online payments are enabled, check saved data or default to 'online'
+            const savedData = loadStep5FormData();
+            if (savedData && savedData.paymentMethod === 'online') {
+              setFormData(prev => ({
+                ...prev,
+                paymentMethod: 'online',
+              }));
+            } else if (!savedData) {
+              // No saved data, default to 'online' when enabled
+              setFormData(prev => ({
+                ...prev,
+                paymentMethod: 'online',
+              }));
+            }
           }
         }
       } catch (err) {
         console.error('Error loading online payments status:', err);
-        // Default to enabled if error occurs
-        setOnlinePaymentsEnabled(true);
+        // Default to transfer if error occurs (safer option)
+        setOnlinePaymentsEnabled(false);
+        setFormData(prev => ({
+          ...prev,
+          paymentMethod: 'transfer',
+        }));
       } finally {
         setLoadingOnlinePaymentsStatus(false);
       }
