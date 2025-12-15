@@ -205,8 +205,8 @@ export default function AdditionalServicesTiles({
   );
 
   // Map protections from API to display format
+  // Show ALL protections from API (not just purchased ones) so users can buy additional ones
   const protectionTiles = protections
-    .filter((p) => selectedProtectionNumericIds.has(p.id))
     .map((protection) => {
       const isActive = selectedProtectionNumericIds.has(protection.id);
       return {
@@ -383,11 +383,8 @@ export default function AdditionalServicesTiles({
           };
         })
       : // Fallback to legacy protections if API failed
+        // Show ALL legacy protections (not just purchased ones) so users can buy additional ones
         legacyProtections
-          .filter((p) => {
-            // Only show if selectedProtection contains matching ID
-            return selectedProtection?.some((id: string) => id === p.id || id === `protection-${p.id}`);
-          })
           .map((protection) => {
             const isActive = selectedProtection?.some((id: string) => id === protection.id || id === `protection-${protection.id}`) || false;
             return {
