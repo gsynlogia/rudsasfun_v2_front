@@ -200,23 +200,26 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         throw new Error('Invalid reservation ID');
       }
 
-      // If contract doesn't exist, generate it first
+      // Check if contract exists and generate if needed
       if (!hasContract) {
+        // Contract doesn't exist, generate it first
         try {
           await contractService.generateContract(reservationIdNum);
           // Reload contract status after generation
           await loadContractStatus();
         } catch (generateError: any) {
-          // If generation fails, try to download anyway (maybe it was just created)
-          console.log('Contract generation returned error, trying download anyway:', generateError);
+          console.error('Error generating contract:', generateError);
+          alert('Nie udało się wygenerować umowy. Spróbuj ponownie.');
+          return;
         }
       }
 
-      // Redirect to downloads page instead of downloading directly
+      // Contract exists (either was already there or just generated)
+      // Redirect to downloads page
       router.push('/profil/do-pobrania');
     } catch (error) {
-      console.error('Error generating contract:', error);
-      alert('Nie udało się wygenerować umowy. Spróbuj ponownie.');
+      console.error('Error handling contract:', error);
+      alert('Nie udało się przetworzyć umowy. Spróbuj ponownie.');
     } finally {
       setIsGenerating(false);
     }

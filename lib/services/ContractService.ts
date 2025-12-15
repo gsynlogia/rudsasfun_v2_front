@@ -11,9 +11,15 @@ class ContractService {
   /**
    * Generate contract for a reservation
    * @param reservationId Reservation ID
-   * @returns Response with contract path
+   * @returns Response with contract path and whether contract already existed
    */
-  async generateContract(reservationId: number): Promise<{ status: string; message: string; contract_path: string }> {
+  async generateContract(reservationId: number): Promise<{ 
+    status: string; 
+    message: string; 
+    contract_path: string;
+    contract_already_exists?: boolean;
+    redirect_to_downloads?: boolean;
+  }> {
     // Import authService to get token
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
