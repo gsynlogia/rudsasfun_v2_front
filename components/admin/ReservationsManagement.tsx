@@ -200,6 +200,9 @@ export default function ReservationsManagement() {
   
   // State for diet names map (ID -> name)
   const [dietNamesMap, setDietNamesMap] = useState<Map<number, string>>(new Map());
+  
+  // Store raw backend reservations to remap when dietNamesMap changes
+  const [rawBackendReservations, setRawBackendReservations] = useState<any[]>([]);
 
   // Fetch qualification card for a reservation
   const fetchQualificationCard = async (reservationId: number) => {
@@ -287,6 +290,9 @@ export default function ReservationsManagement() {
         setIsLoading(true);
         setError(null);
         const backendReservations = await reservationService.listReservations(0, 1000);
+        setRawBackendReservations(backendReservations);
+        
+        // Map reservations with current dietNamesMap
         const mappedReservations = backendReservations.map((r) => mapBackendToFrontend(r, dietNamesMap));
         setAllReservations(mappedReservations);
         
@@ -304,7 +310,15 @@ export default function ReservationsManagement() {
     };
     
     fetchReservations();
-  }, [dietNamesMap]);
+  }, []); // Only fetch once on mount
+
+  // Remap reservations when dietNamesMap changes (after it's loaded)
+  useEffect(() => {
+    if (rawBackendReservations.length > 0 && dietNamesMap.size > 0) {
+      const mappedReservations = rawBackendReservations.map((r) => mapBackendToFrontend(r, dietNamesMap));
+      setAllReservations(mappedReservations);
+    }
+  }, [dietNamesMap, rawBackendReservations]);
   
   // Toggle row expansion with animation
   const toggleRowExpansion = (reservationId: number) => {
