@@ -419,11 +419,15 @@ class ReservationService {
     totalPrice: number,
     depositAmount?: number
   ): CreateReservationRequest {
+    // Always send only the first parent/guardian (index 0)
+    // Second parent data is not needed for payment processing
+    const firstParentOnly = step1Data.parents.length > 0 ? [step1Data.parents[0]] : [];
+    
     return {
       camp_id: campId,
       property_id: propertyId,
       step1: {
-        parents: step1Data.parents,
+        parents: firstParentOnly,
         participantData: step1Data.participantData,
         selectedDietId: step1Data.selectedDietId || null,
         accommodationRequest: step1Data.accommodationRequest,

@@ -9,7 +9,7 @@ import { useReservation } from '@/context/ReservationContext';
 import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { reservationService, ReservationService } from '@/lib/services/ReservationService';
 import type { StepComponentProps, ReservationItem } from '@/types/reservation';
-import { getApiBaseUrlRuntime } from '@/utils/api-config';
+import { getApiBaseUrlRuntime, API_BASE_URL } from '@/utils/api-config';
 import {
   defaultStep1FormData,
   defaultStep2FormData,
@@ -31,6 +31,13 @@ import { loadStep4FormData } from '@/utils/sessionStorage';
 
 import DashedLine from './DashedLine';
 
+interface Source {
+  id: number;
+  name: string;
+  display_order: number;
+  is_active: boolean;
+  is_other: boolean;
+}
 
 /**
  * Step5 Component - Summary and Payment
@@ -40,6 +47,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const router = useRouter();
   const pathname = usePathname();
   const { reservation } = useReservation();
+  const [sources, setSources] = useState<Source[]>([]);
 
   // Initialize state from sessionStorage or defaults
   const getInitialState = (): Step5FormData => {
@@ -117,6 +125,22 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     };
     
     loadOnlinePaymentsStatus();
+  }, []);
+
+  // Fetch sources from API
+  useEffect(() => {
+    const fetchSources = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/sources/public`);
+        if (response.ok) {
+          const data = await response.json();
+          setSources(data.sources || []);
+        }
+      } catch (err) {
+        console.error('[Step5] Error fetching sources:', err);
+      }
+    };
+    fetchSources();
   }, []);
 
   // Load data from sessionStorage on mount
@@ -234,6 +258,20 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     if (!type || type.trim() === '') return 'Nie wybrano';
     if (type === 'zbiorowy') return 'Transport zbiorowy';
     if (type === 'wlasny') return 'Transport własny';
+    return 'Nie wybrano';
+  };
+
+  // Get source name by ID
+  const getSourceName = (sourceId: string | null | undefined): string => {
+    if (!sourceId || sourceId.trim() === '') return 'Nie wybrano';
+    const source = sources.find(s => s.id.toString() === sourceId);
+    if (source) {
+      // If source is "inne" (is_other), append inneText if available
+      if (source.is_other && step2Data.inneText && step2Data.inneText.trim() !== '') {
+        return `${source.name}: ${step2Data.inneText}`;
+      }
+      return source.name;
+    }
     return 'Nie wybrano';
   };
 
@@ -927,7 +965,25 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
           <DashedLine />
 
-          {/* Segment 6: Invoice Data */}
+          {/* Segment 6: Source Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6 pt-4 sm:pt-6">
+            <div>
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
+                Skąd dowiedziałeś się o Radsas Fun?
+              </h3>
+              <div className="text-xs sm:text-sm text-gray-700">
+                {step2Data.selectedSource ? (
+                  getSourceName(step2Data.selectedSource)
+                ) : (
+                  <span className="text-gray-500 italic">Nie wybrano</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DashedLine />
+
+          {/* Segment 7: Invoice Data */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-4 sm:pt-6">
             {/* Left: Invoice Request Status */}
             <div>
