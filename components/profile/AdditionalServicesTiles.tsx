@@ -7,7 +7,7 @@ import UniversalModal from '@/components/admin/UniversalModal';
 import { authService } from '@/lib/services/AuthService';
 import { paymentService, CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { ReservationResponse } from '@/lib/services/ReservationService';
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 
 interface AdditionalServicesTilesProps {
   selectedAddons?: string[] | null;
@@ -232,7 +232,7 @@ export default function AdditionalServicesTiles({
             return (
               <div className={`w-10 h-10 sm:w-12 sm:h-12 ${isActive ? 'opacity-100' : 'opacity-50'}`}>
                 <img
-                  src={protection.icon_url}
+                  src={getStaticAssetUrl(protection.icon_url) || ''}
                   alt={protection.name}
                   className="w-full h-full object-contain"
                 />

@@ -107,8 +107,17 @@ export function getStaticAssetUrl(iconUrl: string | null | undefined): string | 
     return undefined;
   }
 
-  // If already a full URL (http:// or https://), return as-is
+  // If already a full URL (http:// or https://), check if it needs domain conversion
   if (iconUrl.startsWith('http://') || iconUrl.startsWith('https://')) {
+    // Replace old domain with new API domain
+    // Convert: https://rezerwacja.radsas-fun.pl/static/... -> https://api.rezerwacja.radsas-fun.pl/static/...
+    // Also handle old domain: https://rejestracja.radsasfun.system-app.pl/static/... -> https://api.rezerwacja.radsas-fun.pl/static/...
+    if (iconUrl.includes('rezerwacja.radsas-fun.pl') && !iconUrl.includes('api.rezerwacja.radsas-fun.pl')) {
+      return iconUrl.replace('rezerwacja.radsas-fun.pl', 'api.rezerwacja.radsas-fun.pl');
+    }
+    if (iconUrl.includes('rejestracja.radsasfun.system-app.pl')) {
+      return iconUrl.replace('rejestracja.radsasfun.system-app.pl', 'api.rezerwacja.radsas-fun.pl');
+    }
     return iconUrl;
   }
 
