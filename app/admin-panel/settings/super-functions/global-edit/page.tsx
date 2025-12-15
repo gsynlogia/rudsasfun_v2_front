@@ -1,7 +1,7 @@
 'use client';
 
 import AdminLayout from '@/components/admin/AdminLayout';
-import { ArrowLeft, Check, X, Truck, UtensilsCrossed, Tag, Shield, Search, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, X, Truck, UtensilsCrossed, Tag, Shield, Search, Loader2, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -69,6 +69,7 @@ export default function GlobalEditPage() {
   const [filterDiet, setFilterDiet] = useState<'all' | 'assigned' | 'not-assigned'>('all');
   const [filterPromotion, setFilterPromotion] = useState<'all' | 'assigned' | 'not-assigned'>('all');
   const [filterProtection, setFilterProtection] = useState<'all' | 'assigned' | 'not-assigned'>('all');
+  const [filterCity, setFilterCity] = useState<'all' | 'BEAVER' | 'LIMBA' | 'SAWA'>('all');
 
   // Modal states
   const [showTransportModal, setShowTransportModal] = useState(false);
@@ -183,7 +184,7 @@ export default function GlobalEditPage() {
             console.warn(`Error checking diets for turnus ${property.id}:`, err);
           }
 
-          // Check promotions
+          // Check promotions that reduce price (exclude promotions with does_not_reduce_price=true)
           let hasPromotions = false;
           try {
             const promotionsResponse = await fetch(
@@ -191,7 +192,11 @@ export default function GlobalEditPage() {
             );
             if (promotionsResponse.ok) {
               const promotionsData = await promotionsResponse.json();
-              hasPromotions = Array.isArray(promotionsData) && promotionsData.length > 0;
+              // Filter out promotions that don't reduce price (bony/vouchers)
+              const priceReducingPromotions = Array.isArray(promotionsData) 
+                ? promotionsData.filter((p: any) => !p.does_not_reduce_price)
+                : [];
+              hasPromotions = priceReducingPromotions.length > 0;
             }
           } catch (err) {
             console.warn(`Error checking promotions for turnus ${property.id}:`, err);
@@ -276,8 +281,13 @@ export default function GlobalEditPage() {
       filtered = filtered.filter(t => !t.hasProtections);
     }
 
+    // Filter by city
+    if (filterCity !== 'all') {
+      filtered = filtered.filter(t => t.city === filterCity);
+    }
+
     setTurnuses(filtered);
-  }, [allTurnuses, filterTransport, filterDiet, filterPromotion, filterProtection]);
+  }, [allTurnuses, filterTransport, filterDiet, filterPromotion, filterProtection, filterCity]);
 
   // Fetch available transports
   const fetchAvailableTransports = async () => {
@@ -500,22 +510,33 @@ export default function GlobalEditPage() {
         }
       );
 
-      // Verify change in database
+      // Verify change in database - check only price-reducing promotions
       const verifyResponse = await fetch(
         `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/promotions`
       );
       if (verifyResponse.ok) {
         const verifiedPromotions = await verifyResponse.json();
-        const hasPromotions = Array.isArray(verifiedPromotions) && verifiedPromotions.length > 0;
+        // Filter out promotions that don't reduce price (bony/vouchers)
+        const priceReducingPromotions = Array.isArray(verifiedPromotions) 
+          ? verifiedPromotions.filter((p: any) => !p.does_not_reduce_price)
+          : [];
+        const hasPromotions = priceReducingPromotions.length > 0;
         console.log(`✅ Promotion assignment verified in database for turnus ${selectedTurnus.turnusId}:`, hasPromotions);
+        
+        // Update local state without reloading page
+        setAllTurnuses(prev => prev.map(t => 
+          t.turnusId === selectedTurnus.turnusId 
+            ? { ...t, hasPromotions }
+            : t
+        ));
+      } else {
+        // If verification fails, still update state optimistically
+        setAllTurnuses(prev => prev.map(t => 
+          t.turnusId === selectedTurnus.turnusId 
+            ? { ...t, hasPromotions: true }
+            : t
+        ));
       }
-
-      // Update local state without reloading page
-      setAllTurnuses(prev => prev.map(t => 
-        t.turnusId === selectedTurnus.turnusId 
-          ? { ...t, hasPromotions: true }
-          : t
-      ));
 
       setShowPromotionModal(false);
       setSelectedTurnus(null);
@@ -678,17 +699,17 @@ export default function GlobalEditPage() {
         {/* Filters Section */}
         <div className="mb-6 bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtry</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex flex-wrap items-end gap-3">
             {/* Transport Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Truck className="inline-block mr-2" size={16} />
+            <div className="flex-shrink-0">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <Truck className="inline-block mr-1" size={14} />
                 Transport
               </label>
               <select
                 value={filterTransport}
                 onChange={(e) => setFilterTransport(e.target.value as 'all' | 'assigned' | 'not-assigned')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent min-w-[140px]"
               >
                 <option value="all">Wszystkie</option>
                 <option value="assigned">Z przypisanym transportem</option>
@@ -697,15 +718,15 @@ export default function GlobalEditPage() {
             </div>
 
             {/* Diet Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <UtensilsCrossed className="inline-block mr-2" size={16} />
+            <div className="flex-shrink-0">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <UtensilsCrossed className="inline-block mr-1" size={14} />
                 Diety
               </label>
               <select
                 value={filterDiet}
                 onChange={(e) => setFilterDiet(e.target.value as 'all' | 'assigned' | 'not-assigned')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent min-w-[140px]"
               >
                 <option value="all">Wszystkie</option>
                 <option value="assigned">Z przypisanymi dietami</option>
@@ -714,15 +735,15 @@ export default function GlobalEditPage() {
             </div>
 
             {/* Promotion Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Tag className="inline-block mr-2" size={16} />
+            <div className="flex-shrink-0">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <Tag className="inline-block mr-1" size={14} />
                 Promocje
               </label>
               <select
                 value={filterPromotion}
                 onChange={(e) => setFilterPromotion(e.target.value as 'all' | 'assigned' | 'not-assigned')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent min-w-[140px]"
               >
                 <option value="all">Wszystkie</option>
                 <option value="assigned">Z przypisanymi promocjami</option>
@@ -731,25 +752,43 @@ export default function GlobalEditPage() {
             </div>
 
             {/* Protection Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Shield className="inline-block mr-2" size={16} />
+            <div className="flex-shrink-0">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <Shield className="inline-block mr-1" size={14} />
                 Ochrony
               </label>
               <select
                 value={filterProtection}
                 onChange={(e) => setFilterProtection(e.target.value as 'all' | 'assigned' | 'not-assigned')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent min-w-[140px]"
               >
                 <option value="all">Wszystkie</option>
                 <option value="assigned">Z przypisanymi ochronami</option>
                 <option value="not-assigned">Bez ochron</option>
               </select>
             </div>
+
+            {/* City Filter */}
+            <div className="flex-shrink-0">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <MapPin className="inline-block mr-1" size={14} />
+                Miasto
+              </label>
+              <select
+                value={filterCity}
+                onChange={(e) => setFilterCity(e.target.value as 'all' | 'BEAVER' | 'LIMBA' | 'SAWA')}
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent min-w-[120px]"
+              >
+                <option value="all">Wszystkie</option>
+                <option value="BEAVER">BEAVER</option>
+                <option value="LIMBA">LIMBA</option>
+                <option value="SAWA">SAWA</option>
+              </select>
+            </div>
           </div>
           
           {/* Active Filters Summary */}
-          {(filterTransport !== 'all' || filterDiet !== 'all' || filterPromotion !== 'all' || filterProtection !== 'all') && (
+          {(filterTransport !== 'all' || filterDiet !== 'all' || filterPromotion !== 'all' || filterProtection !== 'all' || filterCity !== 'all') && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-600">
@@ -761,6 +800,7 @@ export default function GlobalEditPage() {
                     setFilterDiet('all');
                     setFilterPromotion('all');
                     setFilterProtection('all');
+                    setFilterCity('all');
                   }}
                   className="text-sm text-[#03adf0] hover:text-[#0288c7] font-medium"
                 >
