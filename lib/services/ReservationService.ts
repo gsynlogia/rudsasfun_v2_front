@@ -261,6 +261,33 @@ class ReservationService {
   }
 
   /**
+   * Get reservation by REZ-YYYY-XXX format number
+   * @param reservationNumber Reservation number in format REZ-YYYY-XXX (e.g., REZ-2025-001)
+   * @returns Reservation response data
+   */
+  async getReservationByNumber(reservationNumber: string): Promise<ReservationResponse> {
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/by-number/${reservationNumber}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
    * List all reservations
    * @param skip Number of records to skip
    * @param limit Maximum number of records to return

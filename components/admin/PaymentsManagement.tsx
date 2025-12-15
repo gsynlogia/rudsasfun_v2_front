@@ -6,6 +6,7 @@ import { useState, useMemo, useEffect, Fragment } from 'react';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 import { reservationService } from '@/lib/services/ReservationService';
+import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 import PaymentConfirmationModal from './PaymentConfirmationModal';
 import RefundConfirmationModal from './RefundConfirmationModal';
@@ -733,6 +734,7 @@ export default function PaymentsManagement() {
   const [loadingInvoices, setLoadingInvoices] = useState<Set<number>>(new Set()); // reservation IDs being loaded
   const [cancelingInvoice, setCancelingInvoice] = useState<number | null>(null); // invoice ID being canceled
   const [reservationPaymentsHistory, setReservationPaymentsHistory] = useState<Map<number, PaymentResponse[]>>(new Map()); // reservationId -> payments history
+  const [bankAccount, setBankAccount] = useState<any>(null);
 
   // Load protections and addons data
   useEffect(() => {
@@ -2384,6 +2386,43 @@ export default function PaymentsManagement() {
                                           </div>
                                         );
                                       })()}
+                                      
+                                      {/* Bank Account Details Section */}
+                                      {bankAccount && (
+                                        <div className="mt-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+                                          <h6 className="text-sm font-semibold text-gray-900 mb-3">
+                                            Dane do przelewu tradycyjnego
+                                          </h6>
+                                          <div className="space-y-1.5 text-xs sm:text-sm">
+                                            <div>
+                                              <span className="font-medium text-gray-700">Odbiorca:</span>
+                                              <span className="ml-2 text-gray-900">{bankAccount.account_holder}</span>
+                                            </div>
+                                            <div>
+                                              <span className="font-medium text-gray-700">Numer konta:</span>
+                                              <span className="ml-2 text-gray-900 font-mono">{bankAccount.account_number}</span>
+                                            </div>
+                                            {bankAccount.bank_name && (
+                                              <div>
+                                                <span className="font-medium text-gray-700">Bank:</span>
+                                                <span className="ml-2 text-gray-900">{bankAccount.bank_name}</span>
+                                              </div>
+                                            )}
+                                            {bankAccount.address && (
+                                              <div>
+                                                <span className="font-medium text-gray-700">Adres:</span>
+                                                <span className="ml-2 text-gray-900">{bankAccount.address}</span>
+                                              </div>
+                                            )}
+                                            {bankAccount.transfer_title_template && (
+                                              <div className="pt-2 border-t border-gray-200">
+                                                <span className="font-medium text-gray-700">Tytuł przelewu:</span>
+                                                <p className="mt-1 text-gray-900 italic">{bankAccount.transfer_title_template}</p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>

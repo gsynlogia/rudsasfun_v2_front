@@ -138,19 +138,20 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
                     {isAuthenticated ? (
                       <>
                         <Link
-                          href="/profil/moje-konto"
+                          href="/profil/aktualne-rezerwacje"
                           onClick={() => setAccountDropdownOpen(false)}
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                         >
                           Moje konto
                         </Link>
-                        <Link
+                        {/* TODO: Currently not used in the system - commented out for future use */}
+                        {/* <Link
                           href="/profil/aktualne-rezerwacje"
                           onClick={() => setAccountDropdownOpen(false)}
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                         >
                           Moje rezerwacje
-                        </Link>
+                        </Link> */}
                         <div className="border-t border-gray-200 my-1"></div>
                         <button
                           onClick={handleLogout}

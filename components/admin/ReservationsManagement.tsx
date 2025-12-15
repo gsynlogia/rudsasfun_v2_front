@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, Clock, AlertCircle, Download } from 'lucide-react';
+import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, Clock, AlertCircle, Download, Eye } from 'lucide-react';
 import { reservationService } from '@/lib/services/ReservationService';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { certificateService, CertificateResponse } from '@/lib/services/CertificateService';
@@ -1012,6 +1012,17 @@ export default function ReservationsManagement() {
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/admin-panel/rezerwacja/${reservation.reservationName}`);
+                              }}
+                              className="p-1.5 text-purple-600 hover:bg-purple-50 transition-colors"
+                              title="Zobacz szczegóły"
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
                             {hasQualificationCard && (
                               <button
                                 onClick={(e) => handleDownloadQualificationCard(reservation, e)}

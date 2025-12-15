@@ -25,6 +25,8 @@ export default function QualificationCardModal({
   const [error, setError] = useState<string | null>(null);
   const [canGenerate, setCanGenerate] = useState(false);
   const [noSecondParent, setNoSecondParent] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [validationAttempted, setValidationAttempted] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState<QualificationCardDataUpdate>({
@@ -107,14 +109,31 @@ export default function QualificationCardModal({
         parent1_street: data.parent1_street || reservation.parents_data?.[0]?.street || null,
         parent1_postal_code: data.parent1_postal_code || reservation.parents_data?.[0]?.postalCode || null,
         parent1_city: data.parent1_city || reservation.parents_data?.[0]?.city || null,
-        parent1_phone: data.parent1_phone || (reservation.parents_data?.[0]?.phone || reservation.parents_data?.[0]?.phoneNumber || '') || null,
+        parent1_phone: (() => {
+          // Priority: saved data > phoneNumber from reservation > phone from reservation
+          const phone = data.parent1_phone || reservation.parents_data?.[0]?.phoneNumber || reservation.parents_data?.[0]?.phone || null;
+          // Remove +48 prefix if present for display
+          if (phone && typeof phone === 'string' && phone.startsWith('+48')) {
+            return phone.replace(/^\+48\s*/, '').trim();
+          }
+          return phone;
+        })(),
         parent1_email: data.parent1_email || reservation.parents_data?.[0]?.email || null,
         parent2_first_name: data.parent2_first_name || (hasSecondParent ? reservation.parents_data?.[1]?.firstName : null) || null,
         parent2_last_name: data.parent2_last_name || (hasSecondParent ? reservation.parents_data?.[1]?.lastName : null) || null,
         parent2_street: data.parent2_street || (hasSecondParent ? reservation.parents_data?.[1]?.street : null) || null,
         parent2_postal_code: data.parent2_postal_code || (hasSecondParent ? reservation.parents_data?.[1]?.postalCode : null) || null,
         parent2_city: data.parent2_city || (hasSecondParent ? reservation.parents_data?.[1]?.city : null) || null,
-        parent2_phone: data.parent2_phone || (hasSecondParent ? (reservation.parents_data?.[1]?.phone || reservation.parents_data?.[1]?.phoneNumber || '') : null) || null,
+        parent2_phone: (() => {
+          if (!hasSecondParent) return null;
+          // Priority: saved data > phoneNumber from reservation > phone from reservation
+          const phone = data.parent2_phone || reservation.parents_data?.[1]?.phoneNumber || reservation.parents_data?.[1]?.phone || null;
+          // Remove +48 prefix if present for display
+          if (phone && typeof phone === 'string' && phone.startsWith('+48')) {
+            return phone.replace(/^\+48\s*/, '').trim();
+          }
+          return phone;
+        })(),
         parent2_email: data.parent2_email || (hasSecondParent ? reservation.parents_data?.[1]?.email : null) || null,
       };
 
@@ -141,14 +160,31 @@ export default function QualificationCardModal({
         parent1_street: reservation.parents_data?.[0]?.street || null,
         parent1_postal_code: reservation.parents_data?.[0]?.postalCode || null,
         parent1_city: reservation.parents_data?.[0]?.city || null,
-        parent1_phone: (reservation.parents_data?.[0]?.phone || reservation.parents_data?.[0]?.phoneNumber || '') || null,
+        parent1_phone: (() => {
+          // Priority: phoneNumber from reservation > phone from reservation
+          const phone = reservation.parents_data?.[0]?.phoneNumber || reservation.parents_data?.[0]?.phone || null;
+          // Remove +48 prefix if present for display
+          if (phone && typeof phone === 'string' && phone.startsWith('+48')) {
+            return phone.replace(/^\+48\s*/, '').trim();
+          }
+          return phone;
+        })(),
         parent1_email: reservation.parents_data?.[0]?.email || null,
         parent2_first_name: hasSecondParent ? reservation.parents_data?.[1]?.firstName : null,
         parent2_last_name: hasSecondParent ? reservation.parents_data?.[1]?.lastName : null,
         parent2_street: hasSecondParent ? reservation.parents_data?.[1]?.street : null,
         parent2_postal_code: hasSecondParent ? reservation.parents_data?.[1]?.postalCode : null,
         parent2_city: hasSecondParent ? reservation.parents_data?.[1]?.city : null,
-        parent2_phone: hasSecondParent ? (reservation.parents_data?.[1]?.phone || reservation.parents_data?.[1]?.phoneNumber || '') : null,
+        parent2_phone: (() => {
+          if (!hasSecondParent) return null;
+          // Priority: phoneNumber from reservation > phone from reservation
+          const phone = reservation.parents_data?.[1]?.phoneNumber || reservation.parents_data?.[1]?.phone || null;
+          // Remove +48 prefix if present for display
+          if (phone && typeof phone === 'string' && phone.startsWith('+48')) {
+            return phone.replace(/^\+48\s*/, '').trim();
+          }
+          return phone;
+        })(),
         parent2_email: hasSecondParent ? reservation.parents_data?.[1]?.email : null,
       };
 
@@ -159,12 +195,36 @@ export default function QualificationCardModal({
     }
   };
 
+  // Helper function to prepare phone number for saving (add +48 if not present)
+  const preparePhoneForSave = (phone: string | null | undefined): string | null => {
+    if (!phone || phone.trim() === '') return null;
+    const cleaned = phone.trim();
+    // If it doesn't start with +48, add it
+    if (!cleaned.startsWith('+48')) {
+      return `+48 ${cleaned}`;
+    }
+    return cleaned;
+  };
+
   const handleSave = async () => {
+    // Validate before saving
+    if (!validateForm()) {
+      setError('Wypełnij wszystkie wymagane pola');
+      return;
+    }
+
     try {
       setIsSaving(true);
       setError(null);
 
-      await qualificationCardService.saveQualificationCardData(reservation.id, formData);
+      // Prepare data with phone numbers (add +48 if needed)
+      const dataToSave = {
+        ...formData,
+        parent1_phone: preparePhoneForSave(formData.parent1_phone),
+        parent2_phone: preparePhoneForSave(formData.parent2_phone),
+      };
+
+      await qualificationCardService.saveQualificationCardData(reservation.id, dataToSave);
 
       // Check if can generate now
       const canGen = await qualificationCardService.canGenerateQualificationCard(reservation.id);
@@ -180,12 +240,25 @@ export default function QualificationCardModal({
   };
 
   const handleGenerate = async () => {
+    // Validate before generating
+    if (!validateForm()) {
+      setError('Wypełnij wszystkie wymagane pola przed wygenerowaniem karty');
+      return;
+    }
+
     try {
       setIsSaving(true);
       setError(null);
 
+      // Prepare data with phone numbers (add +48 if needed)
+      const dataToSave = {
+        ...formData,
+        parent1_phone: preparePhoneForSave(formData.parent1_phone),
+        parent2_phone: preparePhoneForSave(formData.parent2_phone),
+      };
+
       // First save data
-      await qualificationCardService.saveQualificationCardData(reservation.id, formData);
+      await qualificationCardService.saveQualificationCardData(reservation.id, dataToSave);
 
       // Then generate card
       await qualificationCardService.generateQualificationCard(reservation.id);
@@ -211,6 +284,99 @@ export default function QualificationCardModal({
 
   const updateField = (field: keyof QualificationCardDataUpdate, value: string | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear validation error for this field when user starts typing
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+
+  // Validation function
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Participant required fields
+    if (!formData.participant_birth_date || formData.participant_birth_date.trim() === '') {
+      errors.participant_birth_date = 'To pole jest wymagane';
+    }
+    if (!formData.participant_birth_place || formData.participant_birth_place.trim() === '') {
+      errors.participant_birth_place = 'To pole jest wymagane';
+    }
+    if (!formData.participant_pesel || formData.participant_pesel.trim() === '') {
+      errors.participant_pesel = 'To pole jest wymagane';
+    }
+    if (!formData.participant_street || formData.participant_street.trim() === '') {
+      errors.participant_street = 'To pole jest wymagane';
+    }
+    if (!formData.participant_postal_code || formData.participant_postal_code.trim() === '') {
+      errors.participant_postal_code = 'To pole jest wymagane';
+    }
+    if (!formData.participant_city_address || formData.participant_city_address.trim() === '') {
+      errors.participant_city_address = 'To pole jest wymagane';
+    }
+
+    // Parent 1 required fields
+    if (!formData.parent1_first_name || formData.parent1_first_name.trim() === '') {
+      errors.parent1_first_name = 'To pole jest wymagane';
+    }
+    if (!formData.parent1_last_name || formData.parent1_last_name.trim() === '') {
+      errors.parent1_last_name = 'To pole jest wymagane';
+    }
+    if (!formData.parent1_street || formData.parent1_street.trim() === '') {
+      errors.parent1_street = 'To pole jest wymagane';
+    }
+    if (!formData.parent1_postal_code || formData.parent1_postal_code.trim() === '') {
+      errors.parent1_postal_code = 'To pole jest wymagane';
+    }
+    if (!formData.parent1_city || formData.parent1_city.trim() === '') {
+      errors.parent1_city = 'To pole jest wymagane';
+    }
+    // Phone validation: if only "+48" or empty, it's invalid
+    const parent1PhoneValue = formData.parent1_phone || '';
+    const parent1PhoneCleaned = parent1PhoneValue.replace(/^\+48\s*/, '').trim();
+    if (!parent1PhoneValue || parent1PhoneCleaned === '') {
+      errors.parent1_phone = 'To pole jest wymagane';
+    }
+    if (!formData.parent1_email || formData.parent1_email.trim() === '') {
+      errors.parent1_email = 'To pole jest wymagane';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.parent1_email)) {
+      errors.parent1_email = 'Nieprawidłowy adres email';
+    }
+
+    // Parent 2 required fields (always required, even if "brak")
+    if (!formData.parent2_first_name || formData.parent2_first_name.trim() === '') {
+      errors.parent2_first_name = 'To pole jest wymagane';
+    }
+    if (!formData.parent2_last_name || formData.parent2_last_name.trim() === '') {
+      errors.parent2_last_name = 'To pole jest wymagane';
+    }
+    if (!formData.parent2_street || formData.parent2_street.trim() === '') {
+      errors.parent2_street = 'To pole jest wymagane';
+    }
+    if (!formData.parent2_postal_code || formData.parent2_postal_code.trim() === '') {
+      errors.parent2_postal_code = 'To pole jest wymagane';
+    }
+    if (!formData.parent2_city || formData.parent2_city.trim() === '') {
+      errors.parent2_city = 'To pole jest wymagane';
+    }
+    // Phone validation: if only "+48" or empty, it's invalid
+    const parent2PhoneValue = formData.parent2_phone || '';
+    const parent2PhoneCleaned = parent2PhoneValue.replace(/^\+48\s*/, '').trim();
+    if (!parent2PhoneValue || parent2PhoneCleaned === '') {
+      errors.parent2_phone = 'To pole jest wymagane';
+    }
+    if (!formData.parent2_email || formData.parent2_email.trim() === '') {
+      errors.parent2_email = 'To pole jest wymagane';
+    } else if (!noSecondParent && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.parent2_email)) {
+      errors.parent2_email = 'Nieprawidłowy adres email';
+    }
+
+    setValidationErrors(errors);
+    setValidationAttempted(true);
+    return Object.keys(errors).length === 0;
   };
 
   const handleNoSecondParentChange = (checked: boolean) => {
@@ -236,7 +402,16 @@ export default function QualificationCardModal({
         parent2_street: hasSecondParent ? reservation.parents_data?.[1]?.street || null : null,
         parent2_postal_code: hasSecondParent ? reservation.parents_data?.[1]?.postalCode || null : null,
         parent2_city: hasSecondParent ? reservation.parents_data?.[1]?.city || null : null,
-        parent2_phone: hasSecondParent ? (reservation.parents_data?.[1]?.phone || reservation.parents_data?.[1]?.phoneNumber || '') || null : null,
+        parent2_phone: (() => {
+          if (!hasSecondParent) return null;
+          // Priority: phoneNumber from reservation > phone from reservation
+          const phone = reservation.parents_data?.[1]?.phoneNumber || reservation.parents_data?.[1]?.phone || null;
+          // Remove +48 prefix if present for display
+          if (phone && typeof phone === 'string' && phone.startsWith('+48')) {
+            return phone.replace(/^\+48\s*/, '').trim();
+          }
+          return phone;
+        })(),
         parent2_email: hasSecondParent ? reservation.parents_data?.[1]?.email || null : null,
       }));
     }
@@ -325,8 +500,15 @@ export default function QualificationCardModal({
                       type="date"
                       value={formData.participant_birth_date || ''}
                       onChange={(e) => updateField('participant_birth_date', e.target.value || null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                        validationErrors.participant_birth_date 
+                          ? 'border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:ring-[#03adf0]'
+                      }`}
                     />
+                    {validationErrors.participant_birth_date && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.participant_birth_date}</p>
+                    )}
                   </div>
 
                   <div>
@@ -338,23 +520,37 @@ export default function QualificationCardModal({
                       value={formData.participant_birth_place || ''}
                       onChange={(e) => updateField('participant_birth_place', e.target.value || null)}
                       placeholder="np. Gdańsk"
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                        validationErrors.participant_birth_place 
+                          ? 'border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:ring-[#03adf0]'
+                      }`}
                     />
+                    {validationErrors.participant_birth_place && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.participant_birth_place}</p>
+                    )}
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      PESEL (opcjonalne)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.participant_pesel || ''}
-                      onChange={(e) => updateField('participant_pesel', e.target.value || null)}
-                      maxLength={11}
-                      placeholder="11 cyfr"
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        PESEL <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.participant_pesel || ''}
+                        onChange={(e) => updateField('participant_pesel', e.target.value || null)}
+                        maxLength={11}
+                        placeholder="11 cyfr"
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.participant_pesel 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        }`}
+                      />
+                      {validationErrors.participant_pesel && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.participant_pesel}</p>
+                      )}
+                    </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -365,8 +561,15 @@ export default function QualificationCardModal({
                       value={formData.participant_street || ''}
                       onChange={(e) => updateField('participant_street', e.target.value || null)}
                       placeholder="np. ul. Długa 1"
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                        validationErrors.participant_street 
+                          ? 'border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:ring-[#03adf0]'
+                      }`}
                     />
+                    {validationErrors.participant_street && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.participant_street}</p>
+                    )}
                   </div>
 
                   <div>
@@ -378,8 +581,15 @@ export default function QualificationCardModal({
                       value={formData.participant_postal_code || ''}
                       onChange={(e) => updateField('participant_postal_code', e.target.value || null)}
                       placeholder="00-000"
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                        validationErrors.participant_postal_code 
+                          ? 'border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:ring-[#03adf0]'
+                      }`}
                     />
+                    {validationErrors.participant_postal_code && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.participant_postal_code}</p>
+                    )}
                   </div>
 
                   <div>
@@ -391,8 +601,15 @@ export default function QualificationCardModal({
                       value={formData.participant_city_address || ''}
                       onChange={(e) => updateField('participant_city_address', e.target.value || null)}
                       placeholder="np. Gdańsk"
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                        validationErrors.participant_city_address 
+                          ? 'border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:ring-[#03adf0]'
+                      }`}
                     />
+                    {validationErrors.participant_city_address && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.participant_city_address}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -414,8 +631,15 @@ export default function QualificationCardModal({
                         type="text"
                         value={formData.parent1_first_name || ''}
                         onChange={(e) => updateField('parent1_first_name', e.target.value || null)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent1_first_name 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        }`}
                       />
+                      {validationErrors.parent1_first_name && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent1_first_name}</p>
+                      )}
                     </div>
 
                     <div>
@@ -426,8 +650,15 @@ export default function QualificationCardModal({
                         type="text"
                         value={formData.parent1_last_name || ''}
                         onChange={(e) => updateField('parent1_last_name', e.target.value || null)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent1_last_name 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        }`}
                       />
+                      {validationErrors.parent1_last_name && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent1_last_name}</p>
+                      )}
                     </div>
 
                     <div>
@@ -438,8 +669,15 @@ export default function QualificationCardModal({
                         type="text"
                         value={formData.parent1_street || ''}
                         onChange={(e) => updateField('parent1_street', e.target.value || null)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent1_street 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        }`}
                       />
+                      {validationErrors.parent1_street && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent1_street}</p>
+                      )}
                     </div>
 
                     <div>
@@ -450,8 +688,15 @@ export default function QualificationCardModal({
                         type="text"
                         value={formData.parent1_postal_code || ''}
                         onChange={(e) => updateField('parent1_postal_code', e.target.value || null)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent1_postal_code 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        }`}
                       />
+                      {validationErrors.parent1_postal_code && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent1_postal_code}</p>
+                      )}
                     </div>
 
                     <div>
@@ -462,20 +707,40 @@ export default function QualificationCardModal({
                         type="text"
                         value={formData.parent1_city || ''}
                         onChange={(e) => updateField('parent1_city', e.target.value || null)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent1_city 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        }`}
                       />
+                      {validationErrors.parent1_city && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent1_city}</p>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Telefon <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
-                        value={formData.parent1_phone || ''}
-                        onChange={(e) => updateField('parent1_phone', e.target.value || null)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                      />
+                      <div className="flex items-center">
+                        <span className="px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-gray-700">
+                          +48
+                        </span>
+                        <input
+                          type="text"
+                          value={formData.parent1_phone || ''}
+                          onChange={(e) => updateField('parent1_phone', e.target.value || null)}
+                          placeholder="123456789"
+                          className={`flex-1 px-3 py-2 border rounded-r focus:outline-none focus:ring-2 ${
+                            validationErrors.parent1_phone 
+                              ? 'border-red-500 focus:ring-red-500' 
+                              : 'border-gray-300 focus:ring-[#03adf0]'
+                          }`}
+                        />
+                      </div>
+                      {validationErrors.parent1_phone && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent1_phone}</p>
+                      )}
                     </div>
 
                     <div>
@@ -486,8 +751,15 @@ export default function QualificationCardModal({
                         type="email"
                         value={formData.parent1_email || ''}
                         onChange={(e) => updateField('parent1_email', e.target.value || null)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent1_email 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        }`}
                       />
+                      {validationErrors.parent1_email && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent1_email}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -521,8 +793,15 @@ export default function QualificationCardModal({
                         value={formData.parent2_first_name || ''}
                         onChange={(e) => updateField('parent2_first_name', e.target.value || null)}
                         disabled={noSecondParent}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent2_first_name 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
+                      {validationErrors.parent2_first_name && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent2_first_name}</p>
+                      )}
                     </div>
 
                     <div>
@@ -534,8 +813,15 @@ export default function QualificationCardModal({
                         value={formData.parent2_last_name || ''}
                         onChange={(e) => updateField('parent2_last_name', e.target.value || null)}
                         disabled={noSecondParent}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent2_last_name 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
+                      {validationErrors.parent2_last_name && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent2_last_name}</p>
+                      )}
                     </div>
 
                     <div>
@@ -547,8 +833,15 @@ export default function QualificationCardModal({
                         value={formData.parent2_street || ''}
                         onChange={(e) => updateField('parent2_street', e.target.value || null)}
                         disabled={noSecondParent}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent2_street 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
+                      {validationErrors.parent2_street && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent2_street}</p>
+                      )}
                     </div>
 
                     <div>
@@ -560,8 +853,15 @@ export default function QualificationCardModal({
                         value={formData.parent2_postal_code || ''}
                         onChange={(e) => updateField('parent2_postal_code', e.target.value || null)}
                         disabled={noSecondParent}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent2_postal_code 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
+                      {validationErrors.parent2_postal_code && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent2_postal_code}</p>
+                      )}
                     </div>
 
                     <div>
@@ -573,21 +873,41 @@ export default function QualificationCardModal({
                         value={formData.parent2_city || ''}
                         onChange={(e) => updateField('parent2_city', e.target.value || null)}
                         disabled={noSecondParent}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent2_city 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
+                      {validationErrors.parent2_city && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent2_city}</p>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Telefon <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
-                        value={formData.parent2_phone || ''}
-                        onChange={(e) => updateField('parent2_phone', e.target.value || null)}
-                        disabled={noSecondParent}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      />
+                      <div className="flex items-center">
+                        <span className={`px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-gray-700 ${noSecondParent ? 'opacity-50' : ''}`}>
+                          +48
+                        </span>
+                        <input
+                          type="text"
+                          value={formData.parent2_phone || ''}
+                          onChange={(e) => updateField('parent2_phone', e.target.value || null)}
+                          disabled={noSecondParent}
+                          placeholder="123456789"
+                          className={`flex-1 px-3 py-2 border rounded-r focus:outline-none focus:ring-2 ${
+                            validationErrors.parent2_phone 
+                              ? 'border-red-500 focus:ring-red-500' 
+                              : 'border-gray-300 focus:ring-[#03adf0]'
+                          } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        />
+                      </div>
+                      {validationErrors.parent2_phone && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent2_phone}</p>
+                      )}
                     </div>
 
                     <div>
@@ -599,8 +919,15 @@ export default function QualificationCardModal({
                         value={formData.parent2_email || ''}
                         onChange={(e) => updateField('parent2_email', e.target.value || null)}
                         disabled={noSecondParent}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
+                          validationErrors.parent2_email 
+                            ? 'border-red-500 focus:ring-red-500' 
+                            : 'border-gray-300 focus:ring-[#03adf0]'
+                        } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
+                      {validationErrors.parent2_email && (
+                        <p className="text-red-500 text-xs mt-1">{validationErrors.parent2_email}</p>
+                      )}
                     </div>
                   </div>
                 </div>

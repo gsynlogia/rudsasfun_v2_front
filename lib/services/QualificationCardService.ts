@@ -167,12 +167,12 @@ class QualificationCardService {
   /**
    * Update qualification card status (admin only)
    * @param reservationId Reservation ID
-   * @param status 'approved' or 'rejected'
+   * @param status 'pending', 'approved' or 'rejected'
    * @param rejectionReason Required if status is 'rejected'
    */
   async updateQualificationCardStatus(
     reservationId: number,
-    status: 'approved' | 'rejected',
+    status: 'pending' | 'approved' | 'rejected',
     rejectionReason?: string,
   ): Promise<{ status: string; message: string; qualification_card_status: string; rejection_reason?: string | null }> {
     const { authService } = await import('@/lib/services/AuthService');
@@ -285,7 +285,7 @@ class QualificationCardService {
    * Download a specific qualification card file by ID
    * @param fileId Qualification card file ID
    */
-  async downloadQualificationCardFile(fileId: number): Promise<void> {
+  async downloadQualificationCardFile(fileId: number): Promise<Blob> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
 
@@ -344,6 +344,8 @@ class QualificationCardService {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+    
+    return blob;
   }
 
   /**

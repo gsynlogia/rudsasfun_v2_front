@@ -39,117 +39,19 @@ export default function Downloads() {
         setIsLoading(true);
         setError(null);
 
-        // Get user's contracts (existing contracts from output directory)
-        const contracts = await contractService.listMyContracts();
-
-        // Get user's qualification cards
-        const qualificationCards = await qualificationCardService.listMyQualificationCards();
-
         // Get user's reservations to get contract_status
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
         const reservationsMap = new Map(reservations.map(r => [r.id, r]));
 
-        // Group contracts and qualification cards by reservation_id to ensure only one of each per reservation
-        const contractsByReservation = new Map<number, typeof contracts[0]>();
-        const cardsByReservation = new Map<number, typeof qualificationCards[0]>();
-
-        // Keep only the most recent contract per reservation
-        contracts.forEach((contract) => {
-          const existing = contractsByReservation.get(contract.reservation_id);
-          if (!existing || new Date(contract.created_at) > new Date(existing.created_at)) {
-            contractsByReservation.set(contract.reservation_id, contract);
-          }
-        });
-
-        // Keep only the most recent qualification card per reservation
-        qualificationCards.forEach((card) => {
-          const existing = cardsByReservation.get(card.reservation_id);
-          if (!existing || new Date(card.created_at) > new Date(existing.created_at)) {
-            cardsByReservation.set(card.reservation_id, card);
-          }
-        });
-
-        // Map contracts to documents (only one per reservation)
-        const contractsList: Document[] = Array.from(contractsByReservation.values()).map((contract) => {
-          const reservation = reservationsMap.get(contract.reservation_id);
-          const participantName = contract.participant_first_name && contract.participant_last_name
-            ? `${contract.participant_first_name} ${contract.participant_last_name}`
-            : 'Brak danych';
-
-          const campName = contract.camp_name || 'Brak danych';
-
-          // Format date from contract created_at
-          let dateStr = 'Brak daty';
-          if (contract.created_at) {
-            const date = new Date(contract.created_at);
-            if (!isNaN(date.getTime())) {
-              dateStr = date.toLocaleDateString('pl-PL', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              });
-            }
-          }
-
-          return {
-            id: `contract-${contract.reservation_id}`,
-            type: 'contract' as const,
-            name: `Umowa - ${campName}`,
-            reservationId: contract.reservation_id,
-            reservationName: campName,
-            participantName: participantName,
-            date: dateStr,
-            amount: contract.total_price || 0,
-            status: 'available' as const, // Contract exists, so it's available
-            contract_status: (reservation && reservation.contract_status) ? reservation.contract_status : null,
-          };
-        });
-
-        // Map qualification cards to documents (only one per reservation)
-        const qualificationCardsList: Document[] = Array.from(cardsByReservation.values()).map((card) => {
-          const reservation = reservationsMap.get(card.reservation_id);
-          const participantName = card.participant_first_name && card.participant_last_name
-            ? `${card.participant_first_name} ${card.participant_last_name}`
-            : 'Brak danych';
-
-          const campName = card.camp_name || 'Brak danych';
-
-          // Format date from card created_at
-          let dateStr = 'Brak daty';
-          if (card.created_at) {
-            const date = new Date(card.created_at);
-            if (!isNaN(date.getTime())) {
-              dateStr = date.toLocaleDateString('pl-PL', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              });
-            }
-          }
-
-          return {
-            id: `qualification-card-${card.reservation_id}`,
-            type: 'qualification_card' as const,
-            name: `Karta kwalifikacyjna - ${campName}`,
-            reservationId: card.reservation_id,
-            reservationName: campName,
-            participantName: participantName,
-            date: dateStr,
-            amount: reservation?.total_price || 0,
-            status: 'available' as const, // Card exists, so it's available
-          };
-        });
-
-        // Fetch uploaded user files for each reservation
-        const uploadedFilesList: Document[] = [];
+        // Fetch ALL contract files for each reservation (both SYSTEM and USER)
+        const allContractsList: Document[] = [];
         
         for (const reservation of reservations) {
           try {
-            // Get uploaded contract files
+            // Get ALL contract files for this reservation (both system-generated and user-uploaded)
             const contractFiles = await contractService.getContractFiles(reservation.id);
-            const userContractFiles = contractFiles.filter(f => f.source === 'user');
             
-            userContractFiles.forEach((file) => {
+            contractFiles.forEach((file) => {
               const campName = reservation.camp_name || 'Brak danych';
               const participantName = reservation.participant_first_name && reservation.participant_last_name
                 ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
@@ -162,10 +64,16 @@ export default function Downloads() {
                 year: 'numeric',
               });
               
-              uploadedFilesList.push({
-                id: `uploaded-contract-${file.id}`,
-                type: 'uploaded_contract' as const,
-                name: `Wgrana umowa (${dateStr}) - ${campName}`,
+              // Determine document type based on source
+              const isSystem = file.source === 'system';
+              const documentType = isSystem ? 'contract' as const : 'uploaded_contract' as const;
+              
+              allContractsList.push({
+                id: `${isSystem ? 'contract' : 'uploaded-contract'}-${file.id}`,
+                type: documentType,
+                name: isSystem 
+                  ? `Umowa wygenerowana (${dateStr}) - ${campName}`
+                  : `Umowa wgrana (${dateStr}) - ${campName}`,
                 reservationId: reservation.id,
                 reservationName: campName,
                 participantName: participantName,
@@ -173,56 +81,69 @@ export default function Downloads() {
                 amount: reservation.total_price || 0,
                 status: 'available' as const,
                 fileId: file.id,
-                source: 'user',
-              });
-            });
-            
-            // Get uploaded qualification card files
-            const cardFiles = await qualificationCardService.getQualificationCardFiles(reservation.id);
-            const userCardFiles = cardFiles.filter(f => f.source === 'user');
-            
-            userCardFiles.forEach((file) => {
-              const campName = reservation.camp_name || 'Brak danych';
-              const participantName = reservation.participant_first_name && reservation.participant_last_name
-                ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
-                : 'Brak danych';
-              
-              const date = new Date(file.uploaded_at);
-              const dateStr = date.toLocaleDateString('pl-PL', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              });
-              
-              uploadedFilesList.push({
-                id: `uploaded-card-${file.id}`,
-                type: 'uploaded_qualification_card' as const,
-                name: `Wgrana karta kwalifikacyjna (${dateStr}) - ${campName}`,
-                reservationId: reservation.id,
-                reservationName: campName,
-                participantName: participantName,
-                date: dateStr,
-                amount: reservation.total_price || 0,
-                status: 'available' as const,
-                fileId: file.id,
-                source: 'user',
+                source: file.source,
+                contract_status: (reservation && reservation.contract_status) ? reservation.contract_status : null,
               });
             });
           } catch (error) {
             // Ignore errors for individual reservations
-            console.error(`Error loading files for reservation ${reservation.id}:`, error);
+            console.error(`Error loading contract files for reservation ${reservation.id}:`, error);
+          }
+        }
+
+        // Fetch ALL qualification card files for each reservation (both SYSTEM and USER)
+        const allQualificationCardsList: Document[] = [];
+        
+        for (const reservation of reservations) {
+          try {
+            // Get ALL qualification card files for this reservation (both system-generated and user-uploaded)
+            const cardFiles = await qualificationCardService.getQualificationCardFiles(reservation.id);
+            
+            cardFiles.forEach((file) => {
+              const campName = reservation.camp_name || 'Brak danych';
+              const participantName = reservation.participant_first_name && reservation.participant_last_name
+                ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
+                : 'Brak danych';
+              
+              const date = new Date(file.uploaded_at);
+              const dateStr = date.toLocaleDateString('pl-PL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              });
+              
+              // Determine document type based on source
+              const isSystem = file.source === 'system';
+              const documentType = isSystem ? 'qualification_card' as const : 'uploaded_qualification_card' as const;
+              
+              allQualificationCardsList.push({
+                id: `${isSystem ? 'qualification-card' : 'uploaded-card'}-${file.id}`,
+                type: documentType,
+                name: isSystem 
+                  ? `Karta kwalifikacyjna wygenerowana (${dateStr}) - ${campName}`
+                  : `Karta kwalifikacyjna wgrana (${dateStr}) - ${campName}`,
+                reservationId: reservation.id,
+                reservationName: campName,
+                participantName: participantName,
+                date: dateStr,
+                amount: reservation.total_price || 0,
+                status: 'available' as const,
+                fileId: file.id,
+                source: file.source,
+              });
+            });
+          } catch (error) {
+            // Ignore errors for individual reservations
+            console.error(`Error loading qualification card files for reservation ${reservation.id}:`, error);
           }
         }
 
         // Combine all documents
-        const documentsList: Document[] = [...contractsList, ...qualificationCardsList, ...uploadedFilesList];
+        const documentsList: Document[] = [...allContractsList, ...allQualificationCardsList];
 
-        // Sort by date (newest first)
-        documentsList.sort((a, b) => {
-          const dateA = new Date(a.date.split('.').reverse().join('-'));
-          const dateB = new Date(b.date.split('.').reverse().join('-'));
-          return dateB.getTime() - dateA.getTime();
-        });
+        // Sort by reservation ID first, then by uploaded_at timestamp within each reservation (newest first)
+        // We need to use the actual uploaded_at from the files, not the formatted date string
+        // So we'll sort after grouping by reservation
 
         setDocuments(documentsList);
       } catch (err) {
@@ -239,15 +160,17 @@ export default function Downloads() {
 
   const handleDownloadDocument = async (document: Document) => {
     if (document.type === 'contract') {
+      // Download specific contract file by ID (system-generated)
+      if (!document.fileId) {
+        alert('Błąd: brak ID pliku do pobrania');
+        return;
+      }
       try {
         setDownloadingIds(prev => new Set(prev).add(document.id));
-        await contractService.downloadContract(document.reservationId);
-
-        // Show important information about contract signing
-        alert('WAŻNE:\n\n• Masz 2 dni na wgranie podpisanej umowy do systemu.\n• Możesz podpisać umowę odręcznie lub podpisem zaufanym.\n• MUSISZ odesłać PODPISANĄ umowę.');
+        await contractService.downloadContractFile(document.fileId);
       } catch (error) {
         console.error('Error downloading contract:', error);
-        alert('Nie udało się pobrać dokumentu. Spróbuj ponownie.');
+        alert('Nie udało się pobrać umowy. Spróbuj ponownie.');
       } finally {
         setDownloadingIds(prev => {
           const newSet = new Set(prev);
@@ -275,23 +198,14 @@ export default function Downloads() {
         });
       }
     } else if (document.type === 'qualification_card') {
+      // Download specific qualification card file by ID (system-generated)
+      if (!document.fileId) {
+        alert('Błąd: brak ID pliku do pobrania');
+        return;
+      }
       try {
         setDownloadingIds(prev => new Set(prev).add(document.id));
-        await qualificationCardService.downloadQualificationCard(document.reservationId);
-
-        // Show important information about qualification card
-        // Get reservation to check if has second parent
-        const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
-        const reservation = reservations.find(r => r.id === document.reservationId);
-        const hasSecondParent = reservation?.parents_data && Array.isArray(reservation.parents_data) && reservation.parents_data.length > 1;
-
-        alert(`WAŻNE INFORMACJE O KARCIE KWALIFIKACYJNEJ:\n\n` +
-              `• Karta jest uzupełniona na podstawie rezerwacji.\n` +
-              `• MUSISZ uzupełnić pozostałe dane: PESEL (jeśli nie został podany) oraz informacje o chorobach/zdrowiu.\n` +
-              `• MUSISZ odesłać PODPISANĄ kartę kwalifikacyjną.\n` +
-              `• Masz 2 dni na wgranie podpisanej karty do systemu.\n` +
-              `• Możesz podpisać kartę odręcznie lub podpisem zaufanym.\n${
-              hasSecondParent ? '• W karcie muszą być dane obojga rodziców/opiekunów.\n' : ''}`);
+        await qualificationCardService.downloadQualificationCardFile(document.fileId);
       } catch (error) {
         console.error('Error downloading qualification card:', error);
         alert('Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
@@ -397,6 +311,16 @@ export default function Downloads() {
     documentsByReservation.get(doc.reservationId)!.documents.push(doc);
   });
 
+  // Sort documents within each reservation by date (newest first)
+  documentsByReservation.forEach(({ documents: reservationDocs }) => {
+    reservationDocs.sort((a, b) => {
+      // Parse dates and compare (newest first)
+      const dateA = new Date(a.date.split('.').reverse().join('-'));
+      const dateB = new Date(b.date.split('.').reverse().join('-'));
+      return dateB.getTime() - dateA.getTime();
+    });
+  });
+
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Documents Section */}
@@ -470,12 +394,21 @@ export default function Downloads() {
                                 <div className="flex items-center gap-2 mb-2">
                                   <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                                   <span className="font-medium text-sm sm:text-base text-gray-900">
-                                    {document.type === 'contract' ? 'Umowa' :
-                                     document.type === 'qualification_card' ? 'Karta kwalifikacyjna' :
-                                     document.type === 'uploaded_contract' ? 'Wgrana umowa' :
-                                     document.type === 'uploaded_qualification_card' ? 'Wgrana karta kwalifikacyjna' :
+                                    {document.type === 'contract' ? 'Umowa wygenerowana' :
+                                     document.type === 'qualification_card' ? 'Karta kwalifikacyjna wygenerowana' :
+                                     document.type === 'uploaded_contract' ? 'Umowa wgrana' :
+                                     document.type === 'uploaded_qualification_card' ? 'Karta kwalifikacyjna wgrana' :
                                      'Inny dokument'}
                                   </span>
+                                  {document.source && (
+                                    <span className={`text-xs px-2 py-0.5 rounded ${
+                                      document.source === 'system' 
+                                        ? 'bg-blue-100 text-blue-700' 
+                                        : 'bg-green-100 text-green-700'
+                                    }`}>
+                                      {document.source === 'system' ? 'Wygenerowana' : 'Wgrana'}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-4 text-xs sm:text-sm text-gray-600 mb-3">
                                   <div className="flex items-center gap-1.5">

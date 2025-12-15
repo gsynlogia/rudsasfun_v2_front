@@ -8,6 +8,7 @@ import { contractService } from '@/lib/services/ContractService';
 import { paymentService, PaymentResponse, CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
+import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 import DashedLine from '../DashedLine';
 
@@ -41,6 +42,9 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const [_loadingCard, _setLoadingCard] = useState(false);
   const [_downloadingContract, _setDownloadingContract] = useState(false);
   const [_downloadingCard, _setDownloadingCard] = useState(false);
+  const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
+  const [bankAccount, setBankAccount] = useState<any>(null);
+  const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
 
   // Format date helper
   const formatDate = (dateString: string | null | undefined): string => {
@@ -58,6 +62,39 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     if (!start || !end) return 'Brak danych';
     return `${formatDate(start)} – ${formatDate(end)}`;
   };
+
+  // Load online payments status and bank account data
+  useEffect(() => {
+    const loadOnlinePaymentsStatus = async () => {
+      try {
+        setLoadingOnlinePaymentsStatus(true);
+        const API_BASE_URL = getApiBaseUrlRuntime();
+        const response = await fetch(`${API_BASE_URL}/api/system-settings/online-payments/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setOnlinePaymentsEnabled(data.enabled);
+          
+          // If online payments are disabled, load bank account data
+          if (!data.enabled) {
+            try {
+              const bankResponse = await fetch(`${API_BASE_URL}/api/bank-accounts/active`);
+              if (bankResponse.ok) {
+                const bankData = await bankResponse.json();
+                setBankAccount(bankData);
+              }
+            } catch (err) {
+              console.error('Error loading bank account:', err);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error loading online payments status:', err);
+      } finally {
+        setLoadingOnlinePaymentsStatus(false);
+      }
+    };
+    loadOnlinePaymentsStatus();
+  }, []);
 
   // Load payments for this reservation
   useEffect(() => {
@@ -472,10 +509,13 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             )}
 
             {!isFullyPaid && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                {/* Payment Installments Options - Left Side */}
-                <div className="space-y-2 sm:space-y-3">
-                  <h6 className="text-xs sm:text-sm font-semibold text-gray-700">Wybierz sposób płatności:</h6>
+              <>
+                {/* Show online payment options only if online payments are enabled */}
+                {onlinePaymentsEnabled && !loadingOnlinePaymentsStatus && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {/* Payment Installments Options - Left Side */}
+                    <div className="space-y-2 sm:space-y-3">
+                      <h6 className="text-xs sm:text-sm font-semibold text-gray-700">Wybierz sposób płatności:</h6>
                   <div className="space-y-2">
                     {/* Calculate remaining amount - disable other options if payment_plan is already set in database */}
                     {(() => {
@@ -680,6 +720,99 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                   </div>
                 )}
               </div>
+                )}
+
+                {/* Show traditional transfer section only if online payments are disabled */}
+                {!onlinePaymentsEnabled && !loadingOnlinePaymentsStatus && (
+                  <div className="bg-blue-50 border-l-4 border-blue-400 p-4 sm:p-6 rounded-lg">
+                    <h6 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
+                      Płatność przelewem tradycyjnym
+                    </h6>
+                    
+                    {/* Calculate deposit: 600 zł + protections */}
+                    {(() => {
+                      const baseDeposit = 600;
+                      // Calculate protection prices from reservation
+                      let protectionTotal = 0;
+                      if (reservation.selected_protection) {
+                        const selectedProtections = Array.isArray(reservation.selected_protection)
+                          ? reservation.selected_protection
+                          : typeof reservation.selected_protection === 'string'
+                            ? JSON.parse(reservation.selected_protection || '[]')
+                            : [];
+                        
+                        // Protection prices: TARCZA = 110, OAZA = 80 (hardcoded for now)
+                        selectedProtections.forEach((prot: string) => {
+                          if (prot.includes('tarcza') || prot.includes('shield') || prot === 'protection-1') {
+                            protectionTotal += 110;
+                          } else if (prot.includes('oaza') || prot.includes('oasa') || prot === 'protection-2') {
+                            protectionTotal += 80;
+                          }
+                        });
+                      }
+                      const totalDeposit = baseDeposit + protectionTotal;
+                      
+                      return (
+                        <div className="space-y-3 sm:space-y-4">
+                          <div className="bg-white p-3 sm:p-4 rounded border border-blue-200">
+                            <p className="text-xs sm:text-sm font-semibold text-gray-900 mb-2">Zaliczka do wpłaty:</p>
+                            <div className="space-y-1 text-xs sm:text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Zaliczka podstawowa:</span>
+                                <span className="font-medium text-gray-900">{baseDeposit.toFixed(2)} zł</span>
+                              </div>
+                              {protectionTotal > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Ochrony:</span>
+                                  <span className="font-medium text-gray-900">+{protectionTotal.toFixed(2)} zł</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between pt-2 border-t border-gray-200">
+                                <span className="font-semibold text-gray-900">Razem zaliczka:</span>
+                                <span className="font-bold text-[#03adf0]">{totalDeposit.toFixed(2)} zł</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {bankAccount && (
+                            <div className="bg-white p-3 sm:p-4 rounded border border-blue-200">
+                              <p className="text-xs sm:text-sm font-semibold text-gray-900 mb-2">Dane do przelewu:</p>
+                              <div className="space-y-1.5 text-xs sm:text-sm">
+                                <div>
+                                  <span className="font-medium text-gray-700">Odbiorca:</span>
+                                  <span className="ml-2 text-gray-900">{bankAccount.account_holder}</span>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-700">Numer konta:</span>
+                                  <span className="ml-2 text-gray-900 font-mono">{bankAccount.account_number}</span>
+                                </div>
+                                {bankAccount.bank_name && (
+                                  <div>
+                                    <span className="font-medium text-gray-700">Bank:</span>
+                                    <span className="ml-2 text-gray-900">{bankAccount.bank_name}</span>
+                                  </div>
+                                )}
+                                {bankAccount.address && (
+                                  <div>
+                                    <span className="font-medium text-gray-700">Adres:</span>
+                                    <span className="ml-2 text-gray-900">{bankAccount.address}</span>
+                                  </div>
+                                )}
+                                {bankAccount.transfer_title_template && (
+                                  <div className="pt-2 border-t border-gray-200">
+                                    <span className="font-medium text-gray-700">Tytuł przelewu:</span>
+                                    <p className="mt-1 text-gray-900 italic">{bankAccount.transfer_title_template}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </>
             )}
           </div>
 

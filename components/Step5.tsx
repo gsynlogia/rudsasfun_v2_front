@@ -9,6 +9,7 @@ import { useReservation } from '@/context/ReservationContext';
 import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { reservationService, ReservationService } from '@/lib/services/ReservationService';
 import type { StepComponentProps, ReservationItem } from '@/types/reservation';
+import { getApiBaseUrlRuntime } from '@/utils/api-config';
 import {
   defaultStep1FormData,
   defaultStep2FormData,
@@ -63,14 +64,55 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const [showPaymentLaterModal, setShowPaymentLaterModal] = useState(false);
   const [createdReservationId, setCreatedReservationId] = useState<number | null>(null);
   const [_paymentInstallments, _setPaymentInstallments] = useState<'full' | '2' | '3'>('full');
+  const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
+  const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
+
+  // Load online payments status on mount
+  useEffect(() => {
+    const loadOnlinePaymentsStatus = async () => {
+      try {
+        setLoadingOnlinePaymentsStatus(true);
+        const API_BASE_URL = getApiBaseUrlRuntime();
+        const response = await fetch(`${API_BASE_URL}/api/system-settings/online-payments/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setOnlinePaymentsEnabled(data.enabled);
+          
+          // If online payments are disabled, automatically select transfer and allow proceeding without payment
+          if (!data.enabled) {
+            setFormData(prev => ({
+              ...prev,
+              paymentMethod: 'transfer',
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Error loading online payments status:', err);
+        // Default to enabled if error occurs
+        setOnlinePaymentsEnabled(true);
+      } finally {
+        setLoadingOnlinePaymentsStatus(false);
+      }
+    };
+    
+    loadOnlinePaymentsStatus();
+  }, []);
 
   // Load data from sessionStorage on mount
   useEffect(() => {
     const savedData = loadStep5FormData();
     if (savedData) {
-      setFormData(savedData);
+      // Only use saved data if online payments are enabled, otherwise force transfer
+      if (onlinePaymentsEnabled) {
+        setFormData(savedData);
+      } else {
+        setFormData({
+          ...savedData,
+          paymentMethod: 'transfer',
+        });
+      }
     }
-  }, []);
+  }, [onlinePaymentsEnabled]);
 
   // Save data to sessionStorage whenever formData changes
   useEffect(() => {
@@ -84,12 +126,13 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
       return false;
     }
 
-    // If online payment, require payment amount
-    if (formData.paymentMethod === 'online' && !formData.paymentAmount) {
+    // If online payment is enabled and selected, require payment amount
+    if (onlinePaymentsEnabled && formData.paymentMethod === 'online' && !formData.paymentAmount) {
       return false;
     }
 
     // Transfer payment doesn't require amount selection
+    // If online payments are disabled, transfer is the only option and validation passes
     return true;
   };
 
@@ -371,21 +414,21 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
   // Handle payment processing
   const handlePayment = async () => {
-    // If transfer payment, create reservation without payment
-    if (formData.paymentMethod === 'transfer') {
-      await handleReservationWithoutPayment();
-      return;
-    }
-
-    // If online payment, proceed with payment
-    if (formData.paymentMethod !== 'online') {
-      return;
-    }
-
     // Validate payment options
     if (!validatePayment()) {
       setValidationError('Proszę wybrać sposób płatności i wielkość wpłaty.');
       validationAttemptedRef.current = true;
+      return;
+    }
+
+    // If transfer payment OR online payments are disabled, create reservation without payment
+    if (formData.paymentMethod === 'transfer' || !onlinePaymentsEnabled) {
+      await handleReservationWithoutPayment();
+      return;
+    }
+
+    // If online payment is not selected or online payments are disabled, return
+    if (formData.paymentMethod !== 'online' || !onlinePaymentsEnabled) {
       return;
     }
 
@@ -1052,36 +1095,38 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
               Wybierz sposób płatności
             </h3>
             <div className="space-y-3 sm:space-y-4">
-              {/* Online Payment (Tpay) */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <input
-                    type="radio"
-                    id="paymentOnline"
-                    name="paymentMethod"
-                    value="online"
-                    checked={formData.paymentMethod === 'online'}
-                    onChange={() => handlePaymentMethodChange('online')}
-                    disabled={disabled}
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                  <label
-                    htmlFor="paymentOnline"
-                    className="text-xs sm:text-sm text-gray-700 cursor-pointer"
-                  >
-                    Płatność online (Tpay)
-                  </label>
+              {/* Online Payment (Tpay) - Only show if enabled */}
+              {onlinePaymentsEnabled && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <input
+                      type="radio"
+                      id="paymentOnline"
+                      name="paymentMethod"
+                      value="online"
+                      checked={formData.paymentMethod === 'online'}
+                      onChange={() => handlePaymentMethodChange('online')}
+                      disabled={disabled}
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor="paymentOnline"
+                      className="text-xs sm:text-sm text-gray-700 cursor-pointer"
+                    >
+                      Płatność online (Tpay)
+                    </label>
+                  </div>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ alignSelf: 'flex-start', marginTop: '-4px' }}>
+                    <Image
+                      src="/tpay-brand-logo-short.png"
+                      alt="Tpay"
+                      width={80}
+                      height={48}
+                      className="h-10 sm:h-12 w-auto object-contain"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center justify-center flex-shrink-0" style={{ alignSelf: 'flex-start', marginTop: '-4px' }}>
-                  <Image
-                    src="/tpay-brand-logo-short.png"
-                    alt="Tpay"
-                    width={80}
-                    height={48}
-                    className="h-10 sm:h-12 w-auto object-contain"
-                  />
-                </div>
-              </div>
+              )}
 
               {/* Traditional Transfer */}
               <div className="flex items-center justify-between">

@@ -239,10 +239,53 @@ class ContractService {
   }
 
   /**
+   * Update contract status (admin only)
+   * @param reservationId Reservation ID
+   * @param status 'pending', 'approved' or 'rejected'
+   * @param rejectionReason Required if status is 'rejected'
+   */
+  async updateContractStatus(
+    reservationId: number,
+    status: 'pending' | 'approved' | 'rejected',
+    rejectionReason?: string,
+  ): Promise<{ status: string; message: string; contract_status: string; rejection_reason?: string | null }> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const body: { status: string; rejection_reason?: string } = { status };
+    if (status === 'rejected') {
+      if (!rejectionReason || !rejectionReason.trim()) {
+        throw new Error('Powód odrzucenia umowy jest wymagany');
+      }
+      body.rejection_reason = rejectionReason.trim();
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/status`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
    * Download a specific contract file by ID
    * @param fileId Contract file ID
    */
-  async downloadContractFile(fileId: number): Promise<void> {
+  async downloadContractFile(fileId: number): Promise<Blob> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
     
@@ -301,6 +344,8 @@ class ContractService {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+    
+    return blob;
   }
 }
 

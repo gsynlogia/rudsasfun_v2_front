@@ -3,6 +3,7 @@
 import { FileText, Download, CheckCircle, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 
 
 import { certificateService, CertificateResponse } from '@/lib/services/CertificateService';
@@ -211,17 +212,11 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         }
       }
 
-      // Now download the contract
-      await contractService.downloadContract(reservationIdNum);
-
-      // Show important information about contract signing
-      alert('WAŻNE:\n\n• Masz 2 dni na wgranie podpisanej umowy do systemu.\n• Możesz podpisać umowę odręcznie lub podpisem zaufanym.\n• MUSISZ odesłać PODPISANĄ umowę.');
-
-      // After successful generation and download, reload status
-      await loadContractStatus();
+      // Redirect to downloads page instead of downloading directly
+      router.push('/profil/do-pobrania');
     } catch (error) {
-      console.error('Error generating/downloading contract:', error);
-      alert('Nie udało się wygenerować/pobrać umowy. Spróbuj ponownie.');
+      console.error('Error generating contract:', error);
+      alert('Nie udało się wygenerować umowy. Spróbuj ponownie.');
     } finally {
       setIsGenerating(false);
     }
@@ -256,25 +251,11 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         }
       }
 
-      // Now download the card
-      setDownloadingCard(true);
-      await qualificationCardService.downloadQualificationCard(reservationIdNum);
-
-      // Show important information about qualification card
-      const hasSecondParent = reservation.parents_data && Array.isArray(reservation.parents_data) && reservation.parents_data.length > 1;
-      alert(`WAŻNE INFORMACJE O KARCIE KWALIFIKACYJNEJ:\n\n` +
-            `• Karta jest uzupełniona na podstawie rezerwacji.\n` +
-            `• MUSISZ uzupełnić pozostałe dane: PESEL (jeśli nie został podany) oraz informacje o chorobach/zdrowiu.\n` +
-            `• MUSISZ odesłać PODPISANĄ kartę kwalifikacyjną.\n` +
-            `• Masz 2 dni na wgranie podpisanej karty do systemu.\n` +
-            `• Możesz podpisać kartę odręcznie lub podpisem zaufanym.\n${
-            hasSecondParent ? '• W karcie muszą być dane obojga rodziców/opiekunów.\n' : ''}`);
-
-      // Reload card status after download
-      await loadQualificationCard();
+      // Redirect to downloads page instead of downloading directly
+      router.push('/profil/do-pobrania');
     } catch (error: any) {
-      console.error('Error downloading qualification card:', error);
-      alert(error.message || 'Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
+      console.error('Error with qualification card:', error);
+      alert(error.message || 'Nie udało się przetworzyć karty kwalifikacyjnej. Spróbuj ponownie.');
     } finally {
       setDownloadingCard(false);
     }

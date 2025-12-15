@@ -36,8 +36,9 @@ export default function NotificationsStrip() {
 
   return (
     <div className="mb-4 sm:mb-6">
+      {/* TODO: Currently not used in the system - commented out for future use */}
       {/* Header */}
-      <div className="flex items-center gap-2 mb-3 sm:mb-4">
+      {/* <div className="flex items-center gap-2 mb-3 sm:mb-4">
         <h2 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">
           Powiadomienia
         </h2>
@@ -46,10 +47,10 @@ export default function NotificationsStrip() {
             {unreadCount}
           </span>
         )}
-      </div>
+      </div> */}
 
       {/* Notifications */}
-      <div className="space-y-2 sm:space-y-3">
+      {/* <div className="space-y-2 sm:space-y-3">
         {notifications.map((notification) => (
           <div
             key={notification.id}
@@ -67,7 +68,7 @@ export default function NotificationsStrip() {
             </button>
           </div>
         ))}
-      </div>
+      </div> */}
     </div>
   );
 }
