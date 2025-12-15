@@ -9,7 +9,7 @@ import { reservationService, type ReservationResponse } from '@/lib/services/Res
 
 interface Document {
   id: string;
-  type: 'contract' | 'qualification_card' | 'invoice';
+  type: 'contract' | 'qualification_card' | 'invoice' | 'uploaded_contract' | 'uploaded_qualification_card';
   name: string;
   reservationId: number;
   reservationName: string;
@@ -18,6 +18,8 @@ interface Document {
   amount: number;
   status: 'available' | 'pending' | 'unavailable';
   contract_status?: string | null; // 'pending', 'approved', 'rejected'
+  fileId?: number; // For uploaded files
+  source?: string; // 'user' or 'system'
 }
 
 /**
@@ -138,8 +140,82 @@ export default function Downloads() {
           };
         });
 
+        // Fetch uploaded user files for each reservation
+        const uploadedFilesList: Document[] = [];
+        
+        for (const reservation of reservations) {
+          try {
+            // Get uploaded contract files
+            const contractFiles = await contractService.getContractFiles(reservation.id);
+            const userContractFiles = contractFiles.filter(f => f.source === 'user');
+            
+            userContractFiles.forEach((file) => {
+              const campName = reservation.camp_name || 'Brak danych';
+              const participantName = reservation.participant_first_name && reservation.participant_last_name
+                ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
+                : 'Brak danych';
+              
+              const date = new Date(file.uploaded_at);
+              const dateStr = date.toLocaleDateString('pl-PL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              });
+              
+              uploadedFilesList.push({
+                id: `uploaded-contract-${file.id}`,
+                type: 'uploaded_contract' as const,
+                name: `Wgrana umowa (${dateStr}) - ${campName}`,
+                reservationId: reservation.id,
+                reservationName: campName,
+                participantName: participantName,
+                date: dateStr,
+                amount: reservation.total_price || 0,
+                status: 'available' as const,
+                fileId: file.id,
+                source: 'user',
+              });
+            });
+            
+            // Get uploaded qualification card files
+            const cardFiles = await qualificationCardService.getQualificationCardFiles(reservation.id);
+            const userCardFiles = cardFiles.filter(f => f.source === 'user');
+            
+            userCardFiles.forEach((file) => {
+              const campName = reservation.camp_name || 'Brak danych';
+              const participantName = reservation.participant_first_name && reservation.participant_last_name
+                ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
+                : 'Brak danych';
+              
+              const date = new Date(file.uploaded_at);
+              const dateStr = date.toLocaleDateString('pl-PL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              });
+              
+              uploadedFilesList.push({
+                id: `uploaded-card-${file.id}`,
+                type: 'uploaded_qualification_card' as const,
+                name: `Wgrana karta kwalifikacyjna (${dateStr}) - ${campName}`,
+                reservationId: reservation.id,
+                reservationName: campName,
+                participantName: participantName,
+                date: dateStr,
+                amount: reservation.total_price || 0,
+                status: 'available' as const,
+                fileId: file.id,
+                source: 'user',
+              });
+            });
+          } catch (error) {
+            // Ignore errors for individual reservations
+            console.error(`Error loading files for reservation ${reservation.id}:`, error);
+          }
+        }
+
         // Combine all documents
-        const documentsList: Document[] = [...contractsList, ...qualificationCardsList];
+        const documentsList: Document[] = [...contractsList, ...qualificationCardsList, ...uploadedFilesList];
 
         // Sort by date (newest first)
         documentsList.sort((a, b) => {
@@ -179,6 +255,25 @@ export default function Downloads() {
           return newSet;
         });
       }
+    } else if (document.type === 'uploaded_contract') {
+      // Download specific uploaded file by ID
+      if (!document.fileId) {
+        alert('Błąd: brak ID pliku do pobrania');
+        return;
+      }
+      try {
+        setDownloadingIds(prev => new Set(prev).add(document.id));
+        await contractService.downloadContractFile(document.fileId);
+      } catch (error) {
+        console.error('Error downloading uploaded contract:', error);
+        alert('Nie udało się pobrać wgranej umowy. Spróbuj ponownie.');
+      } finally {
+        setDownloadingIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(document.id);
+          return newSet;
+        });
+      }
     } else if (document.type === 'qualification_card') {
       try {
         setDownloadingIds(prev => new Set(prev).add(document.id));
@@ -200,6 +295,25 @@ export default function Downloads() {
       } catch (error) {
         console.error('Error downloading qualification card:', error);
         alert('Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
+      } finally {
+        setDownloadingIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(document.id);
+          return newSet;
+        });
+      }
+    } else if (document.type === 'uploaded_qualification_card') {
+      // Download specific uploaded file by ID
+      if (!document.fileId) {
+        alert('Błąd: brak ID pliku do pobrania');
+        return;
+      }
+      try {
+        setDownloadingIds(prev => new Set(prev).add(document.id));
+        await qualificationCardService.downloadQualificationCardFile(document.fileId);
+      } catch (error) {
+        console.error('Error downloading uploaded qualification card:', error);
+        alert('Nie udało się pobrać wgranej karty kwalifikacyjnej. Spróbuj ponownie.');
       } finally {
         setDownloadingIds(prev => {
           const newSet = new Set(prev);
@@ -300,8 +414,8 @@ export default function Downloads() {
           <div className="space-y-4">
             {Array.from(documentsByReservation.entries()).map(([reservationId, { reservation, documents: reservationDocs }]) => {
               const isExpanded = expandedReservations.has(reservationId);
-              const hasContract = reservationDocs.some(d => d.type === 'contract');
-              const hasCard = reservationDocs.some(d => d.type === 'qualification_card');
+              const hasContract = reservationDocs.some(d => d.type === 'contract' || d.type === 'uploaded_contract');
+              const hasCard = reservationDocs.some(d => d.type === 'qualification_card' || d.type === 'uploaded_qualification_card');
 
               return (
                 <div key={reservationId} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
@@ -358,6 +472,8 @@ export default function Downloads() {
                                   <span className="font-medium text-sm sm:text-base text-gray-900">
                                     {document.type === 'contract' ? 'Umowa' :
                                      document.type === 'qualification_card' ? 'Karta kwalifikacyjna' :
+                                     document.type === 'uploaded_contract' ? 'Wgrana umowa' :
+                                     document.type === 'uploaded_qualification_card' ? 'Wgrana karta kwalifikacyjna' :
                                      'Inny dokument'}
                                   </span>
                                 </div>

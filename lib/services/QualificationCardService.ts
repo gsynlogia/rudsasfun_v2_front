@@ -282,6 +282,71 @@ class QualificationCardService {
   }
 
   /**
+   * Download a specific qualification card file by ID
+   * @param fileId Qualification card file ID
+   */
+  async downloadQualificationCardFile(fileId: number): Promise<void> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/file/${fileId}/download`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    // Get blob and create download link
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // Get filename from Content-Disposition header or use default
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `karta_kwalifikacyjna_${fileId}.pdf`;
+    if (contentDisposition) {
+      // Try different patterns for Content-Disposition
+      // Format: filename="file.pdf" or filename=file.pdf or filename*=UTF-8''file.pdf
+      const patterns = [
+        /filename\*?=['"]?([^'";]+)['"]?/i,
+        /filename\*?=UTF-8''(.+)/i,
+        /filename=(.+)/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = contentDisposition.match(pattern);
+        if (match && match[1]) {
+          filename = match[1].trim();
+          // Remove any trailing quotes or semicolons
+          filename = filename.replace(/['";]+$/, '');
+          break;
+        }
+      }
+    }
+    
+    // Ensure filename ends with .pdf
+    if (!filename.toLowerCase().endsWith('.pdf')) {
+      filename = filename.replace(/\.pdf_?$/i, '') + '.pdf';
+    }
+    
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  /**
    * Get qualification card data for a reservation
    * @param reservationId Reservation ID
    */

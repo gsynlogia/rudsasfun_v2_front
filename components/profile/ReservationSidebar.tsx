@@ -316,51 +316,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
             <div className="flex flex-col items-center gap-2 sm:gap-3">
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
               <p className="text-[10px] sm:text-xs text-gray-600 text-center">Umowa</p>
-              {reservation.contract_status === 'rejected' ? (
-                <>
-                  <input
-                    ref={contractInputRef}
-                    type="file"
-                    accept=".pdf"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-
-                      try {
-                        setUploadingContract(true);
-                        await contractService.uploadContract(reservationIdNum, file);
-                        alert('Umowa została przesłana pomyślnie');
-                        await loadContractStatus();
-                        if (contractInputRef.current) {
-                          contractInputRef.current.value = '';
-                        }
-                      } catch (error: any) {
-                        alert(error.message || 'Nie udało się przesłać umowy');
-                      } finally {
-                        setUploadingContract(false);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => contractInputRef.current?.click()}
-                    disabled={uploadingContract}
-                    className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                  >
-                    {uploadingContract ? (
-                      <>
-                        <span className="animate-spin">⏳</span>
-                        <span>Przesyłanie...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="w-3 h-3" />
-                        <span>Dodaj</span>
-                      </>
-                    )}
-                  </button>
-                </>
-              ) : (
+              <div className="w-full flex flex-col gap-1.5 sm:gap-2">
                 <button
                   onClick={handleDownloadContract}
                   disabled={isGenerating || loadingContract}
@@ -387,7 +343,48 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                     </>
                   )}
                 </button>
-              )}
+                <input
+                  ref={contractInputRef}
+                  type="file"
+                  accept=".pdf"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    try {
+                      setUploadingContract(true);
+                      await contractService.uploadContract(reservationIdNum, file);
+                      alert('Umowa została przesłana pomyślnie');
+                      await loadContractStatus();
+                      if (contractInputRef.current) {
+                        contractInputRef.current.value = '';
+                      }
+                    } catch (error: any) {
+                      alert(error.message || 'Nie udało się przesłać umowy');
+                    } finally {
+                      setUploadingContract(false);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => contractInputRef.current?.click()}
+                  disabled={uploadingContract}
+                  className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  {uploadingContract ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      <span>Przesyłanie...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-3 h-3" />
+                      <span>Wgraj podpisaną umowę</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -432,51 +429,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               <p className="text-[10px] sm:text-xs text-gray-600 text-center">
                 {loadingCard ? 'Ładowanie...' : (qualificationCard ? 'Karta kwalifikacyjna' : 'Karta kwalifikacyjna')}
               </p>
-              {reservation.qualification_card_status === 'rejected' ? (
-                <>
-                  <input
-                    ref={qualificationCardInputRef}
-                    type="file"
-                    accept=".pdf"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-
-                      try {
-                        setUploadingCard(true);
-                        await qualificationCardService.uploadQualificationCard(reservationIdNum, file);
-                        alert('Karta kwalifikacyjna została przesłana pomyślnie');
-                        await loadQualificationCard();
-                        if (qualificationCardInputRef.current) {
-                          qualificationCardInputRef.current.value = '';
-                        }
-                      } catch (error: any) {
-                        alert(error.message || 'Nie udało się przesłać karty kwalifikacyjnej');
-                      } finally {
-                        setUploadingCard(false);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => qualificationCardInputRef.current?.click()}
-                    disabled={uploadingCard}
-                    className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                  >
-                    {uploadingCard ? (
-                      <>
-                        <span className="animate-spin">⏳</span>
-                        <span>Przesyłanie...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="w-3 h-3" />
-                        <span>Dodaj</span>
-                      </>
-                    )}
-                  </button>
-                </>
-              ) : (
+              <div className="w-full flex flex-col gap-1.5 sm:gap-2">
                 <button
                   onClick={handleDownloadCard}
                   disabled={downloadingCard || loadingCard || generatingCard}
@@ -504,13 +457,54 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       ) : (
                         <>
                           <FileText className="w-3 h-3" />
-                          <span>Wypełnij kartę</span>
+                          <span>Wypełnij ankietę</span>
                         </>
                       )}
                     </>
                   )}
                 </button>
-              )}
+                <input
+                  ref={qualificationCardInputRef}
+                  type="file"
+                  accept=".pdf"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    try {
+                      setUploadingCard(true);
+                      await qualificationCardService.uploadQualificationCard(reservationIdNum, file);
+                      alert('Karta kwalifikacyjna została przesłana pomyślnie');
+                      await loadQualificationCard();
+                      if (qualificationCardInputRef.current) {
+                        qualificationCardInputRef.current.value = '';
+                      }
+                    } catch (error: any) {
+                      alert(error.message || 'Nie udało się przesłać karty kwalifikacyjnej');
+                    } finally {
+                      setUploadingCard(false);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => qualificationCardInputRef.current?.click()}
+                  disabled={uploadingCard}
+                  className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  {uploadingCard ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      <span>Przesyłanie...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-3 h-3" />
+                      <span>Wgraj podpisaną i wypełnioną kartę</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
