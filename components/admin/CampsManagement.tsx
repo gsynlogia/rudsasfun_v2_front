@@ -31,7 +31,7 @@ export default function CampsManagement() {
   const [viewMode, setViewMode] = useState<'list' | 'camp-detail'>('list');
   const [selectedCamp, setSelectedCamp] = useState<CampWithProperties | null>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   // Load camps on mount
   useEffect(() => {

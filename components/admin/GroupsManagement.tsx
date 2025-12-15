@@ -31,7 +31,7 @@ interface _GroupWithUsers extends Group {
  */
 export default function GroupsManagement() {
   const router = useRouter();
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   // State for groups data
   const [groups, setGroups] = useState<Group[]>([]);

@@ -11,27 +11,27 @@
  * 1. If NEXT_PUBLIC_API_URL is set in environment, use it (highest priority)
  *    - .env.local overrides .env for local development
  *    - .env contains production defaults
- * 2. If running on localhost (client-side), use https://rejestracja.radsasfun.system-app.pl
+ * 2. If running on localhost (client-side), use https://api.rezerwacja.radsas-fun.pl
  * 3. If running on production domain, use production API URL
- * 4. Fallback to https://rejestracja.radsasfun.system-app.pl for development
+ * 4. Fallback to https://api.rezerwacja.radsas-fun.pl for development
  */
 
 /**
  * Get API base URL based on current environment
- * - Localhost: uses https://rejestracja.radsasfun.system-app.pl (from .env.local)
- * - Production: uses https://rejestracja.radsasfun.system-app.pl (from .env)
+ * - Localhost: uses https://api.rezerwacja.radsas-fun.pl (from .env.local)
+ * - Production: uses https://api.rezerwacja.radsas-fun.pl (from .env)
  */
 export function getApiBaseUrl(): string {
   // If NEXT_PUBLIC_API_URL is explicitly set, use it (highest priority)
   // This respects Next.js .env file priority:
   // - .env.local (local development) will override .env (production)
-    // - .env.local should contain: NEXT_PUBLIC_API_URL=https://rejestracja.radsasfun.system-app.pl
-    // - .env should contain: NEXT_PUBLIC_API_URL=https://rejestracja.radsasfun.system-app.pl
+    // - .env.local should contain: NEXT_PUBLIC_API_URL=https://api.rezerwacja.radsas-fun.pl
+    // - .env should contain: NEXT_PUBLIC_API_URL=https://api.rezerwacja.radsas-fun.pl
   if (process.env.NEXT_PUBLIC_API_URL) {
     let url = process.env.NEXT_PUBLIC_API_URL;
 
     // Force HTTPS for production domains to prevent Mixed Content errors
-    if (url.includes('rejestracja.radsasfun.system-app.pl') && url.startsWith('http://')) {
+    if (url.includes('api.rezerwacja.radsas-fun.pl') && url.startsWith('http://')) {
       url = url.replace('http://', 'https://');
     }
 
@@ -45,21 +45,21 @@ export function getApiBaseUrl(): string {
     // Localhost detection - use local API only if explicitly set
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       // Only use localhost if explicitly set in env, otherwise use production
-      return process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+      return process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
     }
 
     // Production domains - use production API
-    if (hostname.includes('rejestracja.radsasfun.system-app.pl')) {
-      return 'https://rejestracja.radsasfun.system-app.pl';
+    if (hostname.includes('rejestracja.radsasfun.system-app.pl') || hostname.includes('rezerwacja.radsas-fun.pl')) {
+      return 'https://api.rezerwacja.radsas-fun.pl';
     }
 
     // Vercel preview deployments - use production API
     if (hostname.includes('vercel.app')) {
-      return 'https://rejestracja.radsasfun.system-app.pl';
+      return 'https://api.rezerwacja.radsas-fun.pl';
     }
 
     // Any other production domain - use production API
-    return 'https://rejestracja.radsasfun.system-app.pl';
+    return 'https://api.rezerwacja.radsas-fun.pl';
   }
 
   // Server-side: check if we're in production via environment
@@ -67,11 +67,11 @@ export function getApiBaseUrl(): string {
   // or check if we're building for production
   if (process.env.NODE_ENV === 'production') {
     // In production build, default to production API
-    return 'https://rejestracja.radsasfun.system-app.pl';
+    return 'https://api.rezerwacja.radsas-fun.pl';
   }
 
   // Development fallback: use production API as default (can be overridden with .env.local)
-  return process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  return process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 }
 
 /**
@@ -93,7 +93,7 @@ export function getApiBaseUrlRuntime(): string {
  */
 export const API_BASE_URL = typeof window !== 'undefined'
   ? getApiBaseUrl() // Client-side: calculate at runtime (will detect Vercel and use production)
-  : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl'); // Server-side: use env var or production default
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl'); // Server-side: use env var or production default
 
 /**
  * Get full URL for static assets (icons, images, etc.)
@@ -112,7 +112,7 @@ export function getStaticAssetUrl(iconUrl: string | null | undefined): string | 
     return iconUrl;
   }
 
-  const baseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : (process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl');
+  const baseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : (process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl');
 
   // If relative path starting with /, prepend API_BASE_URL (already has /static/ if needed)
   if (iconUrl.startsWith('/')) {

@@ -29,7 +29,7 @@ export default function AdminPanelClient() {
   const [editingProperty, setEditingProperty] = useState<{ campId: number; property: CampProperty } | null>(null);
   const [selectedCampId, setSelectedCampId] = useState<number | null>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   // Load camps on mount
   useEffect(() => {

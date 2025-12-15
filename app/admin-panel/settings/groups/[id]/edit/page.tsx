@@ -38,7 +38,7 @@ export default function EditGroupPage() {
   const router = useRouter();
   const params = useParams();
   const groupId = parseInt(params.id as string);
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   const [formData, setFormData] = useState({
     name: '',

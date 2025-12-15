@@ -10,7 +10,7 @@ import { authenticatedApiCall } from '@/utils/api-auth';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 import { isFakeDataEnabled } from '@/utils/fakeData';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
 interface TransportCity {
   city: string;

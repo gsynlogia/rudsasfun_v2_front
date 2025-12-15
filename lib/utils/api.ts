@@ -4,7 +4,7 @@
  */
 import { authService } from '@/lib/services/AuthService';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
 export interface FetchOptions extends RequestInit {
   requireAuth?: boolean;

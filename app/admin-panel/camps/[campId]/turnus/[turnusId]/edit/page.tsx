@@ -42,7 +42,7 @@ const getFirstCity = (cities?: TransportCity[]): TransportCityWithDefaults => {
  * Fetch camp by ID
  */
 const fetchCampById = (id: number): Promise<Camp | null> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   return fetch(`${API_BASE_URL}/api/camps/${id}`)
     .then(response => {
       if (!response.ok) {
@@ -64,7 +64,7 @@ const fetchCampById = (id: number): Promise<Camp | null> => {
  * Uses GET /api/camps/{camp_id}/editions endpoint (backend still uses 'editions')
  */
 const fetchCampProperty = (campId: number, propertyId: number): Promise<CampProperty | null> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   return fetch(`${API_BASE_URL}/api/camps/${campId}/editions`)
     .then(response => {
       if (!response.ok) {
@@ -89,7 +89,7 @@ const fetchCampProperty = (campId: number, propertyId: number): Promise<CampProp
  * Fetch diets assigned to a turnus
  */
 const fetchTurnusDiets = async (campId: number, propertyId: number): Promise<any[]> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   try {
     const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/diets`, {
       method: 'GET',
@@ -115,7 +115,7 @@ const fetchTurnusDiets = async (campId: number, propertyId: number): Promise<any
  * Fetch promotions assigned to a turnus
  */
 const fetchTurnusPromotions = async (campId: number, propertyId: number): Promise<any[]> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   try {
     const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/promotions`, {
       method: 'GET',
@@ -141,7 +141,7 @@ const fetchTurnusPromotions = async (campId: number, propertyId: number): Promis
  * Fetch protections assigned to a turnus
  */
 const fetchTurnusProtections = async (campId: number, propertyId: number): Promise<any[]> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   try {
     const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/protections`, {
       method: 'GET',
@@ -167,7 +167,7 @@ const fetchTurnusProtections = async (campId: number, propertyId: number): Promi
  * Fetch transport settings for a camp property/turnus
  */
 const fetchTransport = (campId: number, propertyId: number): Promise<CampPropertyTransport | null> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   return fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/transport`, {
     method: 'GET',
     headers: {
@@ -210,7 +210,7 @@ export default function CampTurnusEditPage({
   // Handle both Promise and direct params (Next.js 13+ compatibility)
   const [campId, setCampId] = useState<number | null>(null);
   const [turnusId, setTurnusId] = useState<number | null>(null);
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   const [camp, setCamp] = useState<Camp | null>(null);
   const [property, setProperty] = useState<CampProperty | null>(null);
@@ -696,7 +696,7 @@ export default function CampTurnusEditPage({
 
     try {
       setLoadingAvailableDiets(true);
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
       // Use regular fetch for public endpoint (no authentication required)
       // Fetch center diets (not general diets or diets table)
       const response = await fetch(`${API_BASE_URL}/api/center-diets/public`, {
@@ -832,7 +832,7 @@ export default function CampTurnusEditPage({
 
     try {
       setLoadingAvailablePromotions(true);
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
       const response = await fetch(`${API_BASE_URL}/api/center-promotions/public`, {
         method: 'GET',
         headers: {
@@ -958,7 +958,7 @@ export default function CampTurnusEditPage({
   // Filter promotions based on search query
   // Protections handlers
   const fetchAvailableProtections = async () => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
     try {
       setLoadingAvailableProtections(true);
       const response = await fetch(`${API_BASE_URL}/api/center-protections/public`, {
@@ -1105,7 +1105,7 @@ export default function CampTurnusEditPage({
 
     try {
       setLoadingAvailableTransports(true);
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
       const response = await fetch(
         `${API_BASE_URL}/api/camps/${campId}/properties/${turnusId}/transport/available`,
         {

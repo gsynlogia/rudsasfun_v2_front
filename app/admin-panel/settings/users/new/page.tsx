@@ -22,7 +22,7 @@ interface Group {
  */
 export default function AddUserPage() {
   const router = useRouter();
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   const [formData, setFormData] = useState({
     login: '',

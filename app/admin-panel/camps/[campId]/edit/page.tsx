@@ -11,7 +11,7 @@ import type { Camp, CampProperty } from '@/types/reservation';
  * Fetch camp by ID
  */
 const fetchCampById = (id: number): Promise<Camp | null> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   return fetch(`${API_BASE_URL}/api/camps/${id}`)
     .then(response => {
       if (!response.ok) {
@@ -32,7 +32,7 @@ const fetchCampById = (id: number): Promise<Camp | null> => {
  * Fetch camp turnusy/properties
  */
 const fetchCampTurnusy = (campId: number): Promise<CampProperty[]> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   return fetch(`${API_BASE_URL}/api/camps/${campId}/editions`)
     .then(response => {
       if (!response.ok) {
@@ -52,7 +52,7 @@ const fetchCampTurnusy = (campId: number): Promise<CampProperty[]> => {
 export default function CampEditPage({ params }: { params: Promise<{ campId: string }> | { campId: string } }) {
   const router = useRouter();
   const [campId, setCampId] = useState<number | null>(null);
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   const [camp, setCamp] = useState<Camp | null>(null);
   const [turnusy, setTurnusy] = useState<CampProperty[]>([]);

@@ -11,7 +11,7 @@ import type { CampPropertyTransport } from '@/types/reservation';
  * Fetch transport by ID
  */
 const fetchTransportById = (transportId: number): Promise<CampPropertyTransport | null> => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   return fetch(`${API_BASE_URL}/api/camps/transports/${transportId}`, {
     method: 'GET',
     headers: {
@@ -46,7 +46,7 @@ export default function TransportEditPage({
 }) {
   const router = useRouter();
   const [transportId, setTransportId] = useState<number | null>(null);
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rejestracja.radsasfun.system-app.pl';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   const [transport, setTransport] = useState<CampPropertyTransport | null>(null);
   const [loading, setLoading] = useState(true);
