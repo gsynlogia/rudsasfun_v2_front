@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, MapPin, FileText, Info, Download } from 'lucide-react';
+import { Building2, User, Mail, Phone, MapPin, FileText, Info, Download } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { loadStep3FormData, saveStep3FormData } from '@/utils/sessionStorage';
@@ -68,16 +68,16 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
         if (savedData.privateData) {
           setPrivateData(prev => {
             // Only update if there's actual data in sessionStorage
-            const hasData = Object.values(savedData.privateData!).some(val => val && val.trim() !== '');
-            return hasData ? savedData.privateData! : prev;
+            const hasData = Object.values(savedData.privateData).some(val => val && val.trim() !== '');
+            return hasData ? savedData.privateData : prev;
           });
         }
         // Load company data if it exists
         if (savedData.companyData) {
           setCompanyData(prev => {
             // Only update if there's actual data in sessionStorage
-            const hasData = Object.values(savedData.companyData!).some(val => val && val.trim() !== '');
-            return hasData ? savedData.companyData! : prev;
+            const hasData = Object.values(savedData.companyData).some(val => val && val.trim() !== '');
+            return hasData ? savedData.companyData : prev;
           });
         }
       }
@@ -127,10 +127,9 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
   useEffect(() => {
     const savedData = loadStep3FormData() || {} as any;
     const formData = {
-      wantsInvoice: savedData.wantsInvoice ?? true,  // If invoice data is being filled, wantsInvoice should be true
       invoiceType,
       privateData: invoiceType === 'private' ? privateData : (savedData.privateData || privateData),
-      companyData: invoiceType === 'company' ? companyData : (savedData.companyData || companyData || undefined),
+      companyData: invoiceType === 'company' ? companyData : (savedData.companyData || companyData),
       deliveryType: savedData.deliveryType || 'electronic',
       differentAddress: savedData.differentAddress || false,
       deliveryAddress: savedData.deliveryAddress || { street: '', postalCode: '', city: '' },
@@ -139,7 +138,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
   }, [invoiceType, privateData, companyData]);
 
   // Validate private person fields
-  const _validatePrivate = useCallback((): boolean => {
+  const validatePrivate = useCallback((): boolean => {
     const errors: Record<string, string> = {};
 
     if (!privateData.firstName || privateData.firstName.trim() === '') {
@@ -212,7 +211,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
     };
   }, [validateInvoiceData]);
 
-  const _updatePrivateField = (field: keyof typeof privateData, value: string) => {
+  const updatePrivateField = (field: keyof typeof privateData, value: string) => {
     setPrivateData((prev) => ({ ...prev, [field]: value }));
     // Clear error for this field when user starts typing
     if (privateErrors[field]) {

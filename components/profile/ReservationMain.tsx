@@ -729,9 +729,9 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                       Płatność przelewem tradycyjnym
                     </h6>
                     
-                    {/* Calculate deposit: 600 zł + protections */}
+                    {/* Calculate deposit: 500 zł + protections */}
                     {(() => {
-                      const baseDeposit = 600;
+                      const baseDeposit = 500;
                       // Calculate protection prices from reservation
                       let protectionTotal = 0;
                       if (reservation.selected_protection) {

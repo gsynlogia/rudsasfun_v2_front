@@ -46,20 +46,19 @@
   },
   "step2": {
     "selectedDiets": [],
-    "selectedAddons": ["1"],
+    "selectedAddons": [],
     "selectedProtection": [],
     "selectedProtectionIds": [],
-    "selectedPromotion": "1",
-    "promotionJustification": {},
+    "selectedPromotion": "",
     "transportData": {
       "departureType": "zbiorowy",
-      "departureCity": "Warszawa",
+      "departureCity": "",
       "returnType": "zbiorowy",
-      "returnCity": "Warszawa",
+      "returnCity": "",
       "differentCities": false
     },
-    "transportModalConfirmed": true,
-    "selectedSource": "internet",
+    "transportModalConfirmed": false,
+    "selectedSource": "",
     "inneText": ""
   }
 }

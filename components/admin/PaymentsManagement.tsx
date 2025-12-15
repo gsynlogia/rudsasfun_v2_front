@@ -254,21 +254,21 @@ const generatePaymentItems = async (
   // Total amount should match reservation.total_price (this is the source of truth)
   const totalAmount = totalPriceFromReservation;
 
-  // Deposit amount: 600 PLN base + all protections + all addons (if deposit was selected)
-  const depositBaseAmount = 600;
+  // Deposit amount: 500 PLN base + all protections + all addons (if deposit was selected)
+  const depositBaseAmount = 500;
   const depositAmount = depositBaseAmount + totalProtectionAmount + totalAddonsAmount;
 
   // Distribute payments across items
-  // Priority: If totalPaid >= depositAmount, pay deposit first (600 + protections + addons), then camp
-  // Otherwise, if totalPaid < depositAmount but >= depositBaseAmount, pay partial deposit
-  // Otherwise, pay camp first (full payment without deposit)
-  let remainingPaid = totalPaid;
-  const hasDeposit = depositAmount > depositBaseAmount; // Has protections or addons in deposit
-  const isDepositPayment = hasDeposit && totalPaid >= depositBaseAmount && totalPaid < totalAmount;
+    // Priority: If totalPaid >= depositAmount, pay deposit first (500 + protections + addons), then camp
+    // Otherwise, if totalPaid < depositAmount but >= depositBaseAmount, pay partial deposit
+    // Otherwise, pay camp first (full payment without deposit)
+    let remainingPaid = totalPaid;
+    const hasDeposit = depositAmount > depositBaseAmount; // Has protections or addons in deposit
+    const isDepositPayment = hasDeposit && totalPaid >= depositBaseAmount && totalPaid < totalAmount;
 
-  // Always pay deposit components first if deposit was selected (600 + protections + addons)
+    // Always pay deposit components first if deposit was selected (500 + protections + addons)
   if (isDepositPayment || (hasDeposit && totalPaid >= depositAmount)) {
-    // Pay deposit base (600 PLN) first
+    // Pay deposit base (500 PLN) first
     const depositBasePaid = Math.min(remainingPaid, depositBaseAmount);
     remainingPaid -= depositBasePaid;
 
@@ -348,11 +348,11 @@ const generatePaymentItems = async (
 
       // Add deposit (zaliczka) as first item if it was paid
       if (depositBasePaid > 0) {
-        // Find deposit payment from database (payment with amount around 600 PLN, not a "Rata" payment)
+        // Find deposit payment from database (payment with amount around 500 PLN, not a "Rata" payment)
         const depositPayment = successfulPayments.find(p => {
           const amount = p.paid_amount || p.amount || 0;
-          // Check if payment is around 600 PLN (deposit) and not an installment
-          return amount >= 500 && amount <= 700 &&
+          // Check if payment is around 500 PLN (deposit) and not an installment
+          return amount >= 400 && amount <= 600 &&
                  !p.description?.includes('Rata') &&
                  !p.description?.includes('rata');
         });
@@ -360,7 +360,7 @@ const generatePaymentItems = async (
         installments.push({
           number: 0, // Special number for deposit
           total: installmentCount,
-          amount: depositBaseAmount, // 600 PLN
+          amount: depositBaseAmount, // 500 PLN
           paid: depositBasePaid >= depositBaseAmount,
           paidDate: depositPayment?.paid_at
             ? depositPayment.paid_at.split('T')[0]
@@ -391,10 +391,10 @@ const generatePaymentItems = async (
         .filter(item => item.total === installmentCount); // Only match the correct plan
 
       // Calculate installment amount: divide remaining amount (after deposit) by number of installments
-      // Installments are calculated based on remaining amount after deposit (600 PLN), not full campAmount
-      // Example: campAmount = 2400, deposit = 600, remaining = 1800, but if total is 2550:
-      // remaining = totalPriceFromReservation - depositBaseAmount = 2550 - 600 = 1950
-      // So 1950 / 3 = 650 PLN per installment
+      // Installments are calculated based on remaining amount after deposit (500 PLN), not full campAmount
+      // Example: campAmount = 2400, deposit = 500, remaining = 1900, but if total is 2550:
+      // remaining = totalPriceFromReservation - depositBaseAmount = 2550 - 500 = 2050
+      // So 2050 / 3 = 683.33 PLN per installment
       const remainingForInstallments = depositBasePaid > 0
         ? (totalPriceFromReservation - depositBaseAmount)
         : campAmount;

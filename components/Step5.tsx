@@ -220,8 +220,8 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   // Calculate payment amounts
   const totalPrice = reservation.totalPrice || reservationState.totalPrice || 0;
 
-  // Base deposit amount: 600 PLN
-  const baseDepositAmount = 600;
+  // Base deposit amount: 500 PLN
+  const baseDepositAmount = 500;
 
   // Calculate protection prices (OASA and TARCZA) from reservation items
   const protectionItems = reservation.items.filter((item: ReservationItem) => item.type === 'protection');
@@ -236,7 +236,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     return sum;
   }, 0);
 
-  // Deposit amount = base (600 PLN) + protection prices
+  // Deposit amount = base (500 PLN) + protection prices
   const depositAmount = baseDepositAmount + protectionTotal;
   const _remainingAmount = totalPrice - depositAmount;
 

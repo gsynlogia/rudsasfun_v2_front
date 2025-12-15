@@ -9,7 +9,6 @@ import TransportSection from './step2/TransportSection';
 import SourceSection from './step2/SourceSection';
 import type { StepComponentProps } from '@/types/reservation';
 import { saveStep2FormData, loadStep2FormData, type Step2FormData } from '@/utils/sessionStorage';
-import { isFakeDataEnabled, getFakeStep2Data } from '@/utils/fakeData';
 
 /**
  * Step2 Component - Reservation Details
@@ -38,66 +37,13 @@ export default function Step2({ onNext, onPrevious, disabled = false }: StepComp
     };
   }, [validateStep2]);
 
-  // Load data from sessionStorage or fake data on mount
+  // Load data from sessionStorage on mount
   useEffect(() => {
-    const loadData = async () => {
-      let savedData = loadStep2FormData();
-
-      // If fake data is enabled and no saved data exists (or empty), load fake data
-      if (isFakeDataEnabled()) {
-        const hasExistingData = savedData && (
-          (savedData.selectedAddons && savedData.selectedAddons.length > 0) ||
-          (savedData.selectedPromotion && savedData.selectedPromotion !== '') ||
-          (savedData.transportData && savedData.transportData.departureCity !== '')
-        );
-        
-        if (!hasExistingData) {
-          const fakeData = await getFakeStep2Data();
-          if (fakeData) {
-            // Merge fake data with saved data (fake data takes priority)
-            // Ensure transportData is properly merged with all required fields
-            const defaultTransportData = {
-              departureType: 'zbiorowy',
-              departureCity: '',
-              returnType: 'zbiorowy',
-              returnCity: '',
-              differentCities: false,
-            };
-            
-            // Ensure all required fields are defined
-            const mergedData: Step2FormData = {
-              selectedDiets: fakeData.selectedDiets || savedData?.selectedDiets || [],
-              selectedAddons: fakeData.selectedAddons || savedData?.selectedAddons || [],
-              selectedProtection: fakeData.selectedProtection || savedData?.selectedProtection || [],
-              selectedProtectionIds: fakeData.selectedProtectionIds || savedData?.selectedProtectionIds || [],
-              selectedPromotion: fakeData.selectedPromotion !== undefined ? fakeData.selectedPromotion : (savedData?.selectedPromotion ?? ''),
-              promotionJustification: fakeData.promotionJustification || savedData?.promotionJustification || {},
-              transportData: {
-                ...defaultTransportData,
-                ...(savedData?.transportData || {}),
-                ...(fakeData.transportData || {}),
-              },
-              transportModalConfirmed: fakeData.transportModalConfirmed !== undefined ? fakeData.transportModalConfirmed : (savedData?.transportModalConfirmed ?? false),
-              selectedSource: fakeData.selectedSource !== undefined ? fakeData.selectedSource : (savedData?.selectedSource ?? ''),
-              inneText: fakeData.inneText !== undefined ? fakeData.inneText : (savedData?.inneText ?? ''),
-            };
-            
-            savedData = mergedData;
-            // Save fake data to sessionStorage immediately
-            saveStep2FormData(savedData as Step2FormData);
-            
-            // Force a re-render by triggering a custom event that components can listen to
-            window.dispatchEvent(new CustomEvent('fakeDataLoaded', { detail: savedData }));
-          }
-        }
-      }
-
-      if (savedData) {
-        // Data will be loaded by individual components
-        // This is just to ensure we have the structure
-      }
-    };
-    loadData();
+    const savedData = loadStep2FormData();
+    if (savedData) {
+      // Data will be loaded by individual components
+      // This is just to ensure we have the structure
+    }
   }, []);
 
   return (
