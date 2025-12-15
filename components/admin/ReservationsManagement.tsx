@@ -102,7 +102,7 @@ interface BackendReservation {
 }
 
 // Map backend reservation to frontend format
-const mapBackendToFrontend = (backendReservation: BackendReservation): Reservation => {
+const mapBackendToFrontend = (backendReservation: BackendReservation, dietNamesMap: Map<number, string> = new Map()): Reservation => {
   const firstParent = backendReservation.parents_data && backendReservation.parents_data.length > 0 
     ? backendReservation.parents_data[0] 
     : null;
@@ -169,7 +169,7 @@ const mapBackendToFrontend = (backendReservation: BackendReservation): Reservati
       paidAmount: paidAmount,
       notes: backendReservation.accommodation_request || 'Brak uwag',
       specialRequests: backendReservation.accommodation_request || 'Brak',
-      dietaryRestrictions: backendReservation.diet_name || (backendReservation.diet !== null ? 'Dieta ID: ' + backendReservation.diet : 'Standardowa'),
+      dietaryRestrictions: backendReservation.diet_name || (backendReservation.diet !== null ? (dietNamesMap.get(backendReservation.diet) || `Dieta ID: ${backendReservation.diet}`) : 'Standardowa'),
       medicalInfo: 'Brak informacji', // Could be enhanced with health_questions data
     },
   };
@@ -197,6 +197,9 @@ export default function ReservationsManagement() {
   // State for certificates
   const [certificates, setCertificates] = useState<Map<number, CertificateResponse[]>>(new Map());
   const [loadingCertificates, setLoadingCertificates] = useState<Set<number>>(new Set());
+  
+  // State for diet names map (ID -> name)
+  const [dietNamesMap, setDietNamesMap] = useState<Map<number, string>>(new Map());
 
   // Fetch qualification card for a reservation
   const fetchQualificationCard = async (reservationId: number) => {
@@ -244,6 +247,39 @@ export default function ReservationsManagement() {
     }
   };
 
+  // Fetch diet names from API
+  useEffect(() => {
+    const fetchDietNames = async () => {
+      try {
+        const { authService } = await import('@/lib/services/AuthService');
+        const { API_BASE_URL } = await import('@/utils/api-config');
+        const token = authService.getToken();
+        if (token) {
+          const response = await fetch(`${API_BASE_URL}/api/diets/?limit=1000`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            const namesMap = new Map<number, string>();
+            if (data.diets) {
+              data.diets.forEach((diet: { id: number; name: string }) => {
+                namesMap.set(diet.id, diet.name);
+              });
+            }
+            setDietNamesMap(namesMap);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching diet names:', err);
+      }
+    };
+    
+    fetchDietNames();
+  }, []);
+
   // Fetch reservations from API
   useEffect(() => {
     const fetchReservations = async () => {
@@ -251,7 +287,7 @@ export default function ReservationsManagement() {
         setIsLoading(true);
         setError(null);
         const backendReservations = await reservationService.listReservations(0, 1000);
-        const mappedReservations = backendReservations.map(mapBackendToFrontend);
+        const mappedReservations = backendReservations.map((r) => mapBackendToFrontend(r, dietNamesMap));
         setAllReservations(mappedReservations);
         
         // Fetch qualification cards and certificates for all reservations
@@ -268,7 +304,7 @@ export default function ReservationsManagement() {
     };
     
     fetchReservations();
-  }, []);
+  }, [dietNamesMap]);
   
   // Toggle row expansion with animation
   const toggleRowExpansion = (reservationId: number) => {
@@ -1103,7 +1139,7 @@ export default function ReservationsManagement() {
                               </div>
                               
                               {/* Payment Details */}
-                              <div className="space-y-2">
+                              {/* <div className="space-y-2">
                                 <h4 className="font-semibold text-sm text-gray-900 mb-2">Płatności</h4>
                                 <div className="space-y-1 text-xs">
                                   <div className="flex items-center gap-2">
@@ -1122,7 +1158,7 @@ export default function ReservationsManagement() {
                                     <span className="text-gray-900">{reservation.details.paidAmount} / {reservation.details.totalAmount} PLN</span>
                                   </div>
                                 </div>
-                              </div>
+                              </div> */}
                               
                               {/* Qualification Card */}
                               {(() => {

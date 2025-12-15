@@ -229,9 +229,9 @@ export function clearStep2FormData(): void {
 }
 
 export interface Step3FormData {
-  wantsInvoice: boolean;  // Whether client wants an invoice
-  invoiceType?: 'private' | 'company';  // Only required if wantsInvoice === true
-  privateData?: {
+  wantsInvoice: boolean; // Whether client wants an invoice
+  invoiceType: 'private' | 'company';
+  privateData: {
     firstName: string;
     lastName: string;
     email: string;
@@ -241,16 +241,16 @@ export interface Step3FormData {
     city: string;
     nip: string;
   };
-  companyData?: {
+  companyData: {
     companyName: string;
     nip: string;
     street: string;
     postalCode: string;
     city: string;
   };
-  deliveryType?: 'electronic' | 'paper';  // Only required if wantsInvoice === true
-  differentAddress?: boolean;
-  deliveryAddress?: {
+  deliveryType: 'electronic' | 'paper';
+  differentAddress: boolean;
+  deliveryAddress: {
     street: string;
     postalCode: string;
     city: string;

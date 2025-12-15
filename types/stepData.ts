@@ -73,7 +73,7 @@ export const defaultStep2FormData: Step2FormData = {
  * Default Step3 form data
  */
 export const defaultStep3FormData: Step3FormData = {
-  wantsInvoice: false,  // Default: client doesn't want invoice
+  wantsInvoice: true,
   invoiceType: 'private',
   privateData: {
     firstName: '',
