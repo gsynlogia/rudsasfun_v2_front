@@ -96,7 +96,24 @@ class InvoiceService {
       });
 
       if (!response.ok) {
-        // Try to parse error response, but handle cases where response is not JSON
+        // For 500 errors (Internal Server Error), return empty list instead of throwing
+        // This allows the UI to continue working even if backend has issues
+        if (response.status === 500) {
+          console.error('[InvoiceService] Backend error (500): Internal server error. Returning empty invoice list.');
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const error = await response.json();
+              console.error('[InvoiceService] Error details:', error);
+            }
+          } catch (parseError) {
+            // Ignore parsing errors for error responses
+          }
+          // Return empty list to allow UI to continue
+          return { invoices: [], total: 0 };
+        }
+
+        // For other errors, try to parse error response
         let errorMessage = 'Błąd podczas pobierania faktur';
         try {
           const contentType = response.headers.get('content-type');
