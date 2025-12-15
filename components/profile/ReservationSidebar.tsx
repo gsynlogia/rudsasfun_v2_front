@@ -205,27 +205,51 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       let contractExists = false;
       try {
         const contracts = await contractService.listMyContracts();
+        console.log(`[Contract Check] Checking contracts for reservation ${reservationIdNum}:`, contracts);
         contractExists = contracts.some(c => c.reservation_id === reservationIdNum);
+        console.log(`[Contract Check] Contract exists: ${contractExists}`);
       } catch (error) {
         console.error('Error checking contract status:', error);
         // If check fails, assume contract doesn't exist and try to generate
+        contractExists = false;
       }
 
       // If contract doesn't exist, generate it first
       if (!contractExists) {
+        console.log(`[Contract Generation] Generating contract for reservation ${reservationIdNum}...`);
         try {
-          await contractService.generateContract(reservationIdNum);
+          const generateResult = await contractService.generateContract(reservationIdNum);
+          console.log(`[Contract Generation] Contract generation result:`, generateResult);
+          console.log(`[Contract Generation] Contract generated successfully for reservation ${reservationIdNum}`);
+          
+          // Wait a bit to ensure contract is saved to database
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
           // Reload contract status after generation
           await loadContractStatus();
+          
+          // Verify contract was actually created
+          const verifyContracts = await contractService.listMyContracts();
+          const verifyExists = verifyContracts.some(c => c.reservation_id === reservationIdNum);
+          console.log(`[Contract Verification] Contract exists after generation: ${verifyExists}`);
+          
+          if (!verifyExists) {
+            console.error(`[Contract Verification] Contract was not created for reservation ${reservationIdNum}`);
+            alert('Umowa nie została wygenerowana. Spróbuj ponownie.');
+            return;
+          }
         } catch (generateError: any) {
           console.error('Error generating contract:', generateError);
           alert('Nie udało się wygenerować umowy. Spróbuj ponownie.');
           return;
         }
+      } else {
+        console.log(`[Contract Check] Contract already exists for reservation ${reservationIdNum}, skipping generation`);
       }
 
       // Contract exists (either was already there or just generated)
       // Redirect to downloads page
+      console.log(`[Redirect] Redirecting to downloads page for reservation ${reservationIdNum}`);
       router.push('/profil/do-pobrania');
     } catch (error) {
       console.error('Error handling contract:', error);

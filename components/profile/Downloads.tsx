@@ -160,14 +160,16 @@ export default function Downloads() {
 
   const handleDownloadDocument = async (document: Document) => {
     if (document.type === 'contract') {
-      // Download specific contract file by ID (system-generated)
-      if (!document.fileId) {
-        alert('Błąd: brak ID pliku do pobrania');
-        return;
-      }
+      // Download contract - use reservationId if fileId is 0 or missing (file system fallback)
       try {
         setDownloadingIds(prev => new Set(prev).add(document.id));
-        await contractService.downloadContractFile(document.fileId);
+        if (document.fileId && document.fileId > 0) {
+          // Use file ID if available and valid
+          await contractService.downloadContractFile(document.fileId);
+        } else {
+          // Use reservation ID for file system files (fileId = 0)
+          await contractService.downloadContract(document.reservationId);
+        }
       } catch (error) {
         console.error('Error downloading contract:', error);
         alert('Nie udało się pobrać umowy. Spróbuj ponownie.');
@@ -180,7 +182,7 @@ export default function Downloads() {
       }
     } else if (document.type === 'uploaded_contract') {
       // Download specific uploaded file by ID
-      if (!document.fileId) {
+      if (!document.fileId || document.fileId <= 0) {
         alert('Błąd: brak ID pliku do pobrania');
         return;
       }
