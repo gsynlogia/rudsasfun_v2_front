@@ -547,9 +547,9 @@ export default function AdditionalServicesTiles({
               <div className={`text-center mb-1 ${isActive ? 'text-white font-bold' : textColor}`} style={{ minHeight: tile.icon ? '20%' : '40%' }}>
                 <div className="flex flex-col items-center">
                   <span className="text-[10px] sm:text-xs font-semibold leading-tight">{tile.name}</span>
-                  {!isActive && (tile as any).price && (tile as any).price > 0 && (
+                  {(tile as any).price && (tile as any).price > 0 && (
                     <span className={`text-[9px] sm:text-[10px] font-medium leading-tight mt-0.5 ${isActive ? 'text-white' : textColor}`}>
-                      + {(tile as any).price} PLN
+                      {isActive ? '' : '+'} {(tile as any).price} PLN
                     </span>
                   )}
                 </div>
