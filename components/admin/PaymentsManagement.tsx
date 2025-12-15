@@ -1807,11 +1807,65 @@ export default function PaymentsManagement() {
                       </tr>
                       {isExpanded && (
                         <tr className="bg-blue-50 animate-slideDown">
-                          <td colSpan={6} className="px-4 py-4">
+                          <td colSpan={7} className="px-4 py-4">
                             <div className="space-y-4">
+                              {/* Reservation Details Summary - Table Data */}
+                              <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                <h4 className="text-sm font-semibold text-gray-900 mb-3">Szczegóły rezerwacji</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  <div>
+                                    <p className="text-xs text-gray-500 mb-1">Nazwa rezerwacji</p>
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {reservation.reservationName}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-gray-500 mb-1">Data utworzenia</p>
+                                    <p className="text-sm text-gray-900">
+                                      {new Date(reservation.createdAt).toLocaleDateString('pl-PL', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-gray-500 mb-1">Uczestnik</p>
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {reservation.participantName}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-gray-500 mb-1">Status</p>
+                                    <div>
+                                      {hasReturnedItems ? (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                          Zwrócone
+                                        </span>
+                                      ) : allPaid && isFullPayment ? (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                          Opłacone w całości
+                                        </span>
+                                      ) : isPartialPayment || hasPartiallyPaid ? (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                          Częściowo opłacone
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                          Nieopłacone
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
                               {/* Payment Summary */}
                               <div className="bg-white rounded-lg p-4 border border-gray-200">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <h4 className="text-sm font-semibold text-gray-900 mb-3">Podsumowanie płatności</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                   <div>
                                     <p className="text-xs text-gray-500 mb-1">Kwota całkowita</p>
                                     <p className="text-lg font-bold text-gray-900">
@@ -1839,8 +1893,9 @@ export default function PaymentsManagement() {
                                 </div>
 
                                 {/* Payment Items */}
-                                <div className="space-y-2">
+                                <div className="mt-4 pt-4 border-t border-gray-200">
                                   <h4 className="text-sm font-semibold text-gray-900 mb-3">Elementy płatności</h4>
+                                  <div className="space-y-2">
                                   {reservation.paymentDetails.items.map((item) => {
                                     const isItemChecked = isItemSelected(reservation.id, item.id);
                                     const isCanceled = item.status === 'canceled';
@@ -2032,6 +2087,7 @@ export default function PaymentsManagement() {
                                       </Fragment>
                                     );
                                   })}
+                                  </div>
                                 </div>
 
                                 {/* Invoice Status and Actions */}
@@ -2144,11 +2200,11 @@ export default function PaymentsManagement() {
                                   </div>
                                 </div>
 
-                                {/* Invoices and Payment History Section - Two Column Layout */}
+                                {/* Invoices and Payment History Section - Full Width Layout */}
                                 <div className="mt-6 pt-4 border-t border-gray-200">
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {/* Left Column: Invoices */}
-                                    <div>
+                                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Column 1: Invoices */}
+                                    <div className="lg:col-span-2">
                                       <h4 className="text-sm font-semibold text-gray-900 mb-3">Faktury dla tej rezerwacji</h4>
 
                                       {loadingInvoices.has(reservation.id) ? (
@@ -2257,7 +2313,7 @@ export default function PaymentsManagement() {
                                       )}
                                     </div>
 
-                                    {/* Right Column: Payment History */}
+                                    {/* Column 2: Payment History */}
                                     <div>
                                       <h4 className="text-sm font-semibold text-gray-900 mb-3">Historia wpłat</h4>
 
