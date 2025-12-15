@@ -335,7 +335,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
               <p className="text-[10px] sm:text-xs text-gray-600 text-center">Umowa</p>
               <div className="w-full flex flex-col gap-1.5 sm:gap-2">
-                <button
+                {/* <button
                   onClick={handleDownloadContract}
                   disabled={isGenerating || loadingContract}
                   className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
@@ -360,7 +360,10 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       )}
                     </>
                   )}
-                </button>
+                </button> */}
+                <div className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-orange-50 border border-orange-200 text-[10px] sm:text-xs rounded text-orange-700 text-center">
+                  Umowa będzie dostępna za dwa dni
+                </div>
                 <input
                   ref={contractInputRef}
                   type="file"
@@ -448,7 +451,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                 {loadingCard ? 'Ładowanie...' : (qualificationCard ? 'Karta kwalifikacyjna' : 'Karta kwalifikacyjna')}
               </p>
               <div className="w-full flex flex-col gap-1.5 sm:gap-2">
-                <button
+                {/* <button
                   onClick={handleDownloadCard}
                   disabled={downloadingCard || loadingCard || generatingCard}
                   className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
@@ -480,7 +483,10 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       )}
                     </>
                   )}
-                </button>
+                </button> */}
+                <div className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-orange-50 border border-orange-200 text-[10px] sm:text-xs rounded text-orange-700 text-center">
+                  Karta kwalifikacyjna będzie dostępna za dwa dni
+                </div>
                 <input
                   ref={qualificationCardInputRef}
                   type="file"
