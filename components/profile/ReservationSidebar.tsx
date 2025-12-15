@@ -364,7 +364,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                 <div className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-orange-50 border border-orange-200 text-[10px] sm:text-xs rounded text-orange-700 text-center">
                   Umowa będzie dostępna za dwa dni
                 </div>
-                <input
+                {/* <input
                   ref={contractInputRef}
                   type="file"
                   accept=".pdf"
@@ -404,7 +404,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       <span>Wgraj podpisaną umowę</span>
                     </>
                   )}
-                </button>
+                </button> */}
               </div>
             </div>
           </div>
@@ -487,7 +487,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                 <div className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-orange-50 border border-orange-200 text-[10px] sm:text-xs rounded text-orange-700 text-center">
                   Karta kwalifikacyjna będzie dostępna za dwa dni
                 </div>
-                <input
+                {/* <input
                   ref={qualificationCardInputRef}
                   type="file"
                   accept=".pdf"
@@ -527,7 +527,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       <span>Wgraj podpisaną i wypełnioną kartę</span>
                     </>
                   )}
-                </button>
+                </button> */}
               </div>
             </div>
           </div>
