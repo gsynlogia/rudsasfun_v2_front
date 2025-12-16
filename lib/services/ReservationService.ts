@@ -449,15 +449,15 @@ class ReservationService {
     totalPrice: number,
     depositAmount?: number
   ): CreateReservationRequest {
-    // Always send only the first parent/guardian (index 0)
-    // Second parent data is not needed for payment processing
-    const firstParentOnly = step1Data.parents.length > 0 ? [step1Data.parents[0]] : [];
+    // Send all parents/guardians to backend
+    // All parents are saved to database, but only first parent is used for payment processing
+    const allParents = step1Data.parents || [];
     
     return {
       camp_id: campId,
       property_id: propertyId,
       step1: {
-        parents: firstParentOnly,
+        parents: allParents,
         participantData: step1Data.participantData,
         selectedDietId: step1Data.selectedDietId || null,
         accommodationRequest: step1Data.accommodationRequest,
