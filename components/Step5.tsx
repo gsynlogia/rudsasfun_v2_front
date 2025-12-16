@@ -478,7 +478,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     // Get promotion item from reservation
     const promotionItem = reservation.items.find((item: ReservationItem) => item.type === 'promotion');
     if (promotionItem) {
-      return `${promotionItem.name} (${formatPrice(promotionItem.price)}zł)`;
+      return promotionItem.name;
     }
 
     // Fallback to default values
@@ -490,7 +490,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
     const promotion = promotions[step2Data.selectedPromotion];
     if (promotion) {
-      return `${promotion.name} (${formatPrice(promotion.price)}zł)`;
+      return promotion.name;
     }
     return '';
   };
