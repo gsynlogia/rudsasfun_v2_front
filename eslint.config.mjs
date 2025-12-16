@@ -127,7 +127,7 @@ const eslintConfig = defineConfig([
       // Wymuszaj spójne wcięcia (2 spacje) - wyłączamy, bo może kolidować z Prettier/Next.js
       'indent': 'off', // Wyłączamy, bo Next.js ma własne formatowanie
       // Wymuszaj spójne końce linii
-      'eol-last': ['error', 'always'],
+      'eol-last': ['error', 'never'],
       // Wymuszaj spójne spacje w nawiasach klamrowych
       'object-curly-spacing': ['error', 'always'],
       'array-bracket-spacing': ['error', 'never'],
@@ -164,7 +164,7 @@ const eslintConfig = defineConfig([
       // Zabroń multiple blank lines (zbyt wielu pustych linii)
       'no-multiple-empty-lines': ['error', {
         'max': 2, // Maksymalnie 2 puste linie pod rząd
-        'maxEOF': 1, // Maksymalnie 1 pusta linia na końcu pliku
+        'maxEOF': 0, // Brak pustych linii na końcu pliku (spójne z eol-last: never)
         'maxBOF': 0, // Brak pustych linii na początku pliku
       }],
       // Zabroń whitespace na początku linii (indent jest obsługiwany przez indent rule)
