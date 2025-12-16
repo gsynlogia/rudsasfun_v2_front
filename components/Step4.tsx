@@ -420,44 +420,50 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
 
             {/* Documents List */}
             <div className="space-y-0 pl-4 sm:pl-6 md:pl-8">
-              {getDocumentsList().map((doc, index) => (
-                <div key={doc.name}>
-                  <div
-                    className="flex items-center justify-between py-3 sm:py-4 px-0 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => handleDocumentDownload(doc.name)}
-                  >
-                    <span className="text-xs sm:text-sm text-gray-700 flex-1">
-                      {doc.display_name}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDocumentDownload(doc.name);
-                      }}
-                      className="ml-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#EAF6FE] hover:bg-[#D0ECFD] flex items-center justify-center transition-colors flex-shrink-0"
-                      aria-label={`Pobierz ${doc.display_name}`}
+              {getDocumentsList().map((doc, index) => {
+                // Comment out "Regulamin wejścia Watt"
+                if (doc.name === 'watt_input_regulation') {
+                  return null;
+                }
+                return (
+                  <div key={doc.name}>
+                    <div
+                      className="flex items-center justify-between py-3 sm:py-4 px-0 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => handleDocumentDownload(doc.name)}
                     >
-                      <svg
-                        className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0]"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                      <span className="text-xs sm:text-sm text-gray-700 flex-1">
+                        {doc.display_name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDocumentDownload(doc.name);
+                        }}
+                        className="ml-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#EAF6FE] hover:bg-[#D0ECFD] flex items-center justify-center transition-colors flex-shrink-0"
+                        aria-label={`Pobierz ${doc.display_name}`}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0]"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    {index < getDocumentsList().length - 1 && (
+                      <hr className="border-gray-200" />
+                    )}
                   </div>
-                  {index < getDocumentsList().length - 1 && (
-                    <hr className="border-gray-200" />
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
