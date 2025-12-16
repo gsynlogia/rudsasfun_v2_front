@@ -21,6 +21,52 @@ interface Promotion {
 }
 
 /**
+ * Sort promotions by specified order based on name matching
+ */
+function sortPromotionsByOrder(promotions: Promotion[]): Promotion[] {
+  const orderMap: Record<string, number> = {
+    'first minute': 1,
+    'rodzeństwo razem': 2,
+    'obozy na maxa': 3,
+    'duża rodzina': 4,
+    'bon brązowy': 5,
+    'bon srebrny': 6,
+    'bon złoty': 7,
+    'bon platynowy': 8,
+  };
+
+  return [...promotions].sort((a, b) => {
+    const nameA = a.name.toLowerCase().trim();
+    const nameB = b.name.toLowerCase().trim();
+
+    let orderA = 999; // Default for unknown promotions
+    let orderB = 999;
+
+    // Check if name contains any of the order keys
+    for (const [key, order] of Object.entries(orderMap)) {
+      if (nameA.includes(key)) {
+        orderA = order;
+        break;
+      }
+    }
+
+    for (const [key, order] of Object.entries(orderMap)) {
+      if (nameB.includes(key)) {
+        orderB = order;
+        break;
+      }
+    }
+
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+
+    // If same order, maintain original order (stable sort)
+    return 0;
+  });
+}
+
+/**
  * PromotionsSection Component
  * Displays promotions from API for the selected turnus with justification fields
  */
@@ -99,8 +145,9 @@ export default function PromotionsSection() {
 
         const data = await response.json();
         const promotionsList = Array.isArray(data) ? data : [];
-        setPromotions(promotionsList);
-        console.log('[PromotionsSection] Fetched promotions:', promotionsList.length, promotionsList);
+        const sortedPromotions = sortPromotionsByOrder(promotionsList);
+        setPromotions(sortedPromotions);
+        console.log('[PromotionsSection] Fetched promotions:', sortedPromotions.length, sortedPromotions);
       } catch (err) {
         console.error('[PromotionsSection] Error fetching promotions:', err);
         setError('Nie udało się załadować promocji');
