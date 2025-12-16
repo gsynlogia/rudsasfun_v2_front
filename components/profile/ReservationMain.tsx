@@ -312,7 +312,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     
     // Add health questions with details
     if (healthQuestions && typeof healthQuestions === 'object') {
-      if (healthQuestions.chronicDiseases && (healthQuestions.chronicDiseases === 'yes' || healthQuestions.chronicDiseases === 'tak')) {
+      if (healthQuestions.chronicDiseases && (healthQuestions.chronicDiseases === 'yes' || healthQuestions.chronicDiseases === 'tak' || healthQuestions.chronicDiseases === 'Tak')) {
         const details = healthDetails && typeof healthDetails === 'object' ? healthDetails.chronicDiseases : '';
         if (details && details.trim()) {
           parts.push(`Choroby przewlekłe: ${details}`);
@@ -321,7 +321,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         }
       }
       
-      if (healthQuestions.dysfunctions && (healthQuestions.dysfunctions === 'yes' || healthQuestions.dysfunctions === 'tak')) {
+      if (healthQuestions.dysfunctions && (healthQuestions.dysfunctions === 'yes' || healthQuestions.dysfunctions === 'tak' || healthQuestions.dysfunctions === 'Tak')) {
         const details = healthDetails && typeof healthDetails === 'object' ? healthDetails.dysfunctions : '';
         if (details && details.trim()) {
           parts.push(`Dysfunkcje: ${details}`);
@@ -330,7 +330,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         }
       }
       
-      if (healthQuestions.psychiatric && (healthQuestions.psychiatric === 'yes' || healthQuestions.psychiatric === 'tak')) {
+      if (healthQuestions.psychiatric && (healthQuestions.psychiatric === 'yes' || healthQuestions.psychiatric === 'tak' || healthQuestions.psychiatric === 'Tak')) {
         const details = healthDetails && typeof healthDetails === 'object' ? healthDetails.psychiatric : '';
         if (details && details.trim()) {
           parts.push(`Problemy psychiatryczne: ${details}`);
