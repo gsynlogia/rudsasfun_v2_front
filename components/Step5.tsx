@@ -75,6 +75,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const [_paymentInstallments, _setPaymentInstallments] = useState<'full' | '2' | '3'>('full');
   const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
   const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
+  const [step1Diet, setStep1Diet] = useState<{ id: number; name: string; price: number } | null>(null);
 
   // Load online payments status on mount
   useEffect(() => {
@@ -217,6 +218,76 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const step3Data = withDefaults(step3DataRaw, defaultStep3FormData);
   const reservationState = withDefaults(reservationStateRaw, defaultReservationState);
 
+  // Fetch Step1 diet from API
+  useEffect(() => {
+    const fetchStep1Diet = async () => {
+      if (!step1Data?.selectedDietId) {
+        setStep1Diet(null);
+        return;
+      }
+
+      try {
+        // Extract camp_id and property_id from URL
+        const pathParts = pathname.split('/').filter(Boolean);
+        const campIdIndex = pathParts.indexOf('camps');
+        const campId = campIdIndex !== -1 && campIdIndex + 1 < pathParts.length
+          ? parseInt(pathParts[campIdIndex + 1], 10)
+          : null;
+        const propertyId = campIdIndex !== -1 && campIdIndex + 3 < pathParts.length
+          ? parseInt(pathParts[campIdIndex + 3], 10)
+          : null;
+        
+        // First try to get diet from turnus diets
+        if (campId && propertyId && !isNaN(campId) && !isNaN(propertyId)) {
+          try {
+            const turnusDietsResponse = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${propertyId}/diets`);
+            if (turnusDietsResponse.ok) {
+              const turnusDiets = await turnusDietsResponse.json();
+              const diet = turnusDiets.find((d: any) => (d.general_diet_id || d.id) === step1Data.selectedDietId);
+              if (diet) {
+                setStep1Diet({
+                  id: diet.general_diet_id || diet.id,
+                  name: diet.name,
+                  price: diet.price || 0,
+                });
+                return;
+              }
+            }
+          } catch (err) {
+            console.warn('[Step5] Error fetching turnus diets:', err);
+          }
+        }
+
+        // Fallback to general diets
+        try {
+          const generalDietsResponse = await fetch(`${API_BASE_URL}/api/general-diets/public`);
+          if (generalDietsResponse.ok) {
+            const generalDiets = await generalDietsResponse.json();
+            const diet = generalDiets.find((d: any) => d.id === step1Data.selectedDietId);
+            if (diet) {
+              setStep1Diet({
+                id: diet.id,
+                name: diet.display_name || diet.name,
+                price: diet.price || 0,
+              });
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('[Step5] Error fetching general diets:', err);
+        }
+
+        // If not found, set to null
+        setStep1Diet(null);
+      } catch (err) {
+        console.error('[Step5] Error fetching Step1 diet:', err);
+        setStep1Diet(null);
+      }
+    };
+
+    fetchStep1Diet();
+  }, [step1Data?.selectedDietId, pathname]);
+
   // Calculate payment amounts
   const totalPrice = reservation.totalPrice || reservationState.totalPrice || 0;
 
@@ -288,19 +359,17 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     return cities[cityValue] || getValueOrNotSet(cityValue, 'Nie wybrano');
   };
 
-  // Get diet label from selectedDietId or reservation items
+  // Get diet label from selectedDietId from Step1 (fetched from API)
   const getDietLabel = (dietId: number | null | undefined): string => {
     if (!dietId) return 'Nie wybrano';
 
-    // First, try to find diet in reservation items (for paid diets)
-      const dietItem = reservation.items.find((item: ReservationItem) => item.type === 'diet');
-    if (dietItem) {
-      return `${dietItem.name} (${formatPrice(dietItem.price)}zł)`;
+    // Use diet fetched from API (step1Diet state)
+    if (step1Diet && step1Diet.id === dietId) {
+      return `${step1Diet.name} (${formatPrice(step1Diet.price)}zł)`;
     }
 
-    // If not in reservation items, it's likely a free diet (standard)
-    // We could fetch from API, but for now return a generic label
-    return 'Standardowa (0,00zł)';
+    // Fallback while loading or if not found
+    return 'Ładowanie...';
   };
 
   // Get gender label
@@ -769,6 +838,9 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const firstParent: ParentData = (step1Data?.parents && step1Data.parents.length > 0)
     ? step1Data.parents[0]
     : defaultParent;
+  const secondParent: ParentData | null = (step1Data?.parents && step1Data.parents.length > 1)
+    ? step1Data.parents[1]
+    : null;
   const participant: ParticipantData = step1Data?.participantData || defaultParticipant;
 
   // Helper to format phone number
@@ -827,6 +899,25 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
               </div>
             </div>
           </div>
+
+          {/* Second Parent (if exists) */}
+          {secondParent && (
+            <>
+              <DashedLine />
+              <div className="mb-4 sm:mb-6">
+                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
+                  Dane opiekuna 2
+                </h3>
+                <div className="text-xs sm:text-sm text-gray-700 space-y-1">
+                  <div>{getValueOrNotSet(secondParent.firstName)} {getValueOrNotSet(secondParent.lastName)}</div>
+                  <div>{getValueOrNotSet(secondParent.email)}</div>
+                  <div>{formatPhone(secondParent.phone, secondParent.phoneNumber)}</div>
+                  <div>{getValueOrNotSet(secondParent.street)}</div>
+                  <div>{getValueOrNotSet(secondParent.postalCode)} {getValueOrNotSet(secondParent.city)}</div>
+                </div>
+              </div>
+            </>
+          )}
 
           <DashedLine />
 
