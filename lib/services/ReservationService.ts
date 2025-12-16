@@ -153,6 +153,16 @@ export interface ReservationResponse {
   diet_name: string | null;
   accommodation_request: string | null;
   additional_notes?: string | null;
+  health_questions?: {
+    chronicDiseases?: string;
+    dysfunctions?: string;
+    psychiatric?: string;
+  } | null;
+  health_details?: {
+    chronicDiseases?: string;
+    dysfunctions?: string;
+    psychiatric?: string;
+  } | null;
   selected_source: string | null;
   source_name: string | null;
   selected_addons?: string[] | null;

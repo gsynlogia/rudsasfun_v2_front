@@ -292,7 +292,63 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const accommodation = reservation.accommodation_request || 'Brak danych';
 
   // Get health info - use additional_notes (Informacje dodatkowe / Uwagi from Step1)
-  const healthInfo = reservation.additional_notes || 'Brak danych';
+  const additionalNotes = reservation.additional_notes || null;
+  
+  // Get health questions and details
+  const healthQuestions = reservation.health_questions || null;
+  const healthDetails = reservation.health_details || null;
+  
+  // Format health status info
+  const formatHealthStatus = (question: string | null | undefined): string => {
+    if (!question || question.trim() === '') return 'Nie';
+    if (question === 'yes' || question === 'tak') return 'Tak';
+    if (question === 'no' || question === 'nie') return 'Nie';
+    return question;
+  };
+  
+  // Build health info display
+  const buildHealthInfo = () => {
+    const parts: string[] = [];
+    
+    // Add health questions with details
+    if (healthQuestions && typeof healthQuestions === 'object') {
+      if (healthQuestions.chronicDiseases && (healthQuestions.chronicDiseases === 'yes' || healthQuestions.chronicDiseases === 'tak')) {
+        const details = healthDetails && typeof healthDetails === 'object' ? healthDetails.chronicDiseases : '';
+        if (details && details.trim()) {
+          parts.push(`Choroby przewlekłe: ${details}`);
+        } else {
+          parts.push('Choroby przewlekłe: Tak');
+        }
+      }
+      
+      if (healthQuestions.dysfunctions && (healthQuestions.dysfunctions === 'yes' || healthQuestions.dysfunctions === 'tak')) {
+        const details = healthDetails && typeof healthDetails === 'object' ? healthDetails.dysfunctions : '';
+        if (details && details.trim()) {
+          parts.push(`Dysfunkcje: ${details}`);
+        } else {
+          parts.push('Dysfunkcje: Tak');
+        }
+      }
+      
+      if (healthQuestions.psychiatric && (healthQuestions.psychiatric === 'yes' || healthQuestions.psychiatric === 'tak')) {
+        const details = healthDetails && typeof healthDetails === 'object' ? healthDetails.psychiatric : '';
+        if (details && details.trim()) {
+          parts.push(`Problemy psychiatryczne: ${details}`);
+        } else {
+          parts.push('Problemy psychiatryczne: Tak');
+        }
+      }
+    }
+    
+    // Add additional notes if available
+    if (additionalNotes && additionalNotes.trim()) {
+      parts.push(additionalNotes);
+    }
+    
+    return parts.length > 0 ? parts : ['Brak danych'];
+  };
+  
+  const healthInfoParts = buildHealthInfo();
 
   // Map status
   const statusMap: Record<string, string> = {
@@ -467,8 +523,10 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             {/* Health Status */}
             <div>
               <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Opieka zdrowotna</h5>
-              <div className="text-xs sm:text-sm text-gray-700">
-                {healthInfo}
+              <div className="text-xs sm:text-sm text-gray-700 space-y-1">
+                {healthInfoParts.map((part, index) => (
+                  <div key={index}>{part}</div>
+                ))}
               </div>
             </div>
           </div>
