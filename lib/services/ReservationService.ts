@@ -152,6 +152,7 @@ export interface ReservationResponse {
   diet: number | null;
   diet_name: string | null;
   accommodation_request: string | null;
+  additional_notes?: string | null;
   selected_source: string | null;
   source_name: string | null;
   selected_addons?: string[] | null;

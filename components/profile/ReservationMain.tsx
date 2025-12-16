@@ -291,9 +291,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   // Get accommodation
   const accommodation = reservation.accommodation_request || 'Brak danych';
 
-  // Get health info (from health_questions if available in backend)
-  // For now, we'll show accommodation_request as health info placeholder
-  const healthInfo = reservation.accommodation_request || 'Brak danych';
+  // Get health info - use additional_notes (Informacje dodatkowe / Uwagi from Step1)
+  const healthInfo = reservation.additional_notes || 'Brak danych';
 
   // Map status
   const statusMap: Record<string, string> = {
