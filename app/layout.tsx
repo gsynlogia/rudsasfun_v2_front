@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ToastContainer';
 import { ReservationProvider } from '@/context/ReservationContext';
+import MaintenancePage from '@/components/MaintenancePage';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -25,16 +26,23 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Check if portal is offline for maintenance
+  const isOffPortal = process.env.NEXT_PUBLIC_OFF_PORTAL === 'true';
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ReservationProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
-        </ReservationProvider>
+        {isOffPortal ? (
+          <MaintenancePage />
+        ) : (
+          <ReservationProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </ReservationProvider>
+        )}
       </body>
     </html>
   );

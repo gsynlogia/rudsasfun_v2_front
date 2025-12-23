@@ -1,7 +1,6 @@
 import CampsList from '@/components/CampsList';
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
-import MaintenancePage from '@/components/MaintenancePage';
 
 /**
  * Home Page Component
@@ -14,13 +13,6 @@ import MaintenancePage from '@/components/MaintenancePage';
 export const dynamic = 'force-dynamic';
 
 export default function Home() {
-  // Check if portal is offline for maintenance
-  const isOffPortal = process.env.NEXT_PUBLIC_OFF_PORTAL === 'true';
-
-  if (isOffPortal) {
-    return <MaintenancePage />;
-  }
-
   return (
     <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
       <Header />
