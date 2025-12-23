@@ -34,6 +34,8 @@ yarn-error.log*
 # .env.local should NOT be committed (contains local secrets/config)
 .env.local
 .env*.local
+!.env.example
+!.env.production
 
 # .env can be committed if it only contains non-sensitive defaults
 # Uncomment the line below if you want to ignore .env as well
