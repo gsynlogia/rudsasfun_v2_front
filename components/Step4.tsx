@@ -61,7 +61,14 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
   useEffect(() => {
     const savedData = loadStep4FormData();
     if (savedData) {
-      setFormData(savedData);
+      // Ensure all fields are defined to avoid controlled/uncontrolled input warning
+      setFormData({
+        selectAllConsents: savedData.selectAllConsents ?? false,
+        consent1: savedData.consent1 ?? false,
+        consent2: savedData.consent2 ?? false,
+        consent3: savedData.consent3 ?? false,
+        consent4: savedData.consent4 ?? false,
+      });
     }
   }, []);
 
@@ -241,7 +248,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
             <input
               type="checkbox"
               id="selectAllConsents"
-              checked={formData.selectAllConsents}
+              checked={formData.selectAllConsents ?? false}
               onChange={(e) => handleSelectAll(e.target.checked)}
               disabled={disabled}
               className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0"

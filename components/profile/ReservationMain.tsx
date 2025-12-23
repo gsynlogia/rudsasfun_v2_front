@@ -26,7 +26,7 @@ interface ReservationMainProps {
  * Left part of reservation card with main details
  */
 export default function ReservationMain({ reservation, isDetailsExpanded, onToggleDetails }: ReservationMainProps) {
-  const _router = useRouter();
+  const router = useRouter();
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
   const [_loadingPayments, _setLoadingPayments] = useState(false);
   const [paidAmount, setPaidAmount] = useState(0);
@@ -282,8 +282,80 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const returnType = reservation.return_type === 'zbiorowy' ? 'Transport zbiorowy' : 'Transport własny';
   const returnCity = reservation.return_city || '';
 
-  // Get diet name (prefer diet_name, fallback to diet ID)
-  const diet = reservation.diet_name || (reservation.diet ? `Dieta ID: ${reservation.diet}` : 'Brak danych');
+  // State for diet name (will be fetched if not in reservation)
+  const [dietName, setDietName] = useState<string | null>(reservation.diet_name || null);
+
+  // Update dietName when reservation.diet_name changes (from backend)
+  useEffect(() => {
+    if (reservation.diet_name) {
+      setDietName(reservation.diet_name);
+    }
+  }, [reservation.diet_name]);
+
+  // Fetch diet name if not available in reservation
+  useEffect(() => {
+    if (!dietName && reservation.diet && reservation.camp_id && reservation.property_id) {
+      const fetchDietName = async () => {
+        try {
+          const API_BASE_URL = getApiBaseUrlRuntime();
+          
+          // First, try to find in turnus diets
+          const response = await fetch(`${API_BASE_URL}/api/camps/${reservation.camp_id}/properties/${reservation.property_id}/diets`);
+          if (response.ok) {
+            const diets = await response.json();
+            // Try to find diet by id or relation_id
+            const foundDiet = diets.find((d: any) => 
+              d.id === reservation.diet || 
+              d.relation_id === reservation.diet ||
+              (d.is_center_diet_relation && d.relation_id === reservation.diet)
+            );
+            if (foundDiet && foundDiet.name) {
+              setDietName(foundDiet.name);
+              return;
+            }
+          }
+          
+          // If not found in turnus diets, try to fetch directly from general diets or diets
+          // Try as regular diet first
+          try {
+            const dietResponse = await fetch(`${API_BASE_URL}/api/diets/${reservation.diet}`);
+            if (dietResponse.ok) {
+              const dietData = await dietResponse.json();
+              if (dietData.name) {
+                setDietName(dietData.name);
+                return;
+              }
+            }
+          } catch (err) {
+            // Not a regular diet, continue
+          }
+          
+          // Try as general diet
+          try {
+            const generalDietResponse = await fetch(`${API_BASE_URL}/api/general-diets/${reservation.diet}`);
+            if (generalDietResponse.ok) {
+              const generalDietData = await generalDietResponse.json();
+              if (generalDietData.name) {
+                setDietName(generalDietData.name);
+                return;
+              }
+            }
+          } catch (err) {
+            // Not a general diet either
+          }
+          
+          // If still not found, it might be a relation_id from center_diet_general_diets
+          // We can't fetch it directly, so we'll need backend support or keep showing ID
+        } catch (err) {
+          console.error('Error fetching diet name:', err);
+        }
+      };
+      fetchDietName();
+    }
+  }, [dietName, reservation.diet, reservation.camp_id, reservation.property_id]);
+
+  // Get diet name (prefer diet_name, fallback to fetched name, then diet ID)
+  const diet = dietName || (reservation.diet ? `Dieta ID: ${reservation.diet}` : 'Brak danych');
 
   // Get promotion/source name (prefer source_name, fallback to selected_source)
   const promotion = reservation.source_name || reservation.selected_source || 'Brak promocji';
@@ -897,20 +969,39 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
       {/* Toggle Details Button */}
       <div className={`text-center ${isDetailsExpanded ? 'pt-3 sm:pt-4' : ''}`}>
-        <button
-          onClick={onToggleDetails}
-          className="text-xs sm:text-sm text-[#03adf0] hover:text-[#0288c7] flex items-center gap-1 mx-auto transition-colors"
-        >
-          {isDetailsExpanded ? 'ukryj szczegóły' : 'pokaż szczegóły'}
-          <svg
-            className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${isDetailsExpanded ? '' : 'rotate-180'}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {isDetailsExpanded ? (
+          <button
+            onClick={onToggleDetails}
+            className="text-xs sm:text-sm text-[#03adf0] hover:text-[#0288c7] flex items-center gap-1 mx-auto transition-colors"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-          </svg>
-        </button>
+            ukryj szczegóły
+            <svg
+              className="w-3 h-3 sm:w-4 sm:h-4 transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              router.push(`/profil/aktualne-rezerwacje/${reservationNumber}`);
+            }}
+            className="text-xs sm:text-sm text-[#03adf0] hover:text-[#0288c7] flex items-center gap-1 mx-auto transition-colors"
+          >
+            pokaż szczegóły
+            <svg
+              className="w-3 h-3 sm:w-4 sm:h-4 transition-transform rotate-180"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );
