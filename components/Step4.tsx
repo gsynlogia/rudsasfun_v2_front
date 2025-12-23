@@ -180,21 +180,52 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
     }
   };
 
-  // Get document URL by name
-  const getDocumentUrl = (documentName: string): string | null => {
-    const doc = documents.get(documentName);
-    return doc?.file_url || null;
+  // Get document URL by name or by display name (for backward compatibility)
+  const getDocumentUrl = (documentNameOrDisplayName: string): string | null => {
+    // First try exact name match
+    const docByName = documents.get(documentNameOrDisplayName);
+    if (docByName) {
+      return docByName.file_url;
+    }
+    
+    // Then try to find by display name (case-insensitive, partial match)
+    for (const [name, doc] of documents.entries()) {
+      if (doc.display_name.toLowerCase().includes(documentNameOrDisplayName.toLowerCase()) ||
+          documentNameOrDisplayName.toLowerCase().includes(doc.display_name.toLowerCase())) {
+        return doc.file_url;
+      }
+    }
+    
+    return null;
   };
 
-  // Get list of documents to display (only public ones)
+  // Get document by name or display name
+  const getDocument = (documentNameOrDisplayName: string): { name: string; display_name: string; file_url: string } | null => {
+    // First try exact name match
+    const docByName = documents.get(documentNameOrDisplayName);
+    if (docByName) {
+      return { name: documentNameOrDisplayName, ...docByName };
+    }
+    
+    // Then try to find by display name (case-insensitive, partial match)
+    for (const [name, doc] of documents.entries()) {
+      if (doc.display_name.toLowerCase().includes(documentNameOrDisplayName.toLowerCase()) ||
+          documentNameOrDisplayName.toLowerCase().includes(doc.display_name.toLowerCase())) {
+        return { name, ...doc };
+      }
+    }
+    
+    return null;
+  };
+
+  // Get list of documents to display (all public documents from API)
   const getDocumentsList = () => {
-    const docNames = ['portal_regulation', 'privacy_policy', 'tourist_events_regulations', 'tourist_regulations_insurance', 'watt_input_regulation'];
-    return docNames
-      .filter(name => documents.has(name))
-      .map(name => ({
+    return Array.from(documents.entries())
+      .filter(([name, doc]) => doc.file_url) // Only documents with files
+      .map(([name, doc]) => ({
         name,
-        display_name: documents.get(name)!.display_name,
-        file_url: documents.get(name)!.file_url,
+        display_name: doc.display_name,
+        file_url: doc.file_url,
       }));
   };
 
@@ -245,13 +276,14 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                   }`}
                 >
                   Zapoznałem się z{' '}
-                  {getDocumentUrl('portal_regulation') ? (
+                  {getDocumentUrl('Regulamin portalu') || getDocumentUrl('portal_regulation') ? (
                     <a
                       href="#"
                       className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
                       onClick={(e) => {
                         e.preventDefault();
-                        handleDocumentDownload('portal_regulation');
+                        const doc = getDocument('Regulamin portalu') || getDocument('portal_regulation');
+                        if (doc) handleDocumentDownload(doc.name);
                       }}
                     >
                       Regulaminem portalu
@@ -260,13 +292,14 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                     <span className="text-gray-500">Regulaminem portalu</span>
                   )}{' '}
                   oraz{' '}
-                  {getDocumentUrl('privacy_policy') ? (
+                  {getDocumentUrl('Polityka prywatności') || getDocumentUrl('privacy_policy') ? (
                     <a
                       href="#"
                       className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
                       onClick={(e) => {
                         e.preventDefault();
-                        handleDocumentDownload('privacy_policy');
+                        const doc = getDocument('Polityka prywatności') || getDocument('privacy_policy');
+                        if (doc) handleDocumentDownload(doc.name);
                       }}
                     >
                       Polityką prywatności
@@ -303,13 +336,14 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
                   }`}
                 >
                   Zapoznałem się z{' '}
-                  {getDocumentUrl('tourist_events_regulations') ? (
+                  {getDocumentUrl('Warunki uczestnictwa') || getDocumentUrl('tourist_events_regulations') ? (
                     <a
                       href="#"
                       className="text-[#03adf0] underline hover:text-[#0288c7] transition-colors"
                       onClick={(e) => {
                         e.preventDefault();
-                        handleDocumentDownload('tourist_events_regulations');
+                        const doc = getDocument('Warunki uczestnictwa') || getDocument('tourist_events_regulations');
+                        if (doc) handleDocumentDownload(doc.name);
                       }}
                     >
                       Warunkami uczestnictwa
@@ -420,50 +454,58 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
 
             {/* Documents List */}
             <div className="space-y-0 pl-4 sm:pl-6 md:pl-8">
-              {getDocumentsList().map((doc, index) => {
-                // Comment out "Regulamin wejścia Watt"
-                if (doc.name === 'watt_input_regulation') {
-                  return null;
-                }
-                return (
-                  <div key={doc.name}>
-                    <div
-                      className="flex items-center justify-between py-3 sm:py-4 px-0 cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => handleDocumentDownload(doc.name)}
-                    >
-                      <span className="text-xs sm:text-sm text-gray-700 flex-1">
-                        {doc.display_name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDocumentDownload(doc.name);
-                        }}
-                        className="ml-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#EAF6FE] hover:bg-[#D0ECFD] flex items-center justify-center transition-colors flex-shrink-0"
-                        aria-label={`Pobierz ${doc.display_name}`}
+              {getDocumentsList().length > 0 ? (
+                getDocumentsList().map((doc, index) => {
+                  // Skip "Regulamin wejścia Watt" if exists
+                  if (doc.name === 'watt_input_regulation' || doc.display_name.toLowerCase().includes('watt')) {
+                    return null;
+                  }
+                  return (
+                    <div key={doc.name}>
+                      <div
+                        className="flex items-center justify-between py-3 sm:py-4 px-0 cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => handleDocumentDownload(doc.name)}
                       >
-                        <svg
-                          className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0]"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                        <span className="text-xs sm:text-sm text-gray-700 flex-1 font-bold">
+                          {doc.display_name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDocumentDownload(doc.name);
+                          }}
+                          className="ml-4 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#EAF6FE] hover:bg-[#D0ECFD] flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer"
+                          aria-label={`Pobierz ${doc.display_name}`}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                          />
+                          <svg
+                            className="w-4 h-4 sm:w-5 sm:h-5 text-[#03adf0]"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                      {index < getDocumentsList().length - 1 && (
+                        <svg className="w-full h-2" xmlns="http://www.w3.org/2000/svg">
+                          <line x1="0" y1="1" x2="100%" y2="1" stroke="#d1d5db" strokeWidth="1" strokeDasharray="16 4"></line>
                         </svg>
-                      </button>
+                      )}
                     </div>
-                    {index < getDocumentsList().length - 1 && (
-                      <hr className="border-gray-200" />
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <p className="text-xs sm:text-sm text-gray-500 py-3 sm:py-4">
+                  Brak dokumentów do pobrania
+                </p>
+              )}
             </div>
           </div>
         </section>

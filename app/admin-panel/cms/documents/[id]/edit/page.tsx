@@ -37,6 +37,7 @@ export default function DocumentEditPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [currentFileUrl, setCurrentFileUrl] = useState<string | null>(null);
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export default function DocumentEditPage() {
           is_public: document.is_public,
         });
         setCurrentFileUrl(document.file_url);
+        setCurrentFilePath(document.file_path);
       } catch (err) {
         console.error('Error fetching document:', err);
         setError(err instanceof Error ? err.message : 'Błąd podczas ładowania dokumentu');
@@ -194,17 +196,45 @@ export default function DocumentEditPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Plik (PDF, DOC, DOCX)
                 </label>
-                {currentFileUrl && !file && (
-                  <div className="mb-2">
-                    <a
-                      href={currentFileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-[#03adf0] hover:underline"
-                    >
-                      Otwórz obecny plik
-                    </a>
+                {currentFileUrl && currentFilePath && !file && (
+                  <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-700 mb-1">
+                          Obecnie wgrany plik:
+                        </p>
+                        <p className="text-sm text-gray-600 mb-2 break-all">
+                          {currentFilePath.split('/').pop() || currentFilePath}
+                        </p>
+                        <a
+                          href={currentFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-sm text-[#03adf0] hover:text-[#0288c7] hover:underline transition-colors"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                            />
+                          </svg>
+                          Otwórz plik w nowej karcie
+                        </a>
+                      </div>
+                    </div>
                   </div>
+                )}
+                {!currentFileUrl && !file && (
+                  <p className="mb-2 text-sm text-gray-500 italic">
+                    Brak wgranego pliku. Wybierz plik poniżej, aby go wgrać.
+                  </p>
                 )}
                 <input
                   type="file"
@@ -215,7 +245,15 @@ export default function DocumentEditPage() {
                   disabled={isSaving || uploadingFile}
                 />
                 {file && (
-                  <p className="mt-2 text-sm text-gray-600">Wybrany plik: {file.name}</p>
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm font-medium text-blue-900 mb-1">
+                      Nowy plik do wgrania:
+                    </p>
+                    <p className="text-sm text-blue-700">{file.name}</p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      {(file.size / 1024).toFixed(2)} KB
+                    </p>
+                  </div>
                 )}
               </div>
 
