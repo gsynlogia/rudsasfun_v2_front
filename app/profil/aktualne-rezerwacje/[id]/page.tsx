@@ -115,6 +115,24 @@ export default function ReservationDetailPage() {
                 reservation={reservation}
                 isDetailsExpanded={true}
                 onToggleDetails={handleToggleDetails}
+                onReservationUpdate={(updatedReservation) => {
+                  // Update reservation state with the updated data from API
+                  console.log('[ReservationDetailPage] 🔵 BEFORE STATE UPDATE:');
+                  console.log('   Current reservation state:', reservation);
+                  console.log('   Current reservation.selected_addons:', reservation?.selected_addons);
+                  
+                  console.log('[ReservationDetailPage] 🟢 UPDATING STATE WITH:');
+                  console.log('   updatedReservation.id:', updatedReservation.id);
+                  console.log('   updatedReservation.selected_addons:', updatedReservation.selected_addons);
+                  console.log('   updatedReservation.selected_addons type:', typeof updatedReservation.selected_addons);
+                  console.log('   updatedReservation.selected_addons isArray:', Array.isArray(updatedReservation.selected_addons));
+                  console.log('   updatedReservation.selected_addons length:', Array.isArray(updatedReservation.selected_addons) ? updatedReservation.selected_addons.length : 'not array');
+                  
+                  setReservation(updatedReservation);
+                  
+                  console.log('[ReservationDetailPage] ✅ STATE UPDATED');
+                  console.log('   New reservation state will be:', updatedReservation);
+                }}
               />
             </div>
 

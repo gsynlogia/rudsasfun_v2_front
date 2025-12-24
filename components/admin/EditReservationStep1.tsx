@@ -260,13 +260,50 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Telefon *</label>
-                  <input
-                    type="tel"
-                    value={parent.phoneNumber}
-                    onChange={(e) => updateParent(parent.id, 'phoneNumber', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                    style={{ borderRadius: 0 }}
-                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={parent.phone || '+48'}
+                      onChange={(e) => updateParent(parent.id, 'phone', e.target.value)}
+                      className="px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      style={{ borderRadius: 0 }}
+                    >
+                      <option value="+48">+48 (Polska)</option>
+                      <option value="+1">+1 (USA/Kanada)</option>
+                      <option value="+44">+44 (Wielka Brytania)</option>
+                      <option value="+49">+49 (Niemcy)</option>
+                      <option value="+33">+33 (Francja)</option>
+                      <option value="+39">+39 (Włochy)</option>
+                      <option value="+34">+34 (Hiszpania)</option>
+                      <option value="+7">+7 (Rosja/Kazachstan)</option>
+                      <option value="+86">+86 (Chiny)</option>
+                      <option value="+81">+81 (Japonia)</option>
+                      <option value="+82">+82 (Korea Południowa)</option>
+                      <option value="+61">+61 (Australia)</option>
+                      <option value="+31">+31 (Holandia)</option>
+                      <option value="+32">+32 (Belgia)</option>
+                      <option value="+41">+41 (Szwajcaria)</option>
+                      <option value="+43">+43 (Austria)</option>
+                      <option value="+46">+46 (Szwecja)</option>
+                      <option value="+47">+47 (Norwegia)</option>
+                      <option value="+45">+45 (Dania)</option>
+                      <option value="+358">+358 (Finlandia)</option>
+                      <option value="+351">+351 (Portugalia)</option>
+                      <option value="+30">+30 (Grecja)</option>
+                      <option value="+40">+40 (Rumunia)</option>
+                      <option value="+36">+36 (Węgry)</option>
+                      <option value="+420">+420 (Czechy)</option>
+                      <option value="+421">+421 (Słowacja)</option>
+                      <option value="+385">+385 (Chorwacja)</option>
+                      <option value="+353">+353 (Irlandia)</option>
+                    </select>
+                    <input
+                      type="tel"
+                      value={parent.phoneNumber}
+                      onChange={(e) => updateParent(parent.id, 'phoneNumber', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      style={{ borderRadius: 0 }}
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ulica</label>

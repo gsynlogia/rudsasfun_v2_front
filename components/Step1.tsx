@@ -202,6 +202,18 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       errors.lastName = 'Pole obowiązkowe';
     }
 
+    // Phone code validation (must start with + and have 1-4 digits)
+    if (!parent.phone || parent.phone.trim() === '') {
+      errors.phone = 'Kod kierunkowy jest wymagany';
+    } else {
+      const phoneCode = parent.phone.trim();
+      if (!phoneCode.startsWith('+')) {
+        errors.phone = 'Kod kierunkowy musi zaczynać się od +';
+      } else if (!/^\+\d{1,4}$/.test(phoneCode)) {
+        errors.phone = 'Kod kierunkowy musi mieć format +XXX (1-4 cyfry po +)';
+      }
+    }
+
     if (!parent.phoneNumber || parent.phoneNumber.trim() === '') {
       errors.phoneNumber = 'Pole obowiązkowe';
     }
@@ -591,15 +603,27 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
                     Numer telefonu *
                   </label>
                   <div className="flex gap-2">
-                    <select
-                      value={parent.phone}
-                      onChange={(e) => updateParent(parent.id, 'phone', e.target.value)}
-                      disabled={disabled}
-                      className="px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="+48">+48</option>
-                      <option value="+1">+1</option>
-                    </select>
+                    <div className="w-24 sm:w-28">
+                      <input
+                        type="text"
+                        value={parent.phone}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Allow only + and digits
+                          if (value === '' || /^\+?\d*$/.test(value)) {
+                            updateParent(parent.id, 'phone', value);
+                          }
+                        }}
+                        placeholder="+48"
+                        disabled={disabled}
+                        className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                          (parentErrors[parent.id] && parentErrors[parent.id].phone) ? 'border-red-500' : 'border-gray-400'
+                        }`}
+                      />
+                      {(parentErrors[parent.id] && parentErrors[parent.id].phone) && (
+                        <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].phone}</p>
+                      )}
+                    </div>
                     <div className="flex-1">
                       <input
                         type="tel"

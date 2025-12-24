@@ -391,21 +391,49 @@ class ReservationService {
       throw new Error('Not authenticated. Please log in.');
     }
 
+    const requestBody = { addon_id: addonId };
+    console.log('[ReservationService] 🚀 SENDING REQUEST to add addon:', {
+      url: `${this.API_URL}/${reservationId}/addons`,
+      method: 'PATCH',
+      reservationId,
+      addonId,
+      requestBody,
+      timestamp: new Date().toISOString()
+    });
+
     const response = await fetch(`${this.API_URL}/${reservationId}/addons`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ addon_id: addonId }),
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log('[ReservationService] 📥 RECEIVED RESPONSE:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      timestamp: new Date().toISOString()
     });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      console.error('[ReservationService] ❌ ERROR RESPONSE:', error);
       throw new Error(error.detail || `HTTP error! status: ${response.status}`);
     }
 
-    return await response.json();
+    const responseData = await response.json();
+    console.log('[ReservationService] ✅ SUCCESS RESPONSE DATA:', {
+      id: responseData.id,
+      selected_addons: responseData.selected_addons,
+      selected_addons_type: typeof responseData.selected_addons,
+      selected_addons_length: Array.isArray(responseData.selected_addons) ? responseData.selected_addons.length : 'not array',
+      full_response: responseData,
+      timestamp: new Date().toISOString()
+    });
+
+    return responseData;
   }
 
   /**

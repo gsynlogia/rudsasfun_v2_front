@@ -52,6 +52,10 @@ export default function QualificationCardModal({
     parent2_email: null,
   });
 
+  // Phone code states (separate from phone number)
+  const [parent1PhoneCode, setParent1PhoneCode] = useState<string>('+48');
+  const [parent2PhoneCode, setParent2PhoneCode] = useState<string>('+48');
+
   // Check if second parent exists - recalculate on each render to ensure it's up to date
   const hasSecondParent = useMemo(() => {
     const has = reservation.parents_data && Array.isArray(reservation.parents_data) && reservation.parents_data.length > 1;
@@ -112,11 +116,10 @@ export default function QualificationCardModal({
         parent1_phone: (() => {
           // Priority: saved data > phoneNumber from reservation > phone from reservation
           const phone = data.parent1_phone || reservation.parents_data?.[0]?.phoneNumber || reservation.parents_data?.[0]?.phone || null;
-          // Remove +48 prefix if present for display
-          if (phone && typeof phone === 'string' && phone.startsWith('+48')) {
-            return phone.replace(/^\+48\s*/, '').trim();
-          }
-          return phone;
+          // Extract phone parts (code and number)
+          const phoneParts = extractPhoneParts(phone);
+          setParent1PhoneCode(phoneParts.code);
+          return phoneParts.number;
         })(),
         parent1_email: data.parent1_email || reservation.parents_data?.[0]?.email || null,
         parent2_first_name: data.parent2_first_name || (hasSecondParent ? reservation.parents_data?.[1]?.firstName : null) || null,
@@ -128,11 +131,10 @@ export default function QualificationCardModal({
           if (!hasSecondParent) return null;
           // Priority: saved data > phoneNumber from reservation > phone from reservation
           const phone = data.parent2_phone || reservation.parents_data?.[1]?.phoneNumber || reservation.parents_data?.[1]?.phone || null;
-          // Remove +48 prefix if present for display
-          if (phone && typeof phone === 'string' && phone.startsWith('+48')) {
-            return phone.replace(/^\+48\s*/, '').trim();
-          }
-          return phone;
+          // Extract phone parts (code and number)
+          const phoneParts = extractPhoneParts(phone);
+          setParent2PhoneCode(phoneParts.code);
+          return phoneParts.number;
         })(),
         parent2_email: data.parent2_email || (hasSecondParent ? reservation.parents_data?.[1]?.email : null) || null,
       };
@@ -163,11 +165,10 @@ export default function QualificationCardModal({
         parent1_phone: (() => {
           // Priority: phoneNumber from reservation > phone from reservation
           const phone = reservation.parents_data?.[0]?.phoneNumber || reservation.parents_data?.[0]?.phone || null;
-          // Remove +48 prefix if present for display
-          if (phone && typeof phone === 'string' && phone.startsWith('+48')) {
-            return phone.replace(/^\+48\s*/, '').trim();
-          }
-          return phone;
+          // Extract phone parts (code and number)
+          const phoneParts = extractPhoneParts(phone);
+          setParent1PhoneCode(phoneParts.code);
+          return phoneParts.number;
         })(),
         parent1_email: reservation.parents_data?.[0]?.email || null,
         parent2_first_name: hasSecondParent ? reservation.parents_data?.[1]?.firstName : null,
@@ -195,15 +196,25 @@ export default function QualificationCardModal({
     }
   };
 
-  // Helper function to prepare phone number for saving (add +48 if not present)
-  const preparePhoneForSave = (phone: string | null | undefined): string | null => {
-    if (!phone || phone.trim() === '') return null;
+  // Helper function to prepare phone number for saving (combine code + number)
+  const preparePhoneForSave = (phoneCode: string, phoneNumber: string | null | undefined): string | null => {
+    if (!phoneNumber || phoneNumber.trim() === '') return null;
+    const cleaned = phoneNumber.trim();
+    // Combine code and number
+    return `${phoneCode} ${cleaned}`;
+  };
+
+  // Helper function to extract phone code and number from saved phone
+  const extractPhoneParts = (phone: string | null | undefined): { code: string; number: string } => {
+    if (!phone || phone.trim() === '') return { code: '+48', number: '' };
     const cleaned = phone.trim();
-    // If it doesn't start with +48, add it
-    if (!cleaned.startsWith('+48')) {
-      return `+48 ${cleaned}`;
+    // Try to extract code (starts with +)
+    const match = cleaned.match(/^(\+\d{1,4})\s*(.+)$/);
+    if (match) {
+      return { code: match[1], number: match[2] };
     }
-    return cleaned;
+    // If no code found, assume it's just a number and default to +48
+    return { code: '+48', number: cleaned };
   };
 
   const handleSave = async () => {
@@ -220,8 +231,8 @@ export default function QualificationCardModal({
       // Prepare data with phone numbers (add +48 if needed)
       const dataToSave = {
         ...formData,
-        parent1_phone: preparePhoneForSave(formData.parent1_phone),
-        parent2_phone: preparePhoneForSave(formData.parent2_phone),
+        parent1_phone: preparePhoneForSave(parent1PhoneCode, formData.parent1_phone),
+        parent2_phone: preparePhoneForSave(parent2PhoneCode, formData.parent2_phone),
       };
 
       await qualificationCardService.saveQualificationCardData(reservation.id, dataToSave);
@@ -253,8 +264,8 @@ export default function QualificationCardModal({
       // Prepare data with phone numbers (add +48 if needed)
       const dataToSave = {
         ...formData,
-        parent1_phone: preparePhoneForSave(formData.parent1_phone),
-        parent2_phone: preparePhoneForSave(formData.parent2_phone),
+        parent1_phone: preparePhoneForSave(parent1PhoneCode, formData.parent1_phone),
+        parent2_phone: preparePhoneForSave(parent2PhoneCode, formData.parent2_phone),
       };
 
       // First save data
@@ -722,16 +733,47 @@ export default function QualificationCardModal({
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Telefon <span className="text-red-500">*</span>
                       </label>
-                      <div className="flex items-center">
-                        <span className="px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-gray-700">
-                          +48
-                        </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={parent1PhoneCode}
+                          onChange={(e) => setParent1PhoneCode(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        >
+                          <option value="+48">+48 (Polska)</option>
+                          <option value="+1">+1 (USA/Kanada)</option>
+                          <option value="+44">+44 (Wielka Brytania)</option>
+                          <option value="+49">+49 (Niemcy)</option>
+                          <option value="+33">+33 (Francja)</option>
+                          <option value="+39">+39 (Włochy)</option>
+                          <option value="+34">+34 (Hiszpania)</option>
+                          <option value="+7">+7 (Rosja/Kazachstan)</option>
+                          <option value="+86">+86 (Chiny)</option>
+                          <option value="+81">+81 (Japonia)</option>
+                          <option value="+82">+82 (Korea Południowa)</option>
+                          <option value="+61">+61 (Australia)</option>
+                          <option value="+31">+31 (Holandia)</option>
+                          <option value="+32">+32 (Belgia)</option>
+                          <option value="+41">+41 (Szwajcaria)</option>
+                          <option value="+43">+43 (Austria)</option>
+                          <option value="+46">+46 (Szwecja)</option>
+                          <option value="+47">+47 (Norwegia)</option>
+                          <option value="+45">+45 (Dania)</option>
+                          <option value="+358">+358 (Finlandia)</option>
+                          <option value="+351">+351 (Portugalia)</option>
+                          <option value="+30">+30 (Grecja)</option>
+                          <option value="+40">+40 (Rumunia)</option>
+                          <option value="+36">+36 (Węgry)</option>
+                          <option value="+420">+420 (Czechy)</option>
+                          <option value="+421">+421 (Słowacja)</option>
+                          <option value="+385">+385 (Chorwacja)</option>
+                          <option value="+353">+353 (Irlandia)</option>
+                        </select>
                         <input
                           type="text"
                           value={formData.parent1_phone || ''}
                           onChange={(e) => updateField('parent1_phone', e.target.value || null)}
                           placeholder="123456789"
-                          className={`flex-1 px-3 py-2 border rounded-r focus:outline-none focus:ring-2 ${
+                          className={`flex-1 px-3 py-2 border focus:outline-none focus:ring-2 ${
                             validationErrors.parent1_phone 
                               ? 'border-red-500 focus:ring-red-500' 
                               : 'border-gray-300 focus:ring-[#03adf0]'
@@ -888,17 +930,51 @@ export default function QualificationCardModal({
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Telefon <span className="text-red-500">*</span>
                       </label>
-                      <div className="flex items-center">
-                        <span className={`px-3 py-2 bg-gray-100 border border-r-0 border-gray-300 rounded-l text-gray-700 ${noSecondParent ? 'opacity-50' : ''}`}>
-                          +48
-                        </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={parent2PhoneCode}
+                          onChange={(e) => setParent2PhoneCode(e.target.value)}
+                          disabled={noSecondParent}
+                          className={`px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                            noSecondParent ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''
+                          }`}
+                        >
+                          <option value="+48">+48 (Polska)</option>
+                          <option value="+1">+1 (USA/Kanada)</option>
+                          <option value="+44">+44 (Wielka Brytania)</option>
+                          <option value="+49">+49 (Niemcy)</option>
+                          <option value="+33">+33 (Francja)</option>
+                          <option value="+39">+39 (Włochy)</option>
+                          <option value="+34">+34 (Hiszpania)</option>
+                          <option value="+7">+7 (Rosja/Kazachstan)</option>
+                          <option value="+86">+86 (Chiny)</option>
+                          <option value="+81">+81 (Japonia)</option>
+                          <option value="+82">+82 (Korea Południowa)</option>
+                          <option value="+61">+61 (Australia)</option>
+                          <option value="+31">+31 (Holandia)</option>
+                          <option value="+32">+32 (Belgia)</option>
+                          <option value="+41">+41 (Szwajcaria)</option>
+                          <option value="+43">+43 (Austria)</option>
+                          <option value="+46">+46 (Szwecja)</option>
+                          <option value="+47">+47 (Norwegia)</option>
+                          <option value="+45">+45 (Dania)</option>
+                          <option value="+358">+358 (Finlandia)</option>
+                          <option value="+351">+351 (Portugalia)</option>
+                          <option value="+30">+30 (Grecja)</option>
+                          <option value="+40">+40 (Rumunia)</option>
+                          <option value="+36">+36 (Węgry)</option>
+                          <option value="+420">+420 (Czechy)</option>
+                          <option value="+421">+421 (Słowacja)</option>
+                          <option value="+385">+385 (Chorwacja)</option>
+                          <option value="+353">+353 (Irlandia)</option>
+                        </select>
                         <input
                           type="text"
                           value={formData.parent2_phone || ''}
                           onChange={(e) => updateField('parent2_phone', e.target.value || null)}
                           disabled={noSecondParent}
                           placeholder="123456789"
-                          className={`flex-1 px-3 py-2 border rounded-r focus:outline-none focus:ring-2 ${
+                          className={`flex-1 px-3 py-2 border focus:outline-none focus:ring-2 ${
                             validationErrors.parent2_phone 
                               ? 'border-red-500 focus:ring-red-500' 
                               : 'border-gray-300 focus:ring-[#03adf0]'

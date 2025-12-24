@@ -8,6 +8,7 @@ import { authService } from '@/lib/services/AuthService';
 import { paymentService, CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
 import { API_BASE_URL, getStaticAssetUrl, getApiBaseUrlRuntime } from '@/utils/api-config';
+import { useToast } from '@/components/ToastContainer';
 
 interface AdditionalServicesTilesProps {
   selectedAddons?: string[] | null;
@@ -45,6 +46,7 @@ export default function AdditionalServicesTiles({
   reservation = null,
   onReservationUpdate,
 }: AdditionalServicesTilesProps) {
+  const { showSuccess, showError } = useToast();
   const [addons, setAddons] = useState<Addon[]>([]);
   const [protections, setProtections] = useState<Protection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,7 +171,9 @@ export default function AdditionalServicesTiles({
   };
 
   // Map addon IDs to check if they're selected
-  const selectedAddonIds = new Set(selectedAddons?.map(id => id.toString()) || []);
+  // Use reservation.selected_addons if available, otherwise fall back to selectedAddons prop
+  const currentSelectedAddons = reservation?.selected_addons || selectedAddons || [];
+  const selectedAddonIds = new Set(currentSelectedAddons.map(id => id.toString()));
   // selectedProtectionIds is now calculated below after protections are loaded
 
   // Handle service payment (addon or protection)
@@ -179,15 +183,17 @@ export default function AdditionalServicesTiles({
       alert('Brak danych rezerwacji. Nie można utworzyć płatności.');
       return;
     }
+    
+    console.log('[AdditionalServicesTiles] handleServicePayment called:', {
+      serviceId,
+      serviceName,
+      serviceType,
+      reservationId: reservation.id,
+      currentSelectedAddons: reservation.selected_addons
+    });
 
-    // If online payments are disabled, add directly to database after confirmation
+    // If online payments are disabled, add directly to database
     if (!onlinePaymentsEnabled) {
-      const confirmed = window.confirm(`Czy jesteś pewien, że chcesz dokupić "${serviceName}" za ${price.toFixed(2)} PLN?\n\nUsługa zostanie dodana do rezerwacji i będzie uwzględniona w zaliczce.`);
-      
-      if (!confirmed) {
-        return;
-      }
-
       setIsProcessingPayment(true);
       setProcessingServiceId(serviceId);
 
@@ -195,22 +201,43 @@ export default function AdditionalServicesTiles({
         let updatedReservation: ReservationResponse;
         
         if (serviceType === 'addon') {
+          console.log('[AdditionalServicesTiles] 🔵 BEFORE API CALL:');
+          console.log('   Current reservation.selected_addons:', reservation.selected_addons);
+          console.log('   Adding serviceId:', serviceId);
+          
           updatedReservation = await reservationService.addAddonToReservation(reservation.id, serviceId);
+          
+          console.log('[AdditionalServicesTiles] 🟢 AFTER API CALL:');
+          console.log('   updatedReservation.id:', updatedReservation.id);
+          console.log('   updatedReservation.selected_addons:', updatedReservation.selected_addons);
+          console.log('   updatedReservation.selected_addons type:', typeof updatedReservation.selected_addons);
+          console.log('   updatedReservation.selected_addons isArray:', Array.isArray(updatedReservation.selected_addons));
+          console.log('   updatedReservation.selected_addons length:', Array.isArray(updatedReservation.selected_addons) ? updatedReservation.selected_addons.length : 'not array');
+          console.log('   serviceId that was added:', serviceId);
+          console.log('   Is serviceId in selected_addons?', Array.isArray(updatedReservation.selected_addons) ? updatedReservation.selected_addons.includes(serviceId) : 'not array');
         } else {
           // For protection, normalize ID format
           const protectionId = serviceId.startsWith('protection-') ? serviceId : `protection-${serviceId}`;
           updatedReservation = await reservationService.addProtectionToReservation(reservation.id, protectionId);
+          console.log('[AdditionalServicesTiles] Protection added, updated reservation:', {
+            id: updatedReservation.id,
+            selected_protection: updatedReservation.selected_protection,
+            serviceId: protectionId
+          });
         }
 
         // Notify parent component to refresh reservation data
         if (onReservationUpdate) {
+          console.log('[AdditionalServicesTiles] Calling onReservationUpdate with:', updatedReservation);
           onReservationUpdate(updatedReservation);
+        } else {
+          console.warn('[AdditionalServicesTiles] onReservationUpdate callback not provided');
         }
 
-        alert(`Usługa "${serviceName}" została dodana do rezerwacji.`);
+        showSuccess(`Usługa "${serviceName}" została dodana do rezerwacji.`);
       } catch (error) {
         console.error(`Błąd podczas dodawania ${serviceName}:`, error);
-        alert(error instanceof Error ? error.message : `Wystąpił błąd podczas dodawania ${serviceName}`);
+        showError(error instanceof Error ? error.message : `Wystąpił błąd podczas dodawania ${serviceName}`);
       } finally {
         setIsProcessingPayment(false);
         setProcessingServiceId(null);

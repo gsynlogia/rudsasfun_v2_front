@@ -19,13 +19,14 @@ interface ReservationMainProps {
   reservation: ReservationResponse;
   isDetailsExpanded: boolean;
   onToggleDetails: () => void;
+  onReservationUpdate?: (updatedReservation: ReservationResponse) => void;
 }
 
 /**
  * ReservationMain Component
  * Left part of reservation card with main details
  */
-export default function ReservationMain({ reservation, isDetailsExpanded, onToggleDetails }: ReservationMainProps) {
+export default function ReservationMain({ reservation, isDetailsExpanded, onToggleDetails, onReservationUpdate }: ReservationMainProps) {
   const router = useRouter();
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
   const [_loadingPayments, _setLoadingPayments] = useState(false);
@@ -611,16 +612,19 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             selectedProtection={reservation.selected_protection || []}
             reservation={reservation}
             onReservationUpdate={async (updatedReservation) => {
-              // Reload reservation data to reflect changes
-              try {
-                const refreshedReservation = await reservationService.getReservation(reservation.id);
-                // Force re-render by updating parent state if needed
-                // For now, we'll reload the page to show updated data
-                window.location.reload();
-              } catch (error) {
-                console.error('Error refreshing reservation:', error);
-                // Still reload to show changes
-                window.location.reload();
+              // Update reservation data using the updated reservation from API
+              if (onReservationUpdate) {
+                // Use the callback from parent to update reservation state
+                onReservationUpdate(updatedReservation);
+              } else {
+                // Fallback: reload page if no callback provided (for backward compatibility)
+                try {
+                  const refreshedReservation = await reservationService.getReservation(reservation.id);
+                  window.location.reload();
+                } catch (error) {
+                  console.error('Error refreshing reservation:', error);
+                  window.location.reload();
+                }
               }
             }}
           />
@@ -879,8 +883,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                     {/* Calculate deposit: 500 zł + protections */}
                     {(() => {
                       const baseDeposit = 500;
-                      // Calculate protection prices from reservation
-                      let protectionTotal = 0;
+                      // Calculate protection prices from reservation - store each protection separately
+                      const protectionItems: Array<{ name: string; price: number }> = [];
                       if (reservation.selected_protection) {
                         const selectedProtections = Array.isArray(reservation.selected_protection)
                           ? reservation.selected_protection
@@ -888,15 +892,16 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                             ? JSON.parse(reservation.selected_protection || '[]')
                             : [];
                         
-                        // Protection prices: TARCZA = 110, OAZA = 80 (hardcoded for now)
+                        // Protection prices: TARCZA = 110, OAZA = 170 (hardcoded for now)
                         selectedProtections.forEach((prot: string) => {
                           if (prot.includes('tarcza') || prot.includes('shield') || prot === 'protection-1') {
-                            protectionTotal += 110;
+                            protectionItems.push({ name: 'Tarcza', price: 110 });
                           } else if (prot.includes('oaza') || prot.includes('oasa') || prot === 'protection-2') {
-                            protectionTotal += 80;
+                            protectionItems.push({ name: 'Oaza', price: 170 });
                           }
                         });
                       }
+                      const protectionTotal = protectionItems.reduce((sum, item) => sum + item.price, 0);
                       const totalDeposit = baseDeposit + protectionTotal;
                       
                       return (
@@ -908,12 +913,12 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                                 <span className="text-gray-600">Zaliczka podstawowa:</span>
                                 <span className="font-medium text-gray-900">{baseDeposit.toFixed(2)} zł</span>
                               </div>
-                              {protectionTotal > 0 && (
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Ochrony:</span>
-                                  <span className="font-medium text-gray-900">+{protectionTotal.toFixed(2)} zł</span>
+                              {protectionItems.map((item, index) => (
+                                <div key={index} className="flex justify-between">
+                                  <span className="text-gray-600">Ochrona: {item.name}</span>
+                                  <span className="font-medium text-gray-900">+{item.price.toFixed(2)} zł</span>
                                 </div>
-                              )}
+                              ))}
                               <div className="flex justify-between pt-2 border-t border-gray-200">
                                 <span className="font-semibold text-gray-900">Razem zaliczka:</span>
                                 <span className="font-bold text-[#03adf0]">{totalDeposit.toFixed(2)} zł</span>

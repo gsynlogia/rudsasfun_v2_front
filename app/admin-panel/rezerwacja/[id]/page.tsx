@@ -244,7 +244,6 @@ export default function ReservationDetailPage() {
                         id: foundDiet.general_diet_id,
                         name: foundDiet.name,
                         price: foundDiet.price || 0,
-                        description: foundDiet.description,
                       });
                     }
                   } else {
@@ -258,7 +257,6 @@ export default function ReservationDetailPage() {
                         id: foundDiet.id,
                         name: foundDiet.name,
                         price: foundDiet.price || 0,
-                        description: foundDiet.description,
                       });
                     }
                   }
@@ -309,7 +307,6 @@ export default function ReservationDetailPage() {
                         id: foundDiet.general_diet_id,
                         name: foundDiet.name,
                         price: foundDiet.price || 0,
-                        description: foundDiet.description,
                       }));
                     }
                   } else {
@@ -323,7 +320,6 @@ export default function ReservationDetailPage() {
                         id: foundDiet.id,
                         name: foundDiet.name,
                         price: foundDiet.price || 0,
-                        description: foundDiet.description,
                       }));
                     }
                   }
@@ -434,7 +430,7 @@ export default function ReservationDetailPage() {
               </div>
             </div>
             <button
-              onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/edit`)}
+              onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/edit/1/step`)}
               className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200"
               style={{ borderRadius: 0 }}
             >
