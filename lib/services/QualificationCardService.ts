@@ -32,6 +32,17 @@ class QualificationCardService {
   }
 
   /**
+   * Get qualification card HTML URL for opening in new tab
+   * @param reservationId Reservation ID
+   * @returns URL to open qualification card HTML in new tab
+   */
+  getQualificationCardHtmlUrl(reservationId: number): string {
+    const url = `${this.API_URL}/${reservationId}/html`;
+    console.log('QualificationCard HTML URL:', url);
+    return url;
+  }
+
+  /**
    * Download qualification card PDF
    * Downloads the card that was automatically generated when reservation was created
    * @param reservationId Reservation ID
@@ -469,6 +480,34 @@ class QualificationCardService {
     }
 
     const response = await fetch(`${this.API_URL}/${reservationId}/can-generate`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Check if HTML qualification card file exists for a reservation
+   * @param reservationId Reservation ID
+   */
+  async checkHtmlExists(reservationId: number): Promise<{ exists: boolean; reservation_id: number; reason?: string }> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/html-exists`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

@@ -227,6 +227,76 @@ class InvoiceService {
   }
 
   /**
+   * List all invoices (admin only)
+   */
+  async listInvoices(skip: number = 0, limit: number = 1000): Promise<InvoiceResponse[]> {
+    const token = authService.getToken();
+    if (!token) {
+      throw new Error('Brak autoryzacji');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/invoices?skip=${skip}&limit=${limit}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Błąd podczas pobierania faktur';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.detail || error.message || `HTTP ${response.status}: ${response.statusText}`;
+        } else {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+      } catch (parseError) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktur'}`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get invoice by ID
+   */
+  async getById(invoiceId: number): Promise<InvoiceResponse> {
+    const token = authService.getToken();
+    if (!token) {
+      throw new Error('Brak autoryzacji');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/invoices/${invoiceId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Błąd podczas pobierania faktury';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.detail || error.message || `HTTP ${response.status}: ${response.statusText}`;
+        } else {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+      } catch (parseError) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktury'}`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  /**
    * Cancel an invoice
    */
   async cancelInvoice(invoiceId: number): Promise<void> {

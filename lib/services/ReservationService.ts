@@ -50,6 +50,7 @@ export interface CreateReservationRequest {
       psychiatric: string;
     };
     additionalNotes?: string;
+    participantAdditionalInfo?: string;
   };
   step2: {
     selectedDiets?: number[];
@@ -153,6 +154,7 @@ export interface ReservationResponse {
   diet_name: string | null;
   accommodation_request: string | null;
   additional_notes?: string | null;
+  participant_additional_info?: string | null;
   health_questions?: {
     chronicDiseases?: string;
     dysfunctions?: string;
@@ -165,6 +167,8 @@ export interface ReservationResponse {
   } | null;
   selected_source: string | null;
   source_name: string | null;
+  selected_promotion?: string | null;
+  promotion_name?: string | null;
   selected_addons?: string[] | null;
   selected_protection?: string[] | null;
   contract_status?: string | null;
@@ -503,6 +507,7 @@ class ReservationService {
         healthQuestions: step1Data.healthQuestions,
         healthDetails: step1Data.healthDetails,
         additionalNotes: step1Data.additionalNotes,
+        participantAdditionalInfo: step1Data.participantAdditionalInfo,
       },
       step2: {
         selectedDiets: step2Data.selectedDiets,

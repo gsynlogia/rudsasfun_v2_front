@@ -46,6 +46,7 @@ export interface Step1FormData {
     psychiatric: string;
   };
   additionalNotes: string;
+  participantAdditionalInfo?: string; // Optional - additional info about participant (not health-related)
 }
 
 export interface ReservationStorageState {

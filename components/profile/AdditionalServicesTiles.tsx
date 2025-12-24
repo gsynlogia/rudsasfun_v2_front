@@ -105,13 +105,44 @@ export default function AdditionalServicesTiles({
           setAddons([]);
         }
 
-        // Fetch general protections
-        const protectionsResponse = await fetch(`${API_BASE_URL}/api/general-protections/public`);
-        if (protectionsResponse.ok) {
-          const protectionsData = await protectionsResponse.json();
-          setProtections(Array.isArray(protectionsData) ? protectionsData : []);
+        // Fetch protections - prefer turnus-specific prices if camp_id and property_id are available
+        if (reservation?.camp_id && reservation?.property_id) {
+          // Fetch turnus protections (has turnus-specific prices)
+          const turnusProtectionsResponse = await fetch(
+            `${API_BASE_URL}/api/camps/${reservation.camp_id}/properties/${reservation.property_id}/protections`
+          );
+          if (turnusProtectionsResponse.ok) {
+            const turnusProtectionsData = await turnusProtectionsResponse.json();
+            // Map turnus protections to Protection format
+            const mappedProtections = turnusProtectionsData.map((tp: any) => ({
+              id: tp.general_protection_id || tp.id,
+              name: tp.name,
+              display_name: tp.name,
+              price: tp.price || 0,
+              icon_url: tp.icon_url,
+              icon_svg: tp.icon_svg,
+              description: tp.description,
+            }));
+            setProtections(mappedProtections);
+          } else {
+            // Fallback to general protections
+            const protectionsResponse = await fetch(`${API_BASE_URL}/api/general-protections/public`);
+            if (protectionsResponse.ok) {
+              const protectionsData = await protectionsResponse.json();
+              setProtections(Array.isArray(protectionsData) ? protectionsData : []);
+            } else {
+              setProtections([]);
+            }
+          }
         } else {
-          setProtections([]);
+          // Fallback to general protections if no camp/property info
+          const protectionsResponse = await fetch(`${API_BASE_URL}/api/general-protections/public`);
+          if (protectionsResponse.ok) {
+            const protectionsData = await protectionsResponse.json();
+            setProtections(Array.isArray(protectionsData) ? protectionsData : []);
+          } else {
+            setProtections([]);
+          }
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -122,7 +153,7 @@ export default function AdditionalServicesTiles({
       }
     };
     fetchData();
-  }, [reservation?.property_city]);
+  }, [reservation?.property_city, reservation?.camp_id, reservation?.property_id]);
 
   // Fetch Blink configuration when modal opens
   const handlePocketMoneyClick = async () => {

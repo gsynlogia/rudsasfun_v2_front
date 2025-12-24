@@ -2,6 +2,7 @@
 
 import { Search, ChevronUp, ChevronDown, Check, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw, RefreshCw, Trash2 } from 'lucide-react';
 import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
@@ -701,6 +702,7 @@ const mapReservationToPaymentFormat = async (
  * Displays reservations with detailed payment information
  */
 export default function PaymentsManagement() {
+  const router = useRouter();
   const [reservations, setReservations] = useState<ReservationPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1748,7 +1750,15 @@ export default function PaymentsManagement() {
                     <Fragment key={reservation.id}>
                       <tr
                         className={`hover:bg-gray-50 transition-all duration-200 ${isExpanded ? 'bg-blue-50' : ''}`}
-                        onClick={() => toggleRowExpansion(reservation.id)}
+                        onClick={(e) => {
+                          // If clicking on expandable row content, don't navigate
+                          const target = e.target as HTMLElement;
+                          if (target.closest('button, a, input, select')) {
+                            return;
+                          }
+                          // Navigate to payments detail page
+                          router.push(`/admin-panel/rezerwacja/${reservation.reservationName}/payments`);
+                        }}
                         style={{ cursor: 'pointer' }}
                       >
                         <td className="px-4 py-2 whitespace-nowrap">

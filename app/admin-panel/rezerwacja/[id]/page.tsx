@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft, Edit, Check, X, FileText, Download, Upload, Trash2 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { contractService } from '@/lib/services/ContractService';
+import { qualificationCardService } from '@/lib/services/QualificationCardService';
 
 interface ReservationDetails {
   id: number;
@@ -118,6 +120,20 @@ export default function ReservationDetailPage() {
   const [diets, setDiets] = useState<Map<number, Diet>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contractHtmlExists, setContractHtmlExists] = useState(false);
+  const [cardHtmlExists, setCardHtmlExists] = useState(false);
+  const [contractFiles, setContractFiles] = useState<any[]>([]);
+  const [cardFiles, setCardFiles] = useState<any[]>([]);
+  const [rejectingContract, setRejectingContract] = useState(false);
+  const [rejectingCard, setRejectingCard] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejectingDocumentType, setRejectingDocumentType] = useState<'contract' | 'card' | null>(null);
+  const [uploadingContract, setUploadingContract] = useState(false);
+  const [uploadingCard, setUploadingCard] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingReservation, setDeletingReservation] = useState(false);
+  const contractUploadInputRef = useRef<HTMLInputElement>(null);
+  const cardUploadInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -359,6 +375,33 @@ export default function ReservationDetailPage() {
     }
   }, [reservationNumber]);
 
+  // Load document files and check HTML existence
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (!reservation) return;
+      
+      try {
+        // Check if HTML exists
+        const contractHtmlCheck = await contractService.checkHtmlExists(reservation.id);
+        setContractHtmlExists(contractHtmlCheck.exists);
+        
+        const cardHtmlCheck = await qualificationCardService.checkHtmlExists(reservation.id);
+        setCardHtmlExists(cardHtmlCheck.exists);
+        
+        // Load uploaded files
+        const contractFilesData = await contractService.getContractFiles(reservation.id);
+        setContractFiles(contractFilesData.filter(f => f.source === 'user'));
+        
+        const cardFilesData = await qualificationCardService.getQualificationCardFiles(reservation.id);
+        setCardFiles(cardFilesData.filter(f => f.source === 'user'));
+      } catch (err) {
+        console.error('Error loading documents:', err);
+      }
+    };
+    
+    loadDocuments();
+  }, [reservation]);
+
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'Brak danych';
     try {
@@ -429,14 +472,24 @@ export default function ReservationDetailPage() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/edit/1/step`)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200"
-              style={{ borderRadius: 0 }}
-            >
-              <Edit className="w-4 h-4" />
-              <span>Zmiana w rezerwacji</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/edit/1/step`)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200"
+                style={{ borderRadius: 0 }}
+              >
+                <Edit className="w-4 h-4" />
+                <span>Zmiana w rezerwacji</span>
+              </button>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white hover:bg-red-700 transition-all duration-200"
+                style={{ borderRadius: 0 }}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Usuń rezerwację</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 overflow-auto">
@@ -936,34 +989,366 @@ export default function ReservationDetailPage() {
 
             {/* Dokumenty */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Dokumenty</h2>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Status umowy:</label>
-                  <p className="text-sm text-gray-900">
-                    {reservation.contract_status || <MissingInfo field="contract_status" />}
-                  </p>
-                </div>
-                {reservation.contract_rejection_reason && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Powód odrzucenia umowy:</label>
-                    <p className="text-sm text-gray-900">{reservation.contract_rejection_reason}</p>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-semibold text-gray-900">Dokumenty</h2>
+              </div>
+              <div className="space-y-4">
+                {/* Umowa */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Status umowy:</label>
+                        <p className="text-sm text-gray-900">
+                          {reservation.contract_status || 'Brak'}
+                        </p>
+                      </div>
+                      {reservation.contract_status === 'approved' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          ✓ Zatwierdzona
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={contractUploadInputRef}
+                        type="file"
+                        accept=".pdf"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !reservation) return;
+                          
+                          try {
+                            setUploadingContract(true);
+                            await contractService.uploadContract(reservation.id, file);
+                            alert('Umowa została przesłana pomyślnie');
+                            // Reload documents
+                            const contractFilesData = await contractService.getContractFiles(reservation.id);
+                            setContractFiles(contractFilesData.filter(f => f.source === 'user'));
+                            if (contractUploadInputRef.current) {
+                              contractUploadInputRef.current.value = '';
+                            }
+                          } catch (err) {
+                            alert(err instanceof Error ? err.message : 'Nie udało się przesłać umowy');
+                          } finally {
+                            setUploadingContract(false);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => contractUploadInputRef.current?.click()}
+                        disabled={uploadingContract}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-[#03adf0] text-white text-xs rounded hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Wgraj umowę za klienta"
+                      >
+                        <Upload className="w-3 h-3" />
+                        {uploadingContract ? 'Wgrywanie...' : 'Wgraj umowę'}
+                      </button>
+                    </div>
                   </div>
-                )}
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Status karty kwalifikacyjnej:</label>
-                  <p className="text-sm text-gray-900">
-                    {reservation.qualification_card_status || <MissingInfo field="qualification_card_status" />}
-                  </p>
+                  {contractHtmlExists ? (
+                    <div className="bg-green-50 border border-green-200 rounded p-2">
+                      <p className="text-sm text-green-800 font-medium">✓ Dokumenty dostępne dla klienta</p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border border-gray-200 rounded p-2">
+                      <p className="text-sm text-gray-600">Brak</p>
+                    </div>
+                  )}
+                  {contractFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Wgrane dokumenty:</label>
+                      {contractFiles.map((file) => (
+                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-gray-600" />
+                            <span className="text-sm text-gray-900">{file.file_name}</span>
+                            <span className="text-xs text-gray-500">
+                              ({new Date(file.uploaded_at).toLocaleDateString('pl-PL')})
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await contractService.downloadContractFile(file.id);
+                                } catch (err) {
+                                  alert(err instanceof Error ? err.message : 'Błąd podczas pobierania pliku');
+                                }
+                              }}
+                              className="p-1 text-[#03adf0] hover:bg-blue-50 rounded"
+                              title="Pobierz"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await contractService.updateContractStatus(reservation.id, 'approved');
+                                  alert('Umowa została zatwierdzona. Email został wysłany do klienta.');
+                                  window.location.reload();
+                                } catch (err) {
+                                  alert(err instanceof Error ? err.message : 'Błąd podczas zatwierdzania');
+                                }
+                              }}
+                              disabled={reservation.contract_status === 'approved'}
+                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Zatwierdź
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRejectingDocumentType('contract');
+                                setRejectionReason('');
+                              }}
+                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                            >
+                              Odrzuć
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {reservation.contract_rejection_reason && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Powód odrzucenia umowy:</label>
+                      <p className="text-sm text-gray-900">{reservation.contract_rejection_reason}</p>
+                    </div>
+                  )}
                 </div>
-                {reservation.qualification_card_rejection_reason && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Powód odrzucenia karty:</label>
-                    <p className="text-sm text-gray-900">{reservation.qualification_card_rejection_reason}</p>
+
+                <div className="border-t border-gray-200"></div>
+
+                {/* Karta kwalifikacyjna */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Status karty kwalifikacyjnej:</label>
+                        <p className="text-sm text-gray-900">
+                          {reservation.qualification_card_status || 'Brak'}
+                        </p>
+                      </div>
+                      {reservation.qualification_card_status === 'approved' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          ✓ Zatwierdzona
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={cardUploadInputRef}
+                        type="file"
+                        accept=".pdf"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !reservation) return;
+                          
+                          try {
+                            setUploadingCard(true);
+                            await qualificationCardService.uploadQualificationCard(reservation.id, file);
+                            alert('Karta kwalifikacyjna została przesłana pomyślnie');
+                            // Reload documents
+                            const cardFilesData = await qualificationCardService.getQualificationCardFiles(reservation.id);
+                            setCardFiles(cardFilesData.filter(f => f.source === 'user'));
+                            if (cardUploadInputRef.current) {
+                              cardUploadInputRef.current.value = '';
+                            }
+                          } catch (err) {
+                            alert(err instanceof Error ? err.message : 'Nie udało się przesłać karty kwalifikacyjnej');
+                          } finally {
+                            setUploadingCard(false);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => cardUploadInputRef.current?.click()}
+                        disabled={uploadingCard}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-[#03adf0] text-white text-xs rounded hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Wgraj kartę kwalifikacyjną za klienta"
+                      >
+                        <Upload className="w-3 h-3" />
+                        {uploadingCard ? 'Wgrywanie...' : 'Wgraj kartę'}
+                      </button>
+                    </div>
                   </div>
-                )}
+                  {cardHtmlExists ? (
+                    <div className="bg-green-50 border border-green-200 rounded p-2">
+                      <p className="text-sm text-green-800 font-medium">✓ Dokumenty dostępne dla klienta</p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border border-gray-200 rounded p-2">
+                      <p className="text-sm text-gray-600">Brak</p>
+                    </div>
+                  )}
+                  {cardFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Wgrane dokumenty:</label>
+                      {cardFiles.map((file) => (
+                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-gray-600" />
+                            <span className="text-sm text-gray-900">{file.file_name}</span>
+                            <span className="text-xs text-gray-500">
+                              ({new Date(file.uploaded_at).toLocaleDateString('pl-PL')})
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await qualificationCardService.downloadQualificationCardFile(file.id);
+                                } catch (err) {
+                                  alert(err instanceof Error ? err.message : 'Błąd podczas pobierania pliku');
+                                }
+                              }}
+                              className="p-1 text-[#03adf0] hover:bg-blue-50 rounded"
+                              title="Pobierz"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await qualificationCardService.updateQualificationCardStatus(reservation.id, 'approved');
+                                  alert('Karta kwalifikacyjna została zatwierdzona. Email został wysłany do klienta.');
+                                  window.location.reload();
+                                } catch (err) {
+                                  alert(err instanceof Error ? err.message : 'Błąd podczas zatwierdzania');
+                                }
+                              }}
+                              disabled={reservation.qualification_card_status === 'approved'}
+                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Zatwierdź
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRejectingDocumentType('card');
+                                setRejectionReason('');
+                              }}
+                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                            >
+                              Odrzuć
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {reservation.qualification_card_rejection_reason && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Powód odrzucenia karty:</label>
+                      <p className="text-sm text-gray-900">{reservation.qualification_card_rejection_reason}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Modal usuwania rezerwacji */}
+            {showDeleteModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                  <h3 className="text-lg font-semibold mb-4 text-red-600">
+                    Usuń rezerwację
+                  </h3>
+                  <p className="text-sm text-gray-700 mb-4">
+                    Czy na pewno chcesz usunąć rezerwację <strong>{reservationNumber}</strong>?
+                  </p>
+                  <p className="text-xs text-gray-500 mb-4">
+                    Ta operacja jest nieodwracalna. Zostaną usunięte wszystkie powiązane dane:
+                    płatności, faktury, dokumenty, pliki i wszystkie relacje. Dostępność turnusu zostanie zwiększona o 1.
+                  </p>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setShowDeleteModal(false)}
+                      disabled={deletingReservation}
+                      className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Anuluj
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!reservation) return;
+                        try {
+                          setDeletingReservation(true);
+                          await authenticatedApiCall(`/api/reservations/${reservation.id}`, {
+                            method: 'DELETE',
+                          });
+                          alert('Rezerwacja została usunięta pomyślnie. Dostępność turnusu została zwiększona o 1.');
+                          router.push('/admin-panel');
+                        } catch (err) {
+                          alert(err instanceof Error ? err.message : 'Błąd podczas usuwania rezerwacji');
+                        } finally {
+                          setDeletingReservation(false);
+                          setShowDeleteModal(false);
+                        }
+                      }}
+                      disabled={deletingReservation}
+                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deletingReservation ? 'Usuwanie...' : 'Usuń rezerwację'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal odrzucenia */}
+            {rejectingDocumentType && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                  <h3 className="text-lg font-semibold mb-4">
+                    Odrzuć {rejectingDocumentType === 'contract' ? 'umowę' : 'kartę kwalifikacyjną'}
+                  </h3>
+                  <textarea
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Podaj uzasadnienie odrzucenia..."
+                    className="w-full h-32 p-2 border border-gray-300 rounded mb-4"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => {
+                        setRejectingDocumentType(null);
+                        setRejectionReason('');
+                      }}
+                      className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                    >
+                      Anuluj
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!rejectionReason.trim()) {
+                          alert('Podaj uzasadnienie odrzucenia');
+                          return;
+                        }
+                        try {
+                          if (rejectingDocumentType === 'contract') {
+                            await contractService.updateContractStatus(reservation!.id, 'rejected', rejectionReason);
+                          } else {
+                            await qualificationCardService.updateQualificationCardStatus(reservation!.id, 'rejected', rejectionReason);
+                          }
+                          alert(`Dokument został odrzucony. Email z uzasadnieniem został wysłany do klienta.`);
+                          setRejectingDocumentType(null);
+                          setRejectionReason('');
+                          window.location.reload();
+                        } catch (err) {
+                          alert(err instanceof Error ? err.message : 'Błąd podczas odrzucania dokumentu');
+                        }
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                    >
+                      Odrzuć
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Płatności */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 lg:col-span-2">

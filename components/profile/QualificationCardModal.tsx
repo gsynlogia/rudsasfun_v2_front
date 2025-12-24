@@ -271,10 +271,18 @@ export default function QualificationCardModal({
       // First save data
       await qualificationCardService.saveQualificationCardData(reservation.id, dataToSave);
 
-      // Then generate card
-      await qualificationCardService.generateQualificationCard(reservation.id);
+      // Open HTML card in new window (similar to contract)
+      // Use Next.js route instead of direct API URL to handle authentication
+      const formatReservationNumber = (reservationId: number, createdAt: string) => {
+        const year = new Date(createdAt).getFullYear();
+        const paddedId = String(reservationId).padStart(3, '0');
+        return `REZ-${year}-${paddedId}`;
+      };
+      const reservationNumber = formatReservationNumber(reservation.id, reservation.created_at);
+      const url = `/profil/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
+      window.open(url, '_blank');
 
-      // Show important information about qualification card after generation
+      // Show important information about qualification card
       alert(`WAŻNE INFORMACJE O KARCIE KWALIFIKACYJNEJ:\n\n` +
             `• Karta jest uzupełniona na podstawie rezerwacji.\n` +
             `• MUSISZ uzupełnić pozostałe dane: PESEL (jeśli nie został podany) oraz informacje o chorobach/zdrowiu.\n` +
@@ -286,8 +294,8 @@ export default function QualificationCardModal({
       onSuccess();
       onClose();
     } catch (err) {
-      console.error('Error generating qualification card:', err);
-      setError(err instanceof Error ? err.message : 'Błąd podczas generowania karty');
+      console.error('Error opening qualification card:', err);
+      setError(err instanceof Error ? err.message : 'Błąd podczas otwierania karty');
     } finally {
       setIsSaving(false);
     }

@@ -86,6 +86,30 @@ export default function CMSPage() {
               </p>
             </Link>
 
+            {/* Health Notice box */}
+            <Link
+              href="/admin-panel/cms/health-notice"
+              className="group bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 p-6 border-2 border-gray-200 hover:border-[#03adf0] cursor-pointer"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  {/* Health/Medical SVG icon */}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#03adf0] group-hover:text-[#0288c7] transition-colors">
+                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                    <path d="M12 9v6"/>
+                    <path d="M9 12h6"/>
+                  </svg>
+                  <h2 className="text-xl font-semibold text-gray-800 group-hover:text-[#03adf0] transition-colors">
+                    Stan zdrowia
+                  </h2>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-[#03adf0] group-hover:translate-x-1 transition-all" />
+              </div>
+              <p className="text-sm text-gray-600">
+                Zarządzaj uwagą dotyczącą stanu zdrowia wyświetlaną w formularzu rezerwacji (Step 1)
+              </p>
+            </Link>
+
             {/* Blink Configuration box */}
             <Link
               href="/admin-panel/cms/configuration-blink"

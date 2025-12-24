@@ -9,17 +9,19 @@ import { reservationService, type ReservationResponse } from '@/lib/services/Res
 
 interface Document {
   id: string;
-  type: 'contract' | 'qualification_card' | 'invoice' | 'uploaded_contract' | 'uploaded_qualification_card';
+  type: 'contract' | 'qualification_card' | 'invoice' | 'uploaded_contract' | 'uploaded_qualification_card' | 'cms_document';
   name: string;
-  reservationId: number;
-  reservationName: string;
-  participantName: string;
+  reservationId?: number;
+  reservationName?: string;
+  participantName?: string;
   date: string;
-  amount: number;
+  amount?: number;
   status: 'available' | 'pending' | 'unavailable';
   contract_status?: string | null; // 'pending', 'approved', 'rejected'
   fileId?: number; // For uploaded files
   source?: string; // 'user' or 'system'
+  fileUrl?: string; // For CMS documents
+  isHtml?: boolean; // True if document is HTML (for contracts/cards)
 }
 
 /**
@@ -42,6 +44,9 @@ export default function Downloads() {
         // Get user's reservations to get contract_status
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
         const reservationsMap = new Map(reservations.map(r => [r.id, r]));
+        
+        // Store reservations for later use
+        const reservationsList = reservations;
 
         // Fetch ALL contract files for each reservation (both SYSTEM and USER)
         const allContractsList: Document[] = [];
@@ -138,8 +143,69 @@ export default function Downloads() {
           }
         }
 
+        // Fetch public documents from CMS
+        const cmsDocumentsList: Document[] = [];
+        try {
+          const { API_BASE_URL } = await import('@/utils/api-config');
+          const response = await fetch(`${API_BASE_URL}/api/documents/public`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.documents && Array.isArray(data.documents)) {
+              data.documents.forEach((doc: any) => {
+                cmsDocumentsList.push({
+                  id: `cms-document-${doc.id}`,
+                  type: 'cms_document' as const,
+                  name: doc.display_name,
+                  date: new Date(doc.created_at).toLocaleDateString('pl-PL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  }),
+                  status: 'available' as const,
+                  fileUrl: doc.file_url,
+                });
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error loading CMS documents:', error);
+        }
+
+        // Check which contracts/cards have HTML versions
+        const contractsWithHtml = new Set<number>();
+        const cardsWithHtml = new Set<number>();
+        
+        for (const reservation of reservations) {
+          try {
+            const contractHtmlCheck = await contractService.checkHtmlExists(reservation.id);
+            if (contractHtmlCheck.exists) {
+              contractsWithHtml.add(reservation.id);
+            }
+            
+            const cardHtmlCheck = await qualificationCardService.checkHtmlExists(reservation.id);
+            if (cardHtmlCheck.exists) {
+              cardsWithHtml.add(reservation.id);
+            }
+          } catch (error) {
+            // Ignore errors
+          }
+        }
+
+        // Mark HTML documents
+        allContractsList.forEach(doc => {
+          if (doc.source === 'system' && doc.reservationId && contractsWithHtml.has(doc.reservationId)) {
+            doc.isHtml = true;
+          }
+        });
+
+        allQualificationCardsList.forEach(doc => {
+          if (doc.source === 'system' && doc.reservationId && cardsWithHtml.has(doc.reservationId)) {
+            doc.isHtml = true;
+          }
+        });
+
         // Combine all documents
-        const documentsList: Document[] = [...allContractsList, ...allQualificationCardsList];
+        const documentsList: Document[] = [...allContractsList, ...allQualificationCardsList, ...cmsDocumentsList];
 
         // Sort by reservation ID first, then by uploaded_at timestamp within each reservation (newest first)
         // We need to use the actual uploaded_at from the files, not the formatted date string
@@ -160,6 +226,27 @@ export default function Downloads() {
 
   const handleDownloadDocument = async (document: Document) => {
     if (document.type === 'contract') {
+      // For HTML contracts, open in new tab instead of downloading
+      if (document.isHtml && document.reservationId) {
+        try {
+          const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
+          const reservation = reservations.find(r => r.id === document.reservationId);
+          if (reservation) {
+            const formatReservationNumber = (reservationId: number, createdAt: string) => {
+              const year = new Date(createdAt).getFullYear();
+              const paddedId = String(reservationId).padStart(3, '0');
+              return `REZ-${year}-${paddedId}`;
+            };
+            const reservationNumber = formatReservationNumber(document.reservationId, reservation.created_at);
+            const url = `/profil/aktualne-rezerwacje/${reservationNumber}/umowa`;
+            window.open(url, '_blank');
+            return;
+          }
+        } catch (error) {
+          console.error('Error opening contract HTML:', error);
+        }
+      }
+      
       // Download contract - use reservationId if fileId is 0 or missing (file system fallback)
       try {
         setDownloadingIds(prev => new Set(prev).add(document.id));
@@ -168,7 +255,7 @@ export default function Downloads() {
           await contractService.downloadContractFile(document.fileId);
         } else {
           // Use reservation ID for file system files (fileId = 0)
-          await contractService.downloadContract(document.reservationId);
+          await contractService.downloadContract(document.reservationId!);
         }
       } catch (error) {
         console.error('Error downloading contract:', error);
@@ -200,6 +287,27 @@ export default function Downloads() {
         });
       }
     } else if (document.type === 'qualification_card') {
+      // For HTML qualification cards, open in new tab instead of downloading
+      if (document.isHtml && document.reservationId) {
+        try {
+          const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
+          const reservation = reservations.find(r => r.id === document.reservationId);
+          if (reservation) {
+            const formatReservationNumber = (reservationId: number, createdAt: string) => {
+              const year = new Date(createdAt).getFullYear();
+              const paddedId = String(reservationId).padStart(3, '0');
+              return `REZ-${year}-${paddedId}`;
+            };
+            const reservationNumber = formatReservationNumber(document.reservationId, reservation.created_at);
+            const url = `/profil/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
+            window.open(url, '_blank');
+            return;
+          }
+        } catch (error) {
+          console.error('Error opening qualification card HTML:', error);
+        }
+      }
+      
       // Download specific qualification card file by ID (system-generated)
       if (!document.fileId) {
         alert('Błąd: brak ID pliku do pobrania');
@@ -230,6 +338,37 @@ export default function Downloads() {
       } catch (error) {
         console.error('Error downloading uploaded qualification card:', error);
         alert('Nie udało się pobrać wgranej karty kwalifikacyjnej. Spróbuj ponownie.');
+      } finally {
+        setDownloadingIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(document.id);
+          return newSet;
+        });
+      }
+    } else if (document.type === 'cms_document') {
+      // Download CMS document
+      if (!document.fileUrl) {
+        alert('Błąd: brak URL pliku do pobrania');
+        return;
+      }
+      try {
+        setDownloadingIds(prev => new Set(prev).add(document.id));
+        const response = await fetch(document.fileUrl);
+        if (!response.ok) {
+          throw new Error('Nie udało się pobrać pliku');
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = window.document.createElement('a');
+        a.href = url;
+        a.download = document.name || 'dokument';
+        window.document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        window.document.body.removeChild(a);
+      } catch (error) {
+        console.error('Error downloading CMS document:', error);
+        alert('Nie udało się pobrać dokumentu. Spróbuj ponownie.');
       } finally {
         setDownloadingIds(prev => {
           const newSet = new Set(prev);
@@ -300,17 +439,23 @@ export default function Downloads() {
     );
   }
 
+  // Separate CMS documents from reservation documents
+  const cmsDocuments = documents.filter(doc => doc.type === 'cms_document');
+  const reservationDocuments = documents.filter(doc => doc.type !== 'cms_document' && doc.reservationId);
+
   // Group documents by reservation
   const documentsByReservation = new Map<number, { reservation: Document, documents: Document[] }>();
 
-  documents.forEach((doc) => {
-    if (!documentsByReservation.has(doc.reservationId)) {
+  reservationDocuments.forEach((doc) => {
+    if (doc.reservationId && !documentsByReservation.has(doc.reservationId)) {
       documentsByReservation.set(doc.reservationId, {
         reservation: doc,
         documents: [],
       });
     }
-    documentsByReservation.get(doc.reservationId)!.documents.push(doc);
+    if (doc.reservationId) {
+      documentsByReservation.get(doc.reservationId)!.documents.push(doc);
+    }
   });
 
   // Sort documents within each reservation by date (newest first)
@@ -331,12 +476,58 @@ export default function Downloads() {
           Dokumenty do pobrania
         </h3>
 
-        {documentsByReservation.size === 0 ? (
+        {/* CMS Documents Section */}
+        {cmsDocuments.length > 0 && (
+          <div className="mb-6">
+            <h4 className="text-sm sm:text-base font-semibold text-gray-800 mb-3">Dokumenty ogólne</h4>
+            <div className="space-y-2">
+              {cmsDocuments.map((doc) => (
+                <div key={doc.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                        <span className="text-sm sm:text-base font-medium text-gray-900">{doc.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs sm:text-sm text-gray-600">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
+                          {doc.date}
+                        </div>
+                      </div>
+                      {getStatusBadge(doc.status)}
+                    </div>
+                    <button
+                      onClick={() => handleDownloadDocument(doc)}
+                      disabled={doc.status !== 'available' || downloadingIds.has(doc.id)}
+                      className="ml-4 flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-[#03adf0] text-white text-xs sm:text-sm rounded hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {downloadingIds.has(doc.id) ? (
+                        <>
+                          <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                          <span className="hidden sm:inline">Pobieranie...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <span className="hidden sm:inline">Pobierz</span>
+                          <span className="sm:hidden">Pobierz</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {documentsByReservation.size === 0 && cmsDocuments.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
             <p className="text-gray-600">Brak dostępnych dokumentów</p>
           </div>
-        ) : (
+        ) : documentsByReservation.size > 0 ? (
           <div className="space-y-4">
             {Array.from(documentsByReservation.entries()).map(([reservationId, { reservation, documents: reservationDocs }]) => {
               const isExpanded = expandedReservations.has(reservationId);
@@ -364,7 +555,7 @@ export default function Downloads() {
                             {reservation.reservationName}
                           </div>
                           <div className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                            {reservation.participantName} • {reservation.amount.toFixed(2)} zł
+                            {reservation.participantName} • {reservation.amount?.toFixed(2) || '0.00'} zł
                           </div>
                         </div>
                       </div>
@@ -396,8 +587,8 @@ export default function Downloads() {
                                 <div className="flex items-center gap-2 mb-2">
                                   <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                                   <span className="font-medium text-sm sm:text-base text-gray-900">
-                                    {document.type === 'contract' ? 'Umowa wygenerowana' :
-                                     document.type === 'qualification_card' ? 'Karta kwalifikacyjna wygenerowana' :
+                                    {document.type === 'contract' ? (document.isHtml ? 'Umowa (HTML)' : 'Umowa wygenerowana') :
+                                     document.type === 'qualification_card' ? (document.isHtml ? 'Karta kwalifikacyjna (HTML)' : 'Karta kwalifikacyjna wygenerowana') :
                                      document.type === 'uploaded_contract' ? 'Umowa wgrana' :
                                      document.type === 'uploaded_qualification_card' ? 'Karta kwalifikacyjna wgrana' :
                                      'Inny dokument'}
@@ -448,9 +639,19 @@ export default function Downloads() {
                                   </>
                                 ) : (
                                   <>
-                                    <Download className="w-3 h-3 sm:w-4 sm:h-4" />
-                                    <span className="hidden sm:inline">Pobierz</span>
-                                    <span className="sm:hidden">Pobierz</span>
+                                    {document.isHtml ? (
+                                      <>
+                                        <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
+                                        <span className="hidden sm:inline">Otwórz</span>
+                                        <span className="sm:hidden">Otwórz</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+                                        <span className="hidden sm:inline">Pobierz</span>
+                                        <span className="sm:hidden">Pobierz</span>
+                                      </>
+                                    )}
                                   </>
                                 )}
                               </button>
@@ -464,7 +665,7 @@ export default function Downloads() {
               );
             })}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

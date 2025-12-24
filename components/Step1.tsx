@@ -9,6 +9,7 @@ import { useReservation } from '@/context/ReservationContext';
 import type { StepComponentProps } from '@/types/reservation';
 import { saveStep1FormData, loadStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
 import { isFakeDataEnabled, getFakeStep1Data } from '@/utils/fakeData';
+import { API_BASE_URL } from '@/utils/api-config';
 
 import DashedLine from './DashedLine';
 import DietSection from './step1/DietSection';
@@ -379,6 +380,34 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   });
 
   const [additionalNotes, setAdditionalNotes] = useState('');
+  const [participantAdditionalInfo, setParticipantAdditionalInfo] = useState('');
+  const [healthNoticeText, setHealthNoticeText] = useState<string | null>(null);
+
+  // Fetch health notice text from API
+  useEffect(() => {
+    const fetchHealthNotice = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/health-notice/public`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.notice_text && data.notice_text.trim() !== '') {
+            setHealthNoticeText(data.notice_text);
+          } else {
+            setHealthNoticeText(null);
+          }
+        } else {
+          // If 404 or other error, no active notice exists
+          setHealthNoticeText(null);
+        }
+      } catch (err) {
+        console.error('[Step1] Error fetching health notice:', err);
+        // No active notice - don't display alert
+        setHealthNoticeText(null);
+      }
+    };
+
+    fetchHealthNotice();
+  }, []);
 
   // Memoize validateAll to ensure it uses current values
   const validateAllMemoized = useCallback(() => {
@@ -439,6 +468,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
             psychiatric: '',
           },
           additionalNotes: fakeData.additionalNotes !== undefined ? fakeData.additionalNotes : (savedData?.additionalNotes ?? ''),
+          participantAdditionalInfo: savedData?.participantAdditionalInfo ?? '',
         };
         savedData = mergedData;
         // Save fake data to sessionStorage
@@ -471,6 +501,9 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       }
       if (savedData.additionalNotes !== undefined) {
         setAdditionalNotes(savedData.additionalNotes || '');
+      }
+      if (savedData.participantAdditionalInfo !== undefined) {
+        setParticipantAdditionalInfo(savedData.participantAdditionalInfo || '');
       }
     }
 
@@ -516,9 +549,10 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
       healthQuestions,
       healthDetails,
       additionalNotes,
+      participantAdditionalInfo,
     };
     saveStep1FormData(formData);
-  }, [parents, participantData, accommodationRequest, healthQuestions, healthDetails, additionalNotes]);
+  }, [parents, participantData, accommodationRequest, healthQuestions, healthDetails, additionalNotes, participantAdditionalInfo]);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -920,19 +954,33 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
         <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-800">
           Stan zdrowia (choroby/dysfunkcje) uczestnika
         </h2>
+
         <section className="bg-white p-4 sm:p-6">
+          {/* Alert - only show if healthNoticeText exists and is not empty */}
+          {healthNoticeText && healthNoticeText.trim() !== '' && (
+            <>
+              <div className="flex items-start gap-3 mb-4 mt-2">
+                <svg className="w-5 h-5 text-[#D62828] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-bold text-gray-900 mb-1">Uwaga!</p>
+                  <p className="text-xs sm:text-sm text-gray-700">
+                    {healthNoticeText}
+                  </p>
+                </div>
+              </div>
+
+              <svg className="w-full h-2" xmlns="http://www.w3.org/2000/svg">
+                <line x1="0" y1="1" x2="100%" y2="1" stroke="#d1d5db" strokeWidth="1" strokeDasharray="16 4" />
+              </svg>
+            </>
+          )}
           <div className="space-y-3 sm:space-y-4">
             {/* Chronic diseases */}
             <div>
-              <label className="flex items-center gap-2 text-xs sm:text-sm font-bold text-gray-900 mb-2">
-                Czy uczestnik ma choroby przewlekłe?
-                <button className="text-[#03adf0] hover:text-[#0288c7] transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 16v-4"/>
-                    <path d="M12 8h.01"/>
-                  </svg>
-                </button>
+              <label className="block text-xs sm:text-sm font-bold text-gray-900 mb-2">
+                Czy uczestnik choruje na choroby przewlekłe? (czy choruje na choroby długotrwałe, np. na AZS, cukrzycę, łuszczycę, depresję itp.)
               </label>
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-2">
@@ -979,15 +1027,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
 
             {/* Dysfunctions */}
             <div>
-              <label className="flex items-center gap-2 text-xs sm:text-sm font-bold text-gray-900 mb-2">
-                Czy uczestnik ma dysfunkcje?
-                <button className="text-[#03adf0] hover:text-[#0288c7] transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 16v-4"/>
-                    <path d="M12 8h.01"/>
-                  </svg>
-                </button>
+              <label className="block text-xs sm:text-sm font-bold text-gray-900 mb-2">
+                Czy uczestnik posiada jakieś dysfunkcje? (np. ADHD, opóźnienie w stopniu lekkim, niepełnosprawność, jaka? Itp.)
               </label>
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-2">
@@ -1034,15 +1075,8 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
 
             {/* Psychiatric */}
             <div>
-              <label className="flex items-center gap-2 text-xs sm:text-sm font-bold text-gray-900 mb-2">
-                Czy uczestnik ma problemy psychiatryczne?
-                <button className="text-[#03adf0] hover:text-[#0288c7] transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 16v-4"/>
-                    <path d="M12 8h.01"/>
-                  </svg>
-                </button>
+              <label className="block text-xs sm:text-sm font-bold text-gray-900 mb-2">
+                Czy uczestnik leczył się lub leczy psychiatrycznie? (jeśli tak, wpisać kiedy i z jakiego powodu)
               </label>
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-2">
@@ -1089,27 +1123,17 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
 
             <DashedLine />
 
-            {/* Alert */}
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-[#D62828] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div>
-                <p className="text-sm font-bold text-gray-900 mb-1">Uwaga!</p>
-                <p className="text-xs sm:text-sm text-gray-700">
-                  Prosimy o dokładne wypełnienie wszystkich pól dotyczących stanu zdrowia uczestnika.
-                  Informacje te są niezbędne do zapewnienia odpowiedniej opieki podczas obozu.
-                </p>
-              </div>
-            </div>
-
-            <DashedLine />
-
             {/* Additional notes */}
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                Informacje dodatkowe / Uwagi
+                Dodatkowe informacje o stanie zdrowia uczestnika
               </label>
+              <p className="text-xs text-gray-600 mb-2">
+                Prosimy o podanie dodatkowych informacji, np.: alergie, choroba lokomocyjna, czy nosi okulary, czy przyjmuje leki (jeśli tak, prosimy o podanie nazwy leków i dawek), czy może uprawiać sport, czy ma problemy ze słuchem itp.
+              </p>
+              <p className="text-xs text-gray-600 mb-3">
+                <strong>Informacja:</strong> Leki podaje kadra na obozie lub uczestnik samodzielnie, jeśli rodzic/opiekun prawny napisze na to zgodę.
+              </p>
               <textarea
                 value={additionalNotes}
                 onChange={(e) => setAdditionalNotes(e.target.value)}
@@ -1120,6 +1144,26 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
               />
             </div>
           </div>
+        </section>
+      </div>
+
+      {/* Informacje dodatkowe dotyczące uczestnika */}
+      <div>
+        <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-800">
+          Informacje dodatkowe dotyczące uczestnika
+        </h2>
+        <section className="bg-white p-4 sm:p-6">
+          <p className="text-xs text-gray-600 mb-3">
+            Inne informacje, np. wyczesać włosy, nie je wieprzowiny, NIE dla quadów, ograniczone prawa rodzicielskie 2 rodzica itp.
+          </p>
+          <textarea
+            value={participantAdditionalInfo}
+            onChange={(e) => setParticipantAdditionalInfo(e.target.value)}
+            rows={4}
+            disabled={disabled}
+            className="w-full px-3 sm:px-4 py-2 border border-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed"
+            placeholder="Wprowadź dodatkowe informacje..."
+          />
         </section>
       </div>
     </div>

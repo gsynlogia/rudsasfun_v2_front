@@ -269,11 +269,11 @@ export default function TransportSection() {
 
       let transportName = 'Transport';
       if (citiesDifferent) {
-        transportName = `Transport zbiórkowy: ${departureCityName} (wyjazd), ${returnCityName} (powrót)`;
+        transportName = `Transport zbiorowy: ${departureCityName} (wyjazd), ${returnCityName} (powrót)`;
       } else if (transportData.departureType === 'zbiorowy' && transportData.departureCity) {
-        transportName = `Transport zbiórkowy: ${departureCityName}`;
+        transportName = `Transport zbiorowy: ${departureCityName}`;
       } else if (transportData.returnType === 'zbiorowy' && transportData.returnCity) {
-        transportName = `Transport zbiórkowy: ${returnCityName}`;
+        transportName = `Transport zbiorowy: ${returnCityName}`;
       }
 
       addReservationItem({
@@ -460,7 +460,7 @@ export default function TransportSection() {
                   Przed wypełnieniem tego formularza sprawdź informacje transportowe.
                 </p>
                 <p className="text-xs sm:text-sm text-red-600">
-                  Przy zmianie po 30 dniach obowiązuje dopłata 30 zł.
+                  Przy zmianie po 7 dniach obowiązuje dopłata 30 zł.
                 </p>
               </div>
             </div>

@@ -439,21 +439,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
           {/* Documents Section */}
           <div>
             {/* Documents Header */}
-            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6 pl-0">
-              <svg
-                className="w-5 h-5 text-gray-600 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <circle cx="12" cy="12" r="10" strokeWidth="2" />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 16v-4M12 8h.01"
-                />
-              </svg>
+            <div className="mb-4 sm:mb-6 pl-0">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                 Dokumenty do pobrania
               </h3>

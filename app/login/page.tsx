@@ -66,9 +66,15 @@ function LoginContent() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 text-center">
               Logowanie
             </h1>
-            <p className="text-sm sm:text-base text-gray-600 mb-6 text-center">
+            <p className="text-sm sm:text-base text-gray-600 mb-4 text-center">
               Wprowadź swój adres email, aby otrzymać link do logowania
             </p>
+            
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 mb-6">
+              <p className="text-xs sm:text-sm text-yellow-800">
+                <strong>Uwaga:</strong> Tylko poniższy adres e-mail będzie służył do obsługi i wglądu w rezerwacje. Loguj się zawsze tym samym adresem.
+              </p>
+            </div>
 
             {success ? (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
@@ -97,6 +103,18 @@ function LoginContent() {
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                     <p className="text-sm text-red-800">{error}</p>
+                    {error.includes('nie istnieje') && (
+                      <p className="text-xs text-red-700 mt-2">
+                        Nie masz konta?{' '}
+                        <button
+                          type="button"
+                          onClick={() => router.push('/register')}
+                          className="underline font-medium hover:text-red-900"
+                        >
+                          Zarejestruj się
+                        </button>
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -107,6 +125,19 @@ function LoginContent() {
                 >
                   {loading ? 'Wysyłanie...' : 'Zaloguj'}
                 </button>
+
+                <div className="text-center pt-2">
+                  <p className="text-sm text-gray-600">
+                    Nie masz konta?{' '}
+                    <button
+                      type="button"
+                      onClick={() => router.push('/register')}
+                      className="text-[#03adf0] hover:text-[#0288c7] font-medium underline"
+                    >
+                      Zarejestruj się
+                    </button>
+                  </p>
+                </div>
               </form>
             )}
           </div>

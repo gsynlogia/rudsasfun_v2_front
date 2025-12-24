@@ -77,6 +77,33 @@ class MagicLinkService {
 
     return response.json();
   }
+
+  /**
+   * Register a new user and request a magic link
+   * @param email - Email address to register
+   * @param redirectUrl - Optional redirect URL after successful login
+   */
+  async register(email: string, redirectUrl?: string): Promise<MagicLinkResponse> {
+    const body: MagicLinkRequest = { email };
+    if (redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')) {
+      body.redirect_url = redirectUrl;
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/auth/magic-link/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Błąd podczas rejestracji' }));
+      throw new Error(error.detail || 'Błąd podczas rejestracji');
+    }
+
+    return response.json();
+  }
 }
 
 export const magicLinkService = new MagicLinkService();

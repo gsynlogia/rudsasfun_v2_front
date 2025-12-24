@@ -14,6 +14,7 @@ interface Addon {
   price: number;
   icon_url?: string | null;
   icon_svg?: string | null;
+  default_selected?: boolean;
 }
 
 /**
@@ -99,6 +100,7 @@ export default function AddonsSection() {
           price: number;
           icon_url?: string | null;
           icon_svg?: string | null;
+          default_selected?: boolean;
         }) => ({
           id: addon.id.toString(),
           name: addon.name,
@@ -106,8 +108,45 @@ export default function AddonsSection() {
           price: addon.price,
           icon_url: addon.icon_url,
           icon_svg: addon.icon_svg,
+          default_selected: addon.default_selected ?? false,
         }));
         setAddons(addonsFromApi);
+        
+        // Auto-select addons with default_selected = true if no saved data exists
+        const savedData = loadStep2FormData();
+        if (!savedData || !savedData.selectedAddons || !Array.isArray(savedData.selectedAddons) || savedData.selectedAddons.length === 0) {
+          // No saved data - auto-select addons with default_selected = true
+          const defaultSelectedIds = addonsFromApi
+            .filter((addon: Addon) => addon.default_selected)
+            .map((addon: Addon) => addon.id);
+          if (defaultSelectedIds.length > 0) {
+            setSelectedAddons(new Set(defaultSelectedIds));
+            // Save to sessionStorage
+            const currentData = loadStep2FormData();
+            if (currentData) {
+              saveStep2FormData({
+                ...currentData,
+                selectedAddons: defaultSelectedIds,
+              });
+            } else {
+              // If no existing data, create minimal valid structure
+              saveStep2FormData({
+                selectedAddons: defaultSelectedIds,
+                selectedProtection: [],
+                selectedPromotion: '',
+                transportData: {
+                  departureType: 'own',
+                  departureCity: '',
+                  returnType: 'own',
+                  returnCity: '',
+                  differentCities: false,
+                },
+                selectedSource: '',
+                inneText: '',
+              });
+            }
+          }
+        }
       } catch (err) {
         console.error('[AddonsSection] Error fetching addons:', err);
         // Fallback to empty array if API fails

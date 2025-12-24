@@ -15,7 +15,7 @@ import { saveStep2FormData, loadStep2FormData, type Step2FormData } from '@/util
  * Contains: Addons, Protection, Promotions, Transport, Source information
  */
 export default function Step2({ onNext, onPrevious, disabled = false }: StepComponentProps) {
-  // Combined validation function for Step2 (Transport + Source)
+  // Combined validation function for Step2 (Transport + Source + Promotions)
   const validateStep2 = useCallback((): boolean => {
     // Validate transport section
     const validateTransport = (window as any).validateStep2;
@@ -25,7 +25,11 @@ export default function Step2({ onNext, onPrevious, disabled = false }: StepComp
     const validateSource = (window as any).validateSourceSection;
     const sourceValid = validateSource ? validateSource() : true;
     
-    return transportValid && sourceValid;
+    // Validate promotions section
+    const validatePromotions = (window as any).validatePromotionsSection;
+    const promotionsValid = validatePromotions ? validatePromotions() : true;
+    
+    return transportValid && sourceValid && promotionsValid;
   }, []);
 
   // Expose combined validation function

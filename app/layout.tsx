@@ -5,6 +5,7 @@ import './globals.css';
 import { ToastProvider } from '@/components/ToastContainer';
 import { ReservationProvider } from '@/context/ReservationContext';
 import MaintenancePage from '@/components/MaintenancePage';
+import TestBanner from '@/components/TestBanner';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -39,6 +40,7 @@ export default function RootLayout({
         ) : (
           <ReservationProvider>
             <ToastProvider>
+              <TestBanner />
               {children}
             </ToastProvider>
           </ReservationProvider>

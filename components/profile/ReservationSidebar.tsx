@@ -48,6 +48,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
   const [isFullyPaid, setIsFullyPaid] = useState(false);
   const [hasContract, setHasContract] = useState(false);
   const [loadingContract, setLoadingContract] = useState(false);
+  const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [generatingCard, setGeneratingCard] = useState(false);
   const certificateInputRef = useRef<HTMLInputElement>(null);
   const contractInputRef = useRef<HTMLInputElement>(null);
@@ -361,10 +362,23 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                     </>
                   )}
                 </button> */}
-                <div className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-orange-50 border border-orange-200 text-[10px] sm:text-xs rounded text-orange-700 text-center">
-                  Umowa będzie dostępna za dwa dni
-                </div>
-                {/* <input
+                <button
+                  onClick={() => {
+                    // Format reservation number: REZ-YYYY-XXX
+                    const formatReservationNumber = (reservationId: number, createdAt: string) => {
+                      const year = new Date(createdAt).getFullYear();
+                      const paddedId = String(reservationId).padStart(3, '0');
+                      return `REZ-${year}-${paddedId}`;
+                    };
+                    const reservationNumber = formatReservationNumber(reservation.id, reservation.created_at);
+                    window.open(`/profil/aktualne-rezerwacje/${reservationNumber}/umowa`, '_blank');
+                  }}
+                  className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] text-white text-[10px] sm:text-xs rounded hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-1"
+                >
+                  <FileText className="w-3 h-3" />
+                  <span>Pobierz umowę</span>
+                </button>
+                <input
                   ref={contractInputRef}
                   type="file"
                   accept=".pdf"
@@ -376,7 +390,6 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       setUploadingContract(true);
                       await contractService.uploadContract(reservationIdNum, file);
                       alert('Umowa została przesłana pomyślnie');
-                      await loadContractStatus();
                       if (contractInputRef.current) {
                         contractInputRef.current.value = '';
                       }
@@ -404,7 +417,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       <span>Wgraj podpisaną umowę</span>
                     </>
                   )}
-                </button> */}
+                </button>
               </div>
             </div>
           </div>
@@ -419,11 +432,11 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               </svg>
             </div>
             <div className="flex-1">
-              <p className="text-[9px] sm:text-[10px] font-semibold text-blue-900 mb-0.5 sm:mb-1">
-                Ważne informacje
+              <p className="text-xs sm:text-sm font-semibold text-blue-900 mb-0.5 sm:mb-1 uppercase">
+                WAŻNE INFORMACJE
               </p>
-              <p className="text-[9px] sm:text-[10px] text-blue-800 leading-tight">
-                Masz <strong>2 dni</strong> na wgranie podpisanej umowy. Możesz podpisać umowę <strong>odręcznie</strong> lub <strong>podpisem zaufanym</strong>.
+              <p className="text-xs sm:text-sm text-blue-800 leading-tight uppercase">
+                MASZ <strong>2 DNI</strong> NA WGRANIE PODPISANEJ UMOWY. MOŻESZ PODPISAĆ UMOWĘ <strong>ODRĘCZNIE</strong> LUB <strong>PODPISEM ZAUFANYM</strong>.
               </p>
             </div>
           </div>
@@ -484,10 +497,35 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                     </>
                   )}
                 </button> */}
-                <div className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-orange-50 border border-orange-200 text-[10px] sm:text-xs rounded text-orange-700 text-center">
-                  Karta kwalifikacyjna będzie dostępna za dwa dni
-                </div>
-                {/* <input
+                <button
+                  onClick={async () => {
+                    try {
+                      // If card data is not completed, open modal
+                      if (!cardDataCompleted) {
+                        setShowQualificationCardModal(true);
+                        return;
+                      }
+
+                      // If card data is completed, open HTML in new tab
+                      // Use Next.js route instead of direct API URL to handle authentication
+                      const formatReservationNumber = (reservationId: number, createdAt: string) => {
+                        const year = new Date(createdAt).getFullYear();
+                        const paddedId = String(reservationId).padStart(3, '0');
+                        return `REZ-${year}-${paddedId}`;
+                      };
+                      const reservationNumber = formatReservationNumber(reservationIdNum, reservation.created_at);
+                      const url = `/profil/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
+                      window.open(url, '_blank');
+                    } catch (error: any) {
+                      console.error('Error opening qualification card:', error);
+                      alert(error.message || 'Nie udało się otworzyć karty kwalifikacyjnej. Spróbuj ponownie.');
+                    }
+                  }}
+                  className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] hover:bg-[#0299d6] text-white text-[10px] sm:text-xs rounded transition-colors text-center"
+                >
+                  Karta kwalifikacyjna
+                </button>
+                <input
                   ref={qualificationCardInputRef}
                   type="file"
                   accept=".pdf"
@@ -499,7 +537,6 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       setUploadingCard(true);
                       await qualificationCardService.uploadQualificationCard(reservationIdNum, file);
                       alert('Karta kwalifikacyjna została przesłana pomyślnie');
-                      await loadQualificationCard();
                       if (qualificationCardInputRef.current) {
                         qualificationCardInputRef.current.value = '';
                       }
@@ -524,10 +561,10 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                   ) : (
                     <>
                       <FileText className="w-3 h-3" />
-                      <span>Wgraj podpisaną i wypełnioną kartę</span>
+                      <span>Wgraj podpisaną kartę kwalifikacyjną</span>
                     </>
                   )}
-                </button> */}
+                </button>
               </div>
             </div>
           </div>
@@ -554,16 +591,10 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           {/* Action Buttons */}
           <div className="space-y-1.5 sm:space-y-2">
             <button
-              onClick={() => router.push('/profil/faktury-i-platnosci')}
+              onClick={() => setShowCancellationModal(true)}
               className="w-full px-3 sm:px-4 py-1.5 sm:py-2 bg-[#03adf0] text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-[#0288c7] transition-colors"
             >
-              faktury vat
-            </button>
-            <button
-              onClick={() => setShowCertificateModal(true)}
-              className="w-full px-3 sm:px-4 py-1.5 sm:py-2 bg-[#03adf0] text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-[#0288c7] transition-colors"
-            >
-              zaświadczenia
+              rezygnacja
             </button>
           </div>
 
@@ -802,6 +833,74 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         onClose={() => setShowQualificationCardModal(false)}
         onSuccess={handleQualificationCardModalSuccess}
       />
+
+      {/* Cancellation Modal */}
+      <UniversalModal
+        isOpen={showCancellationModal}
+        title="Rezygnacja z rezerwacji"
+        onClose={() => setShowCancellationModal(false)}
+        maxWidth="md"
+      >
+        <div className="p-6">
+          <div className="space-y-4">
+            <p className="text-sm sm:text-base text-gray-700">
+              Aby zrezygnować z rezerwacji, prosimy o kontakt z nami:
+            </p>
+            
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-1">
+                  <svg className="w-5 h-5 text-[#03adf0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 mb-1">Napisz do nas</p>
+                  <a 
+                    href="mailto:kontakt@radsas-fun.pl" 
+                    className="text-sm sm:text-base text-[#03adf0] hover:text-[#0288c7] hover:underline"
+                  >
+                    kontakt@radsas-fun.pl
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-1">
+                  <svg className="w-5 h-5 text-[#03adf0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 mb-1">Zadzwoń do nas</p>
+                  <a 
+                    href="tel:+48513726102" 
+                    className="text-sm sm:text-base text-[#03adf0] hover:text-[#0288c7] hover:underline"
+                  >
+                    +48 513 726 102
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-xs sm:text-sm text-gray-600">
+                Odpowiemy na Twoją wiadomość najszybciej jak to możliwe i pomożemy w procesie rezygnacji.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-6 mt-6 border-t border-gray-200">
+            <button
+              onClick={() => setShowCancellationModal(false)}
+              className="px-4 sm:px-6 py-2 text-sm sm:text-base text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors"
+              style={{ borderRadius: 0 }}
+            >
+              Zamknij
+            </button>
+          </div>
+        </div>
+      </UniversalModal>
     </div>
   );
 }

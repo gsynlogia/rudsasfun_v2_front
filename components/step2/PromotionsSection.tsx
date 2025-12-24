@@ -2,7 +2,7 @@
 
 import { Info, Download } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
 import { API_BASE_URL } from '@/utils/api-config';
@@ -106,6 +106,13 @@ export default function PromotionsSection() {
     if (nameLower.includes('rodzeństwo razem') || nameLower.includes('rodzenstwo razem')) return 'rodzenstwo_razem';
     if (nameLower.includes('obozy na maxa') || nameLower.includes('obozy na max')) return 'obozy_na_maxa';
     if (nameLower.includes('first minute') || nameLower.includes('wczesna rezerwacja')) return 'first_minute';
+    // Check for bon promotions (Bon Brązowy, Bon Srebrny, Bon Złoty, Bon Platynowy)
+    if (nameLower.includes('bon') && (
+      nameLower.includes('brązowy') || nameLower.includes('brazowy') ||
+      nameLower.includes('srebrny') ||
+      nameLower.includes('złoty') || nameLower.includes('zloty') ||
+      nameLower.includes('platynowy')
+    )) return 'bonowych';
     if (nameLower.includes('bonowych') || nameLower.includes('bonowa')) return 'bonowych';
     return 'other';
   };
@@ -273,6 +280,72 @@ export default function PromotionsSection() {
       });
     }
   }, [selectedPromotion, promotionType]);
+
+  // Validation function for promotion justification
+  const validatePromotions = useCallback((): boolean => {
+    // If no promotion is selected, validation passes
+    if (!selectedPromotionId || !selectedPromotion) {
+      return true;
+    }
+
+    // If promotion doesn't require justification, validation passes
+    if (!requiresJustification(selectedPromotion.name)) {
+      return true;
+    }
+
+    // Validate based on promotion type
+    const type = getPromotionType(selectedPromotion.name);
+
+    if (type === 'duza_rodzina') {
+      return !!(promotionJustification.card_number && promotionJustification.card_number.trim() !== '');
+    }
+
+    if (type === 'rodzenstwo_razem') {
+      return !!(
+        promotionJustification.sibling_first_name && 
+        promotionJustification.sibling_first_name.trim() !== '' &&
+        promotionJustification.sibling_last_name && 
+        promotionJustification.sibling_last_name.trim() !== ''
+      );
+    }
+
+    if (type === 'obozy_na_maxa') {
+      return !!(
+        (promotionJustification.first_camp_date && promotionJustification.first_camp_date.trim() !== '') ||
+        (promotionJustification.first_camp_name && promotionJustification.first_camp_name.trim() !== '')
+      );
+    }
+
+    if (type === 'first_minute') {
+      return !!(promotionJustification.reason && promotionJustification.reason.trim() !== '');
+    }
+
+    if (type === 'bonowych') {
+      return !!(
+        promotionJustification.years && 
+        (
+          (Array.isArray(promotionJustification.years) && promotionJustification.years.length > 0) ||
+          (typeof promotionJustification.years === 'string' && promotionJustification.years.trim() !== '')
+        )
+      );
+    }
+
+    // For other promotion types, validation passes
+    return true;
+  }, [selectedPromotionId, selectedPromotion, promotionJustification]);
+
+  // Expose validation function for external use (e.g., Step2 validation)
+  const validationAttemptedRef = useRef(false);
+  useEffect(() => {
+    (window as any).validatePromotionsSection = () => {
+      validationAttemptedRef.current = true;
+      return validatePromotions();
+    };
+
+    return () => {
+      delete (window as any).validatePromotionsSection;
+    };
+  }, [validatePromotions]);
 
   return (
     <div>

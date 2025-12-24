@@ -53,8 +53,8 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
     setIsAuthenticated(false);
     setAccountDropdownOpen(false);
 
-    // Redirect to home page
-    router.push('/');
+    // Redirect to main website
+    window.location.href = 'https://radsas-fun.pl/';
   };
 
   const headerClasses = fixed

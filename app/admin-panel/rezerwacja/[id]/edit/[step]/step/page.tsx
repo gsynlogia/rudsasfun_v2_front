@@ -37,6 +37,7 @@ interface ReservationDetails {
   health_questions?: any;
   health_details?: any;
   additional_notes?: string | null;
+  participant_additional_info?: string | null;
   selected_diets?: number[] | null;
   selected_addons?: string[] | null;
   selected_protection?: string[] | null;
@@ -399,6 +400,7 @@ export default function EditReservationPage() {
                   health_questions: reservation.health_questions,
                   health_details: reservation.health_details,
                   additional_notes: reservation.additional_notes,
+                  participant_additional_info: reservation.participant_additional_info,
                 }}
                 camp_id={reservation.camp_id}
                 property_id={reservation.property_id}

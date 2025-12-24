@@ -359,6 +359,12 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     return cities[cityValue] || getValueOrNotSet(cityValue, 'Nie wybrano');
   };
 
+  // Get transport city label (for transport, "Nie wybrano" means "Transport własny")
+  const getTransportCityLabel = (cityValue: string | null | undefined): string => {
+    const cityLabel = getCityLabel(cityValue);
+    return cityLabel === 'Nie wybrano' ? 'Transport własny' : cityLabel;
+  };
+
   // Get diet label from selectedDietId from Step1 (fetched from API)
   const getDietLabel = (dietId: number | null | undefined): string => {
     if (!dietId) return 'Nie wybrano';
@@ -1022,13 +1028,19 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
             {/* Left: Departure Transport */}
             <div>
               <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
-                Transport do ośrodka
+                Transport: <span className="uppercase">WYJAZD</span>
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 {step2Data.transportData ? (
                   <>
-                    <div>Transport zbiórkowy do ośrodka</div>
-                    <div>{getCityLabel(step2Data.transportData.departureCity)}</div>
+                    {step2Data.transportData.departureType === 'zbiorowy' ? (
+                      <>
+                        <div>Transport zbiorowy</div>
+                        <div>{getTransportCityLabel(step2Data.transportData.departureCity)}</div>
+                      </>
+                    ) : (
+                      <div>{getTransportCityLabel(step2Data.transportData.departureCity)}</div>
+                    )}
                   </>
                 ) : (
                   <div className="text-gray-500 italic">Nie ustawiono</div>
@@ -1039,13 +1051,19 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
             {/* Right: Return Transport */}
             <div>
               <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
-                Transport z ośrodka
+                Transport: <span className="uppercase">PRZYJAZD</span>
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 {step2Data.transportData ? (
                   <>
-                    <div>Transport zbiórkowy z ośrodka</div>
-                    <div>{getCityLabel(step2Data.transportData.returnCity)}</div>
+                    {step2Data.transportData.returnType === 'zbiorowy' ? (
+                      <>
+                        <div>Transport zbiorowy</div>
+                        <div>{getTransportCityLabel(step2Data.transportData.returnCity)}</div>
+                      </>
+                    ) : (
+                      <div>{getTransportCityLabel(step2Data.transportData.returnCity)}</div>
+                    )}
                   </>
                 ) : (
                   <div className="text-gray-500 italic">Nie ustawiono</div>
@@ -1148,21 +1166,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
         </h2>
         <div className="mb-4 sm:mb-6">
           {/* Information */}
-          <div className="flex items-start gap-2 sm:gap-3">
-            <svg
-              className="w-5 h-5 text-gray-600 flex-shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <circle cx="12" cy="12" r="10" strokeWidth="2" />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 16v-4M12 8h.01"
-              />
-            </svg>
+          <div>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
               Dokonując pełnej wpłaty od razu zyskujesz gwarancję niezmienności ceny oraz spokojną głowę (nie musisz pamiętać o kolejnej wpłacie)
             </p>

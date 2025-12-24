@@ -46,6 +46,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
   const [bankAccount, setBankAccount] = useState<any>(null);
   const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
+  const [protections, setProtections] = useState<Map<number, { name: string; price: number }>>(new Map());
 
   // Format date helper
   const formatDate = (dateString: string | null | undefined): string => {
@@ -96,6 +97,84 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     };
     loadOnlinePaymentsStatus();
   }, []);
+
+  // Load protection prices from API
+  useEffect(() => {
+    const loadProtections = async () => {
+      if (!reservation.selected_protection || !reservation.camp_id || !reservation.property_id) {
+        setProtections(new Map());
+        return;
+      }
+
+      try {
+        const API_BASE_URL = getApiBaseUrlRuntime();
+        const protectionsMap = new Map<number, { name: string; price: number }>();
+        
+        // Fetch turnus protections (public endpoint - has name and price)
+        const turnusProtections = await fetch(
+          `${API_BASE_URL}/api/camps/${reservation.camp_id}/properties/${reservation.property_id}/protections`
+        ).then(res => res.ok ? res.json() : []);
+
+        // Fetch public general protections as fallback (public endpoint)
+        const publicProtections = await fetch(
+          `${API_BASE_URL}/api/general-protections/public`
+        ).then(res => res.ok ? res.json() : []).catch(() => []);
+
+        for (const protectionIdValue of reservation.selected_protection) {
+          try {
+            let generalProtectionId: number | null = null;
+            if (typeof protectionIdValue === 'string' && protectionIdValue.startsWith('protection-')) {
+              const numericId = parseInt(protectionIdValue.split('-')[1], 10);
+              if (!isNaN(numericId)) {
+                generalProtectionId = numericId;
+              }
+            } else {
+              const parsedId = typeof protectionIdValue === 'number' ? protectionIdValue : parseInt(String(protectionIdValue));
+              if (!isNaN(parsedId)) {
+                generalProtectionId = parsedId;
+              }
+            }
+            
+            if (generalProtectionId) {
+              // First try to find in turnus protections (has center-specific price)
+              const turnusProtection = turnusProtections.find(
+                (tp: any) => tp.general_protection_id === generalProtectionId || tp.id === generalProtectionId
+              );
+              
+              if (turnusProtection && turnusProtection.general_protection_id) {
+                // Use data from turnus protection (has name and price)
+                protectionsMap.set(generalProtectionId, {
+                  name: turnusProtection.name || `Ochrona ${generalProtectionId}`,
+                  price: turnusProtection.price || 0,
+                });
+              } else {
+                // Fallback to public general protections
+                const publicProtection = publicProtections.find(
+                  (p: any) => p.id === generalProtectionId
+                );
+                
+                if (publicProtection) {
+                  protectionsMap.set(generalProtectionId, {
+                    name: publicProtection.name,
+                    price: publicProtection.price || 0,
+                  });
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`Error processing protection ${protectionIdValue}:`, err);
+          }
+        }
+        
+        setProtections(protectionsMap);
+      } catch (err) {
+        console.error('Error loading protections:', err);
+        setProtections(new Map());
+      }
+    };
+
+    loadProtections();
+  }, [reservation.selected_protection, reservation.camp_id, reservation.property_id]);
 
   // Load payments for this reservation
   useEffect(() => {
@@ -283,8 +362,9 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const returnType = reservation.return_type === 'zbiorowy' ? 'Transport zbiorowy' : 'Transport własny';
   const returnCity = reservation.return_city || '';
 
-  // State for diet name (will be fetched if not in reservation)
+  // State for diet name and price (will be fetched if not in reservation)
   const [dietName, setDietName] = useState<string | null>(reservation.diet_name || null);
+  const [dietPrice, setDietPrice] = useState<number | null>(null);
 
   // Update dietName when reservation.diet_name changes (from backend)
   useEffect(() => {
@@ -293,14 +373,15 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     }
   }, [reservation.diet_name]);
 
-  // Fetch diet name if not available in reservation
+  // Fetch diet price from turnus diets (backend already provides diet_name in reservation)
+  // This gives us turnus-specific price which may differ from base price
   useEffect(() => {
-    if (!dietName && reservation.diet && reservation.camp_id && reservation.property_id) {
-      const fetchDietName = async () => {
+    if (reservation.diet && reservation.camp_id && reservation.property_id) {
+      const fetchDietPrice = async () => {
         try {
           const API_BASE_URL = getApiBaseUrlRuntime();
           
-          // First, try to find in turnus diets
+          // Try to find in turnus diets to get turnus-specific price
           const response = await fetch(`${API_BASE_URL}/api/camps/${reservation.camp_id}/properties/${reservation.property_id}/diets`);
           if (response.ok) {
             const diets = await response.json();
@@ -310,59 +391,38 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
               d.relation_id === reservation.diet ||
               (d.is_center_diet_relation && d.relation_id === reservation.diet)
             );
-            if (foundDiet && foundDiet.name) {
-              setDietName(foundDiet.name);
-              return;
+            if (foundDiet && foundDiet.price !== undefined && foundDiet.price !== null) {
+              setDietPrice(parseFloat(foundDiet.price));
             }
           }
-          
-          // If not found in turnus diets, try to fetch directly from general diets or diets
-          // Try as regular diet first
-          try {
-            const dietResponse = await fetch(`${API_BASE_URL}/api/diets/${reservation.diet}`);
-            if (dietResponse.ok) {
-              const dietData = await dietResponse.json();
-              if (dietData.name) {
-                setDietName(dietData.name);
-                return;
-              }
-            }
-          } catch (err) {
-            // Not a regular diet, continue
-          }
-          
-          // Try as general diet
-          try {
-            const generalDietResponse = await fetch(`${API_BASE_URL}/api/general-diets/${reservation.diet}`);
-            if (generalDietResponse.ok) {
-              const generalDietData = await generalDietResponse.json();
-              if (generalDietData.name) {
-                setDietName(generalDietData.name);
-                return;
-              }
-            }
-          } catch (err) {
-            // Not a general diet either
-          }
-          
-          // If still not found, it might be a relation_id from center_diet_general_diets
-          // We can't fetch it directly, so we'll need backend support or keep showing ID
         } catch (err) {
-          console.error('Error fetching diet name:', err);
+          // Silently fail - price is optional, name is already from backend
+          console.error('Error fetching diet price:', err);
         }
       };
-      fetchDietName();
+      fetchDietPrice();
     }
-  }, [dietName, reservation.diet, reservation.camp_id, reservation.property_id]);
+  }, [reservation.diet, reservation.camp_id, reservation.property_id]);
 
   // Get diet name (prefer diet_name, fallback to fetched name, then diet ID)
   const diet = dietName || (reservation.diet ? `Dieta ID: ${reservation.diet}` : 'Brak danych');
+  
+  // Format diet display with price in parentheses if available
+  const dietDisplay = dietPrice !== null && dietPrice > 0 
+    ? `${diet} (${dietPrice.toFixed(2)} PLN)`
+    : diet;
 
-  // Get promotion/source name (prefer source_name, fallback to selected_source)
-  const promotion = reservation.source_name || reservation.selected_source || 'Brak promocji';
+  // Get promotion name (if selected_promotion exists, show promotion_name or selected_promotion)
+  const promotion = reservation.promotion_name || reservation.selected_promotion || 'Brak promocji';
+  
+  // Get source name (prefer source_name, fallback to selected_source)
+  const source = reservation.source_name || reservation.selected_source || 'Brak danych';
 
   // Get accommodation
   const accommodation = reservation.accommodation_request || 'Brak danych';
+
+  // Get participant additional info
+  const participantAdditionalInfo = reservation.participant_additional_info || null;
 
   // Get health info - use additional_notes (Informacje dodatkowe / Uwagi from Step1)
   const additionalNotes = reservation.additional_notes || null;
@@ -544,7 +604,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         {/* Transport to resort */}
         <div>
           <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">
-            Transport do ośrodka
+            Transport: <span className="uppercase">WYJAZD</span>
           </h5>
           <div className="text-xs sm:text-sm text-gray-700 space-y-1">
             <div>{departureType}</div>
@@ -555,7 +615,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         {/* Transport from resort */}
         <div>
           <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">
-            Transport z ośrodka
+            Transport: <span className="uppercase">PRZYJAZD</span>
           </h5>
           <div className="text-xs sm:text-sm text-gray-700 space-y-1">
             <div>{returnType}</div>
@@ -573,12 +633,20 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div>
               <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Dieta</h5>
-              <div className="text-xs sm:text-sm text-gray-700">{diet}</div>
+              <div className="text-xs sm:text-sm text-gray-700">{dietDisplay}</div>
             </div>
             <div>
               <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Promocja</h5>
               <div className="text-xs sm:text-sm text-gray-700">{promotion}</div>
             </div>
+          </div>
+
+          <DashedLine />
+
+          {/* Source */}
+          <div>
+            <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Źródło</h5>
+            <div className="text-xs sm:text-sm text-gray-700">{source}</div>
           </div>
 
           <DashedLine />
@@ -595,13 +663,22 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
             {/* Health Status */}
             <div>
-              <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Opieka zdrowotna</h5>
+              <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Stan zdrowia</h5>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 {healthInfoParts.map((part, index) => (
                   <div key={index}>{part}</div>
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Participant Additional Info */}
+          <DashedLine />
+          <div>
+            <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Informacje dodatkowe dotyczące uczestnika</h5>
+            <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap">
+              {participantAdditionalInfo || 'brak'}
+            </p>
           </div>
 
           <DashedLine />
@@ -670,11 +747,46 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                   <div className="space-y-2">
                     {/* Calculate remaining amount - disable other options if payment_plan is already set in database */}
                     {(() => {
+                      // Check if First Minute promotion is selected
+                      const promotionName = reservation.promotion_name || reservation.selected_promotion || '';
+                      const isFirstMinute = promotionName.toLowerCase().includes('first minute') || 
+                                          promotionName.toLowerCase().includes('firstminute') ||
+                                          promotionName.toLowerCase().includes('wczesna rezerwacja');
+                      
                       const remainingAmount = reservation.total_price - paidAmount;
                       // Check if payment_plan is already saved in database
                       const savedPaymentPlan = reservation.payment_plan;
                       const isPlanLocked = !!savedPaymentPlan; // If payment_plan exists, lock other options
 
+                      // For First Minute, only allow full payment
+                      if (isFirstMinute) {
+                        // Force full payment for First Minute
+                        if (paymentInstallments !== 'full') {
+                          setPaymentInstallments('full');
+                        }
+                        
+                        return (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              id={`installmentFull-${reservation.id}`}
+                              name={`paymentInstallments-${reservation.id}`}
+                              value="full"
+                              checked={true}
+                              disabled={true}
+                              className="w-4 h-4 text-[#03adf0] focus:ring-[#03adf0] border-gray-400 cursor-not-allowed"
+                            />
+                            <label
+                              htmlFor={`installmentFull-${reservation.id}`}
+                              className="text-xs sm:text-sm text-gray-700"
+                            >
+                              Pełna płatność ({remainingAmount.toFixed(2)} zł) - wymagana dla promocji First Minute
+                            </label>
+                          </div>
+                        );
+                      }
+
+                      // Normal payment options for non-First Minute
                       return (
                         <>
                           {/* Full Payment - disabled if payment_plan is '2' or '3' */}
@@ -880,10 +992,16 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                       Płatność przelewem tradycyjnym
                     </h6>
                     
-                    {/* Calculate deposit: 500 zł + protections */}
+                    {/* Calculate deposit: 500 zł + protections, or full payment for First Minute */}
                     {(() => {
+                      // Check if First Minute promotion is selected
+                      const promotionName = reservation.promotion_name || reservation.selected_promotion || '';
+                      const isFirstMinute = promotionName.toLowerCase().includes('first minute') || 
+                                          promotionName.toLowerCase().includes('firstminute') ||
+                                          promotionName.toLowerCase().includes('wczesna rezerwacja');
+                      
                       const baseDeposit = 500;
-                      // Calculate protection prices from reservation - store each protection separately
+                      // Calculate protection prices from API data
                       const protectionItems: Array<{ name: string; price: number }> = [];
                       if (reservation.selected_protection) {
                         const selectedProtections = Array.isArray(reservation.selected_protection)
@@ -892,37 +1010,65 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                             ? JSON.parse(reservation.selected_protection || '[]')
                             : [];
                         
-                        // Protection prices: TARCZA = 110, OAZA = 170 (hardcoded for now)
+                        // Get protection prices from API (protections state)
                         selectedProtections.forEach((prot: string) => {
-                          if (prot.includes('tarcza') || prot.includes('shield') || prot === 'protection-1') {
-                            protectionItems.push({ name: 'Tarcza', price: 110 });
-                          } else if (prot.includes('oaza') || prot.includes('oasa') || prot === 'protection-2') {
-                            protectionItems.push({ name: 'Oaza', price: 170 });
+                          let generalProtectionId: number | null = null;
+                          if (typeof prot === 'string' && prot.startsWith('protection-')) {
+                            const numericId = parseInt(prot.split('-')[1], 10);
+                            if (!isNaN(numericId)) {
+                              generalProtectionId = numericId;
+                            }
+                          } else {
+                            const parsedId = typeof prot === 'number' ? prot : parseInt(String(prot));
+                            if (!isNaN(parsedId)) {
+                              generalProtectionId = parsedId;
+                            }
+                          }
+                          
+                          if (generalProtectionId) {
+                            const protection = protections.get(generalProtectionId);
+                            if (protection) {
+                              protectionItems.push({ name: protection.name, price: protection.price });
+                            }
                           }
                         });
                       }
                       const protectionTotal = protectionItems.reduce((sum, item) => sum + item.price, 0);
                       const totalDeposit = baseDeposit + protectionTotal;
                       
+                      // For First Minute, show full payment instead of deposit
+                      const paymentAmount = isFirstMinute ? (reservation.total_price || 0) : totalDeposit;
+                      
                       return (
                         <div className="space-y-3 sm:space-y-4">
                           <div className="bg-white p-3 sm:p-4 rounded border border-blue-200">
-                            <p className="text-xs sm:text-sm font-semibold text-gray-900 mb-2">Zaliczka do wpłaty:</p>
+                            <p className="text-xs sm:text-sm font-semibold text-gray-900 mb-2">
+                              {isFirstMinute ? 'Kwota do wpłaty (pełna płatność):' : 'Zaliczka do wpłaty:'}
+                            </p>
                             <div className="space-y-1 text-xs sm:text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Zaliczka podstawowa:</span>
-                                <span className="font-medium text-gray-900">{baseDeposit.toFixed(2)} zł</span>
-                              </div>
-                              {protectionItems.map((item, index) => (
-                                <div key={index} className="flex justify-between">
-                                  <span className="text-gray-600">Ochrona: {item.name}</span>
-                                  <span className="font-medium text-gray-900">+{item.price.toFixed(2)} zł</span>
+                              {isFirstMinute ? (
+                                <div className="flex justify-between pt-2">
+                                  <span className="font-semibold text-gray-900">Całkowita kwota do zapłaty:</span>
+                                  <span className="font-bold text-[#03adf0]">{paymentAmount.toFixed(2)} zł</span>
                                 </div>
-                              ))}
-                              <div className="flex justify-between pt-2 border-t border-gray-200">
-                                <span className="font-semibold text-gray-900">Razem zaliczka:</span>
-                                <span className="font-bold text-[#03adf0]">{totalDeposit.toFixed(2)} zł</span>
-                              </div>
+                              ) : (
+                                <>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-600">Zaliczka podstawowa:</span>
+                                    <span className="font-medium text-gray-900">{baseDeposit.toFixed(2)} zł</span>
+                                  </div>
+                                  {protectionItems.map((item, index) => (
+                                    <div key={index} className="flex justify-between">
+                                      <span className="text-gray-600">Ochrona: {item.name}</span>
+                                      <span className="font-medium text-gray-900">+{item.price.toFixed(2)} zł</span>
+                                    </div>
+                                  ))}
+                                  <div className="flex justify-between pt-2 border-t border-gray-200">
+                                    <span className="font-semibold text-gray-900">Razem zaliczka:</span>
+                                    <span className="font-bold text-[#03adf0]">{totalDeposit.toFixed(2)} zł</span>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </div>
                           

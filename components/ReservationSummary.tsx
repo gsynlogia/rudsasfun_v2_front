@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
 import type { StepNumber, ReservationItem } from '@/types/reservation';
-import { loadStep5FormData } from '@/utils/sessionStorage';
+import { loadStep5FormData, loadStep2FormData } from '@/utils/sessionStorage';
 
 const DEFAULT_BASE_PRICE = 2200; // Fallback for SSR only
 const TOTAL_STEPS = 5;
@@ -146,7 +146,12 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
 
   // Separate base price from other items
   const baseItem = reservation.items.find((item: ReservationItem) => item.type === 'base');
-  const additionalItems = reservation.items.filter((item: ReservationItem) => item.type !== 'base');
+  const transportItem = reservation.items.find((item: ReservationItem) => item.type === 'transport');
+  const additionalItems = reservation.items.filter((item: ReservationItem) => item.type !== 'base' && item.type !== 'transport');
+  
+  // Load transport data from sessionStorage
+  const step2Data = loadStep2FormData();
+  const transportData = step2Data?.transportData;
 
   // Render default state during SSR to avoid hydration mismatch
   if (!isMounted) {
@@ -228,6 +233,36 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
           </div>
         )}
 
+        {/* Transport - special formatting */}
+        {transportItem && (
+          <div className="w-full mb-2">
+            <div className="text-sm text-gray-600 mb-1 flex items-center justify-between w-full">
+              <span>Transport:</span>
+              <span className="font-medium">
+                {transportItem.price > 0 ? '+' : ''}{transportItem.price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+              </span>
+            </div>
+            {transportData && (
+              <>
+                <div className="text-sm text-gray-600 mb-1 ml-4">
+                  Transport: <span className="font-bold uppercase">WYJAZD:</span> {
+                    transportData.departureType === 'zbiorowy' && transportData.departureCity && transportData.departureCity.trim() !== '' && transportData.departureCity !== 'Nie wybrano'
+                      ? transportData.departureCity 
+                      : 'własny'
+                  }
+                </div>
+                <div className="text-sm text-gray-600 mb-1 ml-4">
+                  Transport: <span className="font-bold uppercase">POWRÓT:</span> {
+                    transportData.returnType === 'zbiorowy' && transportData.returnCity && transportData.returnCity.trim() !== '' && transportData.returnCity !== 'Nie wybrano'
+                      ? transportData.returnCity 
+                      : 'własny'
+                  }
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* HR line - solid gray */}
         <div className="w-full h-px bg-gray-300 mb-3 sm:mb-4"></div>
 
@@ -247,6 +282,10 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                 .filter((item: ReservationItem) => {
                   // If deposit is selected, hide protection items (they'll be shown in deposit breakdown)
                   if (paymentAmount === 'deposit' && item.type === 'protection') {
+                    return false;
+                  }
+                  // Transport will be displayed separately with special formatting
+                  if (item.type === 'transport') {
                     return false;
                   }
                   return true;
@@ -279,6 +318,36 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                     </div>
                   );
                 })}
+              
+              {/* Transport - special formatting */}
+              {transportItem && (
+                <>
+                  <div className="text-xs sm:text-sm text-gray-600 flex items-center justify-between">
+                    <span>Transport:</span>
+                    <span className="font-medium text-gray-900">
+                      {transportItem.price > 0 ? '+' : ''}{transportItem.price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                    </span>
+                  </div>
+                  {transportData && (
+                    <>
+                      <div className="text-xs sm:text-sm text-gray-600 ml-4">
+                        Transport: <span className="font-bold uppercase">WYJAZD:</span> {
+                          transportData.departureType === 'zbiorowy' && transportData.departureCity && transportData.departureCity.trim() !== '' && transportData.departureCity !== 'Nie wybrano'
+                            ? transportData.departureCity 
+                            : 'własny'
+                        }
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600 ml-4">
+                        Transport: <span className="font-bold uppercase">POWRÓT:</span> {
+                          transportData.returnType === 'zbiorowy' && transportData.returnCity && transportData.returnCity.trim() !== '' && transportData.returnCity !== 'Nie wybrano'
+                            ? transportData.returnCity 
+                            : 'własny'
+                        }
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="w-full h-px bg-gray-300 my-2"></div>

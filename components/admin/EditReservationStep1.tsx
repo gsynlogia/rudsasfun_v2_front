@@ -36,6 +36,7 @@ interface EditReservationStep1Props {
       psychiatric: string;
     };
     additional_notes?: string | null;
+    participant_additional_info?: string | null;
   };
   camp_id: number;
   property_id: number;
@@ -97,6 +98,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
     psychiatric: data.health_details?.psychiatric || '',
   });
   const [additionalNotes, setAdditionalNotes] = useState(data.additional_notes || '');
+  const [participantAdditionalInfo, setParticipantAdditionalInfo] = useState(data.participant_additional_info || '');
   const [diets, setDiets] = useState<Diet[]>([]);
   const [loadingDiets, setLoadingDiets] = useState(true);
 
@@ -159,6 +161,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
       health_questions: healthQuestions,
       health_details: healthDetails,
       additional_notes: additionalNotes,
+      participant_additional_info: participantAdditionalInfo,
     };
     
     // Only call onChange if data actually changed
@@ -166,7 +169,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
       prevDataRef.current = newData;
       onChange(newData);
     }
-  }, [parents, participantData, selectedDietId, accommodationRequest, healthQuestions, healthDetails, additionalNotes, onChange]);
+  }, [parents, participantData, selectedDietId, accommodationRequest, healthQuestions, healthDetails, additionalNotes, participantAdditionalInfo, onChange]);
 
   const addParent = () => {
     const newParent: ParentData = {
@@ -548,13 +551,29 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
         </div>
       </div>
 
-      {/* Dodatkowe uwagi */}
+      {/* Dodatkowe informacje o stanie zdrowia uczestnika */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dodatkowe uwagi</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dodatkowe informacje o stanie zdrowia uczestnika</h3>
         <textarea
           value={additionalNotes}
           onChange={(e) => setAdditionalNotes(e.target.value)}
           rows={4}
+          className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+          style={{ borderRadius: 0 }}
+        />
+      </div>
+
+      {/* Informacje dodatkowe dotyczące uczestnika */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje dodatkowe dotyczące uczestnika</h3>
+        <p className="text-sm text-gray-600 mb-3">
+          Inne informacje, np. wyczesać włosy, nie je wieprzowiny, NIE dla quadów, ograniczone prawa rodzicielskie 2 rodzica itp.
+        </p>
+        <textarea
+          value={participantAdditionalInfo}
+          onChange={(e) => setParticipantAdditionalInfo(e.target.value)}
+          rows={4}
+          placeholder="Wprowadź dodatkowe informacje..."
           className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
           style={{ borderRadius: 0 }}
         />
