@@ -24,6 +24,7 @@ interface ReservationDetails {
   participant_age?: string | null;
   participant_gender?: string | null;
   participant_city?: string | null;
+  participant_additional_info?: string | null;
   parents_data?: Array<{
     firstName?: string;
     lastName?: string;
@@ -35,6 +36,7 @@ interface ReservationDetails {
   }> | null;
   diet?: number | null;
   diet_name?: string | null;
+  diet_price?: number | null;
   selected_diets?: number[] | null;
   selected_addons?: (string | number)[] | null;
   selected_protection?: (string | number)[] | null;
@@ -169,10 +171,22 @@ export default function ReservationDetailPage() {
           const protectionsMap = new Map<number, Protection>();
           for (const protectionIdValue of reservationData.selected_protection) {
             try {
-              const protectionId = typeof protectionIdValue === 'number' ? protectionIdValue : parseInt(String(protectionIdValue));
-              if (!isNaN(protectionId)) {
-                const protection = await authenticatedApiCall<Protection>(`/api/general-protections/${protectionId}`);
-                protectionsMap.set(protectionId, protection);
+              let generalProtectionId: number | null = null;
+              if (typeof protectionIdValue === 'string' && protectionIdValue.startsWith('protection-')) {
+                const numericId = parseInt(protectionIdValue.split('-')[1], 10);
+                if (!isNaN(numericId)) {
+                  generalProtectionId = numericId;
+                }
+              } else {
+                const parsedId = typeof protectionIdValue === 'number' ? protectionIdValue : parseInt(String(protectionIdValue));
+                if (!isNaN(parsedId)) {
+                  generalProtectionId = parsedId;
+                }
+              }
+              
+              if (generalProtectionId) {
+                const protection = await authenticatedApiCall<Protection>(`/api/general-protections/${generalProtectionId}`);
+                protectionsMap.set(generalProtectionId, protection);
               }
             } catch (err) {
               console.error(`Error fetching protection ${protectionIdValue}:`, err);
@@ -293,66 +307,33 @@ export default function ReservationDetailPage() {
           setDiets(dietsMap);
         }
 
-        // Fetch main diet if exists
-        // NOTE: diet may be relation_id (from center_diet_general_diets) or diet_id
+        // Fetch main diet from turnus (same logic as Step1 reservation process)
+        // This endpoint returns diets with turnus-specific prices (from CenterDietGeneralDiet relations)
         if (reservationData.diet && reservationData.camp_id && reservationData.property_id) {
           try {
             const dietId = typeof reservationData.diet === 'number' ? reservationData.diet : parseInt(String(reservationData.diet));
             if (!isNaN(dietId)) {
-              // Get turnus diets to find the relation
+              // Get turnus diets (same endpoint as Step1 uses)
+              // This returns diets with:
+              // - relation_id: ID of CenterDietGeneralDiet relation (this is what's stored in reservation.diet)
+              // - general_diet_id: ID of the general diet
+              // - name: from general_diet
+              // - price: from CenterDietGeneralDiet relation (turnus-specific price, e.g. 85 zł)
               try {
                 const turnusDiets = await authenticatedApiCall<any[]>(
                   `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/diets`
                 );
-                // Find diet by relation_id or id
+                // Find diet by relation_id (reservation.diet stores the relation_id)
                 const foundDiet = turnusDiets.find(
                   (d: any) => d.relation_id === dietId || d.id === dietId
                 );
                 if (foundDiet) {
-                  // If it's a center diet relation, get general_diet_id
-                  if (foundDiet.is_center_diet_relation && foundDiet.general_diet_id) {
-                    try {
-                      const generalDiet = await authenticatedApiCall<Diet>(`/api/general-diets/${foundDiet.general_diet_id}`);
-                      setDiets(prev => new Map(prev).set(dietId, {
-                        ...generalDiet,
-                        price: foundDiet.price || generalDiet.price, // Use turnus-specific price
-                      }));
-                    } catch (generalDietError) {
-                      // If general diet not found, use data from turnus diet
-                      setDiets(prev => new Map(prev).set(dietId, {
-                        id: foundDiet.general_diet_id,
-                        name: foundDiet.name,
-                        price: foundDiet.price || 0,
-                      }));
-                    }
-                  } else {
-                    // Regular diet from diets table
-                    try {
-                      const diet = await authenticatedApiCall<Diet>(`/api/diets/${foundDiet.id}`);
-                      setDiets(prev => new Map(prev).set(dietId, diet));
-                    } catch (dietError) {
-                      // If diet not found, use data from turnus diet
-                      setDiets(prev => new Map(prev).set(dietId, {
-                        id: foundDiet.id,
-                        name: foundDiet.name,
-                        price: foundDiet.price || 0,
-                      }));
-                    }
-                  }
-                } else {
-                  // Try direct fetch as regular diet
-                  try {
-                    const diet = await authenticatedApiCall<Diet>(`/api/diets/${dietId}`);
-                    setDiets(prev => new Map(prev).set(dietId, diet));
-                  } catch (dietError) {
-                    // Try as general diet
-                    try {
-                      const diet = await authenticatedApiCall<Diet>(`/api/general-diets/${dietId}`);
-                      setDiets(prev => new Map(prev).set(dietId, diet));
-                    } catch (generalDietError) {
-                      console.warn(`Main diet ${dietId} not found in turnus diets, regular diets, or general diets`);
-                    }
-                  }
+                  // Store diet with turnus-specific price (same as Step1 does)
+                  setDiets(prev => new Map(prev).set(dietId, {
+                    id: foundDiet.general_diet_id || foundDiet.id,
+                    name: foundDiet.name,
+                    price: foundDiet.price, // Price from CenterDietGeneralDiet relation (turnus-specific)
+                  }));
                 }
               } catch (turnusDietsError) {
                 console.warn(`Could not fetch turnus diets for main diet:`, turnusDietsError);
@@ -613,12 +594,16 @@ export default function ReservationDetailPage() {
                       {reservation.diet_name || (diets.get(reservation.diet)?.name || `Dieta ID: ${reservation.diet}`)}
                     </p>
                   </div>
-                  {diets.get(reservation.diet) && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Cena:</label>
-                      <p className="text-sm text-gray-900">{formatCurrency(diets.get(reservation.diet)!.price)}</p>
-                    </div>
-                  )}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Cena:</label>
+                    <p className="text-sm text-gray-900">
+                      {reservation.diet_price !== null && reservation.diet_price !== undefined
+                        ? formatCurrency(reservation.diet_price)
+                        : diets.get(reservation.diet)
+                        ? formatCurrency(diets.get(reservation.diet)!.price)
+                        : formatCurrency(0)}
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -662,8 +647,20 @@ export default function ReservationDetailPage() {
                 <h2 className="text-base font-semibold text-gray-900 mb-3">Ochrony</h2>
                 <div className="space-y-2">
                   {reservation.selected_protection.map((protectionIdValue) => {
-                    const protectionId = typeof protectionIdValue === 'number' ? protectionIdValue : parseInt(String(protectionIdValue));
-                    const protection = protections.get(protectionId);
+                    let generalProtectionId: number | null = null;
+                    if (typeof protectionIdValue === 'string' && protectionIdValue.startsWith('protection-')) {
+                      const numericId = parseInt(protectionIdValue.split('-')[1], 10);
+                      if (!isNaN(numericId)) {
+                        generalProtectionId = numericId;
+                      }
+                    } else {
+                      const parsedId = typeof protectionIdValue === 'number' ? protectionIdValue : parseInt(String(protectionIdValue));
+                      if (!isNaN(parsedId)) {
+                        generalProtectionId = parsedId;
+                      }
+                    }
+                    
+                    const protection = generalProtectionId ? protections.get(generalProtectionId) : null;
                     return (
                       <div key={String(protectionIdValue)} className="flex justify-between items-center border-b border-gray-200 pb-2">
                         <span className="text-sm text-gray-900">
@@ -732,14 +729,97 @@ export default function ReservationDetailPage() {
                       }
                     })()}
                   </div>
-                  {reservation.promotion_justification && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Uzasadnienie:</label>
-                      <pre className="text-sm text-gray-900 bg-gray-50 p-3 rounded mt-1 whitespace-pre-wrap">
-                        {JSON.stringify(reservation.promotion_justification, null, 2)}
-                      </pre>
-                    </div>
-                  )}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Uzasadnienie:</label>
+                    {(() => {
+                      const justification = reservation.promotion_justification;
+                      
+                      // Check if justification exists and has any meaningful content
+                      const hasJustification = justification && 
+                        typeof justification === 'object' && 
+                        Object.keys(justification).length > 0 &&
+                        Object.values(justification).some((val: any) => 
+                          val !== null && val !== undefined && val !== '' && 
+                          (Array.isArray(val) ? val.length > 0 : true)
+                        );
+                      
+                      if (!hasJustification) {
+                        return (
+                          <p className="text-sm text-gray-500 italic mt-1">
+                            Klient nie dodał uzasadnienia promocji
+                          </p>
+                        );
+                      }
+                      
+                      // Format justification in a readable way
+                      const formatJustification = (just: any): string => {
+                        const parts: string[] = [];
+                        
+                        if (just.card_number) {
+                          parts.push(`Numer karty dużej rodziny: ${just.card_number}`);
+                        }
+                        
+                        if (just.sibling_first_name || just.sibling_last_name) {
+                          const siblingName = [just.sibling_first_name, just.sibling_last_name]
+                            .filter(Boolean)
+                            .join(' ');
+                          if (siblingName) {
+                            parts.push(`Rodzeństwo: ${siblingName}`);
+                          }
+                        }
+                        
+                        if (just.first_camp_date) {
+                          parts.push(`Data pierwszego obozu: ${just.first_camp_date}`);
+                        }
+                        
+                        if (just.first_camp_name) {
+                          parts.push(`Nazwa pierwszego obozu: ${just.first_camp_name}`);
+                        }
+                        
+                        if (just.reason) {
+                          parts.push(`Powód wyboru promocji: ${just.reason}`);
+                        }
+                        
+                        if (just.years) {
+                          const yearsStr = Array.isArray(just.years) 
+                            ? just.years.join(', ') 
+                            : String(just.years);
+                          if (yearsStr) {
+                            parts.push(`Lata uczestnictwa: ${yearsStr}`);
+                          }
+                        }
+                        
+                        // If there are other fields not covered above, show them
+                        const knownFields = ['card_number', 'sibling_first_name', 'sibling_last_name', 
+                          'first_camp_date', 'first_camp_name', 'reason', 'years'];
+                        const otherFields = Object.keys(just).filter(key => !knownFields.includes(key));
+                        otherFields.forEach(key => {
+                          const value = just[key];
+                          if (value !== null && value !== undefined && value !== '') {
+                            parts.push(`${key}: ${String(value)}`);
+                          }
+                        });
+                        
+                        return parts.length > 0 ? parts.join('\n') : '';
+                      };
+                      
+                      const formattedText = formatJustification(justification);
+                      
+                      if (!formattedText) {
+                        return (
+                          <p className="text-sm text-gray-500 italic mt-1">
+                            Klient nie dodał uzasadnienia promocji
+                          </p>
+                        );
+                      }
+                      
+                      return (
+                        <pre className="text-sm text-gray-900 bg-gray-50 p-3 rounded mt-1 whitespace-pre-wrap">
+                          {formattedText}
+                        </pre>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
             )}
@@ -953,6 +1033,14 @@ export default function ReservationDetailPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Informacje dodatkowe */}
+            {reservation.participant_additional_info && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <h2 className="text-base font-semibold text-gray-900 mb-3">Informacje dodatkowe</h2>
+                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded whitespace-pre-wrap">{reservation.participant_additional_info}</p>
               </div>
             )}
 

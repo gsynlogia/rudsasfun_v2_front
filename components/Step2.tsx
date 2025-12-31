@@ -19,15 +19,16 @@ export default function Step2({ onNext, onPrevious, disabled = false }: StepComp
   const validateStep2 = useCallback((): boolean => {
     // Validate transport section
     const validateTransport = (window as any).validateStep2;
-    const transportValid = validateTransport ? validateTransport() : true;
+    const transportValid = validateTransport ? validateTransport() : false;
     
     // Validate source section
     const validateSource = (window as any).validateSourceSection;
-    const sourceValid = validateSource ? validateSource() : true;
+    const sourceValid = validateSource ? validateSource() : false;
     
     // Validate promotions section
+    // IMPORTANT: If validation function is not loaded yet, return false to prevent bypassing validation
     const validatePromotions = (window as any).validatePromotionsSection;
-    const promotionsValid = validatePromotions ? validatePromotions() : true;
+    const promotionsValid = validatePromotions ? validatePromotions() : false;
     
     return transportValid && sourceValid && promotionsValid;
   }, []);

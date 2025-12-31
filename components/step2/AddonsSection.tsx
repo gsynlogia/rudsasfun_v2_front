@@ -134,6 +134,7 @@ export default function AddonsSection() {
                 selectedAddons: defaultSelectedIds,
                 selectedProtection: [],
                 selectedPromotion: '',
+                promotionJustification: {}, // Initialize empty promotion justification
                 transportData: {
                   departureType: 'own',
                   departureCity: '',
@@ -298,6 +299,7 @@ export default function AddonsSection() {
       selectedAddons: Array.from(selectedAddons),
       selectedProtection: savedData?.selectedProtection || [],
       selectedPromotion: savedData?.selectedPromotion || '',
+      promotionJustification: savedData?.promotionJustification || {}, // Preserve promotion justification
       transportData: savedData?.transportData || {
         departureType: '',
         departureCity: '',

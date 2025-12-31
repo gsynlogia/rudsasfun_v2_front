@@ -182,6 +182,7 @@ export default function DietSection() {
         ? savedData.selectedProtection
         : (savedData?.selectedProtection ? [savedData.selectedProtection] : []),
       selectedPromotion: savedData?.selectedPromotion || '',
+      promotionJustification: savedData?.promotionJustification || {}, // Preserve promotion justification
       transportData: savedData?.transportData || {
         departureType: '',
         departureCity: '',

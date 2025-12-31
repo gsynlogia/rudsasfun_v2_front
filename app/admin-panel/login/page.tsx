@@ -121,12 +121,6 @@ function LoginPageContent() {
               {loading ? 'Logowanie...' : 'Zaloguj się'}
             </button>
           </form>
-
-          <div className="mt-6 text-xs text-gray-500">
-            <p>Domyślne dane logowania:</p>
-            <p>Login: <strong>admin</strong></p>
-            <p>Hasło: <strong>admin</strong></p>
-          </div>
         </div>
       </div>
     </div>

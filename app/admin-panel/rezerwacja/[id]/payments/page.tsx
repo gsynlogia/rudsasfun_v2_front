@@ -17,6 +17,10 @@ interface ReservationDetails {
   property_id?: number;
   camp_name?: string | null;
   property_name?: string | null;
+  property_start_date?: string | null;
+  property_end_date?: string | null;
+  participant_first_name?: string | null;
+  participant_last_name?: string | null;
   total_price?: number;
   deposit_amount?: number | null;
   selected_addons?: (string | number)[] | null;
@@ -436,6 +440,12 @@ export default function ReservationPaymentsPage() {
                 <p className="text-sm text-gray-500 mt-1">
                   Obóz: {reservation.camp_name || 'Brak danych'} | 
                   Turnus: {reservation.property_name || 'Brak danych'}
+                  {reservation.property_start_date && reservation.property_end_date && (
+                    <> | Termin: {formatDate(reservation.property_start_date)} - {formatDate(reservation.property_end_date)}</>
+                  )}
+                  {reservation.participant_first_name && reservation.participant_last_name && (
+                    <> | Uczestnik: {reservation.participant_first_name} {reservation.participant_last_name}</>
+                  )}
                 </p>
               </div>
             </div>

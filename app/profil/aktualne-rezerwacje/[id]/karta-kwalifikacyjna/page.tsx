@@ -123,3 +123,4 @@ export default function QualificationCardHtmlPage() {
   return null; // HTML is written directly to document
 }
 
+

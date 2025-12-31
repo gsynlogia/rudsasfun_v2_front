@@ -70,10 +70,12 @@ export default function SourceSection() {
     const savedData = loadStep2FormData();
     const formData = {
       selectedAddons: savedData?.selectedAddons || [],
+      selectedDiets: savedData?.selectedDiets || [],
       selectedProtection: Array.isArray(savedData?.selectedProtection)
         ? savedData.selectedProtection
         : (savedData?.selectedProtection ? [savedData.selectedProtection] : []),
       selectedPromotion: savedData?.selectedPromotion || '',
+      promotionJustification: savedData?.promotionJustification || {}, // Preserve promotion justification
       transportData: savedData?.transportData || {
         departureType: '',
         departureCity: '',

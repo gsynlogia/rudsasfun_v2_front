@@ -67,7 +67,7 @@ export default function LayoutClient({
 
   // Common validation function for current step
   const validateCurrentStep = (): boolean => {
-    let isValid = true;
+    let isValid = false; // Default to false - require validation function to be loaded
 
     // For step 2, use combined validation function
     if (currentStep === 2) {

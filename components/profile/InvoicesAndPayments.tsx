@@ -1,11 +1,13 @@
 'use client';
 
-import { FileText, Download, CheckCircle, XCircle, Calendar, CreditCard, Loader2 } from 'lucide-react';
+import { FileText, Download, CheckCircle, XCircle, Calendar, CreditCard, Loader2, Paperclip } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { contractService } from '@/lib/services/ContractService';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
+import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
+import { API_BASE_URL } from '@/utils/api-config';
 
 interface Document {
   id: string;
@@ -25,8 +27,12 @@ interface Payment {
   date: string;
   amount: number;
   method: string;
-  description: string;
+  description: string | null;
   invoiceNumber?: string;
+  attachmentUrl?: string | null;
+  attachmentFilename?: string | null;
+  reservationId: number;
+  reservationName?: string;
 }
 
 /**
@@ -39,6 +45,7 @@ export default function InvoicesAndPayments() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
 
   // Load user's invoices and payments
   useEffect(() => {
@@ -76,8 +83,48 @@ export default function InvoicesAndPayments() {
 
         setDocuments(documentsList);
 
-        // Load payments from reservations (for now, keep empty - payments are shown separately)
-        setPayments([]);
+        // Load manual payments from all reservations
+        const allManualPayments: ManualPaymentResponse[] = [];
+        for (const reservation of reservations) {
+          try {
+            const manualPayments = await manualPaymentService.getByReservation(reservation.id);
+            allManualPayments.push(...manualPayments);
+          } catch (err) {
+            console.warn(`Could not fetch manual payments for reservation ${reservation.id}:`, err);
+            // Continue with other reservations
+          }
+        }
+
+        // Map manual payments to Payment interface
+        const paymentsList: Payment[] = allManualPayments.map((payment: ManualPaymentResponse) => {
+          const reservation = reservationsMap.get(payment.reservation_id);
+          const reservationName = reservation 
+            ? `REZ-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(3, '0')}`
+            : undefined;
+
+          // Build attachment URL if attachment exists
+          let attachmentUrl: string | null = null;
+          if (payment.attachment_path) {
+            // attachment_path format: "payments/attachments/{filename}"
+            // Extract filename from path
+            const filename = payment.attachment_path.split('/').pop() || payment.attachment_path;
+            attachmentUrl = `${API_BASE_URL}/payments/attachments/${filename}`;
+          }
+
+          return {
+            id: `manual-payment-${payment.id}`,
+            date: new Date(payment.payment_date).toLocaleDateString('pl-PL'),
+            amount: payment.amount,
+            method: payment.payment_method || 'Nie podano',
+            description: payment.description,
+            attachmentUrl: attachmentUrl,
+            attachmentFilename: payment.attachment_filename,
+            reservationId: payment.reservation_id,
+            reservationName: reservationName,
+          };
+        });
+
+        setPayments(paymentsList);
       } catch (err) {
         console.error('Error loading invoices:', err);
         setError(err instanceof Error ? err.message : 'Nie udało się załadować faktur');
@@ -138,6 +185,26 @@ export default function InvoicesAndPayments() {
         });
       }
     }
+  };
+
+  // Toggle description expansion
+  const toggleDescription = (paymentId: string) => {
+    setExpandedDescriptions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(paymentId)) {
+        newSet.delete(paymentId);
+      } else {
+        newSet.add(paymentId);
+      }
+      return newSet;
+    });
+  };
+
+  // Truncate description to 25 characters
+  const truncateDescription = (text: string | null, maxLength: number = 25): string => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
   };
 
   const getStatusBadge = (status: Document['status']) => {
@@ -296,7 +363,13 @@ export default function InvoicesAndPayments() {
                       Metoda płatności
                     </th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
+                      Rezerwacja
+                    </th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
                       Opis
+                    </th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
+                      Plik
                     </th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
                       Faktura
@@ -322,7 +395,51 @@ export default function InvoicesAndPayments() {
                         </div>
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
-                        {payment.description}
+                        <div>
+                          <div className="font-medium text-gray-900">{payment.reservationName || `REZ-${payment.reservationId}`}</div>
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
+                        {payment.description ? (
+                          <div className="max-w-xs">
+                            {payment.description.length > 25 ? (
+                              <>
+                                <button
+                                  onClick={() => toggleDescription(payment.id)}
+                                  className="text-[#03adf0] hover:text-[#0288c7] hover:underline transition-colors text-left cursor-pointer"
+                                >
+                                  {truncateDescription(payment.description, 25)}
+                                </button>
+                                {expandedDescriptions.has(payment.id) && (
+                                  <div className="mt-1 text-gray-600 text-xs sm:text-sm break-words">
+                                    {payment.description}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <span>{payment.description}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
+                        {payment.attachmentUrl ? (
+                          <a
+                            href={payment.attachmentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-[#03adf0] hover:text-[#0288c7] transition-colors"
+                          >
+                            <Paperclip className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <span className="text-[10px] sm:text-xs">
+                              {payment.attachmentFilename || 'Zobacz plik'}
+                            </span>
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
                         {payment.invoiceNumber ? (

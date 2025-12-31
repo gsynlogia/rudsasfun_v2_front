@@ -68,9 +68,13 @@ interface ReservationPayment {
   id: number;
   reservationName: string;
   participantName: string;
+  participantFirstName?: string | null;
+  participantLastName?: string | null;
   email: string;
   campName: string;
   tripName: string;
+  propertyStartDate?: string | null;
+  propertyEndDate?: string | null;
   status: string;
   createdAt: string;
   paymentDetails: PaymentDetails;
@@ -688,9 +692,13 @@ const mapReservationToPaymentFormat = async (
     id: reservation.id,
     reservationName: `REZ-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(3, '0')}`,
     participantName: participantName || 'Brak danych',
+    participantFirstName: reservation.participant_first_name || null,
+    participantLastName: reservation.participant_last_name || null,
     email: email,
     campName: campName,
     tripName: tripName,
+    propertyStartDate: reservation.property_start_date || null,
+    propertyEndDate: reservation.property_end_date || null,
     status: status,
     createdAt: reservation.created_at.split('T')[0],
     paymentDetails: await generatePaymentDetails(reservation, payments, protectionsMap, addonsMap),
@@ -1761,10 +1769,27 @@ export default function PaymentsManagement() {
                         }}
                         style={{ cursor: 'pointer' }}
                       >
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <span className="text-sm font-medium text-gray-900">
-                            {reservation.reservationName}
-                          </span>
+                        <td className="px-4 py-2">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900">
+                              {reservation.reservationName}
+                            </span>
+                            {(reservation.propertyStartDate || reservation.propertyEndDate || reservation.participantFirstName || reservation.participantLastName) && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {reservation.propertyStartDate && reservation.propertyEndDate && (
+                                  <span>
+                                    {formatDate(reservation.propertyStartDate)} - {formatDate(reservation.propertyEndDate)}
+                                  </span>
+                                )}
+                                {reservation.participantFirstName && reservation.participantLastName && (
+                                  <>
+                                    {reservation.propertyStartDate && reservation.propertyEndDate && ' | '}
+                                    <span>{reservation.participantFirstName} {reservation.participantLastName}</span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <span className="text-sm text-gray-600">

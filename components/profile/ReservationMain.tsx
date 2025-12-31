@@ -8,6 +8,7 @@ import { contractService } from '@/lib/services/ContractService';
 import { paymentService, PaymentResponse, CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
+import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 import DashedLine from '../DashedLine';
@@ -29,6 +30,7 @@ interface ReservationMainProps {
 export default function ReservationMain({ reservation, isDetailsExpanded, onToggleDetails, onReservationUpdate }: ReservationMainProps) {
   const router = useRouter();
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
+  const [manualPayments, setManualPayments] = useState<ManualPaymentResponse[]>([]);
   const [_loadingPayments, _setLoadingPayments] = useState(false);
   const [paidAmount, setPaidAmount] = useState(0);
   const [isFullyPaid, setIsFullyPaid] = useState(false);
@@ -221,9 +223,22 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           return sum + (p.amount || 0);
         }, 0);
 
+        // Load manual payments for this reservation
+        let manualPaymentsTotal = 0;
+        try {
+          const manualPaymentsList = await manualPaymentService.getByReservation(reservation.id);
+          setManualPayments(manualPaymentsList);
+          manualPaymentsTotal = manualPaymentsList.reduce((sum, mp) => sum + mp.amount, 0);
+        } catch (error) {
+          console.error('Error loading manual payments:', error);
+          setManualPayments([]);
+        }
+
         // Use actual paid amount from database (this is the source of truth for payments)
+        // Include manual payments in the total paid amount
         const totalAmount = reservation.total_price || 0;
-        const paidAmount = Math.min(actualPaidAmount, totalAmount);
+        const totalPaidAmount = actualPaidAmount + manualPaymentsTotal;
+        const paidAmount = Math.min(totalPaidAmount, totalAmount);
 
         setPaidAmount(paidAmount);
         setIsFullyPaid(paidAmount >= totalAmount);
@@ -335,8 +350,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
   const reservationNumber = formatReservationNumber(reservation.id, reservation.created_at);
 
-  // Get age
-  const age = reservation.participant_age ? `${reservation.participant_age} lat` : 'Brak danych';
+  // Get age (rocznik - birth year)
+  const age = reservation.participant_age ? `Rocznik: ${reservation.participant_age}` : 'Brak danych';
 
   // Get gender
   const gender = reservation.participant_gender || 'Brak danych';
@@ -719,9 +734,23 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                   <span className="text-gray-600">Całkowity koszt:</span>
                   <span className="font-semibold text-gray-900">{reservation.total_price.toFixed(2)} PLN</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Całkowite wpływy:</span>
-                  <span className="font-semibold text-gray-900">{paidAmount.toFixed(2)} PLN</span>
+                <div className="flex flex-col">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Całkowite wpływy:</span>
+                    <span className="font-semibold text-gray-900">{paidAmount.toFixed(2)} PLN</span>
+                  </div>
+                  {manualPayments.length > 0 && (
+                    <div className="mt-1 ml-4 space-y-1">
+                      {manualPayments.map((mp) => (
+                        <div key={mp.id} className="flex justify-between items-center text-gray-500">
+                          <span className="text-[10px] sm:text-xs">
+                            • {formatDate(mp.payment_date)} {mp.payment_method ? `(${mp.payment_method})` : ''}
+                          </span>
+                          <span className="text-[10px] sm:text-xs font-medium">{mp.amount.toFixed(2)} PLN</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                   <span className="text-gray-700 font-medium">Pozostała kwota do zapłaty:</span>
