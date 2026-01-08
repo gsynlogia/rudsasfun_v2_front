@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Save, Calendar, MapPin } from 'lucide-react';
+import { X, Save, Calendar, MapPin, Tag } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 import type { CampProperty } from '@/types/reservation';
@@ -30,6 +30,7 @@ export default function CampPropertyForm({
   const [maxParticipants, setMaxParticipants] = useState<number>(50);
   const [useDefaultDiet, setUseDefaultDiet] = useState<boolean>(false);
   const [basePrice, setBasePrice] = useState<number>(2200);
+  const [tag, setTag] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +57,7 @@ export default function CampPropertyForm({
       setMaxParticipants(property.max_participants || 50);
       setUseDefaultDiet(property.use_default_diet !== undefined ? property.use_default_diet : false);
       setBasePrice(property.base_price || 2200);
+      setTag(property.tag || '');
     }
   }, [property]);
 
@@ -102,6 +104,7 @@ export default function CampPropertyForm({
             max_participants: maxParticipants,
             use_default_diet: useDefaultDiet,
             base_price: basePrice,
+            tag: tag.trim() || null,
           })
         : JSON.stringify({
             camp_id: campId,
@@ -112,6 +115,7 @@ export default function CampPropertyForm({
             max_participants: maxParticipants,
             use_default_diet: useDefaultDiet,
             base_price: basePrice,
+            tag: tag.trim() || null,
           });
 
       const response = await fetch(url, {
@@ -256,6 +260,25 @@ export default function CampPropertyForm({
             />
             <p className="mt-1 text-xs text-gray-500">
               Podstawowa cena za turnus
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="tag" className="block text-sm font-medium text-gray-700 mb-2">
+              <Tag className="w-4 h-4 inline mr-1" />
+              Tag turnusu
+            </label>
+            <input
+              id="tag"
+              type="text"
+              value={tag}
+              onChange={(e) => setTag(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+              placeholder="np. BEAVER, LIMBA, SAWA"
+              disabled={loading}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Opcjonalny tag dla turnusu
             </p>
           </div>
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowLeft, Save, Edit, MapPin, Calendar, Plus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -51,8 +51,12 @@ const fetchCampTurnusy = (campId: number): Promise<CampProperty[]> => {
 
 export default function CampEditPage({ params }: { params: Promise<{ campId: string }> | { campId: string } }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [campId, setCampId] = useState<number | null>(null);
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
+  
+  // Get fromPage param to return to correct pagination page
+  const fromPage = searchParams.get('fromPage');
 
   const [camp, setCamp] = useState<Camp | null>(null);
   const [turnusy, setTurnusy] = useState<CampProperty[]>([]);
@@ -177,7 +181,8 @@ export default function CampEditPage({ params }: { params: Promise<{ campId: str
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
 
-            router.push('/admin-panel/camps');
+            const returnUrl = fromPage ? `/admin-panel/camps?page=${fromPage}` : '/admin-panel/camps';
+            router.push(returnUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Błąd podczas zapisywania obozu');
       console.error('Error saving camp:', err);

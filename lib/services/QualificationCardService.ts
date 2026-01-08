@@ -522,6 +522,51 @@ class QualificationCardService {
 
     return await response.json();
   }
+
+  /**
+   * Update reservation health info (accommodation, health questions, health details, additional notes, participant additional info)
+   * @param reservationId Reservation ID
+   * @param data Health info data
+   */
+  async updateReservationHealthInfo(
+    reservationId: number,
+    data: {
+      accommodation_request?: string;
+      health_questions?: {
+        chronicDiseases: string;
+        dysfunctions: string;
+        psychiatric: string;
+      };
+      health_details?: {
+        chronicDiseases: string;
+        dysfunctions: string;
+        psychiatric: string;
+      };
+      additional_notes?: string;
+      participant_additional_info?: string;
+    },
+  ): Promise<void> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/reservations/${reservationId}/health-info`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+  }
 }
 
 export const qualificationCardService = QualificationCardService.getInstance();

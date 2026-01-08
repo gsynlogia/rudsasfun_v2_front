@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Save, Calendar, MapPin, Truck, Copy, Search, Trash2, UtensilsCrossed, Tag, Shield } from 'lucide-react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -206,6 +206,9 @@ export default function CampTurnusEditPage({
 }: {
   params: Promise<{ campId: string; turnusId: string }> | { campId: string; turnusId: string }
 }) {
+  const searchParams = useSearchParams();
+  // Get fromPage param to return to correct pagination page
+  const fromPage = searchParams.get('fromPage');
   const router = useRouter();
   // Handle both Promise and direct params (Next.js 13+ compatibility)
   const [campId, setCampId] = useState<number | null>(null);
@@ -225,6 +228,7 @@ export default function CampTurnusEditPage({
   const [endDate, setEndDate] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number>(50);
   const [basePrice, setBasePrice] = useState<number>(2200);
+  const [tag, setTag] = useState<string>('');
   const [minAge, setMinAge] = useState<number | ''>('');
   const [maxAge, setMaxAge] = useState<number | ''>('');
 
@@ -353,6 +357,7 @@ export default function CampTurnusEditPage({
             setEndDate(propertyData.end_date.split('T')[0]);
             setMaxParticipants(propertyData.max_participants || 50);
             setBasePrice(propertyData.base_price || 2200);
+            setTag(propertyData.tag || '');
             setMinAge(propertyData.min_age ?? '');
             setMaxAge(propertyData.max_age ?? '');
 
@@ -464,6 +469,7 @@ export default function CampTurnusEditPage({
           end_date: endDate,
           max_participants: maxParticipants,
           base_price: basePrice,
+          tag: tag.trim() || null,
           min_age: minAge === '' ? null : minAge,
           max_age: maxAge === '' ? null : maxAge,
         }),
@@ -478,7 +484,8 @@ export default function CampTurnusEditPage({
       console.log('[CampTurnusEditPage] Property save successful');
 
       console.log('[CampTurnusEditPage] All saves successful, navigating to camps list');
-      router.push('/admin-panel/camps');
+      const returnUrl = fromPage ? `/admin-panel/camps?page=${fromPage}` : '/admin-panel/camps';
+      router.push(returnUrl);
     } catch (_err) {
       console.error('[CampTurnusEditPage] Error saving:', _err);
       setError(_err instanceof Error ? _err.message : 'Błąd podczas zapisywania turnusu obozu');
@@ -1227,7 +1234,10 @@ export default function CampTurnusEditPage({
             <p className="text-sm text-red-700">{error}</p>
           </div>
           <button
-            onClick={() => router.push('/admin-panel/camps')}
+            onClick={() => {
+              const returnUrl = fromPage ? `/admin-panel/camps?page=${fromPage}` : '/admin-panel/camps';
+              router.push(returnUrl);
+            }}
             className="mt-4 flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors text-sm font-medium"
             style={{ borderRadius: 0, cursor: 'pointer' }}
           >
@@ -1249,7 +1259,10 @@ export default function CampTurnusEditPage({
               : 'Edytuj turnus obozu'}
           </h1>
           <button
-            onClick={() => router.push('/admin-panel/camps')}
+            onClick={() => {
+              const returnUrl = fromPage ? `/admin-panel/camps?page=${fromPage}` : '/admin-panel/camps';
+              router.push(returnUrl);
+            }}
             className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors text-sm font-medium"
             style={{ borderRadius: 0, cursor: 'pointer' }}
           >
@@ -1379,6 +1392,26 @@ export default function CampTurnusEditPage({
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Podstawowa cena za turnus
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="tag" className="block text-sm font-medium text-gray-700 mb-2">
+                  <Tag className="w-4 h-4 inline mr-1" />
+                  Tag turnusu
+                </label>
+                <input
+                  id="tag"
+                  type="text"
+                  value={tag}
+                  onChange={(e) => setTag(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+                  style={{ borderRadius: 0 }}
+                  placeholder="np. BEAVER, LIMBA, SAWA"
+                  disabled={saving}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Opcjonalny tag dla turnusu
                 </p>
               </div>
             </div>
@@ -2130,7 +2163,10 @@ export default function CampTurnusEditPage({
 
           <div className="flex items-center justify-end gap-3 mt-6">
             <button
-              onClick={() => router.push('/admin-panel/camps')}
+              onClick={() => {
+              const returnUrl = fromPage ? `/admin-panel/camps?page=${fromPage}` : '/admin-panel/camps';
+              router.push(returnUrl);
+            }}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-all duration-200"
               style={{ borderRadius: 0, cursor: 'pointer' }}
               disabled={saving}

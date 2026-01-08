@@ -1,16 +1,18 @@
 'use client';
 
-import { Search, ChevronUp, ChevronDown, Check, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw, RefreshCw, Trash2 } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, Check, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, XCircle, RotateCcw, RefreshCw, Trash2, Columns, GripVertical, Filter, X as XIcon, Info } from 'lucide-react';
 import { useState, useMemo, useEffect, Fragment } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
+import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { reservationService } from '@/lib/services/ReservationService';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 import PaymentConfirmationModal from './PaymentConfirmationModal';
 import RefundConfirmationModal from './RefundConfirmationModal';
+import UniversalModal from './UniversalModal';
 
 
 /**
@@ -78,6 +80,14 @@ interface ReservationPayment {
   status: string;
   createdAt: string;
   paymentDetails: PaymentDetails;
+  promotionName?: string | null;
+  protectionNames?: string | null;
+  depositAmount?: number;
+  campId?: number;
+  propertyId?: number;
+  selectedPromotion?: string | null;
+  selectedProtection?: (string | number)[] | null;
+  selectedAddons?: (string | number)[] | null;
 }
 
 /**
@@ -591,6 +601,7 @@ const generatePaymentItems = async (
 const generatePaymentDetails = async (
   reservation: any,
   payments: PaymentResponse[],
+  manualPayments: ManualPaymentResponse[] = [],
   protectionsMap: Map<number, { name: string; price: number }> = new Map(),
   addonsMap: Map<string, { name: string; price: number }> = new Map(),
 ): Promise<PaymentDetails> => {
@@ -621,7 +632,7 @@ const generatePaymentDetails = async (
 
   // Calculate actual paid amount from database
   // Priority: paid_amount (from webhook) > amount (from payment creation)
-  const actualPaidAmount = successfulPayments.reduce((sum, p) => {
+  const tpayPaidAmount = successfulPayments.reduce((sum, p) => {
     // If paid_amount is set (from webhook), use it
     if (p.paid_amount !== null && p.paid_amount !== undefined && p.paid_amount > 0) {
       return sum + p.paid_amount;
@@ -629,6 +640,12 @@ const generatePaymentDetails = async (
     // Otherwise, use amount (payment was created but webhook didn't update it yet)
     return sum + (p.amount || 0);
   }, 0);
+
+  // Sum manual payments for this reservation
+  const manualPaidAmount = manualPayments.reduce((sum, p) => sum + p.amount, 0);
+
+  // Total paid amount = Tpay payments + manual payments
+  const actualPaidAmount = tpayPaidAmount + manualPaidAmount;
 
   // Only count non-canceled and non-returned items in total amount
   const activeItems = items.filter(item => item.status !== 'canceled' && item.status !== 'returned');
@@ -673,7 +690,14 @@ const mapReservationToPaymentFormat = async (
   payments: PaymentResponse[],
   protectionsMap: Map<number, { name: string; price: number }> = new Map(),
   addonsMap: Map<string, { name: string; price: number }> = new Map(),
+  allManualPayments: ManualPaymentResponse[] = [],
+  promotionsCache: Map<string, any[]> = new Map(),
+  protectionsCache: Map<string, Map<number, { name: string; price: number }>> = new Map(),
 ): Promise<ReservationPayment> => {
+  // Filtruj płatności manualne dla tej rezerwacji (zamiast wywołania API)
+  const reservationManualPayments = allManualPayments.filter(
+    mp => mp.reservation_id === reservation.id
+  );
   const participantName = `${reservation.participant_first_name || ''} ${reservation.participant_last_name || ''}`.trim();
   const firstParent = reservation.parents_data && reservation.parents_data.length > 0
     ? reservation.parents_data[0]
@@ -688,6 +712,114 @@ const mapReservationToPaymentFormat = async (
   if (status === 'cancelled') status = 'anulowana';
   if (status === 'completed') status = 'zakończona';
 
+  // Fetch promotion details from cache (zamiast wywołania API)
+  let promotionName: string | null = null;
+  if (reservation.selected_promotion && reservation.camp_id && reservation.property_id) {
+    const cacheKey = `${reservation.camp_id}_${reservation.property_id}`;
+    const turnusPromotions = promotionsCache.get(cacheKey);
+    
+    if (turnusPromotions) {
+      try {
+        const relationId = typeof reservation.selected_promotion === 'number' 
+          ? reservation.selected_promotion 
+          : parseInt(String(reservation.selected_promotion));
+        if (!isNaN(relationId)) {
+          const foundPromotion = turnusPromotions.find(
+            (p: any) => p.relation_id === relationId || p.id === relationId
+          );
+          if (foundPromotion && foundPromotion.general_promotion_id) {
+            try {
+              const { authenticatedApiCall } = await import('@/utils/api-auth');
+              const generalPromotion = await authenticatedApiCall<any>(
+                `/api/general-promotions/${foundPromotion.general_promotion_id}`
+              );
+              promotionName = generalPromotion.name || null;
+            } catch (err) {
+              console.warn('Could not fetch general promotion:', err);
+              promotionName = foundPromotion.name || null;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not process promotion:', err);
+      }
+    }
+  }
+
+  // Fetch protection names from cache (zamiast wywołania API)
+  let protectionNames: string | null = null;
+  let depositAmount: number = 0;
+  if (reservation.selected_protection && reservation.camp_id && reservation.property_id) {
+    const cacheKey = `${reservation.camp_id}_${reservation.property_id}`;
+    const cachedTurnusProtectionsMap = protectionsCache.get(cacheKey);
+    const turnusProtectionsMap = cachedTurnusProtectionsMap || new Map<number, { name: string; price: number }>();
+    const effectiveProtectionsMap = turnusProtectionsMap.size > 0 ? turnusProtectionsMap : protectionsMap;
+    
+    const selectedProtections: string[] = Array.isArray(reservation.selected_protection) 
+      ? reservation.selected_protection 
+      : (typeof reservation.selected_protection === 'string' 
+        ? (() => {
+            try {
+              const parsed = JSON.parse(reservation.selected_protection);
+              return Array.isArray(parsed) ? parsed : [reservation.selected_protection];
+            } catch {
+              return [reservation.selected_protection];
+            }
+          })()
+        : []);
+    
+    const protectionNameList: string[] = [];
+    let totalProtectionAmount = 0;
+    
+    selectedProtections.forEach((protectionId: string) => {
+      const numericIdMatch = protectionId.match(/protection-(\d+)/);
+      if (numericIdMatch) {
+        const numericId = parseInt(numericIdMatch[1], 10);
+        const protectionData = effectiveProtectionsMap.get(numericId);
+        if (protectionData) {
+          protectionNameList.push(protectionData.name);
+          totalProtectionAmount += protectionData.price;
+        }
+      }
+    });
+    
+    if (protectionNameList.length > 0) {
+      protectionNames = protectionNameList.join(', ');
+    }
+    
+    // Calculate addons total for deposit
+    let totalAddonsAmount = 0;
+    const selectedAddons = reservation.selected_addons
+      ? (Array.isArray(reservation.selected_addons) ? reservation.selected_addons : [reservation.selected_addons])
+      : [];
+    selectedAddons.forEach((addonId: string | number) => {
+      const addonIdStr = String(addonId);
+      const addonData = addonsMap.get(addonIdStr);
+      if (addonData) {
+        totalAddonsAmount += addonData.price;
+      }
+    });
+    
+    // Deposit amount: 500 PLN base + all protections + all addons
+    const depositBaseAmount = 500;
+    depositAmount = depositBaseAmount + totalProtectionAmount + totalAddonsAmount;
+  } else {
+    // If no protections, calculate deposit from addons only
+    let totalAddonsAmount = 0;
+    const selectedAddons = reservation.selected_addons
+      ? (Array.isArray(reservation.selected_addons) ? reservation.selected_addons : [reservation.selected_addons])
+      : [];
+    selectedAddons.forEach((addonId: string | number) => {
+      const addonIdStr = String(addonId);
+      const addonData = addonsMap.get(addonIdStr);
+      if (addonData) {
+        totalAddonsAmount += addonData.price;
+      }
+    });
+    const depositBaseAmount = 500;
+    depositAmount = depositBaseAmount + totalAddonsAmount;
+  }
+
   return {
     id: reservation.id,
     reservationName: `REZ-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(3, '0')}`,
@@ -701,7 +833,15 @@ const mapReservationToPaymentFormat = async (
     propertyEndDate: reservation.property_end_date || null,
     status: status,
     createdAt: reservation.created_at.split('T')[0],
-    paymentDetails: await generatePaymentDetails(reservation, payments, protectionsMap, addonsMap),
+    paymentDetails: await generatePaymentDetails(reservation, payments, reservationManualPayments, protectionsMap, addonsMap),
+    promotionName: promotionName,
+    protectionNames: protectionNames || null,
+    depositAmount: depositAmount,
+    campId: reservation.camp_id || undefined,
+    propertyId: reservation.property_id || undefined,
+    selectedPromotion: reservation.selected_promotion || null,
+    selectedProtection: reservation.selected_protection || null,
+    selectedAddons: reservation.selected_addons || null,
   };
 };
 
@@ -711,6 +851,8 @@ const mapReservationToPaymentFormat = async (
  */
 export default function PaymentsManagement() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [reservations, setReservations] = useState<ReservationPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -718,8 +860,397 @@ export default function PaymentsManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Initialize currentPage from URL params or default to 1
+  const pageFromUrl = searchParams.get('page');
+  const [currentPage, setCurrentPage] = useState(pageFromUrl ? parseInt(pageFromUrl, 10) : 1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [pageInputValue, setPageInputValue] = useState('');
+  
+  // State dla alertu o zmianach w płatnościach
+  const [paymentChangesAlert, setPaymentChangesAlert] = useState<{
+    isVisible: boolean;
+    changedCount: number;
+  }>({
+    isVisible: false,
+    changedCount: 0,
+  });
+  
+  // Sync currentPage with URL params on mount and when searchParams change
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    if (pageParam) {
+      const pageNum = parseInt(pageParam, 10);
+      if (!isNaN(pageNum) && pageNum > 0) {
+        setCurrentPage(pageNum);
+      }
+    } else {
+      // If no page param, reset to 1
+      setCurrentPage(1);
+    }
+  }, [searchParams]);
+  
+  // Update URL when currentPage changes
+  const updatePageInUrl = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page === 1) {
+      params.delete('page');
+    } else {
+      params.set('page', page.toString());
+    }
+    const newUrl = params.toString() ? `/admin-panel/payments?${params.toString()}` : '/admin-panel/payments';
+    router.replace(newUrl);
+  };
+  
+  // Handle page input change with validation
+  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow empty string, numbers only
+    if (value === '' || /^\d+$/.test(value)) {
+      setPageInputValue(value);
+    }
+  };
+  
+  // Handle Enter key in page input
+  const handlePageInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      if (pageInputValue === '') return;
+      const totalPages = Math.ceil(filteredReservations.length / itemsPerPage);
+      const pageNum = parseInt(pageInputValue, 10);
+      if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages && Number.isInteger(pageNum)) {
+        handlePageChange(pageNum);
+      } else {
+        setPageInputValue('');
+      }
+    }
+  };
+
+  // Column configuration state
+  const STORAGE_KEY = 'payments_list_columns';
+  
+  // Column configuration: array of {key, visible, filters?}
+  type ColumnConfig = {
+    key: string;
+    visible: boolean;
+    filters?: string[]; // Selected filter values for this column
+  };
+  
+  // Column definitions with labels
+  const COLUMN_DEFINITIONS = {
+    reservationName: 'Numer rezerwacji',
+    createdAt: 'Data utworzenia',
+    participantName: 'Uczestnik',
+    totalAmount: 'Kwota całkowita',
+    paidAmount: 'Całkowite wpływy',
+    remainingAmount: 'Pozostało do zapłaty',
+    promotionName: 'Promocja',
+    protectionNames: 'Ochrona',
+    depositAmount: 'Zaliczka',
+    status: 'Status',
+  };
+  
+  // Default column order and visibility
+  const DEFAULT_COLUMN_ORDER = ['reservationName', 'createdAt', 'participantName', 'totalAmount', 'paidAmount', 'remainingAmount', 'promotionName', 'protectionNames', 'depositAmount', 'status'];
+  const DEFAULT_COLUMNS = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true }));
+  
+  const [columnConfig, setColumnConfig] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
+  const [columnModalOpen, setColumnModalOpen] = useState(false);
+  const [tempColumnConfig, setTempColumnConfig] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
+  const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
+  const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
+  
+  // Filter dropdown state: which column has filter dropdown open
+  const [openFilterColumn, setOpenFilterColumn] = useState<string | null>(null);
+  
+  // Load column configuration from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const savedKeys = new Set(parsed.map((col: { key: string }) => col.key));
+          const merged: ColumnConfig[] = parsed.map((col: any) => ({
+            key: col.key,
+            visible: col.visible !== false,
+            filters: col.filters || [],
+          }));
+          DEFAULT_COLUMN_ORDER.forEach(key => {
+            if (!savedKeys.has(key)) {
+              merged.push({ key, visible: true, filters: [] });
+            }
+          });
+          setColumnConfig(merged);
+          setTempColumnConfig([...merged]);
+        } else {
+          const converted: ColumnConfig[] = DEFAULT_COLUMN_ORDER.map(key => ({
+            key,
+            visible: parsed[key] !== false,
+            filters: [],
+          }));
+          setColumnConfig(converted);
+          setTempColumnConfig([...converted]);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(converted));
+        }
+      }
+    } catch (err) {
+      console.error('Error loading column preferences:', err);
+    }
+  }, []);
+  
+  // Load filters from URL on mount
+  useEffect(() => {
+    const filtersFromUrl: Record<string, string[]> = {};
+    searchParams.forEach((value, key) => {
+      if (key.startsWith('filter_')) {
+        const columnKey = key.replace('filter_', '');
+        filtersFromUrl[columnKey] = value.split(',').filter(v => v);
+      }
+    });
+    
+    if (Object.keys(filtersFromUrl).length > 0) {
+      setColumnConfig(prev => {
+        const hasFilters = prev.some(col => col.filters && col.filters.length > 0);
+        if (hasFilters) return prev; // Don't overwrite if already has filters
+        
+        return prev.map(col => {
+          if (filtersFromUrl[col.key]) {
+            return { ...col, filters: filtersFromUrl[col.key] };
+          }
+          return col;
+        });
+      });
+    }
+  }, []);
+  
+  // Save column configuration to localStorage
+  const saveColumnPreferences = (config: ColumnConfig[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      setColumnConfig([...config]);
+    } catch (err) {
+      console.error('Error saving column preferences:', err);
+    }
+  };
+  
+  // Get unique values for a column from all reservations
+  const getUniqueColumnValues = (columnKey: string): string[] => {
+    const values = new Set<string>();
+    reservations.forEach(reservation => {
+      let value: string | null = null;
+      switch (columnKey) {
+        case 'reservationName':
+          value = reservation.reservationName;
+          break;
+        case 'participantName':
+          value = reservation.participantName;
+          break;
+        case 'totalAmount':
+          value = reservation.paymentDetails.totalAmount.toFixed(2);
+          break;
+        case 'paidAmount':
+          value = reservation.paymentDetails.paidAmount.toFixed(2);
+          break;
+        case 'remainingAmount':
+          value = reservation.paymentDetails.remainingAmount.toFixed(2);
+          break;
+        case 'promotionName':
+          value = reservation.promotionName || '-';
+          break;
+        case 'protectionNames':
+          value = reservation.protectionNames || '-';
+          break;
+        case 'depositAmount':
+          value = reservation.depositAmount ? reservation.depositAmount.toFixed(2) : '-';
+          break;
+        case 'status':
+          value = reservation.status;
+          break;
+        case 'createdAt':
+          value = new Date(reservation.createdAt).toLocaleDateString('pl-PL');
+          break;
+      }
+      if (value !== null && value !== '') {
+        values.add(value);
+      }
+    });
+    return Array.from(values).sort();
+  };
+  
+  // Update filters in URL
+  const updateFiltersInUrl = (filters: Record<string, string[]>) => {
+    const params = new URLSearchParams();
+    
+    // Add page if > 1
+    if (currentPage > 1) {
+      params.set('page', currentPage.toString());
+    }
+    
+    // Add filters
+    Object.entries(filters).forEach(([columnKey, values]) => {
+      if (values.length > 0) {
+        params.set(`filter_${columnKey}`, values.join(','));
+      }
+    });
+    
+    const url = params.toString() ? `/admin-panel/payments?${params.toString()}` : '/admin-panel/payments';
+    router.replace(url, { scroll: false });
+  };
+  
+  // Handle filter toggle for a column value
+  const handleFilterToggle = (columnKey: string, value: string) => {
+    const updated = columnConfig.map(col => {
+      if (col.key === columnKey) {
+        const filters = col.filters || [];
+        const newFilters = filters.includes(value)
+          ? filters.filter(f => f !== value)
+          : [...filters, value];
+        return { ...col, filters: newFilters };
+      }
+      return col;
+    });
+    setColumnConfig(updated);
+    saveColumnPreferences(updated);
+    
+    const filtersForUrl: Record<string, string[]> = {};
+    updated.forEach(col => {
+      if (col.filters && col.filters.length > 0) {
+        filtersForUrl[col.key] = col.filters;
+      }
+    });
+    updateFiltersInUrl(filtersForUrl);
+    
+    updatePageInUrl(1);
+  };
+  
+  // Clear all filters for a column
+  const handleClearColumnFilters = (columnKey: string) => {
+    const updated = columnConfig.map(col => {
+      if (col.key === columnKey) {
+        return { ...col, filters: [] };
+      }
+      return col;
+    });
+    setColumnConfig(updated);
+    saveColumnPreferences(updated);
+    
+    const filtersForUrl: Record<string, string[]> = {};
+    updated.forEach(col => {
+      if (col.filters && col.filters.length > 0) {
+        filtersForUrl[col.key] = col.filters;
+      }
+    });
+    updateFiltersInUrl(filtersForUrl);
+    
+    updatePageInUrl(1);
+  };
+  
+  // Remove single filter value
+  const handleRemoveFilter = (columnKey: string, value: string) => {
+    const updated = columnConfig.map(col => {
+      if (col.key === columnKey) {
+        const filters = col.filters || [];
+        return { ...col, filters: filters.filter(f => f !== value) };
+      }
+      return col;
+    });
+    setColumnConfig(updated);
+    saveColumnPreferences(updated);
+    
+    const filtersForUrl: Record<string, string[]> = {};
+    updated.forEach(col => {
+      if (col.filters && col.filters.length > 0) {
+        filtersForUrl[col.key] = col.filters;
+      }
+    });
+    updateFiltersInUrl(filtersForUrl);
+    
+    updatePageInUrl(1);
+  };
+  
+  // Check if column has active filters
+  const hasActiveFilters = (columnKey: string): boolean => {
+    const col = columnConfig.find(c => c.key === columnKey);
+    return col ? (col.filters?.length || 0) > 0 : false;
+  };
+  
+  // Handle column modal open
+  const handleOpenColumnModal = () => {
+    setTempColumnConfig([...columnConfig]);
+    setColumnModalOpen(true);
+  };
+  
+  // Handle column modal close
+  const handleCloseColumnModal = () => {
+    setColumnModalOpen(false);
+    setTempColumnConfig([...columnConfig]);
+  };
+  
+  // Handle column toggle
+  const handleColumnToggle = (key: string) => {
+    setTempColumnConfig(prev => prev.map(col => 
+      col.key === key ? { ...col, visible: !col.visible } : col
+    ));
+  };
+  
+  // Handle save column preferences
+  const handleSaveColumnPreferences = () => {
+    saveColumnPreferences(tempColumnConfig);
+    setColumnModalOpen(false);
+  };
+  
+  // Handle reset column preferences
+  const handleResetColumnPreferences = () => {
+    setTempColumnConfig([...DEFAULT_COLUMNS]);
+  };
+  
+  // Drag and drop handlers
+  const handleDragStart = (index: number) => {
+    setDraggedColumnIndex(index);
+  };
+  
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDraggedOverIndex(index);
+  };
+  
+  const handleDragLeave = () => {
+    setDraggedOverIndex(null);
+  };
+  
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedColumnIndex === null) return;
+    
+    const newConfig = [...tempColumnConfig];
+    const draggedItem = newConfig[draggedColumnIndex];
+    newConfig.splice(draggedColumnIndex, 1);
+    newConfig.splice(dropIndex, 0, draggedItem);
+    
+    setTempColumnConfig(newConfig);
+    setDraggedColumnIndex(null);
+    setDraggedOverIndex(null);
+  };
+  
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openFilterColumn && !(event.target as Element).closest('th')) {
+        setOpenFilterColumn(null);
+      }
+    };
+    if (openFilterColumn) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openFilterColumn]);
+
+  // Get ordered visible columns
+  const orderedVisibleColumns = useMemo(() => {
+    return columnConfig.filter(col => col.visible);
+  }, [columnConfig]);
 
   // State for payment confirmation modal
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -740,6 +1271,7 @@ export default function PaymentsManagement() {
   // State for protections and addons data
   const [protectionsMap, setProtectionsMap] = useState<Map<number, { name: string; price: number }>>(new Map());
   const [addonsMap, setAddonsMap] = useState<Map<string, { name: string; price: number }>>(new Map());
+  const [isProtectionsAndAddonsLoaded, setIsProtectionsAndAddonsLoaded] = useState(false);
   const [reservationInvoices, setReservationInvoices] = useState<Map<number, InvoiceResponse[]>>(new Map()); // reservationId -> invoices
   const [loadingInvoices, setLoadingInvoices] = useState<Set<number>>(new Set()); // reservation IDs being loaded
   const [cancelingInvoice, setCancelingInvoice] = useState<number | null>(null); // invoice ID being canceled
@@ -793,6 +1325,9 @@ export default function PaymentsManagement() {
         // Continue with empty maps if fetch fails
         setProtectionsMap(new Map());
         setAddonsMap(new Map());
+      } finally {
+        // Mark as loaded even if there was an error (empty maps are still "loaded")
+        setIsProtectionsAndAddonsLoaded(true);
       }
     };
 
@@ -800,7 +1335,13 @@ export default function PaymentsManagement() {
   }, []);
 
   // Load reservations and payments from API
+  // WAIT for protectionsMap and addonsMap to be loaded first
   useEffect(() => {
+    // Don't fetch data if protectionsMap and addonsMap are not loaded yet
+    if (!isProtectionsAndAddonsLoaded) {
+      return;
+    }
+
     const fetchData = async () => {
       try {
         setIsLoading(true);
@@ -823,36 +1364,101 @@ export default function PaymentsManagement() {
           // Continue with empty payments array - reservations will still work
         }
 
-        // Automatyczna synchronizacja statusu płatności ze statusem 'pending'
+        // Automatyczna synchronizacja statusu płatności w tle (nie blokuje ładowania)
         // Webhook nie działa w środowisku lokalnym (localhost), więc synchronizujemy ręcznie
-        console.log('🔄 Synchronizacja statusu płatności z API Tpay (sandbox)...');
         const pendingPayments = paymentsData.filter(p => p.status === 'pending' && p.transaction_id);
-        const syncPromises = pendingPayments.map(async (payment) => {
-          try {
-            console.log(`Synchronizacja płatności ${payment.transaction_id}...`);
-            const syncedPayment = await paymentService.syncPaymentStatus(payment.transaction_id);
-            // Zaktualizuj płatność w tablicy
-            const index = paymentsData.findIndex(p => p.id === payment.id);
-            if (index !== -1) {
-              paymentsData[index] = syncedPayment;
-            }
-            console.log(`✅ Zsynchronizowano płatność ${payment.transaction_id} - status: ${syncedPayment.status}`);
-          } catch (err) {
-            console.warn(`⚠️ Nie można zsynchronizować płatności ${payment.transaction_id}:`, err);
-            // Nie przerywaj procesu - kontynuuj z pozostałymi płatnościami
-          }
-        });
-
-        // Wykonaj synchronizację równolegle (ale nie blokuj UI)
-        await Promise.allSettled(syncPromises);
-        console.log(`✅ Zsynchronizowano ${pendingPayments.length} płatności`);
+        
+        if (pendingPayments.length > 0) {
+          console.log(`🔄 Synchronizacja ${pendingPayments.length} płatności z API Tpay (sandbox) w tle...`);
+          
+          // Uruchom synchronizację w tle - NIE CZEKAJ na wynik
+          Promise.allSettled(
+            pendingPayments.map(async (payment) => {
+              try {
+                console.log(`Synchronizacja płatności ${payment.transaction_id}...`);
+                const syncedPayment = await paymentService.syncPaymentStatus(payment.transaction_id);
+                // Zaktualizuj płatność w tablicy (opcjonalnie - dla przyszłego użycia)
+                const index = paymentsData.findIndex(p => p.id === payment.id);
+                if (index !== -1) {
+                  paymentsData[index] = syncedPayment;
+                }
+                console.log(`✅ Zsynchronizowano płatność ${payment.transaction_id} - status: ${syncedPayment.status}`);
+                return { success: true, payment: syncedPayment };
+              } catch (err) {
+                console.warn(`⚠️ Nie można zsynchronizować płatności ${payment.transaction_id}:`, err);
+                return { success: false, payment: null };
+              }
+            })
+          ).then((results) => {
+            // Logowanie wyników (opcjonalnie)
+            const successful = results.filter(r => r.status === 'fulfilled' && r.value?.success).length;
+            console.log(`✅ Zsynchronizowano ${successful} z ${pendingPayments.length} płatności w tle`);
+          });
+          // ⚠️ NIE MA AWAIT - synchronizacja działa w tle, nie blokuje ładowania
+        }
 
         console.log(`Fetched ${reservationsData.length} reservations and ${paymentsData.length} payments`);
 
-        // Map reservations to payment format (use current protectionsMap and addonsMap)
+        // Pobierz wszystkie płatności manualne raz (zamiast 144 wywołań API)
+        let allManualPayments: ManualPaymentResponse[] = [];
+        try {
+          allManualPayments = await manualPaymentService.getAll(0, 1000);
+          console.log(`Fetched ${allManualPayments.length} manual payments`);
+        } catch (err) {
+          console.warn('Warning: Could not fetch all manual payments, continuing with empty array:', err);
+          // Continue with empty array - reservations will still work
+        }
+
+        // Pobierz unikalne kombinacje camp_id + property_id dla cache promocji i ochron
+        const uniqueCampPropertyPairs = new Set<string>(
+          reservationsData
+            .filter(r => r.camp_id && r.property_id)
+            .map(r => `${r.camp_id}_${r.property_id}`)
+        );
+
+        // Cache dla promocji (pobierz tylko unikalne kombinacje) - równolegle
+        const promotionsCache = new Map<string, any[]>();
+        const promotionPromises = Array.from(uniqueCampPropertyPairs).map(async (pair) => {
+          const [campId, propertyId] = pair.split('_').map(Number);
+          try {
+            const { authenticatedApiCall } = await import('@/utils/api-auth');
+            const turnusPromotions = await authenticatedApiCall<any[]>(
+              `/api/camps/${campId}/properties/${propertyId}/promotions`
+            );
+            promotionsCache.set(pair, turnusPromotions);
+          } catch (err) {
+            console.warn(`Could not fetch promotions for camp ${campId} property ${propertyId}:`, err);
+          }
+        });
+        await Promise.allSettled(promotionPromises);
+        console.log(`Cached promotions for ${promotionsCache.size} unique camp/property combinations`);
+
+        // Cache dla ochron (pobierz tylko unikalne kombinacje) - równolegle
+        const protectionsCache = new Map<string, Map<number, { name: string; price: number }>>();
+        const protectionPromises = Array.from(uniqueCampPropertyPairs).map(async (pair) => {
+          const [campId, propertyId] = pair.split('_').map(Number);
+          try {
+            const turnusProtectionsMap = await fetchTurnusProtectionPrices(campId, propertyId);
+            protectionsCache.set(pair, turnusProtectionsMap);
+          } catch (err) {
+            console.warn(`Could not fetch protections for camp ${campId} property ${propertyId}:`, err);
+          }
+        });
+        await Promise.allSettled(protectionPromises);
+        console.log(`Cached protections for ${protectionsCache.size} unique camp/property combinations`);
+
+        // Map reservations to payment format (use cached data)
         const mappedReservations = await Promise.all(
           reservationsData.map(reservation =>
-            mapReservationToPaymentFormat(reservation, paymentsData, protectionsMap, addonsMap),
+            mapReservationToPaymentFormat(
+              reservation, 
+              paymentsData, 
+              protectionsMap, 
+              addonsMap,
+              allManualPayments,
+              promotionsCache,
+              protectionsCache
+            ),
           ),
         );
 
@@ -868,11 +1474,134 @@ export default function PaymentsManagement() {
     // Fetch data after protections and addons are loaded (even if empty)
     // We use a flag to ensure we only fetch once after initial load
     fetchData();
-  }, [protectionsMap, addonsMap]);
+  }, [isProtectionsAndAddonsLoaded]);
+
+  // HTTP Polling dla wykrywania zmian w płatnościach (tylko gdy na stronie /admin-panel/payments)
+  useEffect(() => {
+    // Sprawdź czy jesteśmy na stronie płatności
+    if (pathname !== '/admin-panel/payments') {
+      return; // Nie polluj gdy nie jesteśmy na stronie płatności
+    }
+
+    // Sprawdź czy strona jest widoczna (Page Visibility API)
+    const handleVisibilityChange = () => {
+      // Strona jest ukryta/widoczna - polling automatycznie się zatrzyma/wznowi
+      // przez sprawdzenie document.hidden w pollForChanges
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const POLLING_INTERVAL = 60000; // 60 sekund
+
+    const pollForChanges = async () => {
+      // Sprawdź czy strona jest widoczna
+      if (document.hidden) {
+        return; // Nie polluj gdy strona jest ukryta
+      }
+
+      try {
+        // Pobierz timestamp ostatniego sprawdzenia z localStorage
+        const lastCheckStr = localStorage.getItem('last_payment_check');
+        const lastCheck = lastCheckStr 
+          ? new Date(lastCheckStr) 
+          : new Date(Date.now() - 24 * 60 * 60 * 1000); // Ostatnie 24h
+
+        const { authenticatedApiCall } = await import('@/utils/api-auth');
+        const response = await authenticatedApiCall<{
+          has_changes: boolean;
+          changed_payments: number;
+          changed_manual: number;
+          total_changed: number;
+          last_update: string | null;
+        }>(`/api/payments/changes?since=${lastCheck.toISOString()}`);
+
+        // Sprawdź czy użytkownik już zamknął alert dla tych zmian
+        const lastAlertDismissedStr = localStorage.getItem('last_alert_dismissed');
+        if (lastAlertDismissedStr) {
+          const lastAlertDismissed = new Date(lastAlertDismissedStr);
+          const lastUpdate = response.last_update ? new Date(response.last_update) : null;
+          
+          // Pokazuj alert tylko jeśli zmiany są nowsze niż ostatnie zamknięcie
+          if (lastUpdate && lastUpdate > lastAlertDismissed) {
+            setPaymentChangesAlert({
+              isVisible: true,
+              changedCount: response.total_changed,
+            });
+          }
+        } else if (response.has_changes) {
+          // Pierwszy raz - pokaż alert
+          setPaymentChangesAlert({
+            isVisible: true,
+            changedCount: response.total_changed,
+          });
+        }
+
+        // Zaktualizuj timestamp ostatniego sprawdzenia
+        localStorage.setItem('last_payment_check', new Date().toISOString());
+      } catch (err) {
+        console.error('Błąd podczas sprawdzania zmian w płatnościach:', err);
+        // Nie pokazuj błędu użytkownikowi - polling działa w tle
+      }
+    };
+
+    // Pierwsze sprawdzenie po 30 sekundach (daj czas na synchronizację Tpay)
+    const initialTimeout = setTimeout(pollForChanges, 30000);
+
+    // Następne sprawdzenia co 60 sekund
+    const intervalId = setInterval(pollForChanges, POLLING_INTERVAL);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [pathname]); // Polling tylko gdy pathname się zmienia (przejście na stronę płatności)
 
   // Filter and sort reservations
   const filteredReservations = useMemo(() => {
     let filtered = [...reservations];
+
+    // Apply column filters
+    columnConfig.forEach(col => {
+      if (col.filters && col.filters.length > 0) {
+        filtered = filtered.filter(reservation => {
+          let value: string | null = null;
+          switch (col.key) {
+            case 'reservationName':
+              value = reservation.reservationName;
+              break;
+            case 'participantName':
+              value = reservation.participantName;
+              break;
+            case 'totalAmount':
+              value = reservation.paymentDetails.totalAmount.toFixed(2);
+              break;
+            case 'paidAmount':
+              value = reservation.paymentDetails.paidAmount.toFixed(2);
+              break;
+            case 'remainingAmount':
+              value = reservation.paymentDetails.remainingAmount.toFixed(2);
+              break;
+            case 'promotionName':
+              value = reservation.promotionName || '-';
+              break;
+            case 'protectionNames':
+              value = reservation.protectionNames || '-';
+              break;
+            case 'depositAmount':
+              value = reservation.depositAmount ? reservation.depositAmount.toFixed(2) : '-';
+              break;
+            case 'status':
+              value = reservation.status;
+              break;
+            case 'createdAt':
+              value = new Date(reservation.createdAt).toLocaleDateString('pl-PL');
+              break;
+          }
+          return value !== null && col.filters && col.filters.includes(value);
+        });
+      }
+    });
 
     // Search filter
     if (searchQuery) {
@@ -933,13 +1662,22 @@ export default function PaymentsManagement() {
     }
 
     return filtered;
-  }, [searchQuery, sortColumn, sortDirection, reservations]);
+  }, [searchQuery, sortColumn, sortDirection, reservations, columnConfig]);
 
   // Pagination
   const totalPages = Math.ceil(filteredReservations.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedReservations = filteredReservations.slice(startIndex, endIndex);
+  
+  // Handle page change with URL update
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      updatePageInUrl(page);
+      setPageInputValue('');
+    }
+  };
 
   // Handle column sort
   const handleSort = (column: string) => {
@@ -950,6 +1688,7 @@ export default function PaymentsManagement() {
       setSortDirection('asc');
     }
     setCurrentPage(1);
+    updatePageInUrl(1);
   };
 
   // Toggle row expansion
@@ -1391,6 +2130,34 @@ export default function PaymentsManagement() {
     setSelectedReservationForPayment(null);
   };
 
+  // Funkcja odświeżania danych płatności
+  const refreshPaymentsData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Pobierz zaktualizowane dane
+      const reservationsData = await reservationService.listReservations(0, 1000);
+      const paymentsData = await paymentService.listPayments(0, 1000);
+      
+      // Zmapuj rezerwacje
+      const mappedReservations = await Promise.all(
+        reservationsData.map(reservation =>
+          mapReservationToPaymentFormat(reservation, paymentsData, protectionsMap, addonsMap),
+        ),
+      );
+      
+      setReservations(mappedReservations);
+      
+      // Zaktualizuj timestamp ostatniego sprawdzenia
+      localStorage.setItem('last_payment_check', new Date().toISOString());
+    } catch (err) {
+      console.error('Błąd odświeżania danych:', err);
+      // Opcjonalnie: pokaż toast z błędem
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle manual sync of all payments
   const handleManualSync = async () => {
     setIsSyncing(true);
@@ -1618,14 +2385,23 @@ export default function PaymentsManagement() {
       {/* Header */}
       <div className="mb-2 flex items-center justify-between" style={{ marginTop: 0, paddingTop: 0, marginRight: '16px' }}>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Płatności</h1>
-        <button
-          onClick={handleManualSync}
-          disabled={isSyncing}
-          className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white rounded-lg hover:bg-[#0288c7] transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          {isSyncing ? 'Synchronizacja...' : 'Zweryfikuj płatności'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleOpenColumnModal}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+          >
+            <Columns className="w-4 h-4" />
+            Wybierz kolumny
+          </button>
+          <button
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white rounded-lg hover:bg-[#0288c7] transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Synchronizacja...' : 'Zweryfikuj płatności'}
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -1639,6 +2415,7 @@ export default function PaymentsManagement() {
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setCurrentPage(1);
+              updatePageInUrl(1);
             }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
             style={{ borderRadius: 0 }}
@@ -1658,6 +2435,7 @@ export default function PaymentsManagement() {
             onChange={(e) => {
               setItemsPerPage(Number(e.target.value));
               setCurrentPage(1);
+              updatePageInUrl(1);
             }}
             className="px-2 py-1 text-xs border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] transition-all duration-200"
             style={{ borderRadius: 0, cursor: 'pointer' }}
@@ -1670,75 +2448,142 @@ export default function PaymentsManagement() {
         </div>
       </div>
 
+      {/* Alert o zmianach w płatnościach */}
+      {paymentChangesAlert.isVisible && (
+        <div className="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-blue-800">
+                Zaktualizowano płatności
+              </p>
+              <p className="text-sm text-blue-700">
+                {paymentChangesAlert.changedCount > 0 
+                  ? `Znaleziono ${paymentChangesAlert.changedCount} ${paymentChangesAlert.changedCount === 1 ? 'zmienioną płatność' : 'zmienionych płatności'}.`
+                  : 'Znaleziono zmiany w płatnościach.'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              // Zapisz timestamp zamknięcia alertu
+              localStorage.setItem('last_alert_dismissed', new Date().toISOString());
+              setPaymentChangesAlert({ isVisible: false, changedCount: 0 });
+              
+              // Odśwież dane
+              refreshPaymentsData();
+            }}
+            className="text-blue-600 hover:text-blue-800 transition-colors p-1 rounded hover:bg-blue-100"
+            aria-label="Zamknij i odśwież"
+            title="Zamknij i odśwież dane"
+          >
+            <XIcon className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       {/* Payments Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col min-h-0">
         <div className="overflow-auto flex-1">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
-                <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('reservationName')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="flex items-center gap-1">
-                    Nazwa rezerwacji
-                    <SortIcon column="reservationName" />
-                  </div>
-                </th>
-                <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('createdAt')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="flex items-center gap-1">
-                    Data utworzenia
-                    <SortIcon column="createdAt" />
-                  </div>
-                </th>
-                <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('participantName')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="flex items-center gap-1">
-                    Uczestnik
-                    <SortIcon column="participantName" />
-                  </div>
-                </th>
-                <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('totalAmount')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="flex items-center gap-1">
-                    Kwota całkowita
-                    <SortIcon column="totalAmount" />
-                  </div>
-                </th>
-                <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('paidAmount')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="flex items-center gap-1">
-                    Opłacone
-                    <SortIcon column="paidAmount" />
-                  </div>
-                </th>
-                <th
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('remainingAmount')}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="flex items-center gap-1">
-                    Pozostało
-                    <SortIcon column="remainingAmount" />
-                  </div>
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
+                {orderedVisibleColumns.map((col) => {
+                  const columnKey = col.key;
+                  const columnLabel = COLUMN_DEFINITIONS[columnKey as keyof typeof COLUMN_DEFINITIONS] || columnKey;
+                  const isFilterOpen = openFilterColumn === columnKey;
+                  const hasFilters = hasActiveFilters(columnKey);
+                  const uniqueValues = getUniqueColumnValues(columnKey);
+                  const columnFilters = columnConfig.find(c => c.key === columnKey)?.filters || [];
+                  
+                  return (
+                    <th
+                      key={columnKey}
+                      className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors relative"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="flex items-center gap-1">
+                        <div 
+                          className="flex items-center gap-1 flex-1"
+                          onClick={() => handleSort(columnKey)}
+                        >
+                          {columnLabel}
+                          <SortIcon column={columnKey} />
+                        </div>
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenFilterColumn(isFilterOpen ? null : columnKey);
+                            }}
+                            className={`p-1 hover:bg-gray-200 transition-colors ${
+                              hasFilters ? 'text-[#03adf0]' : 'text-gray-400'
+                            }`}
+                            title="Filtruj"
+                          >
+                            <Filter className="w-4 h-4" />
+                          </button>
+                          {isFilterOpen && (
+                            <div 
+                              className="absolute right-0 top-full mt-1 bg-white border border-gray-300 shadow-lg z-50 min-w-[200px] max-w-[300px] max-h-[400px] flex flex-col"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ borderRadius: 0 }}
+                            >
+                              {/* Filter header */}
+                              <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                                <span className="text-xs font-medium text-gray-900">Filtruj {columnLabel}</span>
+                                {hasFilters && (
+                                  <button
+                                    onClick={() => handleClearColumnFilters(columnKey)}
+                                    className="text-xs text-[#03adf0] hover:text-[#0288c7]"
+                                  >
+                                    Wyczyść
+                                  </button>
+                                )}
+                              </div>
+                              
+                              {/* Filter options */}
+                              <div className="overflow-y-auto flex-1 max-h-[320px]">
+                                {uniqueValues.length > 0 ? (
+                                  uniqueValues.map((value) => {
+                                    const isSelected = columnFilters.includes(value);
+                                    return (
+                                      <label
+                                        key={value}
+                                        className={`flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors ${
+                                          isSelected ? 'bg-blue-50' : ''
+                                        }`}
+                                        style={{ cursor: 'pointer' }}
+                                      >
+                                        <div className="relative flex items-center">
+                                          <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => handleFilterToggle(columnKey, value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0]"
+                                            style={{ borderRadius: 0, cursor: 'pointer' }}
+                                          />
+                                        </div>
+                                        <span className="text-xs text-gray-900 flex-1 truncate" title={value}>
+                                          {value}
+                                        </span>
+                                      </label>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="px-3 py-4 text-xs text-gray-500 text-center">
+                                    Brak danych
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -1764,87 +2609,140 @@ export default function PaymentsManagement() {
                           if (target.closest('button, a, input, select')) {
                             return;
                           }
-                          // Navigate to payments detail page
-                          router.push(`/admin-panel/rezerwacja/${reservation.reservationName}/payments`);
+                          // Navigate to payments detail page with fromPage param
+                          const paymentsUrl = currentPage > 1 
+                            ? `/admin-panel/rezerwacja/${reservation.reservationName}/payments?fromPage=${currentPage}`
+                            : `/admin-panel/rezerwacja/${reservation.reservationName}/payments`;
+                          router.push(paymentsUrl);
                         }}
                         style={{ cursor: 'pointer' }}
                       >
-                        <td className="px-4 py-2">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-900">
-                              {reservation.reservationName}
-                            </span>
-                            {(reservation.propertyStartDate || reservation.propertyEndDate || reservation.participantFirstName || reservation.participantLastName) && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                {reservation.propertyStartDate && reservation.propertyEndDate && (
-                                  <span>
-                                    {formatDate(reservation.propertyStartDate)} - {formatDate(reservation.propertyEndDate)}
+                        {orderedVisibleColumns.map((col) => {
+                          const columnKey = col.key;
+                          if (columnKey === 'reservationName') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2">
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {reservation.reservationName}
+                                  </span>
+                                  {(reservation.propertyStartDate || reservation.propertyEndDate || reservation.participantFirstName || reservation.participantLastName) && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {reservation.propertyStartDate && reservation.propertyEndDate && (
+                                        <span>
+                                          {formatDate(reservation.propertyStartDate)} - {formatDate(reservation.propertyEndDate)}
+                                        </span>
+                                      )}
+                                      {reservation.participantFirstName && reservation.participantLastName && (
+                                        <>
+                                          {reservation.propertyStartDate && reservation.propertyEndDate && ' | '}
+                                          <span>{reservation.participantFirstName} {reservation.participantLastName}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          } else if (columnKey === 'createdAt') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className="text-sm text-gray-600">
+                                  {new Date(reservation.createdAt).toLocaleDateString('pl-PL', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'participantName') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className="text-sm text-gray-900">
+                                  {reservation.participantName}
+                                </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'totalAmount') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {formatCurrency(reservation.paymentDetails.totalAmount)}
+                                </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'paidAmount') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className="text-sm text-green-600 font-medium">
+                                  {formatCurrency(reservation.paymentDetails.paidAmount)}
+                                </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'remainingAmount') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className={`text-sm font-medium ${hasRemaining ? 'text-red-600' : 'text-gray-500'}`}>
+                                  {formatCurrency(reservation.paymentDetails.remainingAmount)}
+                                </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'promotionName') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className="text-sm text-gray-600">
+                                  {reservation.promotionName || '-'}
+                                </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'protectionNames') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className="text-sm text-gray-600">
+                                  {reservation.protectionNames || '-'}
+                                </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'depositAmount') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {reservation.depositAmount ? formatCurrency(reservation.depositAmount) : '-'}
+                                </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'status') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                {hasReturnedItems ? (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    Zwrócone
+                                  </span>
+                                ) : allPaid && isFullPayment ? (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Opłacone w całości
+                                  </span>
+                                ) : isPartialPayment || hasPartiallyPaid ? (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Częściowo opłacone
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    Nieopłacone
                                   </span>
                                 )}
-                                {reservation.participantFirstName && reservation.participantLastName && (
-                                  <>
-                                    {reservation.propertyStartDate && reservation.propertyEndDate && ' | '}
-                                    <span>{reservation.participantFirstName} {reservation.participantLastName}</span>
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <span className="text-sm text-gray-600">
-                            {new Date(reservation.createdAt).toLocaleDateString('pl-PL', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">
-                            {reservation.participantName}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <span className="text-sm font-medium text-gray-900">
-                            {formatCurrency(reservation.paymentDetails.totalAmount)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <span className="text-sm text-green-600 font-medium">
-                            {formatCurrency(reservation.paymentDetails.paidAmount)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <span className={`text-sm font-medium ${hasRemaining ? 'text-red-600' : 'text-gray-500'}`}>
-                            {formatCurrency(reservation.paymentDetails.remainingAmount)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          {hasReturnedItems ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                              Zwrócone
-                            </span>
-                          ) : allPaid && isFullPayment ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Opłacone w całości
-                            </span>
-                          ) : isPartialPayment || hasPartiallyPaid ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              Częściowo opłacone
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                              Nieopłacone
-                            </span>
-                          )}
-                        </td>
+                              </td>
+                            );
+                          }
+                          return null;
+                        })}
                       </tr>
                       {isExpanded && (
                         <tr className="bg-blue-50 animate-slideDown">
-                          <td colSpan={7} className="px-4 py-4">
+                          <td colSpan={orderedVisibleColumns.length} className="px-4 py-4">
                             <div className="space-y-4">
                               {/* Reservation Details Summary - Table Data */}
                               <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -2471,7 +3369,7 @@ export default function PaymentsManagement() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={orderedVisibleColumns.length} className="px-4 py-8 text-center text-sm text-gray-500">
                     Brak rezerwacji spełniających kryteria wyszukiwania
                   </td>
                 </tr>
@@ -2483,51 +3381,66 @@ export default function PaymentsManagement() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-xs text-gray-600">
-              Strona {currentPage} z {totalPages}
+            <div className="text-sm text-gray-700">
+              Wyświetlanie {startIndex + 1} - {Math.min(endIndex, filteredReservations.length)} z {filteredReservations.length} płatności
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 disabled:opacity-50"
-                style={{ borderRadius: 0, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-              >
-                Poprzednia
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                if (
-                  page === 1 ||
-                  page === totalPages ||
-                  (page >= currentPage - 1 && page <= currentPage + 1)
-                ) {
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
-                        currentPage === page
-                          ? 'bg-[#03adf0] text-white'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                      }`}
-                      style={{ borderRadius: 0, cursor: 'pointer' }}
-                    >
-                      {page}
-                    </button>
-                  );
-                } else if (page === currentPage - 2 || page === currentPage + 2) {
-                  return <span key={page} className="px-2 text-gray-500">...</span>;
-                }
-                return null;
-              })}
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 disabled:opacity-50"
-                style={{ borderRadius: 0, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
-              >
-                Następna
-              </button>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  style={{ borderRadius: 0 }}
+                >
+                  Poprzednia
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`px-3 py-1 text-sm font-medium transition-all duration-200 ${
+                          currentPage === page
+                            ? 'bg-[#03adf0] text-white border border-[#03adf0]'
+                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        }`}
+                        style={{ borderRadius: 0, cursor: 'pointer' }}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (page === currentPage - 2 || page === currentPage + 2) {
+                    return <span key={page} className="px-2 text-gray-500">...</span>;
+                  }
+                  return null;
+                })}
+                <button
+                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  style={{ borderRadius: 0 }}
+                >
+                  Następna
+                </button>
+              </div>
+              {/* Page input field */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={pageInputValue}
+                  onChange={handlePageInputChange}
+                  onKeyDown={handlePageInputKeyDown}
+                  placeholder={`1-${totalPages}`}
+                  className="w-16 px-2 py-1 text-xs border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#03adf0] transition-all duration-200 text-center"
+                  style={{ borderRadius: 0 }}
+                />
+                <span className="text-xs text-gray-500">(Enter)</span>
+              </div>
             </div>
           </div>
         )}
@@ -2571,6 +3484,64 @@ export default function PaymentsManagement() {
           setSelectedItemForRefund(null);
         }}
       />
+
+      {/* Column Selection Modal */}
+      <UniversalModal
+        isOpen={columnModalOpen}
+        onClose={handleCloseColumnModal}
+        title="Wybierz kolumny"
+      >
+        <div className="space-y-4">
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {tempColumnConfig.map((col, index) => (
+              <div
+                key={col.key}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, index)}
+                className={`flex items-center gap-3 p-3 border rounded-lg cursor-move transition-colors ${
+                  draggedOverIndex === index ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'
+                } ${draggedColumnIndex === index ? 'opacity-50' : ''}`}
+              >
+                <GripVertical className="w-5 h-5 text-gray-400" />
+                <input
+                  type="checkbox"
+                  checked={col.visible}
+                  onChange={() => handleColumnToggle(col.key)}
+                  className="w-4 h-4 text-[#03adf0] border-gray-300 rounded focus:ring-[#03adf0]"
+                />
+                <label className="flex-1 text-sm text-gray-700 cursor-pointer">
+                  {COLUMN_DEFINITIONS[col.key as keyof typeof COLUMN_DEFINITIONS] || col.key}
+                </label>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between pt-4 border-t">
+            <button
+              onClick={handleResetColumnPreferences}
+              className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Resetuj ustawienia
+            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCloseColumnModal}
+                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={handleSaveColumnPreferences}
+                className="px-4 py-2 text-sm text-white bg-[#03adf0] rounded-lg hover:bg-[#0288c7] transition-colors"
+              >
+                Zapisz
+              </button>
+            </div>
+          </div>
+        </div>
+      </UniversalModal>
 
       {/* Animations CSS */}
       <style jsx global>{`

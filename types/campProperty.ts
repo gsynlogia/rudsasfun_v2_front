@@ -11,6 +11,7 @@ export interface CampProperty {
   min_age?: number | null;
   max_age?: number | null;
   base_price?: number;
+  tag?: string | null;
   registered_count?: number;
   is_full?: boolean;
   is_ended?: boolean;

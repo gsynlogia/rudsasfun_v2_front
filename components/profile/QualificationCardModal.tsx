@@ -56,6 +56,21 @@ export default function QualificationCardModal({
   const [parent1PhoneCode, setParent1PhoneCode] = useState<string>('+48');
   const [parent2PhoneCode, setParent2PhoneCode] = useState<string>('+48');
 
+  // Health and additional info states
+  const [accommodationRequest, setAccommodationRequest] = useState('');
+  const [healthQuestions, setHealthQuestions] = useState({
+    chronicDiseases: 'Nie',
+    dysfunctions: 'Nie',
+    psychiatric: 'Nie',
+  });
+  const [healthDetails, setHealthDetails] = useState({
+    chronicDiseases: '',
+    dysfunctions: '',
+    psychiatric: '',
+  });
+  const [additionalNotes, setAdditionalNotes] = useState('');
+  const [participantAdditionalInfo, setParticipantAdditionalInfo] = useState('');
+
   // Check if second parent exists - recalculate on each render to ensure it's up to date
   const hasSecondParent = useMemo(() => {
     const has = reservation.parents_data && Array.isArray(reservation.parents_data) && reservation.parents_data.length > 1;
@@ -142,6 +157,30 @@ export default function QualificationCardModal({
       console.log('Setting form data:', formDataToSet);
       setFormData(formDataToSet);
 
+      // Load health and additional info from reservation
+      setAccommodationRequest(reservation.accommodation_request || '');
+      
+      // Load health questions
+      if (reservation.health_questions && typeof reservation.health_questions === 'object') {
+        setHealthQuestions({
+          chronicDiseases: reservation.health_questions.chronicDiseases || 'Nie',
+          dysfunctions: reservation.health_questions.dysfunctions || 'Nie',
+          psychiatric: reservation.health_questions.psychiatric || 'Nie',
+        });
+      }
+      
+      // Load health details
+      if (reservation.health_details && typeof reservation.health_details === 'object') {
+        setHealthDetails({
+          chronicDiseases: reservation.health_details.chronicDiseases || '',
+          dysfunctions: reservation.health_details.dysfunctions || '',
+          psychiatric: reservation.health_details.psychiatric || '',
+        });
+      }
+      
+      setAdditionalNotes(reservation.additional_notes || '');
+      setParticipantAdditionalInfo(reservation.participant_additional_info || '');
+
       // Check if can generate
       const canGen = await qualificationCardService.canGenerateQualificationCard(reservation.id);
       setCanGenerate(canGen.can_generate);
@@ -191,6 +230,28 @@ export default function QualificationCardModal({
 
       console.log('Setting fallback form data:', fallbackFormData);
       setFormData(fallbackFormData);
+
+      // Load health and additional info from reservation (fallback)
+      setAccommodationRequest(reservation.accommodation_request || '');
+      
+      if (reservation.health_questions && typeof reservation.health_questions === 'object') {
+        setHealthQuestions({
+          chronicDiseases: reservation.health_questions.chronicDiseases || 'Nie',
+          dysfunctions: reservation.health_questions.dysfunctions || 'Nie',
+          psychiatric: reservation.health_questions.psychiatric || 'Nie',
+        });
+      }
+      
+      if (reservation.health_details && typeof reservation.health_details === 'object') {
+        setHealthDetails({
+          chronicDiseases: reservation.health_details.chronicDiseases || '',
+          dysfunctions: reservation.health_details.dysfunctions || '',
+          psychiatric: reservation.health_details.psychiatric || '',
+        });
+      }
+      
+      setAdditionalNotes(reservation.additional_notes || '');
+      setParticipantAdditionalInfo(reservation.participant_additional_info || '');
     } finally {
       setIsLoading(false);
     }
@@ -236,6 +297,15 @@ export default function QualificationCardModal({
       };
 
       await qualificationCardService.saveQualificationCardData(reservation.id, dataToSave);
+
+      // Save health and additional info to reservation
+      await qualificationCardService.updateReservationHealthInfo(reservation.id, {
+        accommodation_request: accommodationRequest,
+        health_questions: healthQuestions,
+        health_details: healthDetails,
+        additional_notes: additionalNotes,
+        participant_additional_info: participantAdditionalInfo,
+      });
 
       // Check if can generate now
       const canGen = await qualificationCardService.canGenerateQualificationCard(reservation.id);
@@ -1015,6 +1085,197 @@ export default function QualificationCardModal({
                     </div>
                   </div>
                 </div>
+
+              {/* Zakwaterowanie */}
+              <div className="space-y-4 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <User className="w-5 h-5 text-[#03adf0]" />
+                  Wniosek o zakwaterowanie uczestnika
+                </h3>
+                <textarea
+                  value={accommodationRequest}
+                  onChange={(e) => setAccommodationRequest(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                  placeholder="Uzupełnij to pole, jeśli występują specjalne prośby o zakwaterowanie, np. z rodzeństwem lub znajomym/znajomymi (wpisz imię i nazwisko)"
+                />
+              </div>
+
+              {/* Stan zdrowia */}
+              <div className="space-y-4 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <User className="w-5 h-5 text-[#03adf0]" />
+                  Stan zdrowia (choroby/dysfunkcje) uczestnika
+                </h3>
+                <div className="space-y-4">
+                  {/* Chronic diseases */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Czy uczestnik choruje na choroby przewlekłe? (czy choruje na choroby długotrwałe, np. na AZS, cukrzycę, łuszczycę, depresję itp.)
+                    </label>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="chronicDiseases"
+                          value="Tak"
+                          checked={healthQuestions.chronicDiseases === 'Tak'}
+                          onChange={(e) => setHealthQuestions({ ...healthQuestions, chronicDiseases: e.target.value })}
+                          className="text-[#03adf0] focus:ring-[#03adf0]"
+                        />
+                        <span className="text-sm text-gray-700">Tak</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="chronicDiseases"
+                          value="Nie"
+                          checked={healthQuestions.chronicDiseases === 'Nie'}
+                          onChange={(e) => {
+                            setHealthQuestions({ ...healthQuestions, chronicDiseases: e.target.value });
+                            setHealthDetails({ ...healthDetails, chronicDiseases: '' });
+                          }}
+                          className="text-[#03adf0] focus:ring-[#03adf0]"
+                        />
+                        <span className="text-sm text-gray-700">Nie</span>
+                      </label>
+                    </div>
+                    {healthQuestions.chronicDiseases === 'Tak' && (
+                      <textarea
+                        value={healthDetails.chronicDiseases}
+                        onChange={(e) => setHealthDetails({ ...healthDetails, chronicDiseases: e.target.value })}
+                        placeholder="Opisz choroby przewlekłe..."
+                        rows={3}
+                        className="mt-3 w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      />
+                    )}
+                  </div>
+
+                  {/* Dysfunctions */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Czy uczestnik posiada jakieś dysfunkcje? (np. ADHD, opóźnienie w stopniu lekkim, niepełnosprawność, jaka? Itp.)
+                    </label>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="dysfunctions"
+                          value="Tak"
+                          checked={healthQuestions.dysfunctions === 'Tak'}
+                          onChange={(e) => setHealthQuestions({ ...healthQuestions, dysfunctions: e.target.value })}
+                          className="text-[#03adf0] focus:ring-[#03adf0]"
+                        />
+                        <span className="text-sm text-gray-700">Tak</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="dysfunctions"
+                          value="Nie"
+                          checked={healthQuestions.dysfunctions === 'Nie'}
+                          onChange={(e) => {
+                            setHealthQuestions({ ...healthQuestions, dysfunctions: e.target.value });
+                            setHealthDetails({ ...healthDetails, dysfunctions: '' });
+                          }}
+                          className="text-[#03adf0] focus:ring-[#03adf0]"
+                        />
+                        <span className="text-sm text-gray-700">Nie</span>
+                      </label>
+                    </div>
+                    {healthQuestions.dysfunctions === 'Tak' && (
+                      <textarea
+                        value={healthDetails.dysfunctions}
+                        onChange={(e) => setHealthDetails({ ...healthDetails, dysfunctions: e.target.value })}
+                        placeholder="Opisz dysfunkcje..."
+                        rows={3}
+                        className="mt-3 w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      />
+                    )}
+                  </div>
+
+                  {/* Psychiatric */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Czy uczestnik leczył się lub leczy psychiatrycznie? (jeśli tak, wpisać kiedy i z jakiego powodu)
+                    </label>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="psychiatric"
+                          value="Tak"
+                          checked={healthQuestions.psychiatric === 'Tak'}
+                          onChange={(e) => setHealthQuestions({ ...healthQuestions, psychiatric: e.target.value })}
+                          className="text-[#03adf0] focus:ring-[#03adf0]"
+                        />
+                        <span className="text-sm text-gray-700">Tak</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="psychiatric"
+                          value="Nie"
+                          checked={healthQuestions.psychiatric === 'Nie'}
+                          onChange={(e) => {
+                            setHealthQuestions({ ...healthQuestions, psychiatric: e.target.value });
+                            setHealthDetails({ ...healthDetails, psychiatric: '' });
+                          }}
+                          className="text-[#03adf0] focus:ring-[#03adf0]"
+                        />
+                        <span className="text-sm text-gray-700">Nie</span>
+                      </label>
+                    </div>
+                    {healthQuestions.psychiatric === 'Tak' && (
+                      <textarea
+                        value={healthDetails.psychiatric}
+                        onChange={(e) => setHealthDetails({ ...healthDetails, psychiatric: e.target.value })}
+                        placeholder="Opisz problemy psychiatryczne..."
+                        rows={3}
+                        className="mt-3 w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      />
+                    )}
+                  </div>
+
+                  {/* Additional notes */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Dodatkowe informacje o stanie zdrowia uczestnika
+                    </label>
+                    <p className="text-xs text-gray-600 mb-2">
+                      Prosimy o podanie dodatkowych informacji, np.: alergie, choroba lokomocyjna, czy nosi okulary, czy przyjmuje leki (jeśli tak, prosimy o podanie nazwy leków i dawek), czy może uprawiać sport, czy ma problemy ze słuchem itp.
+                    </p>
+                    <p className="text-xs text-gray-600 mb-3">
+                      <strong>Informacja:</strong> Leki podaje kadra na obozie lub uczestnik samodzielnie, jeśli rodzic/opiekun prawny napisze na to zgodę.
+                    </p>
+                    <textarea
+                      value={additionalNotes}
+                      onChange={(e) => setAdditionalNotes(e.target.value)}
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      placeholder="Wprowadź dodatkowe informacje..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Informacje dodatkowe */}
+              <div className="space-y-4 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <User className="w-5 h-5 text-[#03adf0]" />
+                  Informacje dodatkowe dotyczące uczestnika
+                </h3>
+                <p className="text-xs text-gray-600 mb-3">
+                  Inne informacje, np. wyczesać włosy, nie je wieprzowiny, NIE dla quadów, ograniczone prawa rodzicielskie 2 rodzica itp.
+                </p>
+                <textarea
+                  value={participantAdditionalInfo}
+                  onChange={(e) => setParticipantAdditionalInfo(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                  placeholder="Wprowadź dodatkowe informacje..."
+                />
+              </div>
             </>
           )}
         </div>

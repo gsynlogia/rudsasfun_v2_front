@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, CreditCard, Check, XCircle, Building2, Shield, Utensils, Plus, FileText, Download, RefreshCw, Search, Plus as PlusIcon } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
@@ -53,7 +53,11 @@ interface Promotion {
 export default function ReservationPaymentsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const reservationNumber = params.id as string;
+  
+  // Get fromPage param to return to correct pagination page
+  const fromPage = searchParams.get('fromPage');
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
@@ -427,7 +431,10 @@ export default function ReservationPaymentsPage() {
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push('/admin-panel/payments')}
+                onClick={() => {
+                  const returnUrl = fromPage ? `/admin-panel/payments?page=${fromPage}` : '/admin-panel/payments';
+                  router.push(returnUrl);
+                }}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded"
                 style={{ borderRadius: 0, cursor: 'pointer' }}
               >

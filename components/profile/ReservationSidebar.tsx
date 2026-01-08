@@ -857,10 +857,10 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-gray-900 mb-1">Napisz do nas</p>
                   <a 
-                    href="mailto:kontakt@radsas-fun.pl" 
+                    href="mailto:lato@radsas-fun.pl" 
                     className="text-sm sm:text-base text-[#03adf0] hover:text-[#0288c7] hover:underline"
                   >
-                    kontakt@radsas-fun.pl
+                    lato@radsas-fun.pl
                   </a>
                 </div>
               </div>

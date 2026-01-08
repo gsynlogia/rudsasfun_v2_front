@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Edit, Check, X, FileText, Download, Upload, Trash2 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
@@ -112,14 +112,27 @@ interface Diet {
 export default function ReservationDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   // params.id contains the reservation number (e.g., REZ-2025-001)
   const reservationNumber = params.id as string;
+  
+  // Get fromPage param to return to correct pagination page
+  const fromPage = searchParams.get('fromPage');
+  
+  // Get all filter params to preserve filters when returning
+  const filterParams = new URLSearchParams();
+  searchParams.forEach((value, key) => {
+    if (key.startsWith('filter_')) {
+      filterParams.set(key, value);
+    }
+  });
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);
   const [addons, setAddons] = useState<Map<number, Addon>>(new Map());
   const [protections, setProtections] = useState<Map<number, Protection>>(new Map());
   const [promotions, setPromotions] = useState<Map<number, Promotion>>(new Map());
   const [diets, setDiets] = useState<Map<number, Diet>>(new Map());
+  const [transportCities, setTransportCities] = useState<Array<{ city: string; departure_price: number | null; return_price: number | null }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [contractHtmlExists, setContractHtmlExists] = useState(false);
@@ -343,6 +356,22 @@ export default function ReservationDetailPage() {
             console.error(`Error fetching main diet ${reservationData.diet}:`, err);
           }
         }
+
+        // Fetch transport cities (tylko jeśli transport jest zbiorowy)
+        if ((reservationData.departure_type === 'zbiorowy' || reservationData.return_type === 'zbiorowy') 
+            && reservationData.camp_id && reservationData.property_id) {
+          try {
+            const citiesResponse = await authenticatedApiCall<Array<{ city: string; departure_price: number | null; return_price: number | null }>>(
+              `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/transport/cities`
+            );
+            setTransportCities(citiesResponse || []);
+          } catch (err) {
+            console.warn('Could not fetch transport cities:', err);
+            setTransportCities([]);
+          }
+        } else {
+          setTransportCities([]);
+        }
       } catch (err) {
         console.error('Error fetching reservation details:', err);
         setError(err instanceof Error ? err.message : 'Błąd podczas ładowania szczegółów rezerwacji');
@@ -401,6 +430,25 @@ export default function ReservationDetailPage() {
     <span className="text-red-600 font-medium">⚠️ Tej informacji nie ma w systemie ({field})</span>
   );
 
+  // Oblicz kwotę transportu (dokładnie jak w TransportSection.tsx - krok 3)
+  // Logika: bierze wyższą kwotę z departure_price i return_price
+  let departurePrice: number | null = null;
+  let returnPrice: number | null = null;
+
+  if (reservation && reservation.departure_type === 'zbiorowy' && reservation.departure_city) {
+    const city = transportCities.find(c => c.city === reservation.departure_city);
+    departurePrice = city?.departure_price || null;
+  }
+
+  if (reservation && reservation.return_type === 'zbiorowy' && reservation.return_city) {
+    const city = transportCities.find(c => c.city === reservation.return_city);
+    returnPrice = city?.return_price || null;
+  }
+
+  // Oblicz wyższą kwotę (dokładnie jak w TransportSection.tsx linia 255-256)
+  const prices = [departurePrice, returnPrice].filter((p): p is number => p !== null && p !== undefined);
+  const transportPrice = prices.length > 0 ? Math.max(...prices) : 0;
+
   if (isLoading) {
     return (
       <SectionGuard section="reservations">
@@ -436,7 +484,21 @@ export default function ReservationDetailPage() {
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push('/admin-panel')}
+                onClick={() => {
+                  // Build return URL with page and filters
+                  const returnParams = new URLSearchParams();
+                  if (fromPage) {
+                    returnParams.set('page', fromPage);
+                  }
+                  // Add all filter params
+                  filterParams.forEach((value, key) => {
+                    returnParams.set(key, value);
+                  });
+                  const returnUrl = returnParams.toString() 
+                    ? `/admin-panel?${returnParams.toString()}` 
+                    : '/admin-panel';
+                  router.push(returnUrl);
+                }}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded"
                 style={{ borderRadius: 0, cursor: 'pointer' }}
               >
@@ -857,6 +919,12 @@ export default function ReservationDetailPage() {
                     )}
                   </p>
                 </div>
+                {transportPrice > 0 && (
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-gray-700">Kwota transportu:</label>
+                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(transportPrice)}</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1368,7 +1436,19 @@ export default function ReservationDetailPage() {
                             method: 'DELETE',
                           });
                           alert('Rezerwacja została usunięta pomyślnie. Dostępność turnusu została zwiększona o 1.');
-                          router.push('/admin-panel');
+                          // Build return URL with page and filters
+                          const returnParams = new URLSearchParams();
+                          if (fromPage) {
+                            returnParams.set('page', fromPage);
+                          }
+                          // Add all filter params
+                          filterParams.forEach((value, key) => {
+                            returnParams.set(key, value);
+                          });
+                          const returnUrl = returnParams.toString() 
+                            ? `/admin-panel?${returnParams.toString()}` 
+                            : '/admin-panel';
+                          router.push(returnUrl);
                         } catch (err) {
                           alert(err instanceof Error ? err.message : 'Błąd podczas usuwania rezerwacji');
                         } finally {

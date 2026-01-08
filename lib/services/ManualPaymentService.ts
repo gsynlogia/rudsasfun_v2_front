@@ -47,6 +47,16 @@ class ManualPaymentService {
   }
 
   /**
+   * Get all manual payments (admin only)
+   * Used for bulk fetching to optimize frontend performance
+   */
+  async getAll(skip: number = 0, limit: number = 1000): Promise<ManualPaymentResponse[]> {
+    return authenticatedApiCall<ManualPaymentResponse[]>(
+      `/api/manual-payments?skip=${skip}&limit=${limit}`
+    );
+  }
+
+  /**
    * Get a specific manual payment by ID
    */
   async getById(paymentId: number): Promise<ManualPaymentResponse> {

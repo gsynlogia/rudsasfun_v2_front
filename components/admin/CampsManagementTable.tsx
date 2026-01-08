@@ -1,7 +1,7 @@
 'use client';
 
 import { Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Calendar, MapPin, Plus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 
 import type { Camp, CampProperty } from '@/types/reservation';
@@ -21,6 +21,7 @@ interface CampWithProperties extends Camp {
  */
 export default function CampsManagementTable() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   // State for camps data
@@ -50,8 +51,38 @@ export default function CampsManagementTable() {
   const [_cityFilter, _setCityFilter] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Initialize currentPage from URL params or default to 1
+  const pageFromUrl = searchParams.get('page');
+  const [currentPage, setCurrentPage] = useState(pageFromUrl ? parseInt(pageFromUrl, 10) : 1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [pageInputValue, setPageInputValue] = useState('');
+  
+  // Sync currentPage with URL params on mount and when searchParams change
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    if (pageParam) {
+      const pageNum = parseInt(pageParam, 10);
+      if (!isNaN(pageNum) && pageNum > 0) {
+        setCurrentPage(pageNum);
+      }
+    } else {
+      // If no page param, reset to 1
+      setCurrentPage(1);
+    }
+  }, [searchParams]);
+  
+  // Update URL when currentPage changes
+  const updatePageInUrl = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page === 1) {
+      params.delete('page');
+    } else {
+      params.set('page', page.toString());
+    }
+    const newUrl = params.toString() ? `/admin-panel/camps?${params.toString()}` : '/admin-panel/camps';
+    router.replace(newUrl);
+  };
 
   // Multi-select state for cities
   const [isCitySelectOpen, setIsCitySelectOpen] = useState(false);
@@ -190,6 +221,7 @@ export default function CampsManagementTable() {
       setSortDirection('asc');
     }
     setCurrentPage(1);
+    updatePageInUrl(1);
   };
 
   // Handle filter change
@@ -198,6 +230,7 @@ export default function CampsManagementTable() {
       setPeriodFilter(value);
     }
     setCurrentPage(1);
+    updatePageInUrl(1);
   };
 
   // Handle city filter (multi-select)
@@ -210,12 +243,14 @@ export default function CampsManagementTable() {
       }
     });
     setCurrentPage(1);
+    updatePageInUrl(1);
   };
 
   // Remove single city filter
   const removeCityFilter = (city: string) => {
     setCityFilters(prev => prev.filter(c => c !== city));
     setCurrentPage(1);
+    updatePageInUrl(1);
   };
 
   // Close dropdown when clicking outside
@@ -249,6 +284,48 @@ export default function CampsManagementTable() {
     setPeriodFilter(null);
     setCityFilters([]);
     setCurrentPage(1);
+    updatePageInUrl(1);
+  };
+  
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    updatePageInUrl(page);
+    setPageInputValue(''); // Clear input after page change
+  };
+  
+  // Handle page input change
+  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow only numbers
+    if (value === '' || /^\d+$/.test(value)) {
+      setPageInputValue(value);
+    }
+  };
+  
+  // Handle page input submit (Enter key)
+  const handlePageInputSubmit = () => {
+    if (!pageInputValue) return;
+    
+    const pageNum = parseInt(pageInputValue, 10);
+    
+    // Validation
+    if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages || pageNum % 1 !== 0) {
+      // Invalid input - reset to empty
+      setPageInputValue('');
+      return;
+    }
+    
+    // Valid input - navigate to page
+    handlePageChange(pageNum);
+  };
+  
+  // Handle Enter key in page input
+  const handlePageInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handlePageInputSubmit();
+    }
   };
 
   // Toggle row expansion
@@ -264,10 +341,16 @@ export default function CampsManagementTable() {
     });
   };
 
-  // Handle edit click - navigate to edit page
+  // Handle edit click - navigate to edit page with current page info
   const handleEditClick = (camp: CampWithProperties, e: React.MouseEvent) => {
     e.stopPropagation();
-    router.push(`/admin-panel/camps/${camp.id}/edit`);
+    const params = new URLSearchParams();
+    if (currentPage > 1) {
+      params.set('fromPage', currentPage.toString());
+    }
+    const queryString = params.toString();
+    const url = `/admin-panel/camps/${camp.id}/edit${queryString ? `?${queryString}` : ''}`;
+    router.push(url);
   };
 
   // Handle delete click for camp
@@ -348,11 +431,17 @@ export default function CampsManagementTable() {
     setShowPropertyForm(true);
   };
 
-  // Handle edit property (turnus) - navigate to edit page
+  // Handle edit property (turnus) - navigate to edit page with current page info
   const handleEditProperty = (campId: number, property: CampProperty, e: React.MouseEvent) => {
     e.stopPropagation();
     console.log('[CampsManagementTable] Navigating to turnus edit page:', { campId, turnusId: property.id });
-    router.push(`/admin-panel/camps/${campId}/turnus/${property.id}/edit`);
+    const params = new URLSearchParams();
+    if (currentPage > 1) {
+      params.set('fromPage', currentPage.toString());
+    }
+    const queryString = params.toString();
+    const url = `/admin-panel/camps/${campId}/turnus/${property.id}/edit${queryString ? `?${queryString}` : ''}`;
+    router.push(url);
   };
 
   // Handle delete property (turnus) - now uses modal
@@ -439,6 +528,7 @@ export default function CampsManagementTable() {
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setCurrentPage(1);
+              updatePageInUrl(1);
             }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
             style={{ borderRadius: 0 }}
@@ -603,6 +693,7 @@ export default function CampsManagementTable() {
             onChange={(e) => {
               setItemsPerPage(Number(e.target.value));
               setCurrentPage(1);
+              updatePageInUrl(1);
             }}
             className="px-2 py-1 text-xs border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] transition-all duration-200"
             style={{ borderRadius: 0, cursor: 'pointer' }}
@@ -832,16 +923,17 @@ export default function CampsManagementTable() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-xs text-gray-600">
-              Strona {currentPage} z {totalPages}
+          <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Wyświetlanie {startIndex + 1} - {Math.min(endIndex, filteredCamps.length)} z {filteredCamps.length} obozów
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex gap-2">
               <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 disabled:opacity-50"
-                style={{ borderRadius: 0, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                className="px-3 py-1 text-sm border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                style={{ borderRadius: 0 }}
               >
                 Poprzednia
               </button>
@@ -854,10 +946,10 @@ export default function CampsManagementTable() {
                   return (
                     <button
                       key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+                      onClick={() => handlePageChange(page)}
+                      className={`px-3 py-1 text-sm font-medium transition-all duration-200 ${
                         currentPage === page
-                          ? 'bg-[#03adf0] text-white'
+                          ? 'bg-[#03adf0] text-white border border-[#03adf0]'
                           : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                       }`}
                       style={{ borderRadius: 0, cursor: 'pointer' }}
@@ -871,13 +963,27 @@ export default function CampsManagementTable() {
                 return null;
               })}
               <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-all duration-200 disabled:opacity-50"
-                style={{ borderRadius: 0, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                className="px-3 py-1 text-sm border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                style={{ borderRadius: 0 }}
               >
                 Następna
               </button>
+              </div>
+              {/* Page input field - directly under page number buttons */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={pageInputValue}
+                  onChange={handlePageInputChange}
+                  onKeyDown={handlePageInputKeyDown}
+                  placeholder={`1-${totalPages}`}
+                  className="w-16 px-2 py-1 text-xs border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#03adf0] transition-all duration-200 text-center"
+                  style={{ borderRadius: 0 }}
+                />
+                <span className="text-xs text-gray-500">(Enter)</span>
+              </div>
             </div>
           </div>
         )}
