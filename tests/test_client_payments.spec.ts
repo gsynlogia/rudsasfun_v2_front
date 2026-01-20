@@ -95,3 +95,5 @@ test('Wyświetlanie wpłat manualnych w panelu klienta', async ({ page, context 
 
 
 
+
+
