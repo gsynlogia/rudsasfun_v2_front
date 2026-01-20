@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Edit, Check, X, FileText, Download, Upload, Trash2 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
+import UniversalModal from '@/components/admin/UniversalModal';
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
@@ -101,6 +102,15 @@ interface Promotion {
   id: number;
   name: string;
   price: number;
+  does_not_reduce_price?: boolean;
+  relation_id?: number;
+}
+
+interface PromotionOption {
+  relationId: number;
+  name: string;
+  price: number;
+  doesNotReducePrice?: boolean;
 }
 
 interface Diet {
@@ -131,6 +141,11 @@ export default function ReservationDetailPage() {
   const [addons, setAddons] = useState<Map<number, Addon>>(new Map());
   const [protections, setProtections] = useState<Map<number, Protection>>(new Map());
   const [promotions, setPromotions] = useState<Map<number, Promotion>>(new Map());
+  const [promotionOptions, setPromotionOptions] = useState<PromotionOption[]>([]);
+  const [promotionDraftId, setPromotionDraftId] = useState<number | null>(null);
+  const [pendingPromotionId, setPendingPromotionId] = useState<number | null>(null);
+  const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [savingPromotion, setSavingPromotion] = useState(false);
   const [diets, setDiets] = useState<Map<number, Diet>>(new Map());
   const [transportCities, setTransportCities] = useState<Array<{ city: string; departure_price: number | null; return_price: number | null }>>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -161,6 +176,10 @@ export default function ReservationDetailPage() {
           `/api/reservations/by-number/${reservationNumber}`
         );
         setReservation(reservationData);
+        const currentPromotionId = reservationData.selected_promotion
+          ? parseInt(String(reservationData.selected_promotion), 10)
+          : null;
+        setPromotionDraftId(Number.isNaN(currentPromotionId || undefined) ? null : currentPromotionId);
 
         // Fetch addons details
         if (reservationData.selected_addons && reservationData.selected_addons.length > 0) {
@@ -208,51 +227,39 @@ export default function ReservationDetailPage() {
           setProtections(protectionsMap);
         }
 
-        // Fetch promotion details
-        // NOTE: selected_promotion is a relation_id (from center_promotion_general_promotions table), not general_promotion_id
-        if (reservationData.selected_promotion) {
+        // Fetch promotion options for this turnus (always, niezależnie od wyboru)
+        if (reservationData.camp_id && reservationData.property_id) {
           try {
-            const relationId = typeof reservationData.selected_promotion === 'number' 
-              ? reservationData.selected_promotion 
-              : parseInt(String(reservationData.selected_promotion));
-            if (!isNaN(relationId) && reservationData.camp_id && reservationData.property_id) {
-              // Get turnus promotions to find the relation
-              try {
-                const turnusPromotions = await authenticatedApiCall<any[]>(
-                  `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/promotions`
-                );
-                // Find promotion by relation_id (this is what's stored in selected_promotion)
-                const foundPromotion = turnusPromotions.find(
-                  (p: any) => p.relation_id === relationId || p.id === relationId
-                );
-                if (foundPromotion && foundPromotion.general_promotion_id) {
-                  // Now fetch the general promotion details
-                  try {
-                    const generalPromotion = await authenticatedApiCall<Promotion>(
-                      `/api/general-promotions/${foundPromotion.general_promotion_id}`
-                    );
-                    setPromotions(new Map([[relationId, {
-                      ...generalPromotion,
-                      price: foundPromotion.price || generalPromotion.price, // Use turnus-specific price
-                    }]]));
-                  } catch (generalPromoError) {
-                    // If general promotion not found, use data from turnus promotion
-                    setPromotions(new Map([[relationId, {
-                      id: foundPromotion.general_promotion_id,
-                      name: foundPromotion.name,
-                      price: foundPromotion.price || 0,
-                      description: foundPromotion.description,
-                    }]]));
-                  }
-                } else {
-                  console.warn(`Promotion relation ${relationId} not found in turnus promotions`);
-                }
-              } catch (turnusPromoError) {
-                console.warn(`Could not fetch turnus promotions for relation ${relationId}:`, turnusPromoError);
-              }
+            const turnusPromotions = await authenticatedApiCall<any[]>(
+              `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/promotions`
+            );
+            const options: PromotionOption[] = [];
+            const map = new Map<number, Promotion>();
+            for (const p of turnusPromotions) {
+              const relationId = p.relation_id ?? p.id;
+              if (!relationId) continue;
+              const price = typeof p.price === 'number' ? p.price : 0;
+              const option: PromotionOption = {
+                relationId,
+                name: p.name || `Promocja #${relationId}`,
+                price,
+                doesNotReducePrice: !!p.does_not_reduce_price,
+              };
+              options.push(option);
+              map.set(relationId, {
+                id: relationId,
+                name: option.name,
+                price: option.price,
+                does_not_reduce_price: option.doesNotReducePrice,
+                relation_id: relationId,
+              });
             }
-          } catch (err) {
-            console.error(`Error fetching promotion ${reservationData.selected_promotion}:`, err);
+            setPromotionOptions(options);
+            if (options.length > 0) {
+              setPromotions(map);
+            }
+          } catch (turnusPromoError) {
+            console.warn(`Nie udało się pobrać promocji dla turnusu:`, turnusPromoError);
           }
         }
 
@@ -429,6 +436,67 @@ export default function ReservationDetailPage() {
   const MissingInfo = ({ field }: { field: string }) => (
     <span className="text-red-600 font-medium">⚠️ Tej informacji nie ma w systemie ({field})</span>
   );
+
+  const currentPromotionId = promotionDraftId;
+
+  const openPromotionModal = (relationId: number | null) => {
+    setPendingPromotionId(relationId);
+    setShowPromotionModal(true);
+  };
+
+  const handlePromotionSelect = (value: string) => {
+    if (value === '') {
+      openPromotionModal(null);
+      return;
+    }
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+    openPromotionModal(parsed);
+  };
+
+  const handleConfirmPromotion = async () => {
+    if (!reservation) {
+      setShowPromotionModal(false);
+      return;
+    }
+    setSavingPromotion(true);
+    try {
+      const response = await authenticatedApiCall<ReservationDetails>(
+        `/api/reservations/${reservation.id}/promotion`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            selected_promotion: pendingPromotionId,
+            promotion_justification: reservation.promotion_justification ?? null,
+          }),
+        }
+      );
+      setReservation(response);
+      const updatedPromotionId = response.selected_promotion
+        ? parseInt(String(response.selected_promotion), 10)
+        : null;
+      setPromotionDraftId(
+        updatedPromotionId !== null && !Number.isNaN(updatedPromotionId) ? updatedPromotionId : null
+      );
+      setShowPromotionModal(false);
+      setPendingPromotionId(null);
+    } catch (err) {
+      console.error('Błąd aktualizacji promocji', err);
+      setError('Nie udało się zaktualizować promocji. Spróbuj ponownie.');
+    } finally {
+      setSavingPromotion(false);
+    }
+  };
+
+  const handleCancelPromotion = () => {
+    setPendingPromotionId(null);
+    setShowPromotionModal(false);
+  };
 
   // Oblicz kwotę transportu (dokładnie jak w TransportSection.tsx - krok 3)
   // Logika: bierze wyższą kwotę z departure_price i return_price
@@ -762,35 +830,59 @@ export default function ReservationDetailPage() {
             )}
 
             {/* Promocje */}
-            {reservation.selected_promotion && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900 mb-3">Promocje</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Promocja:</label>
-                    {(() => {
-                      const promotionId = typeof reservation.selected_promotion === 'number' 
-                        ? reservation.selected_promotion 
-                        : parseInt(String(reservation.selected_promotion));
-                      const promotion = promotions.get(promotionId);
-                      if (promotion) {
-                        return (
-                          <>
-                            <p className="text-sm text-gray-900">{promotion.name}</p>
-                            <p className="text-sm text-gray-600 mt-1">
-                              Cena: {formatCurrency(promotion.price)}
-                            </p>
-                          </>
-                        );
-                      } else {
-                        return (
-                          <p className="text-sm text-gray-900">
-                            <MissingInfo field={`promocja ID: ${reservation.selected_promotion}`} />
-                          </p>
-                        );
-                      }
-                    })()}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <h2 className="text-base font-semibold text-gray-900 mb-3">Promocje</h2>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="text-sm font-medium text-gray-700">Promocja:</label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      value={currentPromotionId ?? ''}
+                      onChange={(e) => handlePromotionSelect(e.target.value)}
+                    >
+                      <option value="">Brak promocji</option>
+                      {promotionOptions.map((option) => (
+                        <option key={option.relationId} value={option.relationId}>
+                          {option.name} — {formatCurrency(option.price)}
+                          {option.doesNotReducePrice ? ' (nie obniża ceny)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {currentPromotionId !== null && (
+                      <button
+                        type="button"
+                        onClick={() => openPromotionModal(null)}
+                        className="p-2 rounded-md border border-gray-300 hover:bg-gray-100 transition-colors"
+                        aria-label="Usuń promocję"
+                      >
+                        <X className="h-4 w-4 text-gray-700" />
+                      </button>
+                    )}
                   </div>
+                </div>
+
+                {currentPromotionId !== null && (() => {
+                  const promotion = promotions.get(currentPromotionId);
+                  if (promotion) {
+                    return (
+                      <div>
+                        <p className="text-sm text-gray-900">{promotion.name}</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Cena: {formatCurrency(promotion.price)}
+                          {promotion.does_not_reduce_price ? ' (promocja informacyjna – nie obniża ceny)' : ''}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <p className="text-sm text-gray-900">
+                      <MissingInfo field={`promocja ID: ${reservation.selected_promotion}`} />
+                    </p>
+                  );
+                })()}
+
+                {currentPromotionId !== null && (
                   <div>
                     <label className="text-sm font-medium text-gray-700">Uzasadnienie:</label>
                     {(() => {
@@ -882,9 +974,9 @@ export default function ReservationDetailPage() {
                       );
                     })()}
                   </div>
-                </div>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Transport */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -1404,6 +1496,36 @@ export default function ReservationDetailPage() {
                 </div>
               </div>
             </div>
+
+            <UniversalModal
+              isOpen={showPromotionModal}
+              onClose={handleCancelPromotion}
+              title="Potwierdź zmianę promocji"
+              maxWidth="md"
+            >
+              <div className="space-y-4">
+                <p className="text-sm text-gray-700">
+                  Czy na pewno chcesz zapisać zmianę promocji? Cena rezerwacji zostanie zaktualizowana zgodnie z wybraną promocją.
+                </p>
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCancelPromotion}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
+                  >
+                    Wróć
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmPromotion}
+                    disabled={savingPromotion}
+                    className="px-4 py-2 bg-[#03adf0] text-white rounded hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingPromotion ? 'Zapisywanie...' : 'Zapisz'}
+                  </button>
+                </div>
+              </div>
+            </UniversalModal>
 
             {/* Modal usuwania rezerwacji */}
             {showDeleteModal && (
