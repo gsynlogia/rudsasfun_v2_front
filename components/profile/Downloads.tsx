@@ -46,7 +46,7 @@ export default function Downloads() {
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 1000);
         // Fetch contract files; systemowe zamieniamy na link HTML, user-uploads zostawiamy do pobrania
         const allContractsList: Document[] = [];
-        
+
         for (const reservation of reservations) {
           try {
             // Get ALL contract files for this reservation (both system-generated and user-uploaded)
