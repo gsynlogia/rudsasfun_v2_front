@@ -9,9 +9,14 @@ import { useEffect } from 'react';
 export default function EditReservationRedirect() {
   const params = useParams();
   const router = useRouter();
-  const reservationNumber = params.id as string;
+  const reservationNumber = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
 
   useEffect(() => {
+    if (!reservationNumber) return;
     router.replace(`/admin-panel/rezerwacja/${reservationNumber}/edit/1/step`);
   }, [reservationNumber, router]);
 

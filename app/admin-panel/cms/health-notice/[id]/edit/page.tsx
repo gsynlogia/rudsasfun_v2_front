@@ -24,7 +24,11 @@ interface HealthNotice {
 export default function HealthNoticeEditPage() {
   const router = useRouter();
   const params = useParams();
-  const noticeId = params.id as string;
+  const noticeId = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
 
   // State for form data
   const [formData, setFormData] = useState<HealthNotice | null>(null);
@@ -38,6 +42,11 @@ export default function HealthNoticeEditPage() {
   useEffect(() => {
     const fetchNotice = async () => {
       try {
+        if (!noticeId) {
+          setError('Nieprawidłowe parametry URL');
+          setIsLoading(false);
+          return;
+        }
         setIsLoading(true);
         setError(null);
         const data = await authenticatedApiCall<HealthNotice>(`/api/health-notice/${noticeId}`);

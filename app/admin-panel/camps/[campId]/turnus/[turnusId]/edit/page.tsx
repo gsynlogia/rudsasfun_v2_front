@@ -208,7 +208,7 @@ export default function CampTurnusEditPage({
 }) {
   const searchParams = useSearchParams();
   // Get fromPage param to return to correct pagination page
-  const fromPage = searchParams.get('fromPage');
+  const fromPage = searchParams?.get('fromPage');
   const router = useRouter();
   // Handle both Promise and direct params (Next.js 13+ compatibility)
   const [campId, setCampId] = useState<number | null>(null);

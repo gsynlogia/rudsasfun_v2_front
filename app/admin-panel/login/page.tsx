@@ -37,7 +37,7 @@ function LoginPageContent() {
       }
 
       // Check for error query param
-      const errorParam = searchParams.get('error');
+      const errorParam = searchParams?.get('error');
       if (errorParam === 'admin_only') {
         setError('Tylko administratorzy mogą uzyskać dostęp do panelu administracyjnego.');
       }

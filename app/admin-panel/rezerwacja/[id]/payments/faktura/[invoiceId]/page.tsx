@@ -19,8 +19,16 @@ interface ReservationDetails {
 export default function EditInvoicePage() {
   const params = useParams();
   const router = useRouter();
-  const reservationNumber = params.id as string;
-  const invoiceId = parseInt(params.invoiceId as string, 10);
+  const reservationNumber = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
+  const invoiceId = typeof params?.invoiceId === 'string'
+    ? parseInt(params.invoiceId, 10)
+    : Array.isArray(params?.invoiceId)
+      ? parseInt(params.invoiceId[0], 10)
+      : NaN;
   const { showSuccess, showError } = useToast();
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);

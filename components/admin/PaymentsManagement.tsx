@@ -1233,21 +1233,6 @@ export default function PaymentsManagement() {
     setDraggedOverIndex(null);
   };
 
-  // Close filter dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (openFilterColumn && !(event.target as Element).closest('th')) {
-        setOpenFilterColumn(null);
-      }
-    };
-    if (openFilterColumn) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [openFilterColumn]);
-
   // Get ordered visible columns
   const orderedVisibleColumns = useMemo(() => {
     return columnConfig.filter(col => col.visible);
@@ -2494,8 +2479,6 @@ export default function PaymentsManagement() {
                   const columnLabel = COLUMN_DEFINITIONS[columnKey as keyof typeof COLUMN_DEFINITIONS] || columnKey;
                   const isFilterOpen = openFilterColumn === columnKey;
                   const hasFilters = hasActiveFilters(columnKey);
-                  const uniqueValues = getUniqueColumnValues(columnKey);
-                  const columnFilters = columnConfig.find(c => c.key === columnKey)?.filters || [];
 
                   return (
                     <th
@@ -2524,62 +2507,6 @@ export default function PaymentsManagement() {
                           >
                             <Filter className="w-4 h-4" />
                           </button>
-                          {isFilterOpen && (
-                            <div
-                              className="absolute right-0 top-full mt-1 bg-white border border-gray-300 shadow-lg z-50 min-w-[200px] max-w-[300px] max-h-[400px] flex flex-col"
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ borderRadius: 0 }}
-                            >
-                              {/* Filter header */}
-                              <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                                <span className="text-xs font-medium text-gray-900">Filtruj {columnLabel}</span>
-                                {hasFilters && (
-                                  <button
-                                    onClick={() => handleClearColumnFilters(columnKey)}
-                                    className="text-xs text-[#03adf0] hover:text-[#0288c7]"
-                                  >
-                                    Wyczyść
-                                  </button>
-                                )}
-                              </div>
-
-                              {/* Filter options */}
-                              <div className="overflow-y-auto flex-1 max-h-[320px]">
-                                {uniqueValues.length > 0 ? (
-                                  uniqueValues.map((value) => {
-                                    const isSelected = columnFilters.includes(value);
-                                    return (
-                                      <label
-                                        key={value}
-                                        className={`flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors ${
-                                          isSelected ? 'bg-blue-50' : ''
-                                        }`}
-                                        style={{ cursor: 'pointer' }}
-                                      >
-                                        <div className="relative flex items-center">
-                                          <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => handleFilterToggle(columnKey, value)}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0]"
-                                            style={{ borderRadius: 0, cursor: 'pointer' }}
-                                          />
-                                        </div>
-                                        <span className="text-xs text-gray-900 flex-1 truncate" title={value}>
-                                          {value}
-                                        </span>
-                                      </label>
-                                    );
-                                  })
-                                ) : (
-                                  <div className="px-3 py-4 text-xs text-gray-500 text-center">
-                                    Brak danych
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </th>
@@ -3446,6 +3373,67 @@ export default function PaymentsManagement() {
           </div>
         )}
       </div>
+
+      <UniversalModal
+        isOpen={!!openFilterColumn}
+        onClose={() => setOpenFilterColumn(null)}
+        title={`Filtruj ${openFilterColumn ? (COLUMN_DEFINITIONS[openFilterColumn as keyof typeof COLUMN_DEFINITIONS] || openFilterColumn) : ''}`}
+        maxWidth="md"
+      >
+        {openFilterColumn && (
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs sm:text-sm font-medium text-gray-900">
+                Wybierz wartości do filtrowania
+              </span>
+              {hasActiveFilters(openFilterColumn) && (
+                <button
+                  onClick={() => handleClearColumnFilters(openFilterColumn)}
+                  className="text-xs text-[#03adf0] hover:text-[#0288c7]"
+                >
+                  Wyczyść
+                </button>
+              )}
+            </div>
+            <div className="border border-gray-200" style={{ borderRadius: 0 }}>
+              <div className="max-h-[360px] overflow-y-auto">
+                {getUniqueColumnValues(openFilterColumn).length > 0 ? (
+                  getUniqueColumnValues(openFilterColumn).map((value) => {
+                    const columnFilters = columnConfig.find(c => c.key === openFilterColumn)?.filters || [];
+                    const isSelected = columnFilters.includes(value);
+                    return (
+                      <label
+                        key={value}
+                        className={`flex items-center gap-2 px-3 py-2 hover:bg-gray-50 transition-colors ${
+                          isSelected ? 'bg-blue-50' : ''
+                        }`}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div className="relative flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleFilterToggle(openFilterColumn, value)}
+                            className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0]"
+                            style={{ borderRadius: 0, cursor: 'pointer' }}
+                          />
+                        </div>
+                        <span className="text-xs sm:text-sm text-gray-900 flex-1 truncate" title={value}>
+                          {value}
+                        </span>
+                      </label>
+                    );
+                  })
+                ) : (
+                  <div className="px-3 py-6 text-xs text-gray-500 text-center">
+                    Brak danych
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </UniversalModal>
 
       {/* Payment Confirmation Modal */}
       <PaymentConfirmationModal

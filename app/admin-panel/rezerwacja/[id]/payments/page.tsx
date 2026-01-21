@@ -55,10 +55,14 @@ export default function ReservationPaymentsPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reservationNumber = params.id as string;
+  const reservationNumber = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
 
   // Get fromPage param to return to correct pagination page
-  const fromPage = searchParams.get('fromPage');
+  const fromPage = searchParams?.get('fromPage');
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);
   const [payments, setPayments] = useState<PaymentResponse[]>([]);

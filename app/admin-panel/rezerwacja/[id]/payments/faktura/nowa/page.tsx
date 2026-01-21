@@ -23,7 +23,11 @@ interface ReservationDetails {
 export default function NewInvoicePage() {
   const params = useParams();
   const router = useRouter();
-  const reservationNumber = params.id as string;
+  const reservationNumber = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
   const { showSuccess, showError } = useToast();
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);

@@ -43,6 +43,7 @@ interface ReservationDetails {
   selected_addons?: (string | number)[] | null;
   selected_protection?: (string | number)[] | null;
   selected_promotion?: string | null;
+  promotion_name?: string | null;
   promotion_justification?: any;
   departure_type?: string | null;
   departure_city?: string | null;
@@ -125,14 +126,18 @@ export default function ReservationDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // params.id contains the reservation number (e.g., REZ-2025-001)
-  const reservationNumber = params.id as string;
+  const reservationNumber = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
 
   // Get fromPage param to return to correct pagination page
-  const fromPage = searchParams.get('fromPage');
+  const fromPage = searchParams?.get('fromPage');
 
   // Get all filter params to preserve filters when returning
   const filterParams = new URLSearchParams();
-  searchParams.forEach((value, key) => {
+  searchParams?.forEach((value, key) => {
     if (key.startsWith('filter_')) {
       filterParams.set(key, value);
     }
@@ -155,6 +160,11 @@ export default function ReservationDetailPage() {
   const [cardHtmlExists, setCardHtmlExists] = useState(false);
   const [contractFiles, setContractFiles] = useState<any[]>([]);
   const [cardFiles, setCardFiles] = useState<any[]>([]);
+  const [showContractHtmlModal, setShowContractHtmlModal] = useState(false);
+  const [contractHtmlDraft, setContractHtmlDraft] = useState('');
+  const [loadingContractHtml, setLoadingContractHtml] = useState(false);
+  const [savingContractHtml, setSavingContractHtml] = useState(false);
+  const [contractHtmlError, setContractHtmlError] = useState<string | null>(null);
   const [_rejectingContract, _setRejectingContract] = useState(false);
   const [_rejectingCard, _setRejectingCard] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -728,6 +738,60 @@ export default function ReservationDetailPage() {
       setJustificationError(err?.message || 'Nie udało się zapisać uzasadnienia.');
     } finally {
       setSavingJustification(false);
+    }
+  };
+
+  const openContractHtmlPreview = async () => {
+    if (!reservation) return;
+    const previewWindow = window.open('', '_blank');
+    if (!previewWindow) {
+      alert('Nie udało się otworzyć podglądu umowy');
+      return;
+    }
+    previewWindow.document.open();
+    previewWindow.document.write('<p style="font-family: Arial, sans-serif; padding: 24px;">Ładowanie umowy...</p>');
+    previewWindow.document.close();
+    try {
+      const html = await contractService.getContractHtml(reservation.id);
+      previewWindow.document.open();
+      previewWindow.document.write(html);
+      previewWindow.document.close();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Nie udało się otworzyć podglądu umowy');
+    }
+  };
+
+  const openContractHtmlEditor = async () => {
+    if (!reservation) return;
+    setShowContractHtmlModal(true);
+    setLoadingContractHtml(true);
+    setContractHtmlError(null);
+    try {
+      const html = await contractService.getContractHtml(reservation.id);
+      setContractHtmlDraft(html);
+    } catch (err) {
+      setContractHtmlError(err instanceof Error ? err.message : 'Nie udało się wczytać treści umowy');
+    } finally {
+      setLoadingContractHtml(false);
+    }
+  };
+
+  const handleSaveContractHtml = async () => {
+    if (!reservation) return;
+    if (!contractHtmlDraft.trim()) {
+      setContractHtmlError('Treść umowy jest wymagana');
+      return;
+    }
+    try {
+      setSavingContractHtml(true);
+      setContractHtmlError(null);
+      await contractService.updateContractHtml(reservation.id, contractHtmlDraft);
+      setContractHtmlExists(true);
+      setShowContractHtmlModal(false);
+    } catch (err) {
+      setContractHtmlError(err instanceof Error ? err.message : 'Nie udało się zapisać umowy');
+    } finally {
+      setSavingContractHtml(false);
     }
   };
 
@@ -1732,6 +1796,20 @@ export default function ReservationDetailPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={openContractHtmlPreview}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200"
+                        title="Podgląd umowy (HTML)"
+                      >
+                        Podgląd HTML
+                      </button>
+                      <button
+                        onClick={openContractHtmlEditor}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200"
+                        title="Edytuj umowę (HTML)"
+                      >
+                        Edytuj umowę
+                      </button>
                       <input
                         ref={contractUploadInputRef}
                         type="file"
@@ -2113,6 +2191,54 @@ export default function ReservationDetailPage() {
                 </div>
               </div>
             )}
+
+            <UniversalModal
+              isOpen={showContractHtmlModal}
+              onClose={() => {
+                setShowContractHtmlModal(false);
+                setContractHtmlError(null);
+              }}
+              title="Edycja umowy (HTML)"
+              maxWidth="2xl"
+            >
+              <div className="p-4 space-y-3">
+                <p className="text-sm text-gray-600">
+                  Edytujesz treść umowy w formacie HTML.
+                </p>
+                {contractHtmlError && (
+                  <div className="text-sm text-red-600">{contractHtmlError}</div>
+                )}
+                {loadingContractHtml ? (
+                  <div className="text-sm text-gray-700">Ładowanie treści umowy...</div>
+                ) : (
+                  <textarea
+                    value={contractHtmlDraft}
+                    onChange={(e) => setContractHtmlDraft(e.target.value)}
+                    className="w-full h-96 p-2 border border-gray-300 rounded font-mono text-xs"
+                  />
+                )}
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowContractHtmlModal(false);
+                      setContractHtmlError(null);
+                    }}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                  >
+                    Anuluj
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveContractHtml}
+                    disabled={savingContractHtml || loadingContractHtml}
+                    className="px-4 py-2 bg-[#03adf0] text-white rounded hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingContractHtml ? 'Zapisywanie...' : 'Zapisz'}
+                  </button>
+                </div>
+              </div>
+            </UniversalModal>
 
             {/* Modal edycji uzasadnienia promocji */}
             {showJustificationModal && reservation && (

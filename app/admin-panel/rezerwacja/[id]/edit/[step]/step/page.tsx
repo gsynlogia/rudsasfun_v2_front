@@ -85,8 +85,16 @@ interface FormData {
 export default function EditReservationPage() {
   const params = useParams();
   const router = useRouter();
-  const reservationNumber = params.id as string;
-  const stepParam = params.step as string;
+  const reservationNumber = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
+  const stepParam = typeof params?.step === 'string'
+    ? params.step
+    : Array.isArray(params?.step)
+      ? params.step[0]
+      : '';
   const currentStep = parseInt(stepParam, 10) || 1;
   const { showSuccess, showError: showErrorToast } = useToast();
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);

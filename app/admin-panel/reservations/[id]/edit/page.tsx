@@ -16,7 +16,11 @@ import AdminLayout from '@/components/admin/AdminLayout';
 export default function ReservationEditPage() {
   const router = useRouter();
   const params = useParams();
-  const reservationId = params.id as string;
+  const reservationId = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
 
   // State for form data
   const [formData, setFormData] = useState({

@@ -18,8 +18,16 @@ interface ReservationDetails {
 export default function EditPaymentPage() {
   const params = useParams();
   const router = useRouter();
-  const reservationNumber = params.id as string;
-  const paymentId = parseInt(params.paymentId as string, 10);
+  const reservationNumber = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
+  const paymentId = typeof params?.paymentId === 'string'
+    ? parseInt(params.paymentId, 10)
+    : Array.isArray(params?.paymentId)
+      ? parseInt(params.paymentId[0], 10)
+      : NaN;
   const { showSuccess, showError } = useToast();
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);

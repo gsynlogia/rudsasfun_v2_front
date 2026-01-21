@@ -27,7 +27,11 @@ interface Document {
 export default function DocumentEditPage() {
   const router = useRouter();
   const params = useParams();
-  const documentId = params.id as string;
+  const documentId = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
 
   // State for form data
   const [formData, setFormData] = useState({
@@ -47,6 +51,11 @@ export default function DocumentEditPage() {
   useEffect(() => {
     const fetchDocument = async () => {
       try {
+        if (!documentId) {
+          setError('Nieprawidłowe parametry URL');
+          setIsLoading(false);
+          return;
+        }
         setIsLoading(true);
         const document = await authenticatedApiCall<Document>(`/api/documents/${documentId}`);
         setFormData({

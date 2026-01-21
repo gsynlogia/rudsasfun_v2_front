@@ -56,7 +56,7 @@ export default function CampEditPage({ params }: { params: Promise<{ campId: str
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   // Get fromPage param to return to correct pagination page
-  const fromPage = searchParams.get('fromPage');
+  const fromPage = searchParams?.get('fromPage');
 
   const [camp, setCamp] = useState<Camp | null>(null);
   const [turnusy, setTurnusy] = useState<CampProperty[]>([]);

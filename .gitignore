@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files
 # .env.local should NOT be committed (contains local secrets/config)
+.env
 .env.local
 .env*.local
 !.env.example

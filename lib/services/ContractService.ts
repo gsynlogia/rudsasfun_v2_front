@@ -81,6 +81,27 @@ class ContractService {
     return await response.text();
   }
 
+  async updateContractHtml(reservationId: number, htmlContent: string): Promise<{ status: string; reservation_id: number }> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    const response = await fetch(`${this.API_URL}/${reservationId}/html`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ html_content: htmlContent }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  }
+
   /**
    * Download contract PDF
    * Generates contract if it doesn't exist, then downloads it

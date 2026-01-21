@@ -14,7 +14,11 @@ import AdminLayout from '@/components/admin/AdminLayout';
 export default function ReservationDetailsPage() {
   const router = useRouter();
   const params = useParams();
-  const reservationId = params.id as string;
+  const reservationId = typeof params?.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+      ? params.id[0]
+      : '';
 
   useEffect(() => {
     // Redirect to edit page
