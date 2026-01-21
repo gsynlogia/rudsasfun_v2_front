@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const now = new Date();
     const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
 
-    const baseDir = path.join(process.cwd(), '..', '..', 'backend', 'tests_scripts', 'gtm', datePart);
+    const baseDir = path.join(process.cwd(), 'tests_scripts', 'gtm', datePart);
     await fs.promises.mkdir(baseDir, { recursive: true });
     const filePath = path.join(baseDir, `${reservationNumber}.txt`);
 
