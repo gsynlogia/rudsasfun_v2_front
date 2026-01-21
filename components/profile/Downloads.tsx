@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
+import { API_BASE_URL } from '@/utils/api-config';
 
 interface Document {
   id: string;
@@ -44,7 +45,7 @@ export default function Downloads() {
         setError(null);
 
         // Get user's reservations to get contract_status
-        const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
+        const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 1000);
         const reservationsMap = new Map(reservations.map(r => [r.id, r]));
         
         // Store reservations for later use
@@ -114,50 +115,104 @@ export default function Downloads() {
           }
         }
 
+        // Pobierz listę kart kwalifikacyjnych (do fallbacku, gdy brak plików)
+        let userQualificationCards: Awaited<ReturnType<typeof qualificationCardService.listMyQualificationCards>> = [];
+        try {
+          userQualificationCards = await qualificationCardService.listMyQualificationCards();
+        } catch (error) {
+          console.error('Error loading user qualification cards list:', error);
+        }
+
         // Fetch ALL qualification card files for each reservation (both SYSTEM and USER)
         const allQualificationCardsList: Document[] = [];
         
         for (const reservation of reservations) {
+          const campName = reservation.camp_name || 'Brak danych';
+          const participantName = reservation.participant_first_name && reservation.participant_last_name
+            ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
+            : 'Brak danych';
+
+          let cardFiles: Awaited<ReturnType<typeof qualificationCardService.getQualificationCardFiles>> = [];
+          let cardFromGet: Awaited<ReturnType<typeof qualificationCardService.getQualificationCard>> | null = null;
+          let hasHtmlEndpoint = false;
           try {
-            // Get ALL qualification card files for this reservation (both system-generated and user-uploaded)
-            const cardFiles = await qualificationCardService.getQualificationCardFiles(reservation.id);
-            
-            cardFiles.forEach((file) => {
-              const campName = reservation.camp_name || 'Brak danych';
-              const participantName = reservation.participant_first_name && reservation.participant_last_name
-                ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
-                : 'Brak danych';
-              
-              const date = new Date(file.uploaded_at);
-              const dateStr = date.toLocaleDateString('pl-PL', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              });
-              
-              // Determine document type based on source
-              const isSystem = file.source === 'system';
-              const documentType = isSystem ? 'qualification_card' as const : 'uploaded_qualification_card' as const;
-              
-              allQualificationCardsList.push({
-                id: `${isSystem ? 'qualification-card' : 'uploaded-card'}-${file.id}`,
-                type: documentType,
-                name: isSystem 
-                  ? `Karta kwalifikacyjna wygenerowana (${dateStr}) - ${campName}`
-                  : `Karta kwalifikacyjna wgrana (${dateStr}) - ${campName}`,
-                reservationId: reservation.id,
-                reservationName: campName,
-                participantName: participantName,
-                date: dateStr,
-                amount: reservation.total_price || 0,
-                status: 'available' as const,
-                fileId: file.id,
-                source: file.source,
-              });
-            });
+            cardFiles = await qualificationCardService.getQualificationCardFiles(reservation.id);
           } catch (error) {
-            // Ignore errors for individual reservations
             console.error(`Error loading qualification card files for reservation ${reservation.id}:`, error);
+          }
+          try {
+            cardFromGet = await qualificationCardService.getQualificationCard(reservation.id);
+          } catch (error) {
+            console.error(`Error loading qualification card (single) for reservation ${reservation.id}:`, error);
+          }
+          try {
+            const { authService } = await import('@/lib/services/AuthService');
+            const token = authService.getToken();
+            if (token) {
+              const htmlResp = await fetch(`${API_BASE_URL}/api/qualification-cards/${reservation.id}/html`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                },
+              });
+              hasHtmlEndpoint = htmlResp.ok;
+            }
+          } catch (error) {
+            console.error(`Error probing qualification card HTML for reservation ${reservation.id}:`, error);
+          }
+
+          cardFiles.forEach((file) => {
+            const date = new Date(file.uploaded_at);
+            const dateStr = date.toLocaleDateString('pl-PL', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            });
+            
+            // Determine document type based on source
+            const isSystem = file.source === 'system';
+            const documentType = isSystem ? 'qualification_card' as const : 'uploaded_qualification_card' as const;
+            
+            allQualificationCardsList.push({
+              id: `${isSystem ? 'qualification-card' : 'uploaded-card'}-${file.id}`,
+              type: documentType,
+              name: isSystem 
+                ? `Karta kwalifikacyjna wygenerowana (${dateStr}) - ${campName}`
+                : `Karta kwalifikacyjna wgrana (${dateStr}) - ${campName}`,
+              reservationId: reservation.id,
+              reservationName: campName,
+              participantName: participantName,
+              date: dateStr,
+              amount: reservation.total_price || 0,
+              status: 'available' as const,
+              fileId: file.id,
+              source: file.source,
+            });
+          });
+
+          // Dodaj wpis HTML jeśli istnieje systemowa karta (wygenerowana) lub lista /my zwraca kartę
+          const hasSystemCard = cardFiles.some(f => f.source === 'system');
+          const hasCardFromList = userQualificationCards.some(c => c.reservation_id === reservation.id);
+          const hasCardSingle = !!cardFromGet;
+          const hasStatus = !!reservation.qualification_card_status;
+          if (hasSystemCard || hasCardFromList || hasCardSingle || hasStatus || hasHtmlEndpoint) {
+            const dateStr = reservation.created_at
+              ? new Date(reservation.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              : new Date().toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+            allQualificationCardsList.push({
+              id: `qualification-card-html-${reservation.id}`,
+              type: 'qualification_card',
+              name: `Karta kwalifikacyjna (HTML) - ${campName}`,
+              reservationId: reservation.id,
+              reservationName: campName,
+              participantName,
+              date: dateStr,
+              amount: reservation.total_price || 0,
+              status: 'available' as const,
+              source: 'system',
+              isHtml: true,
+            });
           }
         }
 
@@ -214,7 +269,7 @@ export default function Downloads() {
       // Systemowa umowa: otwieramy HTML w nowej karcie; dla wgranych plików (user/system) zostawiamy download
       if (document.isHtml && document.reservationId) {
         try {
-          const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
+        const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 1000);
           const reservation = reservations.find(r => r.id === document.reservationId);
           if (reservation) {
             const formatReservationNumber = (reservationId: number, createdAt: string) => {
