@@ -1,4 +1,5 @@
 import { isGtmEnabled, getGtmId } from './gtm-config';
+import { API_BASE_URL } from './api-config';
 import { loadStep1FormData, loadStep5FormData, loadReservationState } from './sessionStorage';
 import { ReservationState } from '@/types/reservationState';
 
@@ -16,14 +17,34 @@ function getProcessId(): string {
 }
 
 type ReservationEvent = Record<string, unknown>;
+type GtmPayload = {
+  event: string;
+  gtmId: string;
+  timestamp: string;
+  data: ReservationEvent;
+};
+type PersistedGtmPayload = GtmPayload & { gtmEnabled: boolean };
 
-function buildPayload(event: string, data: ReservationEvent) {
+function buildPayload(event: string, data: ReservationEvent): GtmPayload {
   return {
     event,
     gtmId: getGtmId(),
     timestamp: new Date().toISOString(),
     data,
   };
+}
+
+async function persistGtmEvent(payload: PersistedGtmPayload) {
+  try {
+    await fetch(`${API_BASE_URL}/gtm/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('GTM DB log failed', err);
+  }
 }
 
 export function pushGtmEvent(event: string, data: ReservationEvent) {
@@ -40,20 +61,26 @@ export function pushGtmEvent(event: string, data: ReservationEvent) {
 }
 
 export async function logGtmEvent(event: string, data: ReservationEvent) {
-  if (isGtmEnabled()) {
+  const gtmEnabled = isGtmEnabled();
+  const payload = buildPayload(event, data);
+  const persistedPayload: PersistedGtmPayload = { ...payload, gtmEnabled };
+
+  // Zapis w DB zawsze
+  void persistGtmEvent(persistedPayload);
+
+  if (gtmEnabled) {
     pushGtmEvent(event, data);
     return;
   }
-  // fallback: send to backend logger
-  const payload = buildPayload(event, data);
+
+  // fallback: zapis do pliku gdy GTM=false
   try {
     await fetch('/api/gtm/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(persistedPayload),
     });
   } catch (err) {
-    // silent fail in fallback logger
     // eslint-disable-next-line no-console
     console.warn('GTM log fallback failed', err);
   }
