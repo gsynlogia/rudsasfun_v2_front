@@ -44,9 +44,6 @@ export default function Downloads() {
 
         // Get user's reservations to get contract_status
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 1000);
-        // Store reservations for later use
-        const reservationsList = reservations;
-
         // Fetch contract files; systemowe zamieniamy na link HTML, user-uploads zostawiamy do pobrania
         const allContractsList: Document[] = [];
         
