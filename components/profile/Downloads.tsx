@@ -44,8 +44,6 @@ export default function Downloads() {
 
         // Get user's reservations to get contract_status
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 1000);
-        const reservationsMap = new Map(reservations.map(r => [r.id, r]));
-        
         // Store reservations for later use
         const reservationsList = reservations;
 
