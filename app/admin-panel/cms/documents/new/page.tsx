@@ -65,12 +65,12 @@ export default function DocumentNewPage() {
     if (selectedFile) {
       const allowedExtensions = ['.pdf', '.doc', '.docx'];
       const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
-      
+
       if (!allowedExtensions.includes(fileExtension)) {
         setError('Tylko pliki PDF, DOC i DOCX są dozwolone');
         return;
       }
-      
+
       setFile(selectedFile);
       setError(null);
     }
@@ -207,12 +207,3 @@ export default function DocumentNewPage() {
     </SectionGuard>
   );
 }
-
-
-
-
-
-
-
-
-

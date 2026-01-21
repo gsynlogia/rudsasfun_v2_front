@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save, Upload, X, FileText, Download } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
-import { authenticatedApiCall } from '@/utils/api-auth';
-import { manualPaymentService } from '@/lib/services/ManualPaymentService';
 import { useToast } from '@/components/ToastContainer';
+import { manualPaymentService } from '@/lib/services/ManualPaymentService';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
   id: number;
@@ -34,10 +35,10 @@ export default function NewPaymentPage() {
     const fetchReservation = async () => {
       try {
         const reservationData = await authenticatedApiCall<ReservationDetails>(
-          `/api/reservations/by-number/${reservationNumber}`
+          `/api/reservations/by-number/${reservationNumber}`,
         );
         setReservation(reservationData);
-        
+
         // Set default payment date to today
         const today = new Date().toISOString().split('T')[0];
         setPaymentDate(today);
@@ -55,9 +56,9 @@ export default function NewPaymentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!reservation) return;
-    
+
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
       showError('Kwota musi być większa od 0');
@@ -281,4 +282,3 @@ export default function NewPaymentPage() {
     </SectionGuard>
   );
 }
-

@@ -82,7 +82,7 @@ export default function ContractRegeneratorPage() {
         setLoadingContracts(true);
         setError(null);
         const data = await authenticatedApiCall<ContractItem[]>(
-          `${API_BASE_URL}/api/contracts/regenerator/list`
+          `${API_BASE_URL}/api/contracts/regenerator/list`,
         );
         setContracts(data);
       } catch (err) {
@@ -100,17 +100,17 @@ export default function ContractRegeneratorPage() {
     try {
       setRegenerating(reservationId);
       setError(null);
-      
+
       await authenticatedApiCall(
         `${API_BASE_URL}/api/contracts/regenerator/regenerate/${reservationId}`,
         {
           method: 'POST',
-        }
+        },
       );
 
       // Refresh contracts list
       const data = await authenticatedApiCall<ContractItem[]>(
-        `${API_BASE_URL}/api/contracts/regenerator/list`
+        `${API_BASE_URL}/api/contracts/regenerator/list`,
       );
       setContracts(data);
     } catch (err) {
@@ -129,7 +129,7 @@ export default function ContractRegeneratorPage() {
     try {
       setRegeneratingAll(true);
       setError(null);
-      
+
       const result = await authenticatedApiCall<{
         total: number;
         successful: Array<{ reservation_id: number; contract_path: string }>;
@@ -138,17 +138,17 @@ export default function ContractRegeneratorPage() {
         `${API_BASE_URL}/api/contracts/regenerator/regenerate-all`,
         {
           method: 'POST',
-        }
+        },
       );
 
       alert(
-        `Zregenerowano ${result.successful.length} z ${result.total} umów.\n` +
-        (result.failed.length > 0 ? `Błędy: ${result.failed.length}` : '')
+        `Zregenerowano ${result.successful.length} z ${result.total} umów.\n${
+        result.failed.length > 0 ? `Błędy: ${result.failed.length}` : ''}`,
       );
 
       // Refresh contracts list
       const data = await authenticatedApiCall<ContractItem[]>(
-        `${API_BASE_URL}/api/contracts/regenerator/list`
+        `${API_BASE_URL}/api/contracts/regenerator/list`,
       );
       setContracts(data);
     } catch (err) {
@@ -171,7 +171,7 @@ export default function ContractRegeneratorPage() {
       // Open contract in new tab using dedicated admin endpoint with authentication
       const url = `${API_BASE_URL}/api/contracts/regenerator/view/${reservationNumber}`;
       const newWindow = window.open('', '_blank');
-      
+
       if (newWindow) {
         // Fetch HTML with authentication token
         const response = await fetch(url, {
@@ -405,4 +405,3 @@ export default function ContractRegeneratorPage() {
     </AdminLayout>
   );
 }
-

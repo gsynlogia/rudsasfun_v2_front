@@ -9,4 +9,3 @@ export interface CreatePaymentRequest {
   success_url?: string;
   error_url?: string;
 }
-

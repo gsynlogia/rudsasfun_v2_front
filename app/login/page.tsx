@@ -17,7 +17,7 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
 
   // Get redirect URL from query params
-  const redirectUrl = searchParams.get('redirect') || '/';
+  const redirectUrl = searchParams?.get('redirect') || '/';
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -26,8 +26,8 @@ function LoginContent() {
         const user = await authService.verifyToken();
         if (user) {
           // User is authenticated, redirect to intended page or home
-          const finalRedirect = redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/') 
-            ? redirectUrl 
+          const finalRedirect = redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')
+            ? redirectUrl
             : '/';
           router.replace(finalRedirect);
         } else {
@@ -69,7 +69,7 @@ function LoginContent() {
             <p className="text-sm sm:text-base text-gray-600 mb-4 text-center">
               Wprowadź swój adres email, aby otrzymać link do logowania
             </p>
-            
+
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 mb-6">
               <p className="text-xs sm:text-sm text-yellow-800">
                 <strong>Uwaga:</strong> Tylko poniższy adres e-mail będzie służył do obsługi i wglądu w rezerwacje. Loguj się zawsze tym samym adresem.
@@ -165,4 +165,3 @@ export default function LoginPage() {
 }
 
 export const dynamic = 'force-dynamic';
-

@@ -6,10 +6,10 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
-import { logGtmEvent, buildStepEventData } from '@/utils/gtm-logger';
 import { authService } from '@/lib/services/AuthService';
 import type { LayoutProps, StepNumber, ReservationCamp } from '@/types/reservation';
 import { formatDateRange } from '@/utils/api';
+import { logGtmEvent, buildStepEventData } from '@/utils/gtm-logger';
 
 import Footer from './Footer';
 import HeaderSecondary from './HeaderSecondary';
@@ -34,6 +34,7 @@ export default function LayoutClient({
   const TOTAL_STEPS = 5;
   const router = useRouter();
   const pathname = usePathname();
+  const safePathname = pathname || '';
   const { updateReservationCamp, setBasePrice, reservation, setCurrentStep } = useReservation();
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
@@ -77,7 +78,7 @@ useEffect(() => {
   if (lastLoggedStepRef.current === currentStep) return;
   logStepEvent();
   lastLoggedStepRef.current = currentStep;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
 }, [currentStep, isAdmin, reservation]);
 
   // Common validation function for current step
@@ -142,7 +143,7 @@ useEffect(() => {
     }
 
     // Extract campId and editionId from current path
-    const pathParts = pathname.split('/').filter(Boolean);
+    const pathParts = safePathname.split('/').filter(Boolean);
     const campIdIndex = pathParts.indexOf('camps');
     if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
       const campId = pathParts[campIdIndex + 1];
@@ -397,4 +398,3 @@ const getStepLabel = (stepNumber: StepNumber): string => {
   };
   return labels[stepNumber];
 };
-

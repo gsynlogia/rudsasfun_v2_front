@@ -29,6 +29,7 @@ interface Diet {
 export default function DietSection() {
   const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
+  const safePathname = pathname || '';
   const params = useParams();
 
   const [selectedDietId, setSelectedDietId] = useState<number | null>(null);
@@ -57,10 +58,10 @@ export default function DietSection() {
 
   // Also load when pathname changes to Step1 (handles case when component doesn't remount)
   useEffect(() => {
-    if (pathname && pathname.includes('/step/1')) {
+    if (safePathname && safePathname.includes('/step/1')) {
       loadDietFromStorage();
     }
-  }, [pathname, loadDietFromStorage]);
+  }, [safePathname, loadDietFromStorage]);
 
   // Fetch diets from API
   // Logic: If camp has center diets, use them; otherwise use general diets
@@ -75,7 +76,7 @@ export default function DietSection() {
         const propertyId = editionId ? parseInt(editionId, 10) : undefined;
 
         // Extract campId from pathname
-        const pathParts = pathname.split('/').filter(Boolean);
+        const pathParts = safePathname.split('/').filter(Boolean);
         const campIdIndex = pathParts.indexOf('camps');
         const campId = campIdIndex !== -1 && campIdIndex + 1 < pathParts.length
           ? parseInt(pathParts[campIdIndex + 1], 10)
@@ -281,7 +282,7 @@ export default function DietSection() {
     };
 
     fetchDiets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [params?.editionId]); // Re-fetch when property changes
 
   // Update reservation when diet changes
@@ -474,4 +475,3 @@ export default function DietSection() {
     </div>
   );
 }
-

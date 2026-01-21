@@ -118,7 +118,7 @@ export default function Downloads() {
 
         // Fetch ALL qualification card files for each reservation (both SYSTEM and USER)
         const allQualificationCardsList: Document[] = [];
-        
+
         for (const reservation of reservations) {
           const campName = reservation.camp_name || 'Brak danych';
           const participantName = reservation.participant_first_name && reservation.participant_last_name
@@ -161,15 +161,15 @@ export default function Downloads() {
               month: '2-digit',
               year: 'numeric',
             });
-            
+
             // Determine document type based on source
             const isSystem = file.source === 'system';
             const documentType = isSystem ? 'qualification_card' as const : 'uploaded_qualification_card' as const;
-            
+
             allQualificationCardsList.push({
               id: `${isSystem ? 'qualification-card' : 'uploaded-card'}-${file.id}`,
               type: documentType,
-              name: isSystem 
+              name: isSystem
                 ? `Karta kwalifikacyjna wygenerowana (${dateStr}) - ${campName}`
                 : `Karta kwalifikacyjna wgrana (${dateStr}) - ${campName}`,
               reservationId: reservation.id,
@@ -339,7 +339,7 @@ export default function Downloads() {
           console.error('Error opening qualification card HTML:', error);
         }
       }
-      
+
       // Download specific qualification card file by ID (system-generated)
       if (!document.fileId) {
         alert('Błąd: brak ID pliku do pobrania');
@@ -627,8 +627,8 @@ export default function Downloads() {
                                   </span>
                                   {document.source && (
                                     <span className={`text-xs px-2 py-0.5 rounded ${
-                                      document.source === 'system' 
-                                        ? 'bg-blue-100 text-blue-700' 
+                                      document.source === 'system'
+                                        ? 'bg-blue-100 text-blue-700'
                                         : 'bg-green-100 text-green-700'
                                     }`}>
                                       {document.source === 'system' ? 'Wygenerowana' : 'Wgrana'}
@@ -702,4 +702,3 @@ export default function Downloads() {
     </div>
   );
 }
-

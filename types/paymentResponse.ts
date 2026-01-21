@@ -16,4 +16,3 @@ export interface PaymentResponse {
   payment_date: string | null;
   webhook_received_at: string | null;
 }
-

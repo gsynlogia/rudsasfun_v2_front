@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
-import { useRouter } from 'next/navigation';
 import { Calendar, Mail, User, MapPin, Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Phone, CreditCard, FileText, Clock, AlertCircle, Download, Eye } from 'lucide-react';
-import { reservationService } from '@/lib/services/ReservationService';
-import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
+import { useRouter } from 'next/navigation';
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
+
 import { certificateService, CertificateResponse } from '@/lib/services/CertificateService';
+import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
+import { reservationService } from '@/lib/services/ReservationService';
 
 /**
  * Reservations Management Component
@@ -103,21 +104,21 @@ interface BackendReservation {
 
 // Map backend reservation to frontend format
 const mapBackendToFrontend = (backendReservation: BackendReservation, dietNamesMap: Map<number, string> = new Map()): Reservation => {
-  const firstParent = backendReservation.parents_data && backendReservation.parents_data.length > 0 
-    ? backendReservation.parents_data[0] 
+  const firstParent = backendReservation.parents_data && backendReservation.parents_data.length > 0
+    ? backendReservation.parents_data[0]
     : null;
-  
+
   const participantName = `${backendReservation.participant_first_name || ''} ${backendReservation.participant_last_name || ''}`.trim();
   const email = firstParent?.email || backendReservation.invoice_email || '';
   const campName = backendReservation.camp_name || 'Nieznany obóz';
   const tripName = backendReservation.property_name || `${backendReservation.property_period || ''} - ${backendReservation.property_city || ''}`.trim() || 'Nieznany turnus';
-  
+
   // Map status
   let status = backendReservation.status || 'pending';
   if (status === 'pending') status = 'aktywna';
   if (status === 'cancelled') status = 'anulowana';
   if (status === 'completed') status = 'zakończona';
-  
+
   // Calculate payment status
   const totalAmount = backendReservation.total_price || 0;
   const paidAmount = backendReservation.deposit_amount || 0;
@@ -127,23 +128,23 @@ const mapBackendToFrontend = (backendReservation: BackendReservation, dietNamesM
   } else if (paidAmount > 0) {
     paymentStatus = 'Częściowo opłacona';
   }
-  
+
   // Get parent name
-  const parentName = firstParent 
+  const parentName = firstParent
     ? `${firstParent.firstName} ${firstParent.lastName}`
-    : (backendReservation.invoice_type === 'private' 
+    : (backendReservation.invoice_type === 'private'
       ? `${backendReservation.invoice_first_name || ''} ${backendReservation.invoice_last_name || ''}`.trim()
       : backendReservation.invoice_company_name || 'Brak danych');
-  
+
   const parentEmail = firstParent?.email || backendReservation.invoice_email || '';
   const parentPhone = firstParent?.phoneNumber || backendReservation.invoice_phone || '';
-  
+
   // Calculate age from participant_age string
   const age = backendReservation.participant_age ? parseInt(backendReservation.participant_age) : 0;
   const currentYear = new Date().getFullYear();
   const birthYear = currentYear - age;
   const birthDate = new Date(birthYear, 0, 1).toISOString().split('T')[0];
-  
+
   return {
     id: backendReservation.id,
     reservationName: `REZ-${new Date(backendReservation.created_at).getFullYear()}-${String(backendReservation.id).padStart(3, '0')}`,
@@ -177,37 +178,37 @@ const mapBackendToFrontend = (backendReservation: BackendReservation, dietNamesM
 
 export default function ReservationsManagement() {
   const router = useRouter();
-  
+
   // State for reservations from API
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // State for expanded rows
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  
+
   // State for delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
-  
+
   // State for qualification cards
   const [qualificationCards, setQualificationCards] = useState<Map<number, QualificationCardResponse | null>>(new Map());
   const [loadingCards, setLoadingCards] = useState<Set<number>>(new Set());
-  
+
   // State for certificates
   const [certificates, setCertificates] = useState<Map<number, CertificateResponse[]>>(new Map());
   const [loadingCertificates, setLoadingCertificates] = useState<Set<number>>(new Set());
-  
+
   // State for diet names map (ID -> name)
   const [dietNamesMap, setDietNamesMap] = useState<Map<number, string>>(new Map());
-  
+
   // Store raw backend reservations to remap when dietNamesMap changes
   const [rawBackendReservations, setRawBackendReservations] = useState<any[]>([]);
 
   // Fetch qualification card for a reservation
   const fetchQualificationCard = async (reservationId: number) => {
     if (loadingCards.has(reservationId)) return;
-    
+
     try {
       setLoadingCards(prev => new Set(prev).add(reservationId));
       const card = await qualificationCardService.getQualificationCard(reservationId);
@@ -230,7 +231,7 @@ export default function ReservationsManagement() {
   // Fetch certificates for a reservation
   const fetchCertificates = async (reservationId: number) => {
     if (loadingCertificates.has(reservationId)) return;
-    
+
     try {
       setLoadingCertificates(prev => new Set(prev).add(reservationId));
       const response = await certificateService.getCertificates(reservationId);
@@ -279,7 +280,7 @@ export default function ReservationsManagement() {
         console.error('Error fetching diet names:', err);
       }
     };
-    
+
     fetchDietNames();
   }, []);
 
@@ -291,11 +292,11 @@ export default function ReservationsManagement() {
         setError(null);
         const backendReservations = await reservationService.listReservations(0, 1000);
         setRawBackendReservations(backendReservations);
-        
+
         // Map reservations with current dietNamesMap
         const mappedReservations = backendReservations.map((r) => mapBackendToFrontend(r, dietNamesMap));
         setAllReservations(mappedReservations);
-        
+
         // Fetch qualification cards and certificates for all reservations
         for (const reservation of mappedReservations) {
           fetchQualificationCard(reservation.id);
@@ -308,7 +309,7 @@ export default function ReservationsManagement() {
         setIsLoading(false);
       }
     };
-    
+
     fetchReservations();
   }, []); // Only fetch once on mount
 
@@ -319,7 +320,7 @@ export default function ReservationsManagement() {
       setAllReservations(mappedReservations);
     }
   }, [dietNamesMap, rawBackendReservations]);
-  
+
   // Toggle row expansion with animation
   const toggleRowExpansion = (reservationId: number) => {
     setExpandedRows(prev => {
@@ -332,24 +333,24 @@ export default function ReservationsManagement() {
       return newSet;
     });
   };
-  
+
   // Handle edit click - navigate to edit page
   const handleEditClick = (reservation: Reservation, e: React.MouseEvent) => {
     e.stopPropagation();
     router.push(`/admin-panel/reservations/${reservation.id}/edit`);
   };
-  
+
   // Handle delete click
   const handleDeleteClick = (reservation: Reservation, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedReservation(reservation);
     setDeleteModalOpen(true);
   };
-  
+
   // Handle certificate download
   const handleDownloadCertificate = async (certificate: CertificateResponse, e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     try {
       const blob = await certificateService.downloadCertificate(certificate.id);
       const url = window.URL.createObjectURL(blob);
@@ -374,9 +375,9 @@ export default function ReservationsManagement() {
   // Handle qualification card download
   const handleDownloadQualificationCard = async (reservation: Reservation, e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     let card = qualificationCards.get(reservation.id);
-    
+
     // If card not loaded yet, try to fetch it
     if (!card && !qualificationCards.has(reservation.id)) {
       await fetchQualificationCard(reservation.id);
@@ -384,12 +385,12 @@ export default function ReservationsManagement() {
       await new Promise(resolve => setTimeout(resolve, 100));
       card = qualificationCards.get(reservation.id);
     }
-    
+
     if (!card) {
       alert('Karta kwalifikacyjna nie została znaleziona');
       return;
     }
-    
+
     try {
       const blob = await qualificationCardService.downloadQualificationCard(card.id);
       const url = window.URL.createObjectURL(blob);
@@ -410,7 +411,7 @@ export default function ReservationsManagement() {
       alert('Nie udało się pobrać karty kwalifikacyjnej. Spróbuj ponownie.');
     }
   };
-  
+
   // Handle delete confirmation (without actual deletion)
   const handleDeleteConfirm = () => {
     // TODO: Implement actual deletion when backend is ready
@@ -428,7 +429,7 @@ export default function ReservationsManagement() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  
+
   // Multi-select state
   const [isCampSelectOpen, setIsCampSelectOpen] = useState(false);
   const [campSearchQuery, setCampSearchQuery] = useState('');
@@ -459,7 +460,7 @@ export default function ReservationsManagement() {
           r.participantName.toLowerCase().includes(query) ||
           r.email.toLowerCase().includes(query) ||
           r.campName.toLowerCase().includes(query) ||
-          r.tripName.toLowerCase().includes(query)
+          r.tripName.toLowerCase().includes(query),
       );
     }
 
@@ -596,7 +597,7 @@ export default function ReservationsManagement() {
       return availableCamps;
     }
     return availableCamps.filter(camp =>
-      camp.toLowerCase().includes(campSearchQuery.toLowerCase())
+      camp.toLowerCase().includes(campSearchQuery.toLowerCase()),
     );
   }, [availableCamps, campSearchQuery]);
 
@@ -996,10 +997,10 @@ export default function ReservationsManagement() {
                   const isExpanded = expandedRows.has(reservation.id);
                   const hasQualificationCard = qualificationCards.has(reservation.id) && qualificationCards.get(reservation.id) !== null;
                   const qualificationCard = qualificationCards.get(reservation.id);
-                  
+
                   return (
                     <Fragment key={reservation.id}>
-                      <tr 
+                      <tr
                         className={`hover:bg-gray-50 transition-all duration-200 ${
                           isExpanded ? 'bg-blue-50' : ''
                         } ${
@@ -1051,7 +1052,7 @@ export default function ReservationsManagement() {
                         <td className="px-4 py-2 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                              reservation.status
+                              reservation.status,
                             )}`}
                           >
                             {reservation.status}
@@ -1129,7 +1130,7 @@ export default function ReservationsManagement() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               {/* Parent Details */}
                               <div className="space-y-2">
                                 <h4 className="font-semibold text-sm text-gray-900 mb-2">Dane opiekuna</h4>
@@ -1151,7 +1152,7 @@ export default function ReservationsManagement() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               {/* Payment Details */}
                               {/* <div className="space-y-2">
                                 <h4 className="font-semibold text-sm text-gray-900 mb-2">Płatności</h4>
@@ -1173,7 +1174,7 @@ export default function ReservationsManagement() {
                                   </div>
                                 </div>
                               </div> */}
-                              
+
                               {/* Qualification Card */}
                               {(() => {
                                 const expandedCard = qualificationCards.get(reservation.id);
@@ -1201,7 +1202,7 @@ export default function ReservationsManagement() {
                                   </div>
                                 ) : null;
                               })()}
-                              
+
                               {/* Certificates */}
                               {(() => {
                                 const reservationCertificates = certificates.get(reservation.id) || [];
@@ -1233,7 +1234,7 @@ export default function ReservationsManagement() {
                                   </div>
                                 ) : null;
                               })()}
-                              
+
                               {/* Additional Info */}
                               <div className="space-y-2 md:col-span-2 lg:col-span-3">
                                 <h4 className="font-semibold text-sm text-gray-900 mb-2">Dodatkowe informacje</h4>
@@ -1330,9 +1331,9 @@ export default function ReservationsManagement() {
 
       {/* Delete Confirmation Modal - Professional with transparent background */}
       {deleteModalOpen && selectedReservation && (
-        <div 
+        <div
           className="fixed inset-0 flex items-center justify-center z-50 p-4 animate-fadeIn"
-          style={{ 
+          style={{
             backgroundColor: 'rgba(0, 0, 0, 0.3)',
             backdropFilter: 'blur(2px)',
           }}
@@ -1341,7 +1342,7 @@ export default function ReservationsManagement() {
             setSelectedReservation(null);
           }}
         >
-          <div 
+          <div
             className="bg-white shadow-2xl max-w-md w-full animate-scaleIn"
             style={{ borderRadius: 0 }}
             onClick={(e) => e.stopPropagation()}
@@ -1355,14 +1356,14 @@ export default function ReservationsManagement() {
                   <h2 className="text-xl font-bold text-gray-900">Potwierdź usunięcie</h2>
                 </div>
               </div>
-              
+
               <p className="text-sm text-gray-600 mb-6">
                 Czy na pewno chcesz usunąć rezerwację <strong>{selectedReservation.reservationName}</strong> dla uczestnika <strong>{selectedReservation.participantName}</strong>?
               </p>
               <p className="text-xs text-gray-500 mb-6">
                 Ta operacja jest nieodwracalna. (Uwaga: To jest tylko modal potwierdzenia - faktyczne usunięcie będzie zaimplementowane później)
               </p>
-              
+
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => {

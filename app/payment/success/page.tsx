@@ -16,14 +16,14 @@ function PaymentSuccessContent() {
   const router = useRouter();
 
   useEffect(() => {
-    const orderIdParam = searchParams.get('orderId');
-    const trIdParam = searchParams.get('tr_id');
-    const reservationIdParam = searchParams.get('reservation_id');
-    const serviceParam = searchParams.get('service'); // Addon ID or protection ID
-    const typeParam = searchParams.get('type'); // 'addon' or 'protection'
+    const orderIdParam = searchParams?.get('orderId');
+    const trIdParam = searchParams?.get('tr_id');
+    const reservationIdParam = searchParams?.get('reservation_id');
+    const serviceParam = searchParams?.get('service'); // Addon ID or protection ID
+    const typeParam = searchParams?.get('type'); // 'addon' or 'protection'
 
-    setOrderId(orderIdParam);
-    setTransactionId(trIdParam);
+    setOrderId(orderIdParam ?? null);
+    setTransactionId(trIdParam ?? null);
 
     // Clear all session storage data after successful payment
     // This is the ONLY place where we clear session storage
@@ -132,4 +132,3 @@ export default function PaymentSuccessPage() {
     </Suspense>
   );
 }
-

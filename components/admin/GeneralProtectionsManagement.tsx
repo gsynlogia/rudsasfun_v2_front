@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
 import { getApiBaseUrlRuntime, getStaticAssetUrl } from '@/utils/api-config';
 
@@ -24,7 +25,7 @@ export default function GeneralProtectionsManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProtection, setSelectedProtection] = useState<GeneralProtection | null>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Form state
   const [protectionName, setProtectionName] = useState('');
   const [protectionPrice, setProtectionPrice] = useState<number | ''>(0);
@@ -49,7 +50,7 @@ export default function GeneralProtectionsManagement() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas ładowania ochron';
       console.error('[GeneralProtectionsManagement] Error fetching protections:', err);
-      
+
       if (errorMessage.includes('404') || errorMessage.includes('Not found')) {
         setProtections([]);
         setError(null);
@@ -117,10 +118,10 @@ export default function GeneralProtectionsManagement() {
     try {
       setUploadingIcon(true);
       setError(null);
-      
+
       const formData = new FormData();
       formData.append('file', file);
-      
+
       // Use authenticatedFetch for FormData upload
       const API_BASE_URL = getApiBaseUrlRuntime();
       const response = await authenticatedFetch(`${API_BASE_URL}/api/general-protections/general-protection-icon-upload`, {
@@ -128,7 +129,7 @@ export default function GeneralProtectionsManagement() {
         body: formData,
         // authenticatedFetch will handle Authorization header and Content-Type for FormData
       });
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Sesja wygasła. Zaloguj się ponownie.');
@@ -136,7 +137,7 @@ export default function GeneralProtectionsManagement() {
         const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       setIconUploadUrl(data.url);
       setIconRelativePath(data.relative_path);
@@ -170,7 +171,7 @@ export default function GeneralProtectionsManagement() {
 
       // Upload icon file if method is upload and a new file is selected
       let finalIconRelativePath: string | null = iconRelativePath;
-      
+
       // If user selected a new file, upload it (this handles both new protections and editing existing ones)
       if (iconMethod === 'upload' && iconFile) {
         try {
@@ -189,7 +190,7 @@ export default function GeneralProtectionsManagement() {
         description: protectionDescription.trim() || null,
         is_active: true,
       };
-      
+
       // Add icon based on selected method
       if (iconMethod === 'paste' && iconSvg.trim()) {
         // User is using SVG paste method
@@ -434,7 +435,7 @@ export default function GeneralProtectionsManagement() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Ikona (opcjonalne)
                 </label>
-                
+
                 {/* Method selection */}
                 <div className="flex gap-4 mb-3">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -566,4 +567,3 @@ export default function GeneralProtectionsManagement() {
     </div>
   );
 }
-

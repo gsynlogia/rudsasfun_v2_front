@@ -110,4 +110,3 @@ export default function ToastComponent({ toast, onClose }: ToastProps) {
     </div>
   );
 }
-

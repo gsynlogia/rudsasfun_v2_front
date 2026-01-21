@@ -1,13 +1,14 @@
 'use client';
 
-import AdminLayout from '@/components/admin/AdminLayout';
 import { ArrowLeft, Check, X, Truck, UtensilsCrossed, Tag, Shield, Search, Loader2, MapPin } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+import AdminLayout from '@/components/admin/AdminLayout';
+import UniversalModal from '@/components/admin/UniversalModal';
 import { authService } from '@/lib/services/AuthService';
 import { authenticatedApiCall } from '@/utils/api-auth';
-import UniversalModal from '@/components/admin/UniversalModal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
@@ -51,7 +52,7 @@ interface TurnusAssignmentStatus {
 /**
  * Admin Panel - Globalna edycja obozów i turnusów
  * Route: /admin-panel/settings/super-functions/global-edit
- * 
+ *
  * Global view for editing all turnuses - assign transport, diets, promotions, protections
  * Only accessible for user ID 0
  */
@@ -76,28 +77,28 @@ export default function GlobalEditPage() {
   const [showDietModal, setShowDietModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [showProtectionModal, setShowProtectionModal] = useState(false);
-  
+
   // Selected turnus for assignment
   const [selectedTurnus, setSelectedTurnus] = useState<TurnusAssignmentStatus | null>(null);
-  
+
   // Available items for selection
   const [availableTransports, setAvailableTransports] = useState<any[]>([]);
   const [availableDiets, setAvailableDiets] = useState<any[]>([]);
   const [availablePromotions, setAvailablePromotions] = useState<any[]>([]);
   const [availableProtections, setAvailableProtections] = useState<any[]>([]);
-  
+
   // Loading states for modals
   const [loadingTransports, setLoadingTransports] = useState(false);
   const [loadingDiets, setLoadingDiets] = useState(false);
   const [loadingPromotions, setLoadingPromotions] = useState(false);
   const [loadingProtections, setLoadingProtections] = useState(false);
-  
+
   // Assignment loading states
   const [assigningTransport, setAssigningTransport] = useState(false);
   const [assigningDiet, setAssigningDiet] = useState(false);
   const [assigningPromotion, setAssigningPromotion] = useState(false);
   const [assigningProtection, setAssigningProtection] = useState(false);
-  
+
   // Search queries
   const [transportSearchQuery, setTransportSearchQuery] = useState('');
   const [dietSearchQuery, setDietSearchQuery] = useState('');
@@ -160,7 +161,7 @@ export default function GlobalEditPage() {
           let hasTransport = false;
           try {
             const transportResponse = await fetch(
-              `${API_BASE_URL}/api/camps/${camp.id}/properties/${property.id}/transport`
+              `${API_BASE_URL}/api/camps/${camp.id}/properties/${property.id}/transport`,
             );
             if (transportResponse.ok) {
               const transportData = await transportResponse.json();
@@ -174,7 +175,7 @@ export default function GlobalEditPage() {
           let hasDiets = false;
           try {
             const dietsResponse = await fetch(
-              `${API_BASE_URL}/api/camps/${camp.id}/properties/${property.id}/diets`
+              `${API_BASE_URL}/api/camps/${camp.id}/properties/${property.id}/diets`,
             );
             if (dietsResponse.ok) {
               const dietsData = await dietsResponse.json();
@@ -188,12 +189,12 @@ export default function GlobalEditPage() {
           let hasPromotions = false;
           try {
             const promotionsResponse = await fetch(
-              `${API_BASE_URL}/api/camps/${camp.id}/properties/${property.id}/promotions`
+              `${API_BASE_URL}/api/camps/${camp.id}/properties/${property.id}/promotions`,
             );
             if (promotionsResponse.ok) {
               const promotionsData = await promotionsResponse.json();
               // Filter out promotions that don't reduce price (bony/vouchers)
-              const priceReducingPromotions = Array.isArray(promotionsData) 
+              const priceReducingPromotions = Array.isArray(promotionsData)
                 ? promotionsData.filter((p: any) => !p.does_not_reduce_price)
                 : [];
               hasPromotions = priceReducingPromotions.length > 0;
@@ -206,7 +207,7 @@ export default function GlobalEditPage() {
           let hasProtections = false;
           try {
             const protectionsResponse = await fetch(
-              `${API_BASE_URL}/api/camps/${camp.id}/properties/${property.id}/protections`
+              `${API_BASE_URL}/api/camps/${camp.id}/properties/${property.id}/protections`,
             );
             if (protectionsResponse.ok) {
               const protectionsData = await protectionsResponse.json();
@@ -400,9 +401,9 @@ export default function GlobalEditPage() {
 
       // First, check if turnus already has a transport assigned
       const currentTransportResponse = await fetch(
-        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/transport`
+        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/transport`,
       );
-      
+
       if (currentTransportResponse.ok) {
         const currentTransport = await currentTransportResponse.json();
         if (currentTransport && currentTransport.id && currentTransport.id !== transportId) {
@@ -412,7 +413,7 @@ export default function GlobalEditPage() {
             {
               method: 'PUT',
               body: JSON.stringify({ property_id: null }),
-            }
+            },
           );
         }
       }
@@ -423,12 +424,12 @@ export default function GlobalEditPage() {
         {
           method: 'PUT',
           body: JSON.stringify({ property_id: selectedTurnus.turnusId }),
-        }
+        },
       );
 
       // Verify change in database
       const verifyResponse = await fetch(
-        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/transport`
+        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/transport`,
       );
       if (verifyResponse.ok) {
         const verifiedTransport = await verifyResponse.json();
@@ -437,10 +438,10 @@ export default function GlobalEditPage() {
       }
 
       // Update local state without reloading page
-      setAllTurnuses(prev => prev.map(t => 
-        t.turnusId === selectedTurnus.turnusId 
+      setAllTurnuses(prev => prev.map(t =>
+        t.turnusId === selectedTurnus.turnusId
           ? { ...t, hasTransport: true }
-          : t
+          : t,
       ));
 
       setShowTransportModal(false);
@@ -465,12 +466,12 @@ export default function GlobalEditPage() {
         `/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/diets/${dietId}`,
         {
           method: 'POST',
-        }
+        },
       );
 
       // Verify change in database
       const verifyResponse = await fetch(
-        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/diets`
+        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/diets`,
       );
       if (verifyResponse.ok) {
         const verifiedDiets = await verifyResponse.json();
@@ -479,10 +480,10 @@ export default function GlobalEditPage() {
       }
 
       // Update local state without reloading page
-      setAllTurnuses(prev => prev.map(t => 
-        t.turnusId === selectedTurnus.turnusId 
+      setAllTurnuses(prev => prev.map(t =>
+        t.turnusId === selectedTurnus.turnusId
           ? { ...t, hasDiets: true }
-          : t
+          : t,
       ));
 
       setShowDietModal(false);
@@ -507,34 +508,34 @@ export default function GlobalEditPage() {
         `/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/promotions/${promotionId}`,
         {
           method: 'POST',
-        }
+        },
       );
 
       // Verify change in database - check only price-reducing promotions
       const verifyResponse = await fetch(
-        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/promotions`
+        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/promotions`,
       );
       if (verifyResponse.ok) {
         const verifiedPromotions = await verifyResponse.json();
         // Filter out promotions that don't reduce price (bony/vouchers)
-        const priceReducingPromotions = Array.isArray(verifiedPromotions) 
+        const priceReducingPromotions = Array.isArray(verifiedPromotions)
           ? verifiedPromotions.filter((p: any) => !p.does_not_reduce_price)
           : [];
         const hasPromotions = priceReducingPromotions.length > 0;
         console.log(`✅ Promotion assignment verified in database for turnus ${selectedTurnus.turnusId}:`, hasPromotions);
-        
+
         // Update local state without reloading page
-        setAllTurnuses(prev => prev.map(t => 
-          t.turnusId === selectedTurnus.turnusId 
+        setAllTurnuses(prev => prev.map(t =>
+          t.turnusId === selectedTurnus.turnusId
             ? { ...t, hasPromotions }
-            : t
+            : t,
         ));
       } else {
         // If verification fails, still update state optimistically
-        setAllTurnuses(prev => prev.map(t => 
-          t.turnusId === selectedTurnus.turnusId 
+        setAllTurnuses(prev => prev.map(t =>
+          t.turnusId === selectedTurnus.turnusId
             ? { ...t, hasPromotions: true }
-            : t
+            : t,
         ));
       }
 
@@ -560,12 +561,12 @@ export default function GlobalEditPage() {
         `/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/protections/${protectionId}`,
         {
           method: 'POST',
-        }
+        },
       );
 
       // Verify change in database
       const verifyResponse = await fetch(
-        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/protections`
+        `${API_BASE_URL}/api/camps/${selectedTurnus.campId}/properties/${selectedTurnus.turnusId}/protections`,
       );
       if (verifyResponse.ok) {
         const verifiedProtections = await verifyResponse.json();
@@ -574,10 +575,10 @@ export default function GlobalEditPage() {
       }
 
       // Update local state without reloading page
-      setAllTurnuses(prev => prev.map(t => 
-        t.turnusId === selectedTurnus.turnusId 
+      setAllTurnuses(prev => prev.map(t =>
+        t.turnusId === selectedTurnus.turnusId
           ? { ...t, hasProtections: true }
-          : t
+          : t,
       ));
 
       setShowProtectionModal(false);
@@ -786,7 +787,7 @@ export default function GlobalEditPage() {
               </select>
             </div>
           </div>
-          
+
           {/* Active Filters Summary */}
           {(filterTransport !== 'all' || filterDiet !== 'all' || filterPromotion !== 'all' || filterProtection !== 'all' || filterCity !== 'all') && (
             <div className="mt-4 pt-4 border-t border-gray-200">

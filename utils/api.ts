@@ -82,4 +82,3 @@ export async function getCurrentCamp(): Promise<Camp> {
     throw error;
   }
 }
-

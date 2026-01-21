@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+
 import { API_BASE_URL } from '@/utils/api-config';
 
 interface ParentData {
@@ -121,7 +122,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
             setDiets(dietsData);
           }
         }
-        
+
         // If no diet is selected (data.diet is null), find and select default/standard diet
         if (!data.diet && dietsData.length > 0) {
           // Try to find "ogólna", "standardowa", "standard", or "general" diet
@@ -130,7 +131,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
             d.name?.toLowerCase().includes('ogolna') ||
             d.name?.toLowerCase().includes('standardowa') ||
             d.name?.toLowerCase().includes('standard') ||
-            d.name?.toLowerCase().includes('general')
+            d.name?.toLowerCase().includes('general'),
           );
           // If found, select it; otherwise use first diet
           const defaultDiet = standardDiet || dietsData[0];
@@ -147,7 +148,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
 
   // Notify parent of changes - use useRef to track previous values and only call onChange when actually changed
   const prevDataRef = useRef<any>(null);
-  
+
   useEffect(() => {
     const newData = {
       parents_data: parents,
@@ -163,7 +164,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
       additional_notes: additionalNotes,
       participant_additional_info: participantAdditionalInfo,
     };
-    
+
     // Only call onChange if data actually changed
     if (JSON.stringify(prevDataRef.current) !== JSON.stringify(newData)) {
       prevDataRef.current = newData;
@@ -581,4 +582,3 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
     </div>
   );
 }
-

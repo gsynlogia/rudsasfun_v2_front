@@ -42,7 +42,7 @@ class MagicLinkService {
     if (redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')) {
       body.redirect_url = redirectUrl;
     }
-    
+
     const response = await fetch(`${API_BASE_URL}/api/auth/magic-link/request`, {
       method: 'POST',
       headers: {
@@ -88,7 +88,7 @@ class MagicLinkService {
     if (redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')) {
       body.redirect_url = redirectUrl;
     }
-    
+
     const response = await fetch(`${API_BASE_URL}/api/auth/magic-link/register`, {
       method: 'POST',
       headers: {
@@ -107,8 +107,3 @@ class MagicLinkService {
 }
 
 export const magicLinkService = new MagicLinkService();
-
-
-
-
-

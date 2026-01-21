@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
 import ReservationMain from '@/components/profile/ReservationMain';
 import ReservationSidebar from '@/components/profile/ReservationSidebar';
+import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
 
 /**
  * Reservation Detail Page
@@ -16,7 +16,7 @@ import ReservationSidebar from '@/components/profile/ReservationSidebar';
 export default function ReservationDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const reservationNumber = params.id as string; // e.g., "REZ-2025-016"
+  const reservationNumber = params?.id ? String(params.id) : ''; // e.g., "REZ-2025-016"
 
   const [reservation, setReservation] = useState<ReservationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,16 +120,16 @@ export default function ReservationDetailPage() {
                   console.log('[ReservationDetailPage] 🔵 BEFORE STATE UPDATE:');
                   console.log('   Current reservation state:', reservation);
                   console.log('   Current reservation.selected_addons:', reservation?.selected_addons);
-                  
+
                   console.log('[ReservationDetailPage] 🟢 UPDATING STATE WITH:');
                   console.log('   updatedReservation.id:', updatedReservation.id);
                   console.log('   updatedReservation.selected_addons:', updatedReservation.selected_addons);
                   console.log('   updatedReservation.selected_addons type:', typeof updatedReservation.selected_addons);
                   console.log('   updatedReservation.selected_addons isArray:', Array.isArray(updatedReservation.selected_addons));
                   console.log('   updatedReservation.selected_addons length:', Array.isArray(updatedReservation.selected_addons) ? updatedReservation.selected_addons.length : 'not array');
-                  
+
                   setReservation(updatedReservation);
-                  
+
                   console.log('[ReservationDetailPage] ✅ STATE UPDATED');
                   console.log('   New reservation state will be:', updatedReservation);
                 }}
@@ -150,4 +150,3 @@ export default function ReservationDetailPage() {
     </div>
   );
 }
-

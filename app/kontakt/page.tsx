@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
+import { useState } from 'react';
+
 import Footer from '@/components/Footer';
+import Header from '@/components/Header';
+import { useToast } from '@/components/ToastContainer';
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { getApiBaseUrl } from '@/utils/api-config';
-import { useToast } from '@/components/ToastContainer';
 
 /**
  * Contact Form Page
@@ -22,7 +23,7 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!subject.trim() || !message.trim()) {
       showError('Proszę wypełnić wszystkie pola');
       return;
@@ -50,14 +51,14 @@ export default function ContactPage() {
       }
 
       const data = await response.json();
-      
+
       showSuccess('Dziękujemy za wiadomość! Otrzymaliśmy Twoją wiadomość i odpowiemy wkrótce.');
-      
+
       // Reset form
       setSubject('');
       setMessage('');
       setEmail('');
-      
+
       // Optionally redirect after a delay
       setTimeout(() => {
         router.push('/');
@@ -78,9 +79,9 @@ export default function ContactPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
             Formularz kontaktowy
           </h1>
-          
+
           <p className="text-sm sm:text-base text-gray-600 mb-6">
-            Jesteśmy w trakcie testów. Jeśli napotkasz jakikolwiek problem lub masz pytania, 
+            Jesteśmy w trakcie testów. Jeśli napotkasz jakikolwiek problem lub masz pytania,
             prosimy o wypełnienie poniższego formularza. Odpowiemy najszybciej jak to możliwe.
           </p>
 
@@ -152,4 +153,3 @@ export default function ContactPage() {
     </div>
   );
 }
-

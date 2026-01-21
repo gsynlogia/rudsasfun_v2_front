@@ -3,6 +3,7 @@
  * Service for managing invoices via API
  */
 import { API_BASE_URL } from '@/utils/api-config';
+
 import { authService } from './AuthService';
 
 export interface InvoiceResponse {
@@ -331,4 +332,3 @@ class InvoiceService {
 }
 
 export const invoiceService = new InvoiceService();
-

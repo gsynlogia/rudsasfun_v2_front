@@ -75,7 +75,7 @@ class ManualInvoiceService {
    */
   async getByReservation(reservationId: number): Promise<ManualInvoiceResponse[]> {
     return authenticatedApiCall<ManualInvoiceResponse[]>(
-      `/api/manual-invoices/reservation/${reservationId}`
+      `/api/manual-invoices/reservation/${reservationId}`,
     );
   }
 
@@ -84,7 +84,7 @@ class ManualInvoiceService {
    */
   async getById(invoiceId: number): Promise<ManualInvoiceResponse> {
     return authenticatedApiCall<ManualInvoiceResponse>(
-      `/api/manual-invoices/${invoiceId}`
+      `/api/manual-invoices/${invoiceId}`,
     );
   }
 
@@ -97,7 +97,7 @@ class ManualInvoiceService {
       {
         method: 'POST',
         body: JSON.stringify(invoice),
-      }
+      },
     );
   }
 
@@ -110,7 +110,7 @@ class ManualInvoiceService {
       {
         method: 'PATCH',
         body: JSON.stringify(invoice),
-      }
+      },
     );
   }
 
@@ -122,17 +122,9 @@ class ManualInvoiceService {
       `/api/manual-invoices/${invoiceId}`,
       {
         method: 'DELETE',
-      }
+      },
     );
   }
 }
 
 export const manualInvoiceService = new ManualInvoiceService();
-
-
-
-
-
-
-
-

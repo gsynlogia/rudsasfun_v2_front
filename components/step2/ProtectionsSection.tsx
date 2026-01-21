@@ -30,6 +30,7 @@ interface Protection {
 export default function ProtectionsSection() {
   const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
+  const safePathname = pathname || '';
   const [protections, setProtections] = useState<Protection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +39,7 @@ export default function ProtectionsSection() {
 
   // Extract camp_id and property_id from URL
   const getCampIds = (): { campId: number | null; propertyId: number | null } => {
-    const pathParts = pathname.split('/').filter(Boolean);
+    const pathParts = safePathname.split('/').filter(Boolean);
     const campIdIndex = pathParts.indexOf('camps');
     if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
       const campId = parseInt(pathParts[campIdIndex + 1], 10);
@@ -325,4 +326,3 @@ export default function ProtectionsSection() {
     </div>
   );
 }
-

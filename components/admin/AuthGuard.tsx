@@ -82,4 +82,3 @@ export default function AuthGuard({ children, requireAdmin = false }: AuthGuardP
 
   return <>{children}</>;
 }
-

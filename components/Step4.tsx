@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import DashedLine from './DashedLine';
+import { useState, useEffect, useRef } from 'react';
+
+
 import type { StepComponentProps } from '@/types/reservation';
-import { saveStep4FormData, loadStep4FormData, type Step4FormData } from '@/utils/sessionStorage';
 import { API_BASE_URL } from '@/utils/api-config';
+import { saveStep4FormData, loadStep4FormData, type Step4FormData } from '@/utils/sessionStorage';
+
+import DashedLine from './DashedLine';
 
 /**
  * Step4 Component - Consents and Regulations
@@ -14,7 +17,8 @@ import { API_BASE_URL } from '@/utils/api-config';
 export default function Step4({ onNext, onPrevious, disabled = false }: StepComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
-  
+  const safePathname = pathname || '';
+
   // Initialize state from sessionStorage or defaults
   const getInitialState = (): Step4FormData => {
     const savedData = loadStep4FormData();
@@ -95,12 +99,12 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
 
   // Monitor pathname changes - if user navigates to step 5 without validation, redirect back
   useEffect(() => {
-    if (pathname.includes('/step/5')) {
+    if (safePathname.includes('/step/5')) {
       if (!validateConsents()) {
         setValidationError('Wszystkie zgody są wymagane. Proszę zaznaczyć wszystkie pola przed przejściem do następnego kroku.');
         validationAttemptedRef.current = true;
         // Redirect back to step 4
-        const pathParts = pathname.split('/').filter(Boolean);
+        const pathParts = safePathname.split('/').filter(Boolean);
         const campIdIndex = pathParts.indexOf('camps');
         if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
           const campId = pathParts[campIdIndex + 1];
@@ -109,7 +113,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
         }
       }
     }
-  }, [pathname, formData, router]);
+  }, [safePathname, formData, router]);
 
   // Update selectAllConsents when individual consents change
   useEffect(() => {
@@ -194,7 +198,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
     if (docByName) {
       return docByName.file_url;
     }
-    
+
     // Then try to find by display name (case-insensitive, partial match)
     for (const [name, doc] of documents.entries()) {
       if (doc.display_name.toLowerCase().includes(documentNameOrDisplayName.toLowerCase()) ||
@@ -202,7 +206,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
         return doc.file_url;
       }
     }
-    
+
     return null;
   };
 
@@ -213,7 +217,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
     if (docByName) {
       return { name: documentNameOrDisplayName, ...docByName };
     }
-    
+
     // Then try to find by display name (case-insensitive, partial match)
     for (const [name, doc] of documents.entries()) {
       if (doc.display_name.toLowerCase().includes(documentNameOrDisplayName.toLowerCase()) ||
@@ -221,7 +225,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
         return { name, ...doc };
       }
     }
-    
+
     return null;
   };
 

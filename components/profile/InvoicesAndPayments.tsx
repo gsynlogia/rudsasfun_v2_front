@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 
 import { contractService } from '@/lib/services/ContractService';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
-import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
+import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 import { API_BASE_URL } from '@/utils/api-config';
 
 interface Document {
@@ -98,7 +98,7 @@ export default function InvoicesAndPayments() {
         // Map manual payments to Payment interface
         const paymentsList: Payment[] = allManualPayments.map((payment: ManualPaymentResponse) => {
           const reservation = reservationsMap.get(payment.reservation_id);
-          const reservationName = reservation 
+          const reservationName = reservation
             ? `REZ-${new Date(reservation.created_at).getFullYear()}-${String(reservation.id).padStart(3, '0')}`
             : undefined;
 
@@ -204,7 +204,7 @@ export default function InvoicesAndPayments() {
   const truncateDescription = (text: string | null, maxLength: number = 25): string => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
+    return `${text.substring(0, maxLength)}...`;
   };
 
   const getStatusBadge = (status: Document['status']) => {
@@ -459,4 +459,3 @@ export default function InvoicesAndPayments() {
     </div>
   );
 }
-

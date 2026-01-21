@@ -13,9 +13,9 @@ class ContractService {
    * @param reservationId Reservation ID
    * @returns Response with contract path and whether contract already existed
    */
-  async generateContract(reservationId: number): Promise<{ 
-    status: string; 
-    message: string; 
+  async generateContract(reservationId: number, forceNew: boolean = false): Promise<{
+    status: string;
+    message: string;
     contract_path: string;
     contract_already_exists?: boolean;
     redirect_to_downloads?: boolean;
@@ -23,12 +23,13 @@ class ContractService {
     // Import authService to get token
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
 
-    const response = await fetch(`${this.API_URL}/${reservationId}/generate`, {
+    const url = forceNew ? `${this.API_URL}/${reservationId}/generate?force_new=true` : `${this.API_URL}/${reservationId}/generate`;
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -53,13 +54,31 @@ class ContractService {
     // Import authService to get token
     const { authService } = require('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
 
     // Return URL with token in query (or use Authorization header in fetch)
     return `${this.API_URL}/${reservationId}`;
+  }
+
+  async getContractHtml(reservationId: number): Promise<string> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    const response = await fetch(`${this.API_URL}/${reservationId}/html`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || `HTTP error! status: ${response.status}`);
+    }
+    return await response.text();
   }
 
   /**
@@ -71,7 +90,7 @@ class ContractService {
     // Import authService to get token
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -148,7 +167,7 @@ class ContractService {
   }>> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -184,7 +203,7 @@ class ContractService {
   }> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -223,7 +242,7 @@ class ContractService {
   }>> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -257,7 +276,7 @@ class ContractService {
   ): Promise<{ status: string; message: string; contract_status: string; rejection_reason?: string | null }> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -294,7 +313,7 @@ class ContractService {
   async downloadContractFile(fileId: number): Promise<Blob> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -316,7 +335,7 @@ class ContractService {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
+
     // Get filename from Content-Disposition header or use default
     const contentDisposition = response.headers.get('Content-Disposition');
     let filename = `umowa_${fileId}.pdf`;
@@ -326,9 +345,9 @@ class ContractService {
       const patterns = [
         /filename\*?=['"]?([^'";]+)['"]?/i,
         /filename\*?=UTF-8''(.+)/i,
-        /filename=(.+)/i
+        /filename=(.+)/i,
       ];
-      
+
       for (const pattern of patterns) {
         const match = contentDisposition.match(pattern);
         if (match && match[1]) {
@@ -339,18 +358,18 @@ class ContractService {
         }
       }
     }
-    
+
     // Ensure filename ends with .pdf
     if (!filename.toLowerCase().endsWith('.pdf')) {
-      filename = filename.replace(/\.pdf_?$/i, '') + '.pdf';
+      filename = `${filename.replace(/\.pdf_?$/i, '')}.pdf`;
     }
-    
+
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
-    
+
     return blob;
   }
 
@@ -370,7 +389,7 @@ class ContractService {
   async openContractHtml(reservationId: number): Promise<void> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -389,7 +408,7 @@ class ContractService {
   async checkHtmlExists(reservationId: number): Promise<{ exists: boolean; reservation_id: number }> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -409,7 +428,27 @@ class ContractService {
 
     return await response.json();
   }
+
+  /**
+   * Ensure contract exists for reservation (generate if missing).
+   * Returns true if contract exists or was generated.
+   */
+  async ensureContract(reservationId: number): Promise<boolean> {
+    try {
+      const existing = await this.listMyContracts();
+      const has = existing.some(c => c.reservation_id === reservationId);
+      if (has) return true;
+    } catch {
+      // ignore and attempt generation
+    }
+
+    try {
+      await this.generateContract(reservationId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 export const contractService = new ContractService();
-

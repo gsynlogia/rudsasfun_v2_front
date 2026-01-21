@@ -145,7 +145,7 @@ function OnlinePaymentsToggle() {
       setLoading(true);
       const API_BASE_URL = getApiBaseUrlRuntime();
       const data = await authenticatedApiCall<{ enabled: boolean }>(
-        `${API_BASE_URL}/api/system-settings/online-payments/status`
+        `${API_BASE_URL}/api/system-settings/online-payments/status`,
       );
       setEnabled(data.enabled);
     } catch (err) {
@@ -162,13 +162,13 @@ function OnlinePaymentsToggle() {
       setError('');
       const newStatus = !enabled;
       const API_BASE_URL = getApiBaseUrlRuntime();
-      
+
       await authenticatedApiCall<{ enabled: boolean }>(
         `${API_BASE_URL}/api/system-settings/online-payments/status`,
         {
           method: 'PUT',
           body: JSON.stringify({ enabled: newStatus }),
-        }
+        },
       );
 
       setEnabled(newStatus);
@@ -196,7 +196,7 @@ function OnlinePaymentsToggle() {
             Płatności online
           </h3>
           <p className="text-sm text-gray-600">
-            {enabled 
+            {enabled
               ? 'Płatności online (Tpay) są włączone. Użytkownicy mogą płacić online w kroku 5.'
               : 'Płatności online (Tpay) są wyłączone. Użytkownicy będą mogli tylko wybrać przelew tradycyjny i przejść bez płatności.'
             }
@@ -259,7 +259,7 @@ function BankAccountSettings() {
         transfer_title_template: string | null;
         is_active: number;
       }>>(`${API_BASE_URL}/api/bank-accounts/?active_only=false`);
-      
+
       // Get first active account or first account if no active
       const activeAccount = accounts.find(a => a.is_active === 1) || accounts[0];
       if (activeAccount) {
@@ -285,7 +285,7 @@ function BankAccountSettings() {
       setSaving(true);
       setError('');
       const API_BASE_URL = getApiBaseUrlRuntime();
-      
+
       if (account) {
         // Update existing account
         await authenticatedApiCall(
@@ -293,7 +293,7 @@ function BankAccountSettings() {
           {
             method: 'PUT',
             body: JSON.stringify(formData),
-          }
+          },
         );
       } else {
         // Create new account
@@ -305,10 +305,10 @@ function BankAccountSettings() {
               ...formData,
               is_active: 1,
             }),
-          }
+          },
         );
       }
-      
+
       setIsEditing(false);
       await loadAccount();
     } catch (err: any) {

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
 import { getApiBaseUrlRuntime, getStaticAssetUrl } from '@/utils/api-config';
 
@@ -24,7 +25,7 @@ export default function GeneralDietsManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedDiet, setSelectedDiet] = useState<GeneralDiet | null>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Form state
   const [dietName, setDietName] = useState('');
   const [dietPrice, setDietPrice] = useState<number | ''>(0);
@@ -53,7 +54,7 @@ export default function GeneralDietsManagement() {
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas ładowania diet';
       console.error('[GeneralDietsManagement] Error fetching diets:', err);
       console.error('[GeneralDietsManagement] Error message:', errorMessage);
-      
+
       // If 404 or "Not found", treat as empty list (no diets yet)
       if (errorMessage.includes('404') || errorMessage.includes('Not found') || errorMessage.includes('Resource not found')) {
         setDiets([]);
@@ -124,10 +125,10 @@ export default function GeneralDietsManagement() {
     try {
       setUploadingIcon(true);
       setError(null);
-      
+
       const formData = new FormData();
       formData.append('file', file);
-      
+
       // Use authenticatedFetch for FormData upload
       const API_BASE_URL = getApiBaseUrlRuntime();
       const response = await authenticatedFetch(`${API_BASE_URL}/api/general-diets/general-diet-icon-upload`, {
@@ -135,7 +136,7 @@ export default function GeneralDietsManagement() {
         body: formData,
         // authenticatedFetch will handle Authorization header and Content-Type for FormData
       });
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Sesja wygasła. Zaloguj się ponownie.');
@@ -143,7 +144,7 @@ export default function GeneralDietsManagement() {
         const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       setIconUploadUrl(data.url);
       setIconRelativePath(data.relative_path);
@@ -172,7 +173,7 @@ export default function GeneralDietsManagement() {
 
       // Upload icon file if method is upload and a new file is selected
       let finalIconRelativePath: string | null = iconRelativePath;
-      
+
       // If user selected a new file, upload it (this handles both new diets and editing existing ones)
       if (iconMethod === 'upload' && iconFile) {
         try {
@@ -191,7 +192,7 @@ export default function GeneralDietsManagement() {
         description: dietDescription.trim() || null,
         is_active: true,
       };
-      
+
       // Add icon based on selected method
       if (iconMethod === 'paste' && iconSvg.trim()) {
         // User is using SVG paste method
@@ -307,13 +308,13 @@ export default function GeneralDietsManagement() {
               <tr key={diet.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {diet.icon_svg ? (
-                    <div 
+                    <div
                       className="w-10 h-10 flex items-center justify-center"
                       dangerouslySetInnerHTML={{ __html: diet.icon_svg }}
                     />
                   ) : diet.icon_url ? (
-                    <img 
-                      src={getStaticAssetUrl(diet.icon_url) || ''} 
+                    <img
+                      src={getStaticAssetUrl(diet.icon_url) || ''}
                       alt={diet.name}
                       className="w-10 h-10 object-contain"
                       onError={(e) => {
@@ -389,7 +390,7 @@ export default function GeneralDietsManagement() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -403,7 +404,7 @@ export default function GeneralDietsManagement() {
                   placeholder="np. wegetariańska"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cena (PLN) *
@@ -416,7 +417,7 @@ export default function GeneralDietsManagement() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Opis
@@ -428,12 +429,12 @@ export default function GeneralDietsManagement() {
                   rows={3}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Ikona (opcjonalne)
                 </label>
-                
+
                 {/* Method selection */}
                 <div className="mb-3 flex gap-4">
                   <label className="flex items-center cursor-pointer">
@@ -482,8 +483,8 @@ export default function GeneralDietsManagement() {
                       <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
                         <p className="text-xs text-gray-600 mb-1">Wybrany plik: {iconFile.name}</p>
                         {iconFile.type.startsWith('image/') && (
-                          <img 
-                            src={URL.createObjectURL(iconFile)} 
+                          <img
+                            src={URL.createObjectURL(iconFile)}
                             alt="Preview"
                             className="w-20 h-20 object-contain bg-white border border-gray-300 rounded"
                           />
@@ -493,8 +494,8 @@ export default function GeneralDietsManagement() {
                     {iconUploadUrl && (
                       <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
                         <p className="text-xs text-green-600 mb-1">Ikona została załadowana:</p>
-                        <img 
-                          src={iconUploadUrl} 
+                        <img
+                          src={iconUploadUrl}
                           alt="Uploaded icon"
                           className="w-20 h-20 object-contain bg-white border border-gray-300 rounded"
                         />
@@ -523,11 +524,11 @@ export default function GeneralDietsManagement() {
                     {iconSvg && iconSvg.trim() && (
                       <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
                         <p className="text-xs text-gray-600 mb-2">Podgląd ikony:</p>
-                        <div 
+                        <div
                           className="flex items-center justify-center w-20 h-20 bg-white border border-gray-300 rounded"
-                          style={{ 
+                          style={{
                             minWidth: '80px',
-                            minHeight: '80px'
+                            minHeight: '80px',
                           }}
                           dangerouslySetInnerHTML={{ __html: iconSvg }}
                         />
@@ -540,7 +541,7 @@ export default function GeneralDietsManagement() {
                 )}
               </div>
             </div>
-            
+
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => {
@@ -604,4 +605,3 @@ export default function GeneralDietsManagement() {
     </div>
   );
 }
-

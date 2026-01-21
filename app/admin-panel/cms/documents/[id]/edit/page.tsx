@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Save, X } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
@@ -101,7 +101,7 @@ export default function DocumentEditPage() {
           {
             method: 'POST',
             body: formDataFile,
-          }
+          },
         );
       }
 
@@ -124,12 +124,12 @@ export default function DocumentEditPage() {
     if (selectedFile) {
       const allowedExtensions = ['.pdf', '.doc', '.docx'];
       const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
-      
+
       if (!allowedExtensions.includes(fileExtension)) {
         setError('Tylko pliki PDF, DOC i DOCX są dozwolone');
         return;
       }
-      
+
       setFile(selectedFile);
       setError(null);
     }
@@ -328,4 +328,3 @@ export default function DocumentEditPage() {
     </SectionGuard>
   );
 }
-

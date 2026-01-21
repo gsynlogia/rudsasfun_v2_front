@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { API_BASE_URL } from '@/utils/api-config';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { API_BASE_URL } from '@/utils/api-config';
 
 interface EditReservationStep2Props {
   data: {
@@ -72,7 +73,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
 
   const initialSelectedAddons = normalizeSelectedAddons(data.selected_addons);
   const [selectedAddons, setSelectedAddons] = useState<string[]>(initialSelectedAddons);
-  
+
   // Update selectedAddons when data.selected_addons changes
   useEffect(() => {
     const normalized = normalizeSelectedAddons(data.selected_addons);
@@ -103,24 +104,24 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         // Fetch addons (use property_city from props instead of fetching property)
         const selectedAddonIds = normalizeSelectedAddons(data.selected_addons);
-        
+
         if (property_city) {
           // First, fetch addons available for this city
           const addonsRes = await fetch(`${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(property_city)}`);
           if (addonsRes.ok) {
             const addonsData = await addonsRes.json();
             const fetchedAddons = (addonsData.addons || []).map((a: any) => ({ id: String(a.id), name: a.name, price: a.price }));
-            
+
             // Also fetch addons that are already selected but might not be available for this city
             // This ensures we show all selected addons, even if they're not available for current city
             const addonsMap = new Map<string, Addon>();
             fetchedAddons.forEach((a: Addon) => {
               addonsMap.set(a.id, a);
             });
-            
+
             // Fetch selected addons that might not be in the city-filtered list
             for (const addonIdStr of selectedAddonIds) {
               if (!addonsMap.has(addonIdStr)) {
@@ -135,9 +136,9 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
                 }
               }
             }
-            
+
             setAddons(Array.from(addonsMap.values()));
-            
+
             // Debug: log selected addons and fetched addons
             console.log('[EditReservationStep2] Selected addons from data:', selectedAddonIds);
             console.log('[EditReservationStep2] Fetched addons IDs:', Array.from(addonsMap.keys()));
@@ -207,7 +208,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
 
   // Notify parent of changes - use useRef to track previous values and only call onChange when actually changed
   const prevDataRef = useRef<any>(null);
-  
+
   useEffect(() => {
     const newData = {
       selected_diets: data.selected_diets || [], // Keep original selected_diets from data
@@ -223,7 +224,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
       selected_source: selectedSource,
       source_inne_text: inneText,
     };
-    
+
     // Only call onChange if data actually changed
     if (JSON.stringify(prevDataRef.current) !== JSON.stringify(newData)) {
       prevDataRef.current = newData;
@@ -248,7 +249,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
               // Ensure both are strings for comparison
               const addonIdStr = String(addon.id);
               const isSelected = selectedAddons.some(id => String(id) === addonIdStr);
-              
+
               // Debug log for each addon
               if (addonIdStr === '2') {
                 console.log('[EditReservationStep2] Checking addon ID 2:', {
@@ -257,7 +258,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
                   isSelected,
                 });
               }
-              
+
               return (
                 <label key={addon.id} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -440,4 +441,3 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
     </div>
   );
 }
-

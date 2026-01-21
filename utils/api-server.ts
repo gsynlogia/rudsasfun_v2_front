@@ -267,4 +267,3 @@ export async function getCampById(campId: number): Promise<Camp> {
     throw error;
   }
 }
-

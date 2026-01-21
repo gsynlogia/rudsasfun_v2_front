@@ -1,5 +1,5 @@
-import { ReservationItem } from './reservationItem';
 import { ReservationCamp } from './reservationCamp';
+import { ReservationItem } from './reservationItem';
 
 export interface ReservationState {
   basePrice: number;

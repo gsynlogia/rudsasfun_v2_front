@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
-import { authenticatedApiCall } from '@/utils/api-auth';
-import { manualInvoiceService, ManualInvoiceResponse } from '@/lib/services/ManualInvoiceService';
-import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { useToast } from '@/components/ToastContainer';
+import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
+import { manualInvoiceService, ManualInvoiceResponse } from '@/lib/services/ManualInvoiceService';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
   id: number;
@@ -46,9 +47,9 @@ export default function EditInvoicePage() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        
+
         const reservationData = await authenticatedApiCall<ReservationDetails>(
-          `/api/reservations/by-number/${reservationNumber}`
+          `/api/reservations/by-number/${reservationNumber}`,
         );
         setReservation(reservationData);
 
@@ -70,7 +71,7 @@ export default function EditInvoicePage() {
           setNotes(manualInvoiceData.notes || '');
           setIsPaid(manualInvoiceData.is_paid);
           setIsCanceled(manualInvoiceData.is_canceled);
-        } catch (manualErr) {
+        } catch {
           // If not found as manual, try Fakturownia invoice
           try {
             const fakturowniaInvoiceData = await invoiceService.getById(invoiceId);
@@ -88,7 +89,7 @@ export default function EditInvoicePage() {
             setBuyerEmail(fakturowniaInvoiceData.buyer_email || '');
             setIsPaid(fakturowniaInvoiceData.is_paid);
             setIsCanceled(fakturowniaInvoiceData.is_canceled || false);
-          } catch (fakturowniaErr) {
+          } catch {
             throw new Error('Faktura nie została znaleziona');
           }
         }
@@ -130,13 +131,13 @@ export default function EditInvoicePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!invoice) return;
-    
+
     const totalNum = parseFloat(totalAmount);
     const netNum = parseFloat(netAmount);
     const taxNum = parseFloat(taxAmount);
-    
+
     if (isNaN(totalNum) || totalNum <= 0) {
       showError('Kwota całkowita musi być większa od 0');
       return;
@@ -487,11 +488,3 @@ export default function EditInvoicePage() {
     </SectionGuard>
   );
 }
-
-
-
-
-
-
-
-

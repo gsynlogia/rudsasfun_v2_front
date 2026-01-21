@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
+import type { ReservationItem } from '@/types/reservation';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
-import type { ReservationItem } from '@/types/reservation';
 
 interface Protection {
   id: string;  // Protection ID for compatibility
@@ -27,6 +27,7 @@ interface Protection {
 export default function ProtectionSection() {
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
   const pathname = usePathname();
+  const safePathname = pathname || '';
 
   // Initialize with data from sessionStorage if available
   const getInitialSelectedProtections = (): Set<string> => {
@@ -53,7 +54,7 @@ export default function ProtectionSection() {
 
   // Extract camp_id and property_id from URL
   const getCampIds = (): { campId: number | null; propertyId: number | null } => {
-    const pathParts = pathname.split('/').filter(Boolean);
+    const pathParts = safePathname.split('/').filter(Boolean);
     const campIdIndex = pathParts.indexOf('camps');
     if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
       const campId = parseInt(pathParts[campIdIndex + 1], 10);
@@ -204,7 +205,7 @@ export default function ProtectionSection() {
         }
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [isInitialized, reservation.items.length]);
 
   // Update reservation when protections change
@@ -425,4 +426,3 @@ export default function ProtectionSection() {
     </div>
   );
 }
-

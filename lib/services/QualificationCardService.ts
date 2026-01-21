@@ -321,7 +321,7 @@ class QualificationCardService {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
+
     // Get filename from Content-Disposition header or use default
     const contentDisposition = response.headers.get('Content-Disposition');
     let filename = `karta_kwalifikacyjna_${fileId}.pdf`;
@@ -331,9 +331,9 @@ class QualificationCardService {
       const patterns = [
         /filename\*?=['"]?([^'";]+)['"]?/i,
         /filename\*?=UTF-8''(.+)/i,
-        /filename=(.+)/i
+        /filename=(.+)/i,
       ];
-      
+
       for (const pattern of patterns) {
         const match = contentDisposition.match(pattern);
         if (match && match[1]) {
@@ -344,18 +344,18 @@ class QualificationCardService {
         }
       }
     }
-    
+
     // Ensure filename ends with .pdf
     if (!filename.toLowerCase().endsWith('.pdf')) {
-      filename = filename.replace(/\.pdf_?$/i, '') + '.pdf';
+      filename = `${filename.replace(/\.pdf_?$/i, '')}.pdf`;
     }
-    
+
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
-    
+
     return blob;
   }
 
@@ -374,7 +374,7 @@ class QualificationCardService {
     try {
       const url = `${this.API_URL}/${reservationId}/data`;
       console.log('[QualificationCardService] Fetching data from:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -390,7 +390,7 @@ class QualificationCardService {
         try {
           const errorText = await response.text();
           console.log('[QualificationCardService] Error response text:', errorText);
-          
+
           if (errorText) {
             try {
               const error = JSON.parse(errorText);
@@ -410,7 +410,7 @@ class QualificationCardService {
 
       const responseText = await response.text();
       console.log('[QualificationCardService] Response text:', responseText);
-      
+
       if (!responseText) {
         throw new Error('Empty response from server');
       }

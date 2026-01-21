@@ -12,12 +12,12 @@ function PaymentFailureContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const orderIdParam = searchParams.get('orderId');
-    const trIdParam = searchParams.get('tr_id');
-    const errorParam = searchParams.get('error');
-    setOrderId(orderIdParam);
-    setTransactionId(trIdParam);
-    setError(errorParam);
+    const orderIdParam = searchParams?.get('orderId');
+    const trIdParam = searchParams?.get('tr_id');
+    const errorParam = searchParams?.get('error');
+    setOrderId(orderIdParam ?? null);
+    setTransactionId(trIdParam ?? null);
+    setError(errorParam ?? null);
   }, [searchParams]);
 
   return (
@@ -101,4 +101,3 @@ export default function PaymentFailurePage() {
     </Suspense>
   );
 }
-

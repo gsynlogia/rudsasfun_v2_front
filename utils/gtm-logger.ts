@@ -1,7 +1,9 @@
-import { isGtmEnabled, getGtmId } from './gtm-config';
-import { API_BASE_URL } from './api-config';
-import { loadStep1FormData, loadStep5FormData, loadReservationState } from './sessionStorage';
 import { ReservationState } from '@/types/reservationState';
+
+import { API_BASE_URL } from './api-config';
+import { isGtmEnabled, getGtmId } from './gtm-config';
+import { loadStep1FormData, loadStep5FormData, loadReservationState } from './sessionStorage';
+
 
 const PROCESS_KEY = 'radsasfun_res_process_id';
 
@@ -17,12 +19,12 @@ function getProcessId(): string {
 }
 
 type ReservationEvent = Record<string, unknown>;
-type GtmPayload = {
+interface GtmPayload {
   event: string;
   gtmId: string;
   timestamp: string;
   data: ReservationEvent;
-};
+}
 type PersistedGtmPayload = GtmPayload & { gtmEnabled: boolean };
 
 function buildPayload(event: string, data: ReservationEvent): GtmPayload {
@@ -36,13 +38,13 @@ function buildPayload(event: string, data: ReservationEvent): GtmPayload {
 
 async function persistGtmEvent(payload: PersistedGtmPayload) {
   try {
-    await fetch(`${API_BASE_URL}/gtm/events`, {
+    await fetch(`${API_BASE_URL}/api/gtm/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
   } catch (err) {
-    // eslint-disable-next-line no-console
+
     console.warn('GTM DB log failed', err);
   }
 }
@@ -52,8 +54,8 @@ export function pushGtmEvent(event: string, data: ReservationEvent) {
   const payload = buildPayload(event, data);
   // Ensure stringified payload to avoid [object Object] in GTM
   if (typeof window !== 'undefined') {
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
+    (window as any).dataLayer = (window as any).dataLayer || [];
+    (window as any).dataLayer.push({
       event: payload.event,
       payload: JSON.stringify(payload),
     });
@@ -81,7 +83,7 @@ export async function logGtmEvent(event: string, data: ReservationEvent) {
       body: JSON.stringify(persistedPayload),
     });
   } catch (err) {
-    // eslint-disable-next-line no-console
+
     console.warn('GTM log fallback failed', err);
   }
 }

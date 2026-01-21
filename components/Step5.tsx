@@ -6,11 +6,9 @@ import { useState, useEffect, useRef } from 'react';
 
 import UniversalModal from '@/components/admin/UniversalModal';
 import { useReservation } from '@/context/ReservationContext';
-import { logGtmEvent, buildStepEventData } from '@/utils/gtm-logger';
 import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { reservationService, ReservationService } from '@/lib/services/ReservationService';
 import type { StepComponentProps, ReservationItem } from '@/types/reservation';
-import { getApiBaseUrlRuntime, API_BASE_URL } from '@/utils/api-config';
 import {
   defaultStep1FormData,
   defaultStep2FormData,
@@ -18,6 +16,8 @@ import {
   defaultReservationState,
   withDefaults,
 } from '@/types/stepData';
+import { getApiBaseUrlRuntime, API_BASE_URL } from '@/utils/api-config';
+import { logGtmEvent, buildStepEventData } from '@/utils/gtm-logger';
 import {
   saveStep5FormData,
   loadStep5FormData,
@@ -47,6 +47,7 @@ interface Source {
 export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabled = false }: StepComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const safePathname = pathname || '';
   const { reservation, setReservationNumber } = useReservation();
   const [sources, setSources] = useState<Source[]>([]);
 
@@ -86,7 +87,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const logCompletion = async (reservationId: number, reservationNumber: string) => {
     await logGtmEvent(
       'reservation_completed',
-      buildStepEventData(5, { ...reservation, reservationNumber }, { reservationId, reservationNumber })
+      buildStepEventData(5, { ...reservation, reservationNumber }, { reservationId, reservationNumber }),
     );
   };
 
@@ -100,7 +101,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
         if (response.ok) {
           const data = await response.json();
           setOnlinePaymentsEnabled(data.enabled);
-          
+
           // If online payments are disabled, automatically select transfer
           // If enabled, check if we have saved data with 'online', otherwise keep 'transfer'
           if (!data.enabled) {
@@ -137,7 +138,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
         setLoadingOnlinePaymentsStatus(false);
       }
     };
-    
+
     loadOnlinePaymentsStatus();
   }, []);
 
@@ -241,7 +242,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
       try {
         // Extract camp_id and property_id from URL
-        const pathParts = pathname.split('/').filter(Boolean);
+        const pathParts = safePathname.split('/').filter(Boolean);
         const campIdIndex = pathParts.indexOf('camps');
         const campId = campIdIndex !== -1 && campIdIndex + 1 < pathParts.length
           ? parseInt(pathParts[campIdIndex + 1], 10)
@@ -249,7 +250,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
         const propertyId = campIdIndex !== -1 && campIdIndex + 3 < pathParts.length
           ? parseInt(pathParts[campIdIndex + 3], 10)
           : null;
-        
+
         // First try to get diet from turnus diets
         if (campId && propertyId && !isNaN(campId) && !isNaN(propertyId)) {
           try {
@@ -299,7 +300,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     };
 
     fetchStep1Diet();
-  }, [step1Data?.selectedDietId, pathname]);
+  }, [step1Data?.selectedDietId, safePathname]);
 
   // Calculate payment amounts
   const totalPrice = reservation.totalPrice || reservationState.totalPrice || 0;
@@ -544,7 +545,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
   // Extract camp_id and property_id from URL
   const getCampIds = (): { campId: number | null; propertyId: number | null } => {
-    const pathParts = pathname.split('/').filter(Boolean);
+    const pathParts = safePathname.split('/').filter(Boolean);
     const campIdIndex = pathParts.indexOf('camps');
     if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
       const campId = parseInt(pathParts[campIdIndex + 1], 10);

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Save, Edit, MapPin, Calendar, Plus } from 'lucide-react';
+import { ArrowLeft, Save, Edit, MapPin, Calendar } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -54,7 +54,7 @@ export default function CampEditPage({ params }: { params: Promise<{ campId: str
   const searchParams = useSearchParams();
   const [campId, setCampId] = useState<number | null>(null);
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
-  
+
   // Get fromPage param to return to correct pagination page
   const fromPage = searchParams.get('fromPage');
 
@@ -362,4 +362,3 @@ export default function CampEditPage({ params }: { params: Promise<{ campId: str
     </AdminLayout>
   );
 }
-

@@ -67,7 +67,7 @@ class AuthService {
     }
 
     const data: LoginResponse = await response.json();
-    
+
     // Store token and user info
     if (typeof window !== 'undefined') {
       localStorage.setItem(this.tokenKey, data.access_token);
@@ -84,7 +84,7 @@ class AuthService {
    */
   async logout(): Promise<void> {
     const token = this.getToken();
-    
+
     // Call backend logout endpoint if token exists (optional, for logging)
     if (token) {
       try {
@@ -100,7 +100,7 @@ class AuthService {
         // Ignore errors
       }
     }
-    
+
     // Clear local storage
     if (typeof window !== 'undefined') {
       localStorage.removeItem(this.tokenKey);
@@ -192,7 +192,7 @@ class AuthService {
       }
 
       const user: User = await response.json();
-      
+
       // Update stored user info
       if (typeof window !== 'undefined') {
         localStorage.setItem(this.userKey, JSON.stringify(user));
@@ -208,5 +208,3 @@ class AuthService {
 
 // Export singleton instance
 export const authService = AuthService.getInstance();
-
-

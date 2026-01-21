@@ -132,12 +132,3 @@ export default function HealthNoticeNewPage() {
     </SectionGuard>
   );
 }
-
-
-
-
-
-
-
-
-

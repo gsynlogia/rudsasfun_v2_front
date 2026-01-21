@@ -20,8 +20,8 @@ export default function CurrentReservations() {
 
   // Check for payment status in query params
   useEffect(() => {
-    const paymentStatus = searchParams.get('payment');
-    const reservationId = searchParams.get('reservation_id');
+    const paymentStatus = searchParams?.get('payment');
+    const reservationId = searchParams?.get('reservation_id');
 
     if (paymentStatus === 'success') {
       showSuccess('Płatność została pomyślnie zarezerwowana. Twoja rezerwacja jest teraz aktywna.', 8000);
@@ -39,6 +39,7 @@ export default function CurrentReservations() {
   const [reservations, setReservations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contractsEnsured, setContractsEnsured] = useState(false);
 
   // Load user's reservations from API
   useEffect(() => {
@@ -186,6 +187,27 @@ export default function CurrentReservations() {
     loadReservations();
   }, []);
 
+  // Auto-generate contracts for loaded reservations (one pass; force generate per rezerwacja)
+  useEffect(() => {
+    const ensureContracts = async () => {
+      if (contractsEnsured || reservations.length === 0) return;
+      const { contractService } = await import('@/lib/services/ContractService');
+      try {
+        for (const res of reservations) {
+          try {
+            await contractService.generateContract(res.id);
+          } catch (e) {
+            console.warn('Auto-generation contract failed for reservation', res.id, e);
+          }
+        }
+      } finally {
+        setContractsEnsured(true);
+      }
+    };
+
+    ensureContracts();
+  }, [reservations, contractsEnsured]);
+
   return (
     <div>
       <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 mb-4 sm:mb-6">
@@ -214,4 +236,3 @@ export default function CurrentReservations() {
     </div>
   );
 }
-

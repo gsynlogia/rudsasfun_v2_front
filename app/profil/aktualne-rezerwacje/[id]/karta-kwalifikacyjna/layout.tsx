@@ -9,11 +9,3 @@ export default function QualificationCardLayout({
 }) {
   return <>{children}</>;
 }
-
-
-
-
-
-
-
-

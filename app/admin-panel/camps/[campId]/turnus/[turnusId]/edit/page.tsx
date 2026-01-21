@@ -1814,7 +1814,7 @@ export default function CampTurnusEditPage({
                   <strong>Uwaga:</strong> Wiek jest obliczany na dzień rozpoczęcia turnusu, nie na dzień obecny.
                 </p>
                 <p className="text-xs text-blue-700">
-                  Przykład: Jeśli turnus rozpoczyna się w lipcu 2026, a dziecko ma teraz 17 lat, 
+                  Przykład: Jeśli turnus rozpoczyna się w lipcu 2026, a dziecko ma teraz 17 lat,
                   to w dniu rozpoczęcia turnusu będzie miało 18 lat i może być poza zakresem wieku.
                 </p>
               </div>

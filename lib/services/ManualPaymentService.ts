@@ -3,6 +3,7 @@
  * Service for managing manual payment entries
  */
 import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
+
 import { authService } from './AuthService';
 
 export interface ManualPaymentResponse {
@@ -42,7 +43,7 @@ class ManualPaymentService {
    */
   async getByReservation(reservationId: number): Promise<ManualPaymentResponse[]> {
     return authenticatedApiCall<ManualPaymentResponse[]>(
-      `/api/manual-payments/reservation/${reservationId}`
+      `/api/manual-payments/reservation/${reservationId}`,
     );
   }
 
@@ -52,7 +53,7 @@ class ManualPaymentService {
    */
   async getAll(skip: number = 0, limit: number = 1000): Promise<ManualPaymentResponse[]> {
     return authenticatedApiCall<ManualPaymentResponse[]>(
-      `/api/manual-payments?skip=${skip}&limit=${limit}`
+      `/api/manual-payments?skip=${skip}&limit=${limit}`,
     );
   }
 
@@ -61,7 +62,7 @@ class ManualPaymentService {
    */
   async getById(paymentId: number): Promise<ManualPaymentResponse> {
     return authenticatedApiCall<ManualPaymentResponse>(
-      `/api/manual-payments/${paymentId}`
+      `/api/manual-payments/${paymentId}`,
     );
   }
 
@@ -74,7 +75,7 @@ class ManualPaymentService {
       {
         method: 'POST',
         body: JSON.stringify(payment),
-      }
+      },
     );
   }
 
@@ -87,7 +88,7 @@ class ManualPaymentService {
       {
         method: 'PATCH',
         body: JSON.stringify(payment),
-      }
+      },
     );
   }
 
@@ -99,7 +100,7 @@ class ManualPaymentService {
       `/api/manual-payments/${paymentId}`,
       {
         method: 'DELETE',
-      }
+      },
     );
   }
 
@@ -117,7 +118,7 @@ class ManualPaymentService {
       {
         method: 'POST',
         body: formData,
-      }
+      },
     );
 
     if (!response.ok) {
@@ -136,7 +137,7 @@ class ManualPaymentService {
       `/api/manual-payments/${paymentId}/attachment`,
       {
         method: 'DELETE',
-      }
+      },
     );
   }
 
@@ -146,11 +147,11 @@ class ManualPaymentService {
   getAttachmentUrl(paymentId: number): string {
     // This will be used in a link, so we need to get the token and add it as a query param
     // or use authenticatedFetch in the onClick handler
-    const token = authService.getToken();
+    const _token = authService.getToken();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { API_BASE_URL } = require('@/utils/api-config');
     return `${API_BASE_URL}/api/manual-payments/${paymentId}/attachment`;
   }
 }
 
 export const manualPaymentService = new ManualPaymentService();
-

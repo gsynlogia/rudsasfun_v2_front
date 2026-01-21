@@ -3,16 +3,15 @@
  * Service for handling reservation operations with backend API
  */
 
-import { API_BASE_URL } from '@/utils/api-config';
-
+import { authService } from '@/lib/services/AuthService';
 // Import types from sessionStorage
+import { API_BASE_URL } from '@/utils/api-config';
 import type {
   Step1FormData,
   Step2FormData,
   Step3FormData,
   Step4FormData,
 } from '@/utils/sessionStorage';
-import { authService } from '@/lib/services/AuthService';
 
 export interface CreateReservationRequest {
   camp_id: number;
@@ -177,6 +176,8 @@ export interface ReservationResponse {
   qualification_card_status?: string | null;
   qualification_card_rejection_reason?: string | null;
   payment_plan?: string | null;
+  promotion_justification?: Record<string, any> | null;
+  contract_read_at?: string | null;
 }
 
 export interface ValidationErrorDetail {
@@ -200,7 +201,7 @@ class ReservationService {
   async createReservation(data: CreateReservationRequest): Promise<ReservationResponse> {
     // Get auth token for authenticated request
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated. Please log in to create a reservation.');
     }
@@ -216,15 +217,15 @@ class ReservationService {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      
+
       // Handle validation errors
       if (response.status === 422 && error.detail) {
         let errorMessage = 'Błąd walidacji: ';
-        
+
         if (error.detail.details && Array.isArray(error.detail.details)) {
           // Format: { error: "Validation Error", details: [...] }
-          const messages = error.detail.details.map((d: ValidationErrorDetail) => 
-            `${d.field}: ${d.message}`
+          const messages = error.detail.details.map((d: ValidationErrorDetail) =>
+            `${d.field}: ${d.message}`,
           ).join(', ');
           errorMessage += messages;
         } else if (Array.isArray(error.detail)) {
@@ -240,10 +241,10 @@ class ReservationService {
         } else {
           errorMessage = JSON.stringify(error.detail);
         }
-        
+
         throw new Error(errorMessage);
       }
-      
+
       // Handle other errors
       let errorMessage = 'Request failed';
       if (typeof error.detail === 'string') {
@@ -253,7 +254,7 @@ class ReservationService {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       throw new Error(errorMessage || `HTTP error! status: ${response.status}`);
     }
 
@@ -283,7 +284,7 @@ class ReservationService {
    */
   async getReservationByNumber(reservationNumber: string): Promise<ReservationResponse> {
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -330,7 +331,7 @@ class ReservationService {
     // Import authService to get token
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -358,7 +359,7 @@ class ReservationService {
    */
   async updatePaymentPlan(reservationId: number, paymentPlan: 'full' | '2' | '3' | null): Promise<ReservationResponse> {
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated. Please log in.');
     }
@@ -391,7 +392,7 @@ class ReservationService {
    */
   async addAddonToReservation(reservationId: number, addonId: string): Promise<ReservationResponse> {
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated. Please log in.');
     }
@@ -403,7 +404,7 @@ class ReservationService {
       reservationId,
       addonId,
       requestBody,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     const response = await fetch(`${this.API_URL}/${reservationId}/addons`, {
@@ -419,7 +420,7 @@ class ReservationService {
       status: response.status,
       statusText: response.statusText,
       ok: response.ok,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     if (!response.ok) {
@@ -435,7 +436,7 @@ class ReservationService {
       selected_addons_type: typeof responseData.selected_addons,
       selected_addons_length: Array.isArray(responseData.selected_addons) ? responseData.selected_addons.length : 'not array',
       full_response: responseData,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return responseData;
@@ -449,7 +450,7 @@ class ReservationService {
    */
   async addProtectionToReservation(reservationId: number, protectionId: string): Promise<ReservationResponse> {
     const token = authService.getToken();
-    
+
     if (!token) {
       throw new Error('Not authenticated. Please log in.');
     }
@@ -491,12 +492,12 @@ class ReservationService {
     campId: number,
     propertyId: number,
     totalPrice: number,
-    depositAmount?: number
+    depositAmount?: number,
   ): CreateReservationRequest {
     // Send all parents/guardians to backend
     // All parents are saved to database, but only first parent is used for payment processing
     const allParents = step1Data.parents || [];
-    
+
     return {
       camp_id: campId,
       property_id: propertyId,
@@ -532,8 +533,8 @@ class ReservationService {
         companyData: step3Data.wantsInvoice && step3Data.invoiceType === 'company' ? step3Data.companyData : undefined,
         deliveryType: step3Data.wantsInvoice ? (step3Data.deliveryType || 'electronic') : undefined,
         differentAddress: step3Data.wantsInvoice ? (step3Data.differentAddress || false) : false,
-        deliveryAddress: step3Data.wantsInvoice && step3Data.deliveryType === 'paper' && step3Data.differentAddress 
-          ? step3Data.deliveryAddress 
+        deliveryAddress: step3Data.wantsInvoice && step3Data.deliveryType === 'paper' && step3Data.differentAddress
+          ? step3Data.deliveryAddress
           : undefined,
       },
       step4: {
@@ -546,10 +547,39 @@ class ReservationService {
       deposit_amount: depositAmount,
     };
   }
+
+  /**
+   * Add promotion justification (one-time) by reservation owner
+   */
+  async addPromotionJustification(
+    reservationId: number,
+    justification: Record<string, any>,
+  ): Promise<ReservationResponse> {
+    const token = authService.getToken();
+
+    if (!token) {
+      throw new Error('Not authenticated. Please log in.');
+    }
+
+    const response = await fetch(`${this.API_URL}/${reservationId}/promotion-justification`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ promotion_justification: justification }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
 }
 
 export const reservationService = new ReservationService();
 
 // Export class for static methods
 export { ReservationService };
-

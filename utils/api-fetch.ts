@@ -3,13 +3,13 @@
  * Functions for fetching data with fallback defaults
  */
 
-import { API_BASE_URL } from './api-config';
 import { BackendUnavailableError } from './api-auth';
+import { API_BASE_URL } from './api-config';
 
 /**
  * Fetch data from API with default fallback values
  * If the fetch fails (network error, backend unavailable), returns the default value
- * 
+ *
  * @param endpoint - API endpoint (relative or absolute URL)
  * @param defaultValue - Default value to return if fetch fails
  * @param options - Fetch options (method, headers, etc.)
@@ -18,12 +18,12 @@ import { BackendUnavailableError } from './api-auth';
 export async function fetchWithDefaults<T>(
   endpoint: string,
   defaultValue: T,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   try {
     // Build full URL
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
-    
+
     // Make fetch request
     const response = await fetch(url, {
       ...options,
@@ -57,7 +57,7 @@ export async function fetchWithDefaults<T>(
       console.warn('[fetchWithDefaults] Backend unavailable, using default value:', error);
       throw new BackendUnavailableError('Backend is unavailable');
     }
-    
+
     // Re-throw other errors
     throw error;
   }

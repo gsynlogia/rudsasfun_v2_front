@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Truck, Plus, MapPin, Copy, Search, Edit, Trash2, AlertCircle, ExternalLink } from 'lucide-react';
-import UniversalModal from './UniversalModal';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
 import type { Camp, CampProperty } from '@/types/reservation';
 import { API_BASE_URL } from '@/utils/api-config';
+
+import DeleteConfirmationModal from './DeleteConfirmationModal';
+import UniversalModal from './UniversalModal';
 
 interface TransportCity {
   id: number;
@@ -62,7 +64,7 @@ export default function TransportsManagement() {
   const [campId, setCampId] = useState<number | ''>('');
   const [departureType, setDepartureType] = useState<'collective' | 'own'>('collective');
   const [returnType, setReturnType] = useState<'collective' | 'own'>('collective');
-  
+
   // Cities state - array of {city: string, departure_price: number | '', return_price: number | ''}
   interface CityFormData {
     id: string; // Temporary ID for React keys
@@ -133,8 +135,8 @@ export default function TransportsManagement() {
 
   // Update city field
   const updateCity = (id: string, field: 'city' | 'departure_price' | 'return_price', value: string | number) => {
-    setCities(cities.map(c => 
-      c.id === id ? { ...c, [field]: value } : c
+    setCities(cities.map(c =>
+      c.id === id ? { ...c, [field]: value } : c,
     ));
   };
 
@@ -195,7 +197,7 @@ export default function TransportsManagement() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(transportData),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -240,7 +242,7 @@ export default function TransportsManagement() {
           headers: {
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -261,10 +263,10 @@ export default function TransportsManagement() {
   const handleDeleteClick = async (transport: Transport, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedTransport(transport);
-    
+
     // Check if transport is assigned to any turnus
     const usage = await checkTransportUsage(transport.id);
-    
+
     if (usage.length > 0) {
       // Transport is assigned - show usage modal
       setTransportUsage(usage);
@@ -293,7 +295,7 @@ export default function TransportsManagement() {
           headers: {
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -349,7 +351,7 @@ export default function TransportsManagement() {
             headers: {
               'Content-Type': 'application/json',
             },
-          }
+          },
         );
         if (turnusResponse.ok) {
           const turnusData = await turnusResponse.json();
@@ -366,7 +368,7 @@ export default function TransportsManagement() {
             headers: {
               'Content-Type': 'application/json',
             },
-          }
+          },
         );
 
         if (!getResponse.ok) {
@@ -393,7 +395,7 @@ export default function TransportsManagement() {
                 return_price: city.return_price,
               })) || [],
             }),
-          }
+          },
         );
 
         if (!updateResponse.ok) {
@@ -412,7 +414,7 @@ export default function TransportsManagement() {
             body: JSON.stringify({
               name: newName.trim() || null,
             }),
-          }
+          },
         );
 
         if (!updateResponse.ok) {
@@ -490,7 +492,7 @@ export default function TransportsManagement() {
             {transports.length === 0 ? 'Brak zadeklarowanych transportów' : 'Brak wyników wyszukiwania'}
           </p>
           <p className="text-xs text-gray-500">
-            {transports.length === 0 
+            {transports.length === 0
               ? 'Kliknij "Dodaj transport" aby utworzyć nowy transport.'
               : 'Spróbuj zmienić kryteria wyszukiwania.'}
           </p>
@@ -1018,4 +1020,3 @@ export default function TransportsManagement() {
     </div>
   );
 }
-

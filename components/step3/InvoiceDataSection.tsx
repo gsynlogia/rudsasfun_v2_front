@@ -373,4 +373,3 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
     </div>
   );
 }
-

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { Edit, Plus, AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface HealthNotice {
@@ -25,7 +26,7 @@ export default function HealthNoticeManagement() {
       setLoading(true);
       setError(null);
       const data = await authenticatedApiCall<{ notices: HealthNotice[]; total: number }>(
-        '/api/health-notice/'
+        '/api/health-notice/',
       );
       setNotices(data.notices || []);
     } catch (err) {
@@ -170,12 +171,3 @@ export default function HealthNoticeManagement() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

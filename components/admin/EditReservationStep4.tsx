@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+
 import { API_BASE_URL } from '@/utils/api-config';
 
 interface EditReservationStep4Props {
@@ -53,7 +54,7 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
 
   // Notify parent of changes - use useRef to track previous values and only call onChange when actually changed
   const prevDataRef = useRef<any>(null);
-  
+
   useEffect(() => {
     const newData = {
       consent1: consents.consent1,
@@ -61,7 +62,7 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
       consent3: consents.consent3,
       consent4: consents.consent4,
     };
-    
+
     // Only call onChange if data actually changed
     if (JSON.stringify(prevDataRef.current) !== JSON.stringify(newData)) {
       prevDataRef.current = newData;
@@ -86,9 +87,9 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
   };
 
   const getDocumentUrl = (documentName: string): string | null => {
-    const doc = documents.find(d => 
-      d.name === documentName || 
-      d.display_name.toLowerCase().includes(documentName.toLowerCase())
+    const doc = documents.find(d =>
+      d.name === documentName ||
+      d.display_name.toLowerCase().includes(documentName.toLowerCase()),
     );
     return doc?.file_url || null;
   };
@@ -272,4 +273,3 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
     </div>
   );
 }
-

@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, ChevronUp, ChevronDown, Columns, GripVertical, Filter, X as XIcon } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
+
 import UniversalModal from './UniversalModal';
 
 interface BackendReservation {
@@ -49,24 +51,24 @@ interface Reservation {
 }
 
 const mapBackendToFrontend = (backendReservation: BackendReservation): Reservation => {
-  const firstParent = backendReservation.parents_data && backendReservation.parents_data.length > 0 
-    ? backendReservation.parents_data[0] 
+  const firstParent = backendReservation.parents_data && backendReservation.parents_data.length > 0
+    ? backendReservation.parents_data[0]
     : null;
-  
+
   const participantName = `${backendReservation.participant_first_name || ''} ${backendReservation.participant_last_name || ''}`.trim();
   const email = firstParent?.email || backendReservation.invoice_email || '';
-  
+
   // Map status
   let status = backendReservation.status || 'pending';
   if (status === 'pending') status = 'aktywna';
   if (status === 'cancelled') status = 'anulowana';
   if (status === 'completed') status = 'zakończona';
-  
+
   // Camp location: property_period - property_city (e.g., "lato - BEAVER")
   const campLocation = backendReservation.property_period && backendReservation.property_city
     ? `${backendReservation.property_period} - ${backendReservation.property_city}`
     : backendReservation.property_name || 'Nieznana lokalizacja';
-  
+
   return {
     id: backendReservation.id,
     reservationName: `REZ-${new Date(backendReservation.created_at).getFullYear()}-${String(backendReservation.id).padStart(3, '0')}`,
@@ -88,25 +90,25 @@ const mapBackendToFrontend = (backendReservation: BackendReservation): Reservati
 export default function ReservationsTable() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // State for search, sorting, and pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  
+
   // Initialize currentPage from URL params or default to 1
-  const pageFromUrl = searchParams.get('page');
+  const pageFromUrl = searchParams?.get('page');
   const [currentPage, setCurrentPage] = useState(pageFromUrl ? parseInt(pageFromUrl, 10) : 1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [pageInputValue, setPageInputValue] = useState('');
-  
+
   // Column configuration state
   const STORAGE_KEY = 'reservations_list_columns';
-  
+
   // Column definitions with labels
   const COLUMN_DEFINITIONS = {
     reservationName: 'Numer rezerwacji',
@@ -120,11 +122,11 @@ export default function ReservationsTable() {
     totalPrice: 'Cena',
     createdAt: 'Data utworzenia',
   };
-  
+
   // Default column order and visibility
   const DEFAULT_COLUMN_ORDER = ['reservationName', 'participantName', 'email', 'campName', 'campLocation', 'tag', 'promotionName', 'status', 'totalPrice', 'createdAt'];
   const DEFAULT_COLUMNS = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true }));
-  
+
   // Column configuration: array of {key, visible, filters?}
   interface ColumnConfig {
     key: string;
@@ -136,10 +138,11 @@ export default function ReservationsTable() {
   const [tempColumnConfig, setTempColumnConfig] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
-  
+
   // Filter dropdown state: which column has filter dropdown open
   const [openFilterColumn, setOpenFilterColumn] = useState<string | null>(null);
-  
+  const [filterDropdownPosition, setFilterDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+
   // Convert column config to visibility map for easy access
   const visibleColumns = useMemo(() => {
     const map: Record<string, boolean> = {};
@@ -148,12 +151,12 @@ export default function ReservationsTable() {
     });
     return map;
   }, [columnConfig]);
-  
+
   // Get ordered visible columns for rendering
   const orderedVisibleColumns = useMemo(() => {
     return columnConfig.filter(col => col.visible);
   }, [columnConfig]);
-  
+
   // Load column configuration from localStorage on mount
   useEffect(() => {
     try {
@@ -197,7 +200,7 @@ export default function ReservationsTable() {
       console.error('Error loading column preferences:', err);
     }
   }, []);
-  
+
   // Save column configuration to localStorage
   const saveColumnPreferences = (config: ColumnConfig[]) => {
     try {
@@ -207,7 +210,7 @@ export default function ReservationsTable() {
       console.error('Error saving column preferences:', err);
     }
   };
-  
+
   // Get unique values for a column from all reservations (not just current page)
   const getUniqueColumnValues = (columnKey: string): string[] => {
     const values = new Set<string>();
@@ -251,7 +254,7 @@ export default function ReservationsTable() {
     });
     return Array.from(values).sort();
   };
-  
+
   // Handle filter toggle for a column value
   const handleFilterToggle = (columnKey: string, value: string) => {
     const updated = columnConfig.map(col => {
@@ -266,7 +269,7 @@ export default function ReservationsTable() {
     });
     setColumnConfig(updated);
     saveColumnPreferences(updated);
-    
+
     // Update URL with filters
     const filtersForUrl: Record<string, string[]> = {};
     updated.forEach(col => {
@@ -275,11 +278,11 @@ export default function ReservationsTable() {
       }
     });
     updateFiltersInUrl(filtersForUrl);
-    
+
     setCurrentPage(1);
     updatePageInUrl(1);
   };
-  
+
   // Clear all filters for a column
   const handleClearColumnFilters = (columnKey: string) => {
     const updated = columnConfig.map(col => {
@@ -290,7 +293,7 @@ export default function ReservationsTable() {
     });
     setColumnConfig(updated);
     saveColumnPreferences(updated);
-    
+
     // Update URL with filters
     const filtersForUrl: Record<string, string[]> = {};
     updated.forEach(col => {
@@ -299,11 +302,11 @@ export default function ReservationsTable() {
       }
     });
     updateFiltersInUrl(filtersForUrl);
-    
+
     setCurrentPage(1);
     updatePageInUrl(1);
   };
-  
+
   // Remove single filter value
   const handleRemoveFilter = (columnKey: string, value: string) => {
     const updated = columnConfig.map(col => {
@@ -315,7 +318,7 @@ export default function ReservationsTable() {
     });
     setColumnConfig(updated);
     saveColumnPreferences(updated);
-    
+
     // Update URL with filters
     const filtersForUrl: Record<string, string[]> = {};
     updated.forEach(col => {
@@ -324,28 +327,30 @@ export default function ReservationsTable() {
       }
     });
     updateFiltersInUrl(filtersForUrl);
-    
+
     setCurrentPage(1);
     updatePageInUrl(1);
   };
-  
+
   // Check if column has active filters
   const hasActiveFilters = (columnKey: string): boolean => {
     const col = columnConfig.find(c => c.key === columnKey);
     return col ? (col.filters?.length || 0) > 0 : false;
   };
-  
+  const activeFilterColor = '#03adf0';
+
   // Handle column modal open
   const handleOpenColumnModal = () => {
     setTempColumnConfig([...columnConfig]);
     setColumnModalOpen(true);
   };
-  
+
   // Close filter dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (openFilterColumn && !(event.target as Element).closest('th')) {
         setOpenFilterColumn(null);
+        setFilterDropdownPosition(null);
       }
     };
     if (openFilterColumn) {
@@ -355,27 +360,27 @@ export default function ReservationsTable() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [openFilterColumn]);
-  
+
   // Handle column modal close
   const handleCloseColumnModal = () => {
     setColumnModalOpen(false);
     setDraggedColumnIndex(null);
     setDraggedOverIndex(null);
   };
-  
+
   // Handle column selection change
   const handleColumnToggle = (columnKey: string) => {
-    setTempColumnConfig(prev => 
-      prev.map(col => col.key === columnKey ? { ...col, visible: !col.visible } : col)
+    setTempColumnConfig(prev =>
+      prev.map(col => col.key === columnKey ? { ...col, visible: !col.visible } : col),
     );
   };
-  
+
   // Handle save column preferences
   const handleSaveColumnPreferences = () => {
     saveColumnPreferences(tempColumnConfig);
     setColumnModalOpen(false);
   };
-  
+
   // Handle reset column preferences
   const handleResetColumnPreferences = () => {
     const reset = [...DEFAULT_COLUMNS];
@@ -383,51 +388,53 @@ export default function ReservationsTable() {
     saveColumnPreferences(reset);
     setColumnModalOpen(false);
   };
-  
+
   // Drag & Drop handlers for column reordering
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedColumnIndex(index);
     e.dataTransfer.effectAllowed = 'move';
   };
-  
+
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDraggedOverIndex(index);
   };
-  
+
   const handleDragLeave = () => {
     setDraggedOverIndex(null);
   };
-  
+
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     setDraggedOverIndex(null);
-    
+
     if (draggedColumnIndex === null || draggedColumnIndex === targetIndex) {
       setDraggedColumnIndex(null);
       return;
     }
-    
+
     // Reorder columns
     const newConfig = [...tempColumnConfig];
     const [removed] = newConfig.splice(draggedColumnIndex, 1);
     newConfig.splice(targetIndex, 0, removed);
-    
+
     setTempColumnConfig(newConfig);
     setDraggedColumnIndex(null);
   };
-  
+
   // Load filters from URL params only on mount (not on every searchParams change to avoid overwriting local changes)
   useEffect(() => {
     const filtersFromUrl: Record<string, string[]> = {};
-    searchParams.forEach((value, key) => {
-      if (key.startsWith('filter_')) {
-        const columnKey = key.replace('filter_', '');
-        filtersFromUrl[columnKey] = value.split(',').filter(v => v);
-      }
-    });
-    
+    if (searchParams) {
+      searchParams.forEach((value, key) => {
+        if (key.startsWith('filter_')) {
+          const columnKey = key.replace('filter_', '');
+          filtersFromUrl[columnKey] = value.split(',').filter(v => v);
+        }
+      });
+    }
+
     // Only update if there are filters in URL and columnConfig doesn't have them yet (initial load)
     if (Object.keys(filtersFromUrl).length > 0) {
       setColumnConfig(prev => {
@@ -448,10 +455,10 @@ export default function ReservationsTable() {
       });
     }
   }, []); // Only on mount
-  
+
   // Sync currentPage with URL params on mount and when searchParams change
   useEffect(() => {
-    const pageParam = searchParams.get('page');
+    const pageParam = searchParams?.get('page');
     if (pageParam) {
       const pageNum = parseInt(pageParam, 10);
       if (!isNaN(pageNum) && pageNum > 0) {
@@ -462,10 +469,10 @@ export default function ReservationsTable() {
       setCurrentPage(1);
     }
   }, [searchParams]);
-  
+
   // Update URL when currentPage changes
   const updatePageInUrl = (page: number) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
     if (page === 1) {
       params.delete('page');
     } else {
@@ -474,23 +481,23 @@ export default function ReservationsTable() {
     const newUrl = params.toString() ? `/admin-panel?${params.toString()}` : '/admin-panel';
     router.replace(newUrl);
   };
-  
+
   // Sync filters to URL when columnConfig changes
   const updateFiltersInUrl = (filters: Record<string, string[]>) => {
     const params = new URLSearchParams();
-    
+
     // Add filter params
     Object.entries(filters).forEach(([columnKey, values]) => {
       if (values.length > 0) {
         params.set(`filter_${columnKey}`, values.join(','));
       }
     });
-    
+
     // Update page param if needed
     if (currentPage > 1) {
       params.set('page', currentPage.toString());
     }
-    
+
     const queryString = params.toString();
     const url = `/admin-panel${queryString ? `?${queryString}` : ''}`;
     router.replace(url, { scroll: false });
@@ -504,38 +511,38 @@ export default function ReservationsTable() {
         setError(null);
         const data = await authenticatedApiCall<BackendReservation[]>('/api/reservations/');
         const mapped = data.map(mapBackendToFrontend);
-        
+
         // Fetch promotions for reservations that have selected_promotion
         const reservationsWithPromotions = await Promise.all(
           mapped.map(async (reservation) => {
             if (!reservation.selectedPromotion || !reservation.campId || !reservation.propertyId) {
               return reservation;
             }
-            
+
             try {
-              const relationId = typeof reservation.selectedPromotion === 'number' 
-                ? reservation.selectedPromotion 
+              const relationId = typeof reservation.selectedPromotion === 'number'
+                ? reservation.selectedPromotion
                 : parseInt(String(reservation.selectedPromotion));
-              
+
               if (isNaN(relationId)) {
                 return reservation;
               }
-              
+
               // Fetch turnus promotions
               const turnusPromotions = await authenticatedApiCall<any[]>(
-                `/api/camps/${reservation.campId}/properties/${reservation.propertyId}/promotions`
+                `/api/camps/${reservation.campId}/properties/${reservation.propertyId}/promotions`,
               );
-              
+
               // Find promotion by relation_id
               const foundPromotion = turnusPromotions.find(
-                (p: any) => p.relation_id === relationId || p.id === relationId
+                (p: any) => p.relation_id === relationId || p.id === relationId,
               );
-              
+
               if (foundPromotion && foundPromotion.general_promotion_id) {
                 // Fetch general promotion details
                 try {
                   const generalPromotion = await authenticatedApiCall<any>(
-                    `/api/general-promotions/${foundPromotion.general_promotion_id}`
+                    `/api/general-promotions/${foundPromotion.general_promotion_id}`,
                   );
                   return {
                     ...reservation,
@@ -549,15 +556,15 @@ export default function ReservationsTable() {
                   };
                 }
               }
-              
+
               return reservation;
             } catch (err) {
               console.warn(`[ReservationsTable] Could not fetch promotion for reservation ${reservation.id}:`, err);
               return reservation;
             }
-          })
+          }),
         );
-        
+
         setAllReservations(reservationsWithPromotions);
       } catch (err) {
         console.error('[ReservationsTable] Error fetching reservations:', err);
@@ -628,7 +635,7 @@ export default function ReservationsTable() {
           res.campName.toLowerCase().includes(query) ||
           res.campLocation.toLowerCase().includes(query) ||
           (res.tag && res.tag.toLowerCase().includes(query)) ||
-          (res.promotionName && res.promotionName.toLowerCase().includes(query))
+          (res.promotionName && res.promotionName.toLowerCase().includes(query)),
       );
     }
 
@@ -724,14 +731,14 @@ export default function ReservationsTable() {
     const url = `/admin-panel/rezerwacja/${reservation.reservationName}${queryString ? `?${queryString}` : ''}`;
     router.push(url);
   };
-  
+
   // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     updatePageInUrl(page);
     setPageInputValue(''); // Clear input after page change
   };
-  
+
   // Handle page input change
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -740,24 +747,24 @@ export default function ReservationsTable() {
       setPageInputValue(value);
     }
   };
-  
+
   // Handle page input submit (Enter key)
   const handlePageInputSubmit = () => {
     if (!pageInputValue) return;
-    
+
     const pageNum = parseInt(pageInputValue, 10);
-    
+
     // Validation
     if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages || pageNum % 1 !== 0) {
       // Invalid input - reset to current page
       setPageInputValue('');
       return;
     }
-    
+
     // Valid input - navigate to page
     handlePageChange(pageNum);
   };
-  
+
   // Handle Enter key in page input
   const handlePageInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -812,8 +819,8 @@ export default function ReservationsTable() {
               return (
                 <div
                   key={`${col.key}-${value}`}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#03adf0] text-white text-xs font-medium"
-                  style={{ borderRadius: 0 }}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-white text-xs font-medium"
+                  style={{ borderRadius: 0, backgroundColor: activeFilterColor }}
                 >
                   <span>{columnLabel}: {value}</span>
                   <button
@@ -868,7 +875,7 @@ export default function ReservationsTable() {
       </div>
 
       {/* Reservations Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col min-h-0">
+      <div className="bg-white rounded-lg shadow overflow-visible flex-1 flex flex-col min-h-0">
         {/* Table Header with Column Selection Button */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
           <h2 className="text-lg font-semibold text-gray-900">Rezerwacje</h2>
@@ -882,10 +889,10 @@ export default function ReservationsTable() {
             Wybierz kolumny
           </button>
         </div>
-        <div className="overflow-auto flex-1">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0">
-              <tr>
+        <div className="overflow-visible flex-1 relative">
+          <table className="min-w-full divide-y divide-gray-200 relative" style={{ overflow: 'visible' }}>
+            <thead className="bg-gray-50 sticky top-0 relative overflow-visible z-10">
+              <tr className="overflow-visible">
                 {orderedVisibleColumns.map((col) => {
                   const columnKey = col.key;
                   const columnLabel = COLUMN_DEFINITIONS[columnKey as keyof typeof COLUMN_DEFINITIONS] || columnKey;
@@ -893,15 +900,15 @@ export default function ReservationsTable() {
                   const hasFilters = hasActiveFilters(columnKey);
                   const uniqueValues = getUniqueColumnValues(columnKey);
                   const columnFilters = columnConfig.find(c => c.key === columnKey)?.filters || [];
-                  
+
                   return (
                     <th
                       key={columnKey}
-                      className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors relative"
+                      className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors relative overflow-visible"
                       style={{ cursor: 'pointer' }}
                     >
                       <div className="flex items-center gap-1">
-                        <div 
+                        <div
                           className="flex items-center gap-1 flex-1"
                           onClick={() => handleSort(columnKey)}
                         >
@@ -912,6 +919,11 @@ export default function ReservationsTable() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setFilterDropdownPosition({
+                                top: rect.bottom + window.scrollY,
+                                left: rect.left + window.scrollX,
+                              });
                               setOpenFilterColumn(isFilterOpen ? null : columnKey);
                             }}
                             className={`p-1 hover:bg-gray-200 transition-colors ${
@@ -922,10 +934,17 @@ export default function ReservationsTable() {
                             <Filter className="w-4 h-4" />
                           </button>
                           {isFilterOpen && (
-                            <div 
-                              className="absolute right-0 top-full mt-1 bg-white border border-gray-300 shadow-lg z-50 min-w-[200px] max-w-[300px] max-h-[400px] flex flex-col"
+                            <div
+                              className="bg-white border border-gray-300 shadow-lg min-w-[200px] max-w-[300px] max-h-[400px] flex flex-col"
                               onClick={(e) => e.stopPropagation()}
-                              style={{ borderRadius: 0 }}
+                              style={{
+                                borderRadius: 0,
+                                overflow: 'visible',
+                                position: 'fixed',
+                                top: (filterDropdownPosition?.top ?? 0),
+                                left: (filterDropdownPosition?.left ?? 0),
+                                zIndex: 100000,
+                              }}
                             >
                               {/* Filter header */}
                               <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between bg-gray-50">
@@ -939,7 +958,7 @@ export default function ReservationsTable() {
                                   </button>
                                 )}
                               </div>
-                              
+
                               {/* Filter options */}
                               <div className="overflow-y-auto flex-1 max-h-[320px]">
                                 {uniqueValues.length > 0 ? (
@@ -1161,7 +1180,7 @@ export default function ReservationsTable() {
           </div>
         )}
       </div>
-      
+
       {/* Column Selection Modal */}
       <UniversalModal
         isOpen={columnModalOpen}
@@ -1231,9 +1250,3 @@ export default function ReservationsTable() {
     </div>
   );
 }
-
-
-
-
-
-

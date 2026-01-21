@@ -44,7 +44,12 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
   useEffect(() => {
     const savedState = loadReservationState();
     if (savedState) {
-      setReservation(savedState);
+      setReservation((prev) => ({
+        ...prev,
+        ...savedState,
+        currentStep: savedState.currentStep ?? prev.currentStep ?? 1,
+        reservationNumber: savedState.reservationNumber ?? null,
+      }));
     }
     setIsHydrated(true);
   }, []);
@@ -244,4 +249,3 @@ export function useReservation(): ReservationContextType {
   }
   return context;
 }
-

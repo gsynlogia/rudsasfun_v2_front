@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { Info } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
-import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import type { ReservationItem } from '@/types/reservation';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
+import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 interface Addon {
   id: string;
@@ -23,7 +24,7 @@ interface Addon {
  */
 export default function AddonsSection() {
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
-  
+
   // Initialize with data from sessionStorage if available
   const getInitialSelectedAddons = (): Set<string> => {
     if (typeof window === 'undefined') return new Set();
@@ -33,7 +34,7 @@ export default function AddonsSection() {
     }
     return new Set();
   };
-  
+
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(getInitialSelectedAddons);
   const [addonDescription, setAddonDescription] = useState<string>('');
   const [infoHeader, setInfoHeader] = useState<string>('');
@@ -76,7 +77,7 @@ export default function AddonsSection() {
         setLoadingAddons(true);
         // Get the selected city from reservation context
         const selectedCity = reservation.camp?.properties?.city;
-        
+
         // Always require city to be present - if not, don't fetch addons
         if (!selectedCity) {
           console.warn('[AddonsSection] No city found in reservation context, not fetching addons');
@@ -84,10 +85,10 @@ export default function AddonsSection() {
           setLoadingAddons(false);
           return;
         }
-        
+
         // Build URL with city filter (always required)
         const url = `${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(selectedCity)}`;
-        
+
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -111,7 +112,7 @@ export default function AddonsSection() {
           default_selected: addon.default_selected ?? false,
         }));
         setAddons(addonsFromApi);
-        
+
         // Auto-select addons with default_selected = true if no saved data exists
         const savedData = loadStep2FormData();
         if (!savedData || !savedData.selectedAddons || !Array.isArray(savedData.selectedAddons) || savedData.selectedAddons.length === 0) {
@@ -178,16 +179,16 @@ export default function AddonsSection() {
         }
       }
     };
-    
+
     syncData();
     setIsInitialized(true);
-    
+
     // Listen for fake data loaded event
     const handleFakeDataLoaded = () => {
       setTimeout(syncData, 100); // Small delay to ensure sessionStorage is updated
     };
     window.addEventListener('fakeDataLoaded', handleFakeDataLoaded);
-    
+
     return () => {
       window.removeEventListener('fakeDataLoaded', handleFakeDataLoaded);
     };
@@ -207,10 +208,10 @@ export default function AddonsSection() {
       const addon = addons.find(a => a.id === addonId);
       if (addon) {
         const reservationId = `addon-${addonId}`;
-        
+
         // Check if already exists in reservation
         const existing = reservation.items.find(
-          (item: ReservationItem) => item.type === 'addon' && item.name === addon.name
+          (item: ReservationItem) => item.type === 'addon' && item.name === addon.name,
         );
         if (!existing) {
           addonReservationIdsRef.current.set(addonId, reservationId);
@@ -225,7 +226,7 @@ export default function AddonsSection() {
         }
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [isInitialized, addons.length, reservation.items.length]);
 
   // Update reservation when addons change
@@ -252,7 +253,7 @@ export default function AddonsSection() {
           const addon = addons.find(a => a.id === addonId);
           if (addon) {
             const itemByName = reservation.items.find(
-              (item: ReservationItem) => item.type === 'addon' && item.name === addon.name
+              (item: ReservationItem) => item.type === 'addon' && item.name === addon.name,
             );
             if (itemByName) {
               removeReservationItem(itemByName.id);
@@ -269,10 +270,10 @@ export default function AddonsSection() {
       if (addon) {
         // Use predictable ID format: addon-{addonId}
         const reservationId = `addon-${addonId}`;
-        
+
         // Check if item with this ID already exists
         const existingItem = reservation.items.find((item: ReservationItem) => item.id === reservationId);
-        
+
         if (!existingItem) {
           addonReservationIdsRef.current.set(addonId, reservationId);
           // Use the predictable ID when adding
@@ -292,7 +293,7 @@ export default function AddonsSection() {
   // Save to sessionStorage whenever addons change
   useEffect(() => {
     if (!isInitialized) return; // Don't save during initial load
-    
+
     const savedData = loadStep2FormData();
     const formData = {
       selectedDiets: savedData?.selectedDiets || [],
@@ -434,7 +435,7 @@ export default function AddonsSection() {
             <Info className="w-5 h-5 text-[#03adf0] flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               {infoHeader && (
-                <div 
+                <div
                   className="text-xs sm:text-sm font-medium text-gray-800 mb-2"
                   dangerouslySetInnerHTML={{ __html: infoHeader }}
                 />
@@ -446,4 +447,3 @@ export default function AddonsSection() {
     </div>
   );
 }
-

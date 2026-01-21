@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save, Upload, X, FileText, Download, Trash2, AlertTriangle } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
-import { authenticatedApiCall } from '@/utils/api-auth';
-import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { useToast } from '@/components/ToastContainer';
+import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
   id: number;
@@ -39,9 +40,9 @@ export default function EditPaymentPage() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        
+
         const reservationData = await authenticatedApiCall<ReservationDetails>(
-          `/api/reservations/by-number/${reservationNumber}`
+          `/api/reservations/by-number/${reservationNumber}`,
         );
         setReservation(reservationData);
 
@@ -65,9 +66,9 @@ export default function EditPaymentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!payment) return;
-    
+
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
       showError('Kwota musi być większa od 0');
@@ -241,7 +242,7 @@ export default function EditPaymentPage() {
                             const { authenticatedFetch } = await import('@/utils/api-auth');
                             const { API_BASE_URL } = await import('@/utils/api-config');
                             const response = await authenticatedFetch(
-                              `${API_BASE_URL}/api/manual-payments/${paymentId}/attachment`
+                              `${API_BASE_URL}/api/manual-payments/${paymentId}/attachment`,
                             );
                             if (response.ok) {
                               const blob = await response.blob();
@@ -384,4 +385,3 @@ export default function EditPaymentPage() {
     </SectionGuard>
   );
 }
-

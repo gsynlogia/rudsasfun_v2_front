@@ -44,4 +44,3 @@ export function useCamp(): UseCampReturn {
     refetch: fetchCamp,
   };
 }
-

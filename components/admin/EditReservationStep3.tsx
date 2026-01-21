@@ -52,7 +52,7 @@ export default function EditReservationStep3({ data, onChange }: EditReservation
 
   // Notify parent of changes - use useRef to track previous values and only call onChange when actually changed
   const prevDataRef = useRef<any>(null);
-  
+
   useEffect(() => {
     const newData = {
       wants_invoice: wantsInvoice,
@@ -72,7 +72,7 @@ export default function EditReservationStep3({ data, onChange }: EditReservation
       delivery_postal_code: differentAddress ? deliveryAddress.postalCode : null,
       delivery_city: differentAddress ? deliveryAddress.city : null,
     };
-    
+
     // Only call onChange if data actually changed
     if (JSON.stringify(prevDataRef.current) !== JSON.stringify(newData)) {
       prevDataRef.current = newData;
@@ -320,4 +320,3 @@ export default function EditReservationStep3({ data, onChange }: EditReservation
     </div>
   );
 }
-

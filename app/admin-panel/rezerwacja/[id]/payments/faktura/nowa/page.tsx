@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
-import { authenticatedApiCall } from '@/utils/api-auth';
-import { manualInvoiceService } from '@/lib/services/ManualInvoiceService';
 import { useToast } from '@/components/ToastContainer';
+import { manualInvoiceService } from '@/lib/services/ManualInvoiceService';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
   id: number;
@@ -45,10 +46,10 @@ export default function NewInvoicePage() {
     const fetchReservation = async () => {
       try {
         const reservationData = await authenticatedApiCall<ReservationDetails>(
-          `/api/reservations/by-number/${reservationNumber}`
+          `/api/reservations/by-number/${reservationNumber}`,
         );
         setReservation(reservationData);
-        
+
         // Set default dates
         const today = new Date().toISOString().split('T')[0];
         setIssueDate(today);
@@ -56,7 +57,7 @@ export default function NewInvoicePage() {
         const paymentToDate = new Date();
         paymentToDate.setDate(paymentToDate.getDate() + 14); // 14 days from now
         setPaymentTo(paymentToDate.toISOString().split('T')[0]);
-        
+
         // Set buyer data from reservation
         if (reservationData.invoice_company_name) {
           setBuyerName(reservationData.invoice_company_name);
@@ -106,13 +107,13 @@ export default function NewInvoicePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!reservation) return;
-    
+
     const totalNum = parseFloat(totalAmount);
     const netNum = parseFloat(netAmount);
     const taxNum = parseFloat(taxAmount);
-    
+
     if (isNaN(totalNum) || totalNum <= 0) {
       showError('Kwota całkowita musi być większa od 0');
       return;
@@ -409,11 +410,3 @@ export default function NewInvoicePage() {
     </SectionGuard>
   );
 }
-
-
-
-
-
-
-
-

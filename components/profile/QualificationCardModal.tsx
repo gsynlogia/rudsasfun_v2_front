@@ -159,7 +159,7 @@ export default function QualificationCardModal({
 
       // Load health and additional info from reservation
       setAccommodationRequest(reservation.accommodation_request || '');
-      
+
       // Load health questions
       if (reservation.health_questions && typeof reservation.health_questions === 'object') {
         setHealthQuestions({
@@ -168,7 +168,7 @@ export default function QualificationCardModal({
           psychiatric: reservation.health_questions.psychiatric || 'Nie',
         });
       }
-      
+
       // Load health details
       if (reservation.health_details && typeof reservation.health_details === 'object') {
         setHealthDetails({
@@ -177,7 +177,7 @@ export default function QualificationCardModal({
           psychiatric: reservation.health_details.psychiatric || '',
         });
       }
-      
+
       setAdditionalNotes(reservation.additional_notes || '');
       setParticipantAdditionalInfo(reservation.participant_additional_info || '');
 
@@ -233,7 +233,7 @@ export default function QualificationCardModal({
 
       // Load health and additional info from reservation (fallback)
       setAccommodationRequest(reservation.accommodation_request || '');
-      
+
       if (reservation.health_questions && typeof reservation.health_questions === 'object') {
         setHealthQuestions({
           chronicDiseases: reservation.health_questions.chronicDiseases || 'Nie',
@@ -241,7 +241,7 @@ export default function QualificationCardModal({
           psychiatric: reservation.health_questions.psychiatric || 'Nie',
         });
       }
-      
+
       if (reservation.health_details && typeof reservation.health_details === 'object') {
         setHealthDetails({
           chronicDiseases: reservation.health_details.chronicDiseases || '',
@@ -249,7 +249,7 @@ export default function QualificationCardModal({
           psychiatric: reservation.health_details.psychiatric || '',
         });
       }
-      
+
       setAdditionalNotes(reservation.additional_notes || '');
       setParticipantAdditionalInfo(reservation.participant_additional_info || '');
     } finally {
@@ -590,8 +590,8 @@ export default function QualificationCardModal({
                       value={formData.participant_birth_date || ''}
                       onChange={(e) => updateField('participant_birth_date', e.target.value || null)}
                       className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                        validationErrors.participant_birth_date 
-                          ? 'border-red-500 focus:ring-red-500' 
+                        validationErrors.participant_birth_date
+                          ? 'border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:ring-[#03adf0]'
                       }`}
                     />
@@ -610,8 +610,8 @@ export default function QualificationCardModal({
                       onChange={(e) => updateField('participant_birth_place', e.target.value || null)}
                       placeholder="np. Gdańsk"
                       className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                        validationErrors.participant_birth_place 
-                          ? 'border-red-500 focus:ring-red-500' 
+                        validationErrors.participant_birth_place
+                          ? 'border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:ring-[#03adf0]'
                       }`}
                     />
@@ -631,8 +631,8 @@ export default function QualificationCardModal({
                         maxLength={11}
                         placeholder="11 cyfr"
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.participant_pesel 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.participant_pesel
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         }`}
                       />
@@ -651,8 +651,8 @@ export default function QualificationCardModal({
                       onChange={(e) => updateField('participant_street', e.target.value || null)}
                       placeholder="np. ul. Długa 1"
                       className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                        validationErrors.participant_street 
-                          ? 'border-red-500 focus:ring-red-500' 
+                        validationErrors.participant_street
+                          ? 'border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:ring-[#03adf0]'
                       }`}
                     />
@@ -671,8 +671,8 @@ export default function QualificationCardModal({
                       onChange={(e) => updateField('participant_postal_code', e.target.value || null)}
                       placeholder="00-000"
                       className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                        validationErrors.participant_postal_code 
-                          ? 'border-red-500 focus:ring-red-500' 
+                        validationErrors.participant_postal_code
+                          ? 'border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:ring-[#03adf0]'
                       }`}
                     />
@@ -691,8 +691,8 @@ export default function QualificationCardModal({
                       onChange={(e) => updateField('participant_city_address', e.target.value || null)}
                       placeholder="np. Gdańsk"
                       className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                        validationErrors.participant_city_address 
-                          ? 'border-red-500 focus:ring-red-500' 
+                        validationErrors.participant_city_address
+                          ? 'border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:ring-[#03adf0]'
                       }`}
                     />
@@ -721,8 +721,8 @@ export default function QualificationCardModal({
                         value={formData.parent1_first_name || ''}
                         onChange={(e) => updateField('parent1_first_name', e.target.value || null)}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent1_first_name 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent1_first_name
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         }`}
                       />
@@ -740,8 +740,8 @@ export default function QualificationCardModal({
                         value={formData.parent1_last_name || ''}
                         onChange={(e) => updateField('parent1_last_name', e.target.value || null)}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent1_last_name 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent1_last_name
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         }`}
                       />
@@ -759,8 +759,8 @@ export default function QualificationCardModal({
                         value={formData.parent1_street || ''}
                         onChange={(e) => updateField('parent1_street', e.target.value || null)}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent1_street 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent1_street
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         }`}
                       />
@@ -778,8 +778,8 @@ export default function QualificationCardModal({
                         value={formData.parent1_postal_code || ''}
                         onChange={(e) => updateField('parent1_postal_code', e.target.value || null)}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent1_postal_code 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent1_postal_code
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         }`}
                       />
@@ -797,8 +797,8 @@ export default function QualificationCardModal({
                         value={formData.parent1_city || ''}
                         onChange={(e) => updateField('parent1_city', e.target.value || null)}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent1_city 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent1_city
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         }`}
                       />
@@ -852,8 +852,8 @@ export default function QualificationCardModal({
                           onChange={(e) => updateField('parent1_phone', e.target.value || null)}
                           placeholder="123456789"
                           className={`flex-1 px-3 py-2 border focus:outline-none focus:ring-2 ${
-                            validationErrors.parent1_phone 
-                              ? 'border-red-500 focus:ring-red-500' 
+                            validationErrors.parent1_phone
+                              ? 'border-red-500 focus:ring-red-500'
                               : 'border-gray-300 focus:ring-[#03adf0]'
                           }`}
                         />
@@ -872,8 +872,8 @@ export default function QualificationCardModal({
                         value={formData.parent1_email || ''}
                         onChange={(e) => updateField('parent1_email', e.target.value || null)}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent1_email 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent1_email
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         }`}
                       />
@@ -914,8 +914,8 @@ export default function QualificationCardModal({
                         onChange={(e) => updateField('parent2_first_name', e.target.value || null)}
                         disabled={noSecondParent}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent2_first_name 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent2_first_name
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
@@ -934,8 +934,8 @@ export default function QualificationCardModal({
                         onChange={(e) => updateField('parent2_last_name', e.target.value || null)}
                         disabled={noSecondParent}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent2_last_name 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent2_last_name
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
@@ -954,8 +954,8 @@ export default function QualificationCardModal({
                         onChange={(e) => updateField('parent2_street', e.target.value || null)}
                         disabled={noSecondParent}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent2_street 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent2_street
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
@@ -974,8 +974,8 @@ export default function QualificationCardModal({
                         onChange={(e) => updateField('parent2_postal_code', e.target.value || null)}
                         disabled={noSecondParent}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent2_postal_code 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent2_postal_code
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
@@ -994,8 +994,8 @@ export default function QualificationCardModal({
                         onChange={(e) => updateField('parent2_city', e.target.value || null)}
                         disabled={noSecondParent}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent2_city 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent2_city
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
@@ -1053,8 +1053,8 @@ export default function QualificationCardModal({
                           disabled={noSecondParent}
                           placeholder="123456789"
                           className={`flex-1 px-3 py-2 border focus:outline-none focus:ring-2 ${
-                            validationErrors.parent2_phone 
-                              ? 'border-red-500 focus:ring-red-500' 
+                            validationErrors.parent2_phone
+                              ? 'border-red-500 focus:ring-red-500'
                               : 'border-gray-300 focus:ring-[#03adf0]'
                           } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                         />
@@ -1074,8 +1074,8 @@ export default function QualificationCardModal({
                         onChange={(e) => updateField('parent2_email', e.target.value || null)}
                         disabled={noSecondParent}
                         className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 ${
-                          validationErrors.parent2_email 
-                            ? 'border-red-500 focus:ring-red-500' 
+                          validationErrors.parent2_email
+                            ? 'border-red-500 focus:ring-red-500'
                             : 'border-gray-300 focus:ring-[#03adf0]'
                         } ${noSecondParent ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />

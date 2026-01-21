@@ -7,9 +7,9 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react
 
 import { useReservation } from '@/context/ReservationContext';
 import type { StepComponentProps } from '@/types/reservation';
-import { saveStep1FormData, loadStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
-import { isFakeDataEnabled, getFakeStep1Data } from '@/utils/fakeData';
 import { API_BASE_URL } from '@/utils/api-config';
+import { isFakeDataEnabled, getFakeStep1Data } from '@/utils/fakeData';
+import { saveStep1FormData, loadStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
 
 import DashedLine from './DashedLine';
 import DietSection from './step1/DietSection';
@@ -521,7 +521,7 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
   useLayoutEffect(() => {
     loadDataFromStorage();
   }, []); // Empty deps - will run on every mount (which happens when key changes)
-  
+
   // Also load fake data when pathname changes to Step1 (handles case when component doesn't remount)
   useEffect(() => {
     if (pathname && pathname.includes('/step/1')) {
@@ -1169,4 +1169,3 @@ export default function Step1({ onNext, onPrevious, disabled = false }: StepComp
     </div>
   );
 }
-

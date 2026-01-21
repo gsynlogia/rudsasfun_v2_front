@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { ArrowLeft, Check, XCircle, Shield, Utensils, Plus, FileText, Download, RefreshCw, Search, Plus as PlusIcon } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, CreditCard, Check, XCircle, Building2, Shield, Utensils, Plus, FileText, Download, RefreshCw, Search, Plus as PlusIcon } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
-import { authenticatedApiCall } from '@/utils/api-auth';
-import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
-import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { manualInvoiceService, ManualInvoiceResponse } from '@/lib/services/ManualInvoiceService';
+import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
+import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
   id: number;
@@ -55,7 +56,7 @@ export default function ReservationPaymentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reservationNumber = params.id as string;
-  
+
   // Get fromPage param to return to correct pagination page
   const fromPage = searchParams.get('fromPage');
 
@@ -70,7 +71,7 @@ export default function ReservationPaymentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  
+
   // Search states
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
@@ -83,13 +84,13 @@ export default function ReservationPaymentsPage() {
 
         // Fetch reservation by number
         const reservationData = await authenticatedApiCall<ReservationDetails>(
-          `/api/reservations/by-number/${reservationNumber}`
+          `/api/reservations/by-number/${reservationNumber}`,
         );
         setReservation(reservationData);
 
         // Fetch all payments (Tpay)
         const allPayments = await paymentService.listPayments(0, 1000);
-        
+
         // Filter payments for this reservation
         const reservationPayments = allPayments.filter(p => {
           const orderId = p.order_id || '';
@@ -150,12 +151,12 @@ export default function ReservationPaymentsPage() {
         // Fetch protections details
         if (reservationData.selected_protection && reservationData.selected_protection.length > 0 && reservationData.camp_id && reservationData.property_id) {
           const protectionsMap = new Map<number, Protection>();
-          
+
           try {
             const turnusProtections = await authenticatedApiCall<any[]>(
-              `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/protections`
+              `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/protections`,
             );
-            
+
             for (const protectionIdValue of reservationData.selected_protection) {
               try {
                 let generalProtectionId: number | null = null;
@@ -170,16 +171,16 @@ export default function ReservationPaymentsPage() {
                     generalProtectionId = parsedId;
                   }
                 }
-                
+
                 if (generalProtectionId) {
                   const turnusProtection = turnusProtections.find(
-                    (tp: any) => tp.general_protection_id === generalProtectionId || tp.id === generalProtectionId
+                    (tp: any) => tp.general_protection_id === generalProtectionId || tp.id === generalProtectionId,
                   );
-                  
+
                   if (turnusProtection && turnusProtection.general_protection_id) {
                     try {
                       const generalProtection = await authenticatedApiCall<Protection>(
-                        `/api/general-protections/${turnusProtection.general_protection_id}`
+                        `/api/general-protections/${turnusProtection.general_protection_id}`,
                       );
                       protectionsMap.set(generalProtectionId, {
                         ...generalProtection,
@@ -214,20 +215,20 @@ export default function ReservationPaymentsPage() {
         // Fetch promotion details
         if (reservationData.selected_promotion && reservationData.camp_id && reservationData.property_id) {
           try {
-            const relationId = typeof reservationData.selected_promotion === 'number' 
-              ? reservationData.selected_promotion 
+            const relationId = typeof reservationData.selected_promotion === 'number'
+              ? reservationData.selected_promotion
               : parseInt(String(reservationData.selected_promotion));
             if (!isNaN(relationId)) {
               const turnusPromotions = await authenticatedApiCall<any[]>(
-                `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/promotions`
+                `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/promotions`,
               );
               const foundPromotion = turnusPromotions.find(
-                (p: any) => p.relation_id === relationId || p.id === relationId
+                (p: any) => p.relation_id === relationId || p.id === relationId,
               );
               if (foundPromotion && foundPromotion.general_promotion_id) {
                 try {
                   const generalPromotion = await authenticatedApiCall<Promotion>(
-                    `/api/general-promotions/${foundPromotion.general_promotion_id}`
+                    `/api/general-promotions/${foundPromotion.general_promotion_id}`,
                   );
                   setPromotion({
                     ...generalPromotion,
@@ -299,10 +300,10 @@ export default function ReservationPaymentsPage() {
     const tpayAmount = payments
       .filter(p => p.status === 'success' || (p.status === 'pending' && p.amount && p.amount > 0))
       .reduce((sum, p) => sum + (p.paid_amount || p.amount || 0), 0);
-    
+
     // Sum manual payments
     const manualAmount = manualPayments.reduce((sum, p) => sum + p.amount, 0);
-    
+
     return tpayAmount + manualAmount;
   };
 
@@ -324,17 +325,17 @@ export default function ReservationPaymentsPage() {
   // Filtered payments (manual + Tpay combined)
   const allPaymentsCombined = useMemo(() => {
     const combined: Array<PaymentResponse | ManualPaymentResponse & { type: 'tpay' | 'manual' }> = [];
-    
+
     // Add Tpay payments
     payments.forEach(p => {
       combined.push({ ...p, type: 'tpay' } as any);
     });
-    
+
     // Add manual payments
     manualPayments.forEach(p => {
       combined.push({ ...p, type: 'manual' } as any);
     });
-    
+
     return combined;
   }, [payments, manualPayments]);
 
@@ -359,17 +360,17 @@ export default function ReservationPaymentsPage() {
   // Filtered invoices (Fakturownia + manual combined)
   const allInvoicesCombined = useMemo(() => {
     const combined: Array<InvoiceResponse | ManualInvoiceResponse & { type: 'fakturownia' | 'manual' }> = [];
-    
+
     // Add Fakturownia invoices
     invoices.forEach(inv => {
       combined.push({ ...inv, type: 'fakturownia' } as any);
     });
-    
+
     // Add manual invoices
     manualInvoices.forEach(inv => {
       combined.push({ ...inv, type: 'manual' } as any);
     });
-    
+
     return combined;
   }, [invoices, manualInvoices]);
 
@@ -445,7 +446,7 @@ export default function ReservationPaymentsPage() {
                   Płatności: {reservationNumber}
                 </h1>
                 <p className="text-sm text-gray-500 mt-1">
-                  Obóz: {reservation.camp_name || 'Brak danych'} | 
+                  Obóz: {reservation.camp_name || 'Brak danych'} |
                   Turnus: {reservation.property_name || 'Brak danych'}
                   {reservation.property_start_date && reservation.property_end_date && (
                     <> | Termin: {formatDate(reservation.property_start_date)} - {formatDate(reservation.property_end_date)}</>
@@ -515,7 +516,7 @@ export default function ReservationPaymentsPage() {
                               generalProtectionId = parsedId;
                             }
                           }
-                          
+
                           if (!generalProtectionId) return null;
                           const protection = protections.get(generalProtectionId);
                           if (!protection) return null;
@@ -549,10 +550,10 @@ export default function ReservationPaymentsPage() {
                     {reservation.selected_addons.map((addonIdValue) => {
                       const addonId = typeof addonIdValue === 'number' ? addonIdValue : parseInt(String(addonIdValue));
                       const addon = addons.get(addonId);
-                      const isPaid = payments.some(p => 
-                        p.status === 'success' && 
+                      const isPaid = payments.some(p =>
+                        p.status === 'success' &&
                         p.order_id?.startsWith(`ADDON-${reservation.id}-`) &&
-                        p.description?.includes(addon?.name || '')
+                        p.description?.includes(addon?.name || ''),
                       );
                       return (
                         <div key={String(addonIdValue)} className="flex justify-between items-center border-b border-gray-200 pb-2">
@@ -604,7 +605,7 @@ export default function ReservationPaymentsPage() {
                           generalProtectionId = parsedId;
                         }
                       }
-                      
+
                       if (!generalProtectionId) {
                         return (
                           <div key={String(protectionIdValue)} className="flex justify-between items-center border-b border-gray-200 pb-2">
@@ -615,7 +616,7 @@ export default function ReservationPaymentsPage() {
                           </div>
                         );
                       }
-                      
+
                       const protection = protections.get(generalProtectionId);
                       return (
                         <div key={String(protectionIdValue)} className="flex justify-between items-center border-b border-gray-200 pb-2">
@@ -668,7 +669,7 @@ export default function ReservationPaymentsPage() {
                   Dodaj
                 </button>
               </div>
-              
+
               {/* Search */}
               <div className="mb-3">
                 <div className="relative">
@@ -705,11 +706,11 @@ export default function ReservationPaymentsPage() {
                     ) : (
                       filteredPayments.map((payment: any) => {
                         const isManual = payment.type === 'manual';
-                        const paymentDate = isManual 
+                        const paymentDate = isManual
                           ? formatDate(payment.payment_date)
                           : formatDate(payment.payment_date || payment.paid_at || payment.created_at);
                         const paymentAmount = isManual ? payment.amount : (payment.paid_amount || payment.amount || 0);
-                        const paymentMethod = isManual 
+                        const paymentMethod = isManual
                           ? (payment.payment_method || 'Tradycyjna')
                           : (payment.channel_id === 64 ? 'BLIK' : payment.channel_id === 53 ? 'Karta' : 'Online');
                         const status = isManual ? 'success' : payment.status;
@@ -769,7 +770,7 @@ export default function ReservationPaymentsPage() {
                   Dodaj
                 </button>
               </div>
-              
+
               {/* Search */}
               <div className="mb-3">
                 <div className="relative">

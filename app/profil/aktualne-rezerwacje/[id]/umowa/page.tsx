@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { API_BASE_URL } from '@/utils/api-config';
+import { useEffect, useRef, useState } from 'react';
+
 import { authService } from '@/lib/services/AuthService';
+import { API_BASE_URL } from '@/utils/api-config';
 
 /**
  * Contract HTML Page
@@ -13,7 +14,7 @@ import { authService } from '@/lib/services/AuthService';
 export default function ContractHtmlPage() {
   const params = useParams();
   const reservationId = params?.id ? String(params.id) : ''; // e.g., "REZ-2025-016" or reservation ID
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const printedRef = useRef(false);
@@ -27,29 +28,29 @@ export default function ContractHtmlPage() {
         // Extract reservation ID from reservation number (e.g., "REZ-2025-016")
         // We need to fetch reservations to find the matching ID
         let reservationIdNum: number;
-        
+
         if (reservationId.startsWith('REZ-')) {
           // It's a reservation number, fetch reservations to find the ID
           const { reservationService } = await import('@/lib/services/ReservationService');
           const reservations = await reservationService.getMyReservations(0, 100);
-          
+
           const formatReservationNumber = (reservationId: number, createdAt: string) => {
             const year = new Date(createdAt).getFullYear();
             const paddedId = String(reservationId).padStart(3, '0');
             return `REZ-${year}-${paddedId}`;
           };
-          
+
           const foundReservation = reservations.find((r: any) => {
             const rNumber = formatReservationNumber(r.id, r.created_at);
             return rNumber === reservationId;
           });
-          
+
           if (!foundReservation) {
             setError('Rezerwacja nie została znaleziona');
             setIsLoading(false);
             return;
           }
-          
+
           reservationIdNum = foundReservation.id;
         } else {
           reservationIdNum = parseInt(reservationId, 10);
@@ -144,4 +145,3 @@ export default function ContractHtmlPage() {
   // This should never be reached if document.write succeeded
   return null;
 }
-

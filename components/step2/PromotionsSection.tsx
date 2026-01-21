@@ -73,6 +73,7 @@ function sortPromotionsByOrder(promotions: Promotion[]): Promotion[] {
 export default function PromotionsSection() {
   const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
+  const safePathname = pathname || '';
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +85,7 @@ export default function PromotionsSection() {
 
   // Extract camp_id and property_id from URL (similar to Step5)
   const getCampIds = (): { campId: number | null; propertyId: number | null } => {
-    const pathParts = pathname.split('/').filter(Boolean);
+    const pathParts = safePathname.split('/').filter(Boolean);
     const campIdIndex = pathParts.indexOf('camps');
     if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
       const campId = parseInt(pathParts[campIdIndex + 1], 10);
@@ -197,16 +198,16 @@ export default function PromotionsSection() {
         setPromotionJustification(savedData.promotionJustification || {});
       }
     };
-    
+
     syncData();
     setIsInitialized(true);
-    
+
     // Listen for fake data loaded event
     const handleFakeDataLoaded = () => {
       setTimeout(syncData, 100); // Small delay to ensure sessionStorage is updated
     };
     window.addEventListener('fakeDataLoaded', handleFakeDataLoaded);
-    
+
     return () => {
       window.removeEventListener('fakeDataLoaded', handleFakeDataLoaded);
     };
@@ -302,9 +303,9 @@ export default function PromotionsSection() {
 
     if (type === 'rodzenstwo_razem') {
       return !!(
-        promotionJustification.sibling_first_name && 
+        promotionJustification.sibling_first_name &&
         promotionJustification.sibling_first_name.trim() !== '' &&
-        promotionJustification.sibling_last_name && 
+        promotionJustification.sibling_last_name &&
         promotionJustification.sibling_last_name.trim() !== ''
       );
     }
@@ -322,7 +323,7 @@ export default function PromotionsSection() {
 
     if (type === 'bonowych') {
       return !!(
-        promotionJustification.years && 
+        promotionJustification.years &&
         (
           (Array.isArray(promotionJustification.years) && promotionJustification.years.length > 0) ||
           (typeof promotionJustification.years === 'string' && promotionJustification.years.trim() !== '')

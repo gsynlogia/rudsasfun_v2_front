@@ -14,4 +14,3 @@ export interface ReservationContextType {
   setReservationNumber: (reservationNumber: string | null) => void;
   resetReservation: () => void;
 }
-

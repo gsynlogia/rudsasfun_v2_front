@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 import { contractService } from '@/lib/services/ContractService';
+import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse, CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
-import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 import DashedLine from '../DashedLine';
@@ -49,6 +49,134 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const [bankAccount, setBankAccount] = useState<any>(null);
   const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
   const [protections, setProtections] = useState<Map<number, { name: string; price: number }>>(new Map());
+  const [showJustificationModal, setShowJustificationModal] = useState(false);
+  const [justificationDraft, setJustificationDraft] = useState<Record<string, any>>(reservation.promotion_justification || {});
+  const [savingJustification, setSavingJustification] = useState(false);
+  const [justificationError, setJustificationError] = useState<string | null>(null);
+
+  const getPromotionType = (promotionName?: string | null): string => {
+    if (!promotionName) return 'other';
+    const nameLower = promotionName.toLowerCase();
+    if (nameLower.includes('duża rodzina') || nameLower.includes('duza rodzina')) return 'duza_rodzina';
+    if (nameLower.includes('rodzeństwo razem') || nameLower.includes('rodzenstwo razem')) return 'rodzenstwo_razem';
+    if (nameLower.includes('obozy na maxa') || nameLower.includes('obozy na max')) return 'obozy_na_maxa';
+    if (nameLower.includes('first minute') || nameLower.includes('wczesna rezerwacja')) return 'first_minute';
+    if (nameLower.includes('bon') && (
+      nameLower.includes('brązowy') || nameLower.includes('brazowy') ||
+      nameLower.includes('srebrny') ||
+      nameLower.includes('złoty') || nameLower.includes('zloty') ||
+      nameLower.includes('platynowy')
+    )) return 'bonowych';
+    if (nameLower.includes('bonowych') || nameLower.includes('bonowa')) return 'bonowych';
+    return 'other';
+  };
+
+  const requiresJustification = (promotionName?: string | null): boolean => {
+    const type = getPromotionType(promotionName);
+    return ['duza_rodzina', 'rodzenstwo_razem', 'obozy_na_maxa', 'first_minute', 'bonowych'].includes(type);
+  };
+
+  const hasJustificationData = (justification: any): boolean => {
+    return Boolean(
+      justification &&
+      typeof justification === 'object' &&
+      Object.keys(justification).length > 0 &&
+      Object.values(justification).some((val: any) =>
+        val !== null && val !== undefined && val !== '' &&
+        (Array.isArray(val) ? val.length > 0 : true),
+      ),
+    );
+  };
+
+  const formatJustification = (just: any): string[] => {
+    if (!just || typeof just !== 'object') return [];
+    const parts: string[] = [];
+    if (just.card_number) parts.push(`Numer karty dużej rodziny: ${just.card_number}`);
+    if (just.sibling_first_name || just.sibling_last_name) {
+      const siblingName = [just.sibling_first_name, just.sibling_last_name].filter(Boolean).join(' ');
+      if (siblingName) parts.push(`Rodzeństwo: ${siblingName}`);
+    }
+    if (just.first_camp_date) parts.push(`Data pierwszego obozu: ${just.first_camp_date}`);
+    if (just.first_camp_name) parts.push(`Nazwa pierwszego obozu: ${just.first_camp_name}`);
+    if (just.reason) parts.push(`Powód wyboru promocji: ${just.reason}`);
+    if (just.years) {
+      const yearsStr = Array.isArray(just.years) ? just.years.join(', ') : String(just.years);
+      if (yearsStr) parts.push(`Lata uczestnictwa: ${yearsStr}`);
+    }
+    const knownFields = ['card_number', 'sibling_first_name', 'sibling_last_name', 'first_camp_date', 'first_camp_name', 'reason', 'years'];
+    const otherFields = Object.keys(just).filter(key => !knownFields.includes(key));
+    otherFields.forEach(key => {
+      const value = just[key];
+      if (value !== null && value !== undefined && value !== '') {
+        parts.push(`${key}: ${String(value)}`);
+      }
+    });
+    return parts;
+  };
+
+  const validateJustificationDraft = (): boolean => {
+    setJustificationError(null);
+    const promotionName = reservation.promotion_name || reservation.selected_promotion || '';
+    const type = getPromotionType(promotionName);
+    const just = justificationDraft || {};
+
+    if (!requiresJustification(promotionName)) {
+      // Wymuś chociaż jedno pole opisowe dla spójności
+      const hasAny = hasJustificationData(just);
+      if (!hasAny) {
+        setJustificationError('Uzupełnij krótkie uzasadnienie.');
+      }
+      return hasAny;
+    }
+
+    if (type === 'duza_rodzina') {
+      const ok = !!(just.card_number && just.card_number.trim() !== '');
+      if (!ok) setJustificationError('Podaj numer karty dużej rodziny.');
+      return ok;
+    }
+
+    if (type === 'rodzenstwo_razem') {
+      const ok = !!(
+        just.sibling_first_name && just.sibling_first_name.trim() !== '' &&
+        just.sibling_last_name && just.sibling_last_name.trim() !== ''
+      );
+      if (!ok) setJustificationError('Podaj imię i nazwisko rodzeństwa.');
+      return ok;
+    }
+
+    if (type === 'obozy_na_maxa') {
+      const ok = !!(
+        (just.first_camp_date && just.first_camp_date.trim() !== '') ||
+        (just.first_camp_name && just.first_camp_name.trim() !== '')
+      );
+      if (!ok) setJustificationError('Podaj datę lub nazwę pierwszego obozu.');
+      return ok;
+    }
+
+    if (type === 'first_minute') {
+      const ok = !!(just.reason && just.reason.trim() !== '');
+      if (!ok) setJustificationError('Podaj powód wyboru promocji First Minute.');
+      return ok;
+    }
+
+    if (type === 'bonowych') {
+      const ok = !!(just.years &&
+        (
+          (Array.isArray(just.years) && just.years.length > 0) ||
+          (typeof just.years === 'string' && just.years.trim() !== '')
+        ));
+      if (!ok) setJustificationError('Podaj lata uczestnictwa.');
+      return ok;
+    }
+
+    const fallback = hasJustificationData(just);
+    if (!fallback) setJustificationError('Uzupełnij uzasadnienie.');
+    return fallback;
+  };
+
+  useEffect(() => {
+    setJustificationDraft(reservation.promotion_justification || {});
+  }, [reservation.promotion_justification]);
 
   // Format date helper
   const formatDate = (dateString: string | null | undefined): string => {
@@ -77,7 +205,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         if (response.ok) {
           const data = await response.json();
           setOnlinePaymentsEnabled(data.enabled);
-          
+
           // If online payments are disabled, load bank account data
           if (!data.enabled) {
             try {
@@ -111,15 +239,15 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
       try {
         const API_BASE_URL = getApiBaseUrlRuntime();
         const protectionsMap = new Map<number, { name: string; price: number }>();
-        
+
         // Fetch turnus protections (public endpoint - has name and price)
         const turnusProtections = await fetch(
-          `${API_BASE_URL}/api/camps/${reservation.camp_id}/properties/${reservation.property_id}/protections`
+          `${API_BASE_URL}/api/camps/${reservation.camp_id}/properties/${reservation.property_id}/protections`,
         ).then(res => res.ok ? res.json() : []);
 
         // Fetch public general protections as fallback (public endpoint)
         const publicProtections = await fetch(
-          `${API_BASE_URL}/api/general-protections/public`
+          `${API_BASE_URL}/api/general-protections/public`,
         ).then(res => res.ok ? res.json() : []).catch(() => []);
 
         for (const protectionIdValue of reservation.selected_protection) {
@@ -136,13 +264,13 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                 generalProtectionId = parsedId;
               }
             }
-            
+
             if (generalProtectionId) {
               // First try to find in turnus protections (has center-specific price)
               const turnusProtection = turnusProtections.find(
-                (tp: any) => tp.general_protection_id === generalProtectionId || tp.id === generalProtectionId
+                (tp: any) => tp.general_protection_id === generalProtectionId || tp.id === generalProtectionId,
               );
-              
+
               if (turnusProtection && turnusProtection.general_protection_id) {
                 // Use data from turnus protection (has name and price)
                 protectionsMap.set(generalProtectionId, {
@@ -152,9 +280,9 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
               } else {
                 // Fallback to public general protections
                 const publicProtection = publicProtections.find(
-                  (p: any) => p.id === generalProtectionId
+                  (p: any) => p.id === generalProtectionId,
                 );
-                
+
                 if (publicProtection) {
                   protectionsMap.set(generalProtectionId, {
                     name: publicProtection.name,
@@ -167,7 +295,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             console.error(`Error processing protection ${protectionIdValue}:`, err);
           }
         }
-        
+
         setProtections(protectionsMap);
       } catch (err) {
         console.error('Error loading protections:', err);
@@ -395,16 +523,16 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
       const fetchDietPrice = async () => {
         try {
           const API_BASE_URL = getApiBaseUrlRuntime();
-          
+
           // Try to find in turnus diets to get turnus-specific price
           const response = await fetch(`${API_BASE_URL}/api/camps/${reservation.camp_id}/properties/${reservation.property_id}/diets`);
           if (response.ok) {
             const diets = await response.json();
             // Try to find diet by id or relation_id
-            const foundDiet = diets.find((d: any) => 
-              d.id === reservation.diet || 
+            const foundDiet = diets.find((d: any) =>
+              d.id === reservation.diet ||
               d.relation_id === reservation.diet ||
-              (d.is_center_diet_relation && d.relation_id === reservation.diet)
+              (d.is_center_diet_relation && d.relation_id === reservation.diet),
             );
             if (foundDiet && foundDiet.price !== undefined && foundDiet.price !== null) {
               setDietPrice(parseFloat(foundDiet.price));
@@ -421,15 +549,16 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
   // Get diet name (prefer diet_name, fallback to fetched name, then diet ID)
   const diet = dietName || (reservation.diet ? `Dieta ID: ${reservation.diet}` : 'Brak danych');
-  
+
   // Format diet display with price in parentheses if available
-  const dietDisplay = dietPrice !== null && dietPrice > 0 
+  const dietDisplay = dietPrice !== null && dietPrice > 0
     ? `${diet} (${dietPrice.toFixed(2)} PLN)`
     : diet;
 
   // Get promotion name (if selected_promotion exists, show promotion_name or selected_promotion)
   const promotion = reservation.promotion_name || reservation.selected_promotion || 'Brak promocji';
-  
+  const hasPromotion = !!(reservation.selected_promotion || reservation.promotion_name);
+
   // Get source name (prefer source_name, fallback to selected_source)
   const source = reservation.source_name || reservation.selected_source || 'Brak danych';
 
@@ -441,11 +570,11 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
   // Get health info - use additional_notes (Informacje dodatkowe / Uwagi from Step1)
   const additionalNotes = reservation.additional_notes || null;
-  
+
   // Get health questions and details
   const healthQuestions = reservation.health_questions || null;
   const healthDetails = reservation.health_details || null;
-  
+
   // Format health status info
   const formatHealthStatus = (question: string | null | undefined): string => {
     if (!question || question.trim() === '') return 'Nie';
@@ -453,11 +582,11 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     if (question === 'no' || question === 'nie') return 'Nie';
     return question;
   };
-  
+
   // Build health info display
   const buildHealthInfo = () => {
     const parts: string[] = [];
-    
+
     // Add health questions with details
     if (healthQuestions && typeof healthQuestions === 'object') {
       if (healthQuestions.chronicDiseases && (healthQuestions.chronicDiseases === 'yes' || healthQuestions.chronicDiseases === 'tak' || healthQuestions.chronicDiseases === 'Tak')) {
@@ -468,7 +597,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           parts.push('Choroby przewlekłe: Tak');
         }
       }
-      
+
       if (healthQuestions.dysfunctions && (healthQuestions.dysfunctions === 'yes' || healthQuestions.dysfunctions === 'tak' || healthQuestions.dysfunctions === 'Tak')) {
         const details = healthDetails && typeof healthDetails === 'object' ? healthDetails.dysfunctions : '';
         if (details && details.trim()) {
@@ -477,7 +606,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           parts.push('Dysfunkcje: Tak');
         }
       }
-      
+
       if (healthQuestions.psychiatric && (healthQuestions.psychiatric === 'yes' || healthQuestions.psychiatric === 'tak' || healthQuestions.psychiatric === 'Tak')) {
         const details = healthDetails && typeof healthDetails === 'object' ? healthDetails.psychiatric : '';
         if (details && details.trim()) {
@@ -487,15 +616,15 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         }
       }
     }
-    
+
     // Add additional notes if available
     if (additionalNotes && additionalNotes.trim()) {
       parts.push(additionalNotes);
     }
-    
+
     return parts.length > 0 ? parts : ['Brak danych'];
   };
-  
+
   const healthInfoParts = buildHealthInfo();
 
   // Map status
@@ -509,7 +638,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const statusColor = reservation.status === 'cancelled' ? 'red' : reservation.status === 'completed' ? 'gray' : 'green';
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <>
+      <div className="space-y-4 sm:space-y-6">
       {/* Header Section */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
@@ -653,6 +783,38 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             <div>
               <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Promocja</h5>
               <div className="text-xs sm:text-sm text-gray-700">{promotion}</div>
+              {hasPromotion && (
+                <div className="mt-2">
+                  {hasJustificationData(reservation.promotion_justification) ? (
+                    <div className="space-y-1 text-xs sm:text-sm text-gray-700">
+                      {formatJustification(reservation.promotion_justification).map((line, idx) => (
+                        <div key={idx}>{line}</div>
+                      ))}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const type = getPromotionType(reservation.promotion_name || reservation.selected_promotion || '');
+                        if (type === 'first_minute' && (!justificationDraft.reason || justificationDraft.reason.trim() === '')) {
+                          setJustificationDraft({
+                            ...justificationDraft,
+                            reason: 'Promocja - First Minute',
+                          });
+                        } else {
+                          setJustificationDraft(reservation.promotion_justification || {});
+                        }
+                        setJustificationError(null);
+                        setShowJustificationModal(true);
+                      }}
+                      className="text-xs px-3 py-1 bg-[#03adf0] text-white rounded hover:bg-[#0288c7] transition-colors"
+                      disabled={savingJustification}
+                    >
+                      Dodaj uzasadnienie
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -778,10 +940,10 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                     {(() => {
                       // Check if First Minute promotion is selected
                       const promotionName = reservation.promotion_name || reservation.selected_promotion || '';
-                      const isFirstMinute = promotionName.toLowerCase().includes('first minute') || 
+                      const isFirstMinute = promotionName.toLowerCase().includes('first minute') ||
                                           promotionName.toLowerCase().includes('firstminute') ||
                                           promotionName.toLowerCase().includes('wczesna rezerwacja');
-                      
+
                       const remainingAmount = reservation.total_price - paidAmount;
                       // Check if payment_plan is already saved in database
                       const savedPaymentPlan = reservation.payment_plan;
@@ -793,7 +955,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                         if (paymentInstallments !== 'full') {
                           setPaymentInstallments('full');
                         }
-                        
+
                         return (
                           <div className="flex items-center gap-2">
                             <input
@@ -1020,15 +1182,15 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                     <h6 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">
                       Płatność przelewem tradycyjnym
                     </h6>
-                    
+
                     {/* Calculate deposit: 500 zł + protections, or full payment for First Minute */}
                     {(() => {
                       // Check if First Minute promotion is selected
                       const promotionName = reservation.promotion_name || reservation.selected_promotion || '';
-                      const isFirstMinute = promotionName.toLowerCase().includes('first minute') || 
+                      const isFirstMinute = promotionName.toLowerCase().includes('first minute') ||
                                           promotionName.toLowerCase().includes('firstminute') ||
                                           promotionName.toLowerCase().includes('wczesna rezerwacja');
-                      
+
                       const baseDeposit = 500;
                       // Calculate protection prices from API data
                       const protectionItems: Array<{ name: string; price: number }> = [];
@@ -1038,7 +1200,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                           : typeof reservation.selected_protection === 'string'
                             ? JSON.parse(reservation.selected_protection || '[]')
                             : [];
-                        
+
                         // Get protection prices from API (protections state)
                         selectedProtections.forEach((prot: string) => {
                           let generalProtectionId: number | null = null;
@@ -1053,7 +1215,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                               generalProtectionId = parsedId;
                             }
                           }
-                          
+
                           if (generalProtectionId) {
                             const protection = protections.get(generalProtectionId);
                             if (protection) {
@@ -1064,10 +1226,10 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                       }
                       const protectionTotal = protectionItems.reduce((sum, item) => sum + item.price, 0);
                       const totalDeposit = baseDeposit + protectionTotal;
-                      
+
                       // For First Minute, show full payment instead of deposit
                       const paymentAmount = isFirstMinute ? (reservation.total_price || 0) : totalDeposit;
-                      
+
                       return (
                         <div className="space-y-3 sm:space-y-4">
                           <div className="bg-white p-3 sm:p-4 rounded border border-blue-200">
@@ -1100,7 +1262,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                               )}
                             </div>
                           </div>
-                          
+
                           {bankAccount && (
                             <div className="bg-white p-3 sm:p-4 rounded border border-blue-200">
                               <p className="text-xs sm:text-sm font-semibold text-gray-900 mb-2">Dane do przelewu:</p>
@@ -1183,6 +1345,244 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           </button>
         )}
       </div>
-    </div>
+      </div>
+
+      {showJustificationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-3">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">Uzasadnienie promocji</h3>
+            <p className="text-xs sm:text-sm text-gray-600 mb-4">
+              Dodaj jednorazowo uzasadnienie wybranej promocji. Po zapisaniu nie będzie można go zmienić.
+            </p>
+
+            {justificationError && (
+              <div className="mb-3 text-xs sm:text-sm text-red-600">{justificationError}</div>
+            )}
+
+            {(() => {
+              const promotionName = reservation.promotion_name || reservation.selected_promotion || '';
+              const type = getPromotionType(promotionName);
+
+              if (!requiresJustification(promotionName)) {
+                return (
+                  <div className="space-y-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                      Uzasadnienie (krótki opis) *
+                    </label>
+                    <textarea
+                      value={justificationDraft.reason || ''}
+                      onChange={(e) => setJustificationDraft({
+                        ...justificationDraft,
+                        reason: e.target.value,
+                      })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      placeholder="Wpisz krótkie uzasadnienie"
+                      rows={3}
+                    />
+                  </div>
+                );
+              }
+
+              if (type === 'duza_rodzina') {
+                return (
+                  <div className="space-y-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                      Numer karty dużej rodziny *
+                    </label>
+                    <input
+                      type="text"
+                      value={justificationDraft.card_number || ''}
+                      onChange={(e) => setJustificationDraft({
+                        ...justificationDraft,
+                        card_number: e.target.value,
+                      })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      placeholder="Wpisz numer karty"
+                    />
+                  </div>
+                );
+              }
+
+              if (type === 'rodzenstwo_razem') {
+                return (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                        Imię rodzeństwa *
+                      </label>
+                      <input
+                        type="text"
+                        value={justificationDraft.sibling_first_name || ''}
+                        onChange={(e) => setJustificationDraft({
+                          ...justificationDraft,
+                          sibling_first_name: e.target.value,
+                        })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        placeholder="Wpisz imię rodzeństwa"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                        Nazwisko rodzeństwa *
+                      </label>
+                      <input
+                        type="text"
+                        value={justificationDraft.sibling_last_name || ''}
+                        onChange={(e) => setJustificationDraft({
+                          ...justificationDraft,
+                          sibling_last_name: e.target.value,
+                        })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        placeholder="Wpisz nazwisko rodzeństwa"
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (type === 'obozy_na_maxa') {
+                return (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                        Data pierwszego obozu
+                      </label>
+                      <input
+                        type="text"
+                        value={justificationDraft.first_camp_date || ''}
+                        onChange={(e) => setJustificationDraft({
+                          ...justificationDraft,
+                          first_camp_date: e.target.value,
+                        })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        placeholder="DD.MM.RRRR"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                        Nazwa pierwszego obozu
+                      </label>
+                      <input
+                        type="text"
+                        value={justificationDraft.first_camp_name || ''}
+                        onChange={(e) => setJustificationDraft({
+                          ...justificationDraft,
+                          first_camp_name: e.target.value,
+                        })}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                        placeholder="Podaj nazwę obozu"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Wystarczy wypełnić datę lub nazwę pierwszego obozu.
+                    </p>
+                  </div>
+                );
+              }
+
+              if (type === 'first_minute') {
+                return (
+                  <div className="space-y-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                      Powód wyboru promocji First Minute *
+                    </label>
+                    <input
+                      type="text"
+                      value={justificationDraft.reason || ''}
+                      onChange={(e) => setJustificationDraft({
+                        ...justificationDraft,
+                        reason: e.target.value,
+                      })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      placeholder="Napisz krótki powód"
+                    />
+                  </div>
+                );
+              }
+
+              if (type === 'bonowych') {
+                return (
+                  <div className="space-y-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                      Lata uczestnictwa *
+                    </label>
+                    <input
+                      type="text"
+                      value={Array.isArray(justificationDraft.years) ? justificationDraft.years.join(', ') : (justificationDraft.years || '')}
+                      onChange={(e) => setJustificationDraft({
+                        ...justificationDraft,
+                        years: e.target.value,
+                      })}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                      placeholder="Np. 2022, 2023"
+                    />
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                    Uzasadnienie *
+                  </label>
+                  <textarea
+                    value={justificationDraft.reason || ''}
+                    onChange={(e) => setJustificationDraft({
+                      ...justificationDraft,
+                      reason: e.target.value,
+                    })}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
+                    placeholder="Wpisz uzasadnienie"
+                    rows={3}
+                  />
+                </div>
+              );
+            })()}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowJustificationModal(false);
+                  setJustificationError(null);
+                }}
+                className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100"
+                disabled={savingJustification}
+              >
+                Anuluj
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setJustificationError(null);
+                  const valid = validateJustificationDraft();
+                  if (!valid) return;
+
+                  try {
+                    setSavingJustification(true);
+                    const updated = await reservationService.addPromotionJustification(
+                      reservation.id,
+                      justificationDraft,
+                    );
+                    if (onReservationUpdate) {
+                      onReservationUpdate(updated);
+                    }
+                    setShowJustificationModal(false);
+                  } catch (err: any) {
+                    setJustificationError(err?.message || 'Nie udało się zapisać uzasadnienia.');
+                  } finally {
+                    setSavingJustification(false);
+                  }
+                }}
+                className="px-4 py-2 text-sm bg-[#03adf0] text-white rounded hover:bg-[#0288c7] disabled:opacity-60"
+                disabled={savingJustification}
+              >
+                Zapisz
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

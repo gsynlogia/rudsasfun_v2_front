@@ -17,6 +17,7 @@ interface ReservationAuthGuardProps {
 export default function ReservationAuthGuard({ children }: ReservationAuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const safePathname = pathname || '/';
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -28,7 +29,7 @@ export default function ReservationAuthGuard({ children }: ReservationAuthGuardP
       if (!authService.isAuthenticated()) {
         if (isMounted) {
           // Redirect to login with current path as redirect (will be saved in database)
-          router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+          router.push(`/login?redirect=${encodeURIComponent(safePathname)}`);
         }
         return;
       }
@@ -37,7 +38,7 @@ export default function ReservationAuthGuard({ children }: ReservationAuthGuardP
       const user = await authService.verifyToken();
       if (!user) {
         if (isMounted) {
-          router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+          router.push(`/login?redirect=${encodeURIComponent(safePathname)}`);
         }
         return;
       }
@@ -54,7 +55,7 @@ export default function ReservationAuthGuard({ children }: ReservationAuthGuardP
     return () => {
       isMounted = false;
     };
-  }, [router, pathname]);
+  }, [router, safePathname]);
 
   if (loading) {
     return (
@@ -73,4 +74,3 @@ export default function ReservationAuthGuard({ children }: ReservationAuthGuardP
 
   return <>{children}</>;
 }
-

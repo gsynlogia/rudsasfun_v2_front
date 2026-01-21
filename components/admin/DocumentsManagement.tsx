@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { FileText, Search, ChevronUp, ChevronDown, Edit, Trash2, Plus, Eye, EyeOff, Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
+
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 interface Document {
@@ -41,7 +43,7 @@ export default function DocumentsManagement() {
       setLoading(true);
       setError(null);
       const data = await authenticatedApiCall<{ documents: Document[]; total: number }>(
-        '/api/documents/'
+        '/api/documents/',
       );
       setDocuments(data.documents || []);
     } catch (err) {
@@ -68,7 +70,7 @@ export default function DocumentsManagement() {
       filtered = filtered.filter(
         doc =>
           doc.display_name.toLowerCase().includes(query) ||
-          doc.name.toLowerCase().includes(query)
+          doc.name.toLowerCase().includes(query),
       );
     }
 

@@ -231,7 +231,7 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
       {wantsInvoice && (
         <>
           <DashedLine />
-          
+
           {/* Invoice Type Section */}
           <InvoiceTypeSection />
 

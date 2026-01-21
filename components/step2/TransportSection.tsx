@@ -7,8 +7,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { useReservation } from '@/context/ReservationContext';
 import { authenticatedApiCall } from '@/utils/api-auth';
-import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 import { isFakeDataEnabled } from '@/utils/fakeData';
+import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
@@ -25,10 +25,11 @@ interface TransportCity {
  */
 export default function TransportSection() {
   const pathname = usePathname();
+  const safePathname = pathname || '';
   const { addReservationItem, removeReservationItemsByType, reservation: _reservation } = useReservation();
 
   // Extract campId and editionId from URL
-  const pathParts = pathname.split('/').filter(Boolean);
+  const pathParts = safePathname.split('/').filter(Boolean);
   const campIdIndex = pathParts.indexOf('camps');
   const campId = campIdIndex !== -1 && campIdIndex + 1 < pathParts.length
     ? parseInt(pathParts[campIdIndex + 1], 10)
@@ -116,15 +117,15 @@ export default function TransportSection() {
         setTransportModalConfirmed(savedData.transportModalConfirmed);
       }
     };
-    
+
     syncData();
-    
+
     // Listen for fake data loaded event
     const handleFakeDataLoaded = () => {
       setTimeout(syncData, 100); // Small delay to ensure sessionStorage is updated
     };
     window.addEventListener('fakeDataLoaded', handleFakeDataLoaded);
-    
+
     return () => {
       window.removeEventListener('fakeDataLoaded', handleFakeDataLoaded);
     };

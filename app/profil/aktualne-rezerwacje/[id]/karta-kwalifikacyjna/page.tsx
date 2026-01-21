@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { API_BASE_URL } from '@/utils/api-config';
+import { useEffect, useState } from 'react';
+
 import { authService } from '@/lib/services/AuthService';
+import { API_BASE_URL } from '@/utils/api-config';
 
 /**
  * Qualification Card HTML Page
@@ -12,8 +13,8 @@ import { authService } from '@/lib/services/AuthService';
  */
 export default function QualificationCardHtmlPage() {
   const params = useParams();
-  const reservationId = params.id as string; // e.g., "REZ-2025-016" or reservation ID
-  
+  const reservationId = params?.id ? String(params.id) : ''; // e.g., "REZ-2025-016" or reservation ID
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,29 +27,29 @@ export default function QualificationCardHtmlPage() {
         // Extract reservation ID from reservation number (e.g., "REZ-2025-016")
         // We need to fetch reservations to find the matching ID
         let reservationIdNum: number;
-        
+
         if (reservationId.startsWith('REZ-')) {
           // It's a reservation number, fetch reservations to find the ID
           const { reservationService } = await import('@/lib/services/ReservationService');
           const reservations = await reservationService.getMyReservations(0, 100);
-          
+
           const formatReservationNumber = (reservationId: number, createdAt: string) => {
             const year = new Date(createdAt).getFullYear();
             const paddedId = String(reservationId).padStart(3, '0');
             return `REZ-${year}-${paddedId}`;
           };
-          
+
           const foundReservation = reservations.find((r: any) => {
             const rNumber = formatReservationNumber(r.id, r.created_at);
             return rNumber === reservationId;
           });
-          
+
           if (!foundReservation) {
             setError('Rezerwacja nie została znaleziona');
             setIsLoading(false);
             return;
           }
-          
+
           reservationIdNum = foundReservation.id;
         } else {
           reservationIdNum = parseInt(reservationId);
@@ -80,7 +81,7 @@ export default function QualificationCardHtmlPage() {
         }
 
         const html = await response.text();
-        
+
         // Replace entire document with qualification card HTML
         // Backend already provides full API URLs for images and includes auto-print script
         document.open();
@@ -122,11 +123,3 @@ export default function QualificationCardHtmlPage() {
 
   return null; // HTML is written directly to document
 }
-
-
-
-
-
-
-
-

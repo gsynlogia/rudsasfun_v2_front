@@ -1,9 +1,9 @@
 'use client';
 
 import { FileText, Download, CheckCircle, XCircle } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
 
 
 import { certificateService, CertificateResponse } from '@/lib/services/CertificateService';
@@ -241,18 +241,18 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           const generateResult = await contractService.generateContract(reservationIdNum);
           console.log(`[Contract Generation] Contract generation result:`, generateResult);
           console.log(`[Contract Generation] Contract generated successfully for reservation ${reservationIdNum}`);
-          
+
           // Wait a bit to ensure contract is saved to database
           await new Promise(resolve => setTimeout(resolve, 500));
-          
+
           // Reload contract status after generation
           await loadContractStatus();
-          
+
           // Verify contract was actually created
           const verifyContracts = await contractService.listMyContracts();
           const verifyExists = verifyContracts.some(c => c.reservation_id === reservationIdNum);
           console.log(`[Contract Verification] Contract exists after generation: ${verifyExists}`);
-          
+
           if (!verifyExists) {
             console.error(`[Contract Verification] Contract was not created for reservation ${reservationIdNum}`);
             alert('Umowa nie została wygenerowana. Spróbuj ponownie.');
@@ -383,13 +383,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                 </button> */}
                 <button
                   onClick={() => {
-                    const formatReservationNumber = (reservationId: number, createdAt: string) => {
-                      const year = new Date(createdAt).getFullYear();
-                      const paddedId = String(reservationId).padStart(3, '0');
-                      return `REZ-${year}-${paddedId}`;
-                    };
-                    const reservationNumber = formatReservationNumber(reservation.id, reservation.created_at);
-                    window.open(`/profil/aktualne-rezerwacje/${reservationNumber}/umowa`, '_blank');
+                    router.push('/profil/do-pobrania');
                   }}
                   className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] text-white text-[10px] sm:text-xs rounded hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-1"
                 >
@@ -864,7 +858,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
             <p className="text-sm sm:text-base text-gray-700">
               Aby zrezygnować z rezerwacji, prosimy o kontakt z nami:
             </p>
-            
+
             <div className="space-y-3">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 mt-1">
@@ -874,8 +868,8 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-gray-900 mb-1">Napisz do nas</p>
-                  <a 
-                    href="mailto:lato@radsas-fun.pl" 
+                  <a
+                    href="mailto:lato@radsas-fun.pl"
                     className="text-sm sm:text-base text-[#03adf0] hover:text-[#0288c7] hover:underline"
                   >
                     lato@radsas-fun.pl
@@ -891,8 +885,8 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-gray-900 mb-1">Zadzwoń do nas</p>
-                  <a 
-                    href="tel:+48513726102" 
+                  <a
+                    href="tel:+48513726102"
                     className="text-sm sm:text-base text-[#03adf0] hover:text-[#0288c7] hover:underline"
                   >
                     +48 513 726 102
@@ -922,4 +916,3 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
     </div>
   );
 }
-

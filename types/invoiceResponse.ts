@@ -22,4 +22,3 @@ export interface InvoiceResponse {
   created_at: string;
   updated_at: string;
 }
-

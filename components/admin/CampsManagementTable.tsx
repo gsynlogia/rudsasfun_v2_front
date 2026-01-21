@@ -51,16 +51,16 @@ export default function CampsManagementTable() {
   const [_cityFilter, _setCityFilter] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  
+
   // Initialize currentPage from URL params or default to 1
-  const pageFromUrl = searchParams.get('page');
+  const pageFromUrl = searchParams?.get('page');
   const [currentPage, setCurrentPage] = useState(pageFromUrl ? parseInt(pageFromUrl, 10) : 1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [pageInputValue, setPageInputValue] = useState('');
-  
+
   // Sync currentPage with URL params on mount and when searchParams change
   useEffect(() => {
-    const pageParam = searchParams.get('page');
+    const pageParam = searchParams?.get('page');
     if (pageParam) {
       const pageNum = parseInt(pageParam, 10);
       if (!isNaN(pageNum) && pageNum > 0) {
@@ -71,10 +71,10 @@ export default function CampsManagementTable() {
       setCurrentPage(1);
     }
   }, [searchParams]);
-  
+
   // Update URL when currentPage changes
   const updatePageInUrl = (page: number) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
     if (page === 1) {
       params.delete('page');
     } else {
@@ -286,14 +286,14 @@ export default function CampsManagementTable() {
     setCurrentPage(1);
     updatePageInUrl(1);
   };
-  
+
   // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     updatePageInUrl(page);
     setPageInputValue(''); // Clear input after page change
   };
-  
+
   // Handle page input change
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -302,24 +302,24 @@ export default function CampsManagementTable() {
       setPageInputValue(value);
     }
   };
-  
+
   // Handle page input submit (Enter key)
   const handlePageInputSubmit = () => {
     if (!pageInputValue) return;
-    
+
     const pageNum = parseInt(pageInputValue, 10);
-    
+
     // Validation
     if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages || pageNum % 1 !== 0) {
       // Invalid input - reset to empty
       setPageInputValue('');
       return;
     }
-    
+
     // Valid input - navigate to page
     handlePageChange(pageNum);
   };
-  
+
   // Handle Enter key in page input
   const handlePageInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -1077,4 +1077,3 @@ export default function CampsManagementTable() {
     </div>
   );
 }
-

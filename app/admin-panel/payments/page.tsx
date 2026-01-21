@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import PaymentsManagement from '@/components/admin/PaymentsManagement';
 import SectionGuard from '@/components/admin/SectionGuard';
@@ -33,4 +34,3 @@ export default function PaymentsPage() {
     </SectionGuard>
   );
 }
-

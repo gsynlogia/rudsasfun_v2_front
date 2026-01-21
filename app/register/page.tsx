@@ -17,7 +17,7 @@ function RegisterContent() {
   const [loading, setLoading] = useState(false);
 
   // Get redirect URL from query params
-  const redirectUrl = searchParams.get('redirect') || '/';
+  const redirectUrl = searchParams?.get('redirect') || '/';
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -26,8 +26,8 @@ function RegisterContent() {
         const user = await authService.verifyToken();
         if (user) {
           // User is authenticated, redirect to intended page or home
-          const finalRedirect = redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/') 
-            ? redirectUrl 
+          const finalRedirect = redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')
+            ? redirectUrl
             : '/';
           router.replace(finalRedirect);
         } else {
@@ -52,7 +52,7 @@ function RegisterContent() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Błąd podczas rejestracji';
       setError(errorMessage);
-      
+
       // If user already exists, suggest logging in
       if (errorMessage.includes('już istnieje')) {
         // Error message already contains suggestion to login
@@ -165,11 +165,3 @@ export default function RegisterPage() {
 }
 
 export const dynamic = 'force-dynamic';
-
-
-
-
-
-
-
-

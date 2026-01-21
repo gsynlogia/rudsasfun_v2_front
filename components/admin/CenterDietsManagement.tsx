@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface GeneralDietRelation {
@@ -51,7 +52,7 @@ export default function CenterDietsManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedDiet, setSelectedDiet] = useState<CenterDiet | null>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Form state
   const [dietName, setDietName] = useState('');
   const [selectedGeneralDietIds, setSelectedGeneralDietIds] = useState<number[]>([]);
@@ -107,7 +108,7 @@ export default function CenterDietsManagement() {
   const handleEdit = (diet: CenterDiet) => {
     setSelectedDiet(diet);
     setDietName(diet.name || '');
-    
+
     // Populate selected general diets and their prices
     const selectedIds: number[] = [];
     const prices: Record<number, number> = {};
@@ -117,7 +118,7 @@ export default function CenterDietsManagement() {
     });
     setSelectedGeneralDietIds(selectedIds);
     setGeneralDietPrices(prices);
-    
+
     setDietDescription(diet.description || '');
     setShowEditModal(true);
   };
@@ -127,7 +128,7 @@ export default function CenterDietsManagement() {
       setError('Nazwa diety dla ośrodka jest wymagana');
       return;
     }
-    
+
     // Validate all prices
     for (const generalDietId of selectedGeneralDietIds) {
       const price = generalDietPrices[generalDietId];
@@ -144,7 +145,7 @@ export default function CenterDietsManagement() {
       // Build general diets list with prices
       const generalDietsList = selectedGeneralDietIds.map(generalDietId => ({
         general_diet_id: generalDietId,
-        price: Number(generalDietPrices[generalDietId])
+        price: Number(generalDietPrices[generalDietId]),
       }));
 
       const payload = {
@@ -152,7 +153,7 @@ export default function CenterDietsManagement() {
         name: dietName.trim(),
         description: dietDescription.trim() || null,
         is_active: true,
-        general_diets: generalDietsList
+        general_diets: generalDietsList,
       };
 
       if (selectedDiet) {
@@ -312,7 +313,7 @@ export default function CenterDietsManagement() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-            
+
             <div className="space-y-4">
               {/* 1. Nazwa diety dla ośrodka - PIERWSZA POZYCJA */}
               <div>
@@ -346,7 +347,7 @@ export default function CenterDietsManagement() {
                             setSelectedGeneralDietIds([...selectedGeneralDietIds, gd.id]);
                             setGeneralDietPrices({
                               ...generalDietPrices,
-                              [gd.id]: gd.price
+                              [gd.id]: gd.price,
                             });
                           } else {
                             // Remove from selection
@@ -377,7 +378,7 @@ export default function CenterDietsManagement() {
                     {selectedGeneralDietIds.map((generalDietId) => {
                       const generalDiet = generalDiets.find(gd => gd.id === generalDietId);
                       if (!generalDiet) return null;
-                      
+
                       return (
                         <div key={generalDietId} className="flex items-center gap-4">
                           <div className="flex-1">
@@ -397,7 +398,7 @@ export default function CenterDietsManagement() {
                                 const price = e.target.value ? parseFloat(e.target.value) : generalDiet.price;
                                 setGeneralDietPrices({
                                   ...generalDietPrices,
-                                  [generalDietId]: price
+                                  [generalDietId]: price,
                                 });
                               }}
                               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
@@ -413,7 +414,7 @@ export default function CenterDietsManagement() {
                   </p>
                 </div>
               )}
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Opis
@@ -426,7 +427,7 @@ export default function CenterDietsManagement() {
                 />
               </div>
             </div>
-            
+
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => {
@@ -454,4 +455,3 @@ export default function CenterDietsManagement() {
     </div>
   );
 }
-

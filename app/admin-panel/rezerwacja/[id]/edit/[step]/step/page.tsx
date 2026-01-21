@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
-import SectionGuard from '@/components/admin/SectionGuard';
-import { authenticatedApiCall } from '@/utils/api-auth';
-import { useToast } from '@/components/ToastContainer';
 import EditReservationStep1 from '@/components/admin/EditReservationStep1';
 import EditReservationStep2 from '@/components/admin/EditReservationStep2';
 import EditReservationStep3 from '@/components/admin/EditReservationStep3';
 import EditReservationStep4 from '@/components/admin/EditReservationStep4';
+import SectionGuard from '@/components/admin/SectionGuard';
+import { useToast } from '@/components/ToastContainer';
+import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
   id: number;
@@ -275,12 +276,12 @@ export default function EditReservationPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(updateRequest),
-        }
+        },
       );
 
       // Success - show toast and stay on edit page
       showSuccess('Zmiany zostały zapisane pomyślnie');
-      
+
       // Update local reservation state with response data
       setReservation(response);
     } catch (err) {
@@ -344,7 +345,7 @@ export default function EditReservationPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Fixed Save Button - always visible at top right */}
           <button
             onClick={handleSave}
@@ -469,4 +470,3 @@ export default function EditReservationPage() {
     </SectionGuard>
   );
 }
-

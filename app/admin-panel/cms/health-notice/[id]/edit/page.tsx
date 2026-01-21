@@ -5,9 +5,9 @@ import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
 import SectionGuard from '@/components/admin/SectionGuard';
 import { authenticatedApiCall } from '@/utils/api-auth';
-import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
 
 interface HealthNotice {
   id: number;
@@ -235,4 +235,3 @@ export default function HealthNoticeEditPage() {
     </SectionGuard>
   );
 }
-

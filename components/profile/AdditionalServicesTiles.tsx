@@ -4,11 +4,11 @@ import { Phone, Info } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 import UniversalModal from '@/components/admin/UniversalModal';
+import { useToast } from '@/components/ToastContainer';
 import { authService } from '@/lib/services/AuthService';
 import { paymentService, CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
 import { API_BASE_URL, getStaticAssetUrl, getApiBaseUrlRuntime } from '@/utils/api-config';
-import { useToast } from '@/components/ToastContainer';
 
 interface AdditionalServicesTilesProps {
   selectedAddons?: string[] | null;
@@ -83,10 +83,10 @@ export default function AdditionalServicesTiles({
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         // Get city from reservation (required for filtering addons by center)
         const city = reservation?.property_city;
-        
+
         if (!city) {
           console.warn('[AdditionalServicesTiles] No city found in reservation, cannot fetch addons');
           setAddons([]);
@@ -94,7 +94,7 @@ export default function AdditionalServicesTiles({
           setLoading(false);
           return;
         }
-        
+
         // Fetch addons filtered by city (only addons available for this center)
         const addonsUrl = `${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(city)}`;
         const addonsResponse = await fetch(addonsUrl);
@@ -109,7 +109,7 @@ export default function AdditionalServicesTiles({
         if (reservation?.camp_id && reservation?.property_id) {
           // Fetch turnus protections (has turnus-specific prices)
           const turnusProtectionsResponse = await fetch(
-            `${API_BASE_URL}/api/camps/${reservation.camp_id}/properties/${reservation.property_id}/protections`
+            `${API_BASE_URL}/api/camps/${reservation.camp_id}/properties/${reservation.property_id}/protections`,
           );
           if (turnusProtectionsResponse.ok) {
             const turnusProtectionsData = await turnusProtectionsResponse.json();
@@ -214,13 +214,13 @@ export default function AdditionalServicesTiles({
       alert('Brak danych rezerwacji. Nie można utworzyć płatności.');
       return;
     }
-    
+
     console.log('[AdditionalServicesTiles] handleServicePayment called:', {
       serviceId,
       serviceName,
       serviceType,
       reservationId: reservation.id,
-      currentSelectedAddons: reservation.selected_addons
+      currentSelectedAddons: reservation.selected_addons,
     });
 
     // If online payments are disabled, add directly to database
@@ -230,14 +230,14 @@ export default function AdditionalServicesTiles({
 
       try {
         let updatedReservation: ReservationResponse;
-        
+
         if (serviceType === 'addon') {
           console.log('[AdditionalServicesTiles] 🔵 BEFORE API CALL:');
           console.log('   Current reservation.selected_addons:', reservation.selected_addons);
           console.log('   Adding serviceId:', serviceId);
-          
+
           updatedReservation = await reservationService.addAddonToReservation(reservation.id, serviceId);
-          
+
           console.log('[AdditionalServicesTiles] 🟢 AFTER API CALL:');
           console.log('   updatedReservation.id:', updatedReservation.id);
           console.log('   updatedReservation.selected_addons:', updatedReservation.selected_addons);
@@ -253,7 +253,7 @@ export default function AdditionalServicesTiles({
           console.log('[AdditionalServicesTiles] Protection added, updated reservation:', {
             id: updatedReservation.id,
             selected_protection: updatedReservation.selected_protection,
-            serviceId: protectionId
+            serviceId: protectionId,
           });
         }
 
@@ -334,7 +334,7 @@ export default function AdditionalServicesTiles({
         const match = id.match(/^protection-(\d+)$/);
         return match ? parseInt(match[1], 10) : null;
       })
-      .filter((id): id is number => id !== null)
+      .filter((id): id is number => id !== null),
   );
 
   // Map protections from API to display format
@@ -357,7 +357,7 @@ export default function AdditionalServicesTiles({
                     (match, attrs) => {
                       attrs = attrs.replace(/\s*(width|height|style)=["'][^"']*["']/gi, '');
                       return `<svg${attrs} class="w-full h-full" style="fill: currentColor;">`;
-                    }
+                    },
                   ),
                 }}
               />
@@ -709,4 +709,3 @@ export default function AdditionalServicesTiles({
     </div>
   );
 }
-

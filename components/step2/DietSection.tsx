@@ -4,9 +4,9 @@ import { Info, UtensilsCrossed } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
+import type { ReservationItem } from '@/types/reservation';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
-import type { ReservationItem } from '@/types/reservation';
 
 interface Diet {
   id: number;
@@ -113,7 +113,7 @@ export default function DietSection() {
         }
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [isInitialized, diets.length, reservation.items.length]);
 
   // Update reservation when diets change
@@ -338,4 +338,3 @@ export default function DietSection() {
     </div>
   );
 }
-

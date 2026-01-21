@@ -121,4 +121,3 @@ export default function CampForm({ camp, onSuccess, onCancel }: CampFormProps) {
     </div>
   );
 }
-

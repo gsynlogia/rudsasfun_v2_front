@@ -85,16 +85,49 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
           <div className="hidden lg:flex items-center gap-6 text-sm">
             {/* Text links */}
             <div className="flex items-center gap-6">
-              <Link href="#" className="text-gray-600 hover:text-[#03adf0] transition-colors">Fotorelacje</Link>
-              <Link href="#" className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1">
+              <Link
+                href="https://radsas-fun.pl/fotorelacja/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-[#03adf0] transition-colors"
+              >
+                Fotorelacje
+              </Link>
+              <Link
+                href="https://radsas-fun.pl/o-nas/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1"
+              >
                 Poznaj nas
                 <svg className="w-3 h-3 text-[#03adf0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </Link>
-              <Link href="#" className="text-gray-600 hover:text-[#03adf0] transition-colors">Blog</Link>
-              <Link href="#" className="text-gray-600 hover:text-[#03adf0] transition-colors">Sklep</Link>
-              <Link href="#" className="text-gray-600 hover:text-[#03adf0] transition-colors">Kontakt</Link>
+              <Link
+                href="https://radsas-fun.pl/blog/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-[#03adf0] transition-colors"
+              >
+                Blog
+              </Link>
+              <Link
+                href="https://radsas-fun.pl/sklep/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-[#03adf0] transition-colors"
+              >
+                Sklep
+              </Link>
+              <Link
+                href="https://radsas-fun.pl/kontakt/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-[#03adf0] transition-colors"
+              >
+                Kontakt
+              </Link>
             </div>
 
             {/* Vertical separator */}
@@ -193,14 +226,49 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
         </div>
 
         {/* Mobile menu dropdown */}
-        {mobileMenuOpen && (
+            {mobileMenuOpen && (
           <div className="lg:hidden border-t border-gray-200 bg-white">
             <div className="max-w-container px-3 py-4 space-y-3">
-              <Link href="#" className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2">Fotorelacje</Link>
-              <Link href="#" className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2">Poznaj nas</Link>
-              <Link href="#" className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2">Blog</Link>
-              <Link href="#" className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2">Sklep</Link>
-              <Link href="#" className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2">Kontakt</Link>
+              <Link
+                href="https://radsas-fun.pl/fotorelacja/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2"
+              >
+                Fotorelacje
+              </Link>
+              <Link
+                href="https://radsas-fun.pl/o-nas/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2"
+              >
+                Poznaj nas
+              </Link>
+              <Link
+                href="https://radsas-fun.pl/blog/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2"
+              >
+                Blog
+              </Link>
+              <Link
+                href="https://radsas-fun.pl/sklep/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2"
+              >
+                Sklep
+              </Link>
+              <Link
+                href="https://radsas-fun.pl/kontakt/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2"
+              >
+                Kontakt
+              </Link>
               <div className="flex items-center gap-4 pt-2 border-t border-gray-200">
                 <div className="flex items-center gap-1">
                   <button className="text-gray-600 hover:text-[#03adf0] transition-colors">
@@ -241,4 +309,3 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
     </header>
   );
 }
-

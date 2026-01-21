@@ -48,4 +48,3 @@ export interface QualificationCardDataUpdate {
   parent2_phone?: string | null;
   parent2_email?: string | null;
 }
-

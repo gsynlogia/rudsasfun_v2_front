@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
+
 import AdminLayout from '@/components/admin/AdminLayout';
 import ReservationsTable from '@/components/admin/ReservationsTable';
 import SectionGuard from '@/components/admin/SectionGuard';

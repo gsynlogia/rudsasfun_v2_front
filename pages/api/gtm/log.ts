@@ -1,6 +1,7 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
+
+import type { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -18,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const filePath = path.join(baseDir, `${reservationNumber}.txt`);
 
     const existing = fs.existsSync(filePath) ? await fs.promises.readFile(filePath, 'utf-8') : '';
-    const appendData = (existing ? existing + '\n' : '') + JSON.stringify(payload);
+    const appendData = (existing ? `${existing}\n` : '') + JSON.stringify(payload);
     await fs.promises.writeFile(filePath, appendData, 'utf-8');
 
     return res.status(200).json({ success: true });

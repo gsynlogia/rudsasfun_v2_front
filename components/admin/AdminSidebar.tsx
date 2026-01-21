@@ -171,15 +171,16 @@ export default function AdminSidebar() {
   });
 
   const isActive = (href: string) => {
+    const path = pathname || '';
     if (href === '/admin-panel') {
       // For main page, only active if exactly /admin-panel (not /admin-panel/camps, etc.)
-      return pathname === '/admin-panel' || pathname === '/admin-panel/';
+      return path === '/admin-panel' || path === '/admin-panel/';
     }
     if (href === '/admin-panel/settings') {
       // Settings is active for /admin-panel/settings but not for /admin-panel/settings/super-functions
-      return pathname.startsWith('/admin-panel/settings') && !pathname.startsWith('/admin-panel/settings/super-functions') && pathname !== '/admin-panel/settings/super-functions';
+      return path.startsWith('/admin-panel/settings') && !path.startsWith('/admin-panel/settings/super-functions') && path !== '/admin-panel/settings/super-functions';
     }
-    return pathname.startsWith(href);
+    return path.startsWith(href);
   };
 
   return (

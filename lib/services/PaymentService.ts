@@ -239,4 +239,3 @@ class PaymentService {
 }
 
 export const paymentService = PaymentService.getInstance();
-

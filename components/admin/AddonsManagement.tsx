@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Edit, Trash2, Power, PowerOff, Save, DollarSign, GripVertical } from 'lucide-react';
-import UniversalModal from './UniversalModal';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
+import { useState, useEffect, useCallback } from 'react';
+
 import { authenticatedApiCall, authenticatedFetch } from '@/utils/api-auth';
 import { getApiBaseUrlRuntime, getStaticAssetUrl } from '@/utils/api-config';
+
+import DeleteConfirmationModal from './DeleteConfirmationModal';
+import UniversalModal from './UniversalModal';
 
 interface Addon {
   id: number;
@@ -47,7 +49,7 @@ export default function AddonsManagement() {
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [selectedCenters, setSelectedCenters] = useState<string[]>([]);
   const [addonDefaultSelected, setAddonDefaultSelected] = useState<boolean>(true);
-  
+
   // Available centers
   const availableCenters = ['SAWA', 'BEAVER', 'LIMBA'];
 
@@ -56,7 +58,7 @@ export default function AddonsManagement() {
       setLoading(true);
       setError(null);
       const data = await authenticatedApiCall<{ addons: Addon[]; total: number }>(
-        '/api/addons/?include_inactive=true'
+        '/api/addons/?include_inactive=true',
       );
       // Sort by display_order
       const sorted = (data.addons || []).sort((a, b) => a.display_order - b.display_order);
@@ -150,10 +152,10 @@ export default function AddonsManagement() {
     try {
       setUploadingIcon(true);
       setError(null);
-      
+
       const formData = new FormData();
       formData.append('file', file);
-      
+
       // Use authenticatedFetch for FormData upload
       const API_BASE_URL = getApiBaseUrlRuntime();
       const response = await authenticatedFetch(`${API_BASE_URL}/api/addons/addon-icon-upload`, {
@@ -161,7 +163,7 @@ export default function AddonsManagement() {
         body: formData,
         // authenticatedFetch will handle Authorization header and Content-Type for FormData
       });
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Sesja wygasła. Zaloguj się ponownie.');
@@ -169,7 +171,7 @@ export default function AddonsManagement() {
         const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       // Backend returns relative_path and url (relative path with /static/)
       const fullUrl = data.url.startsWith('http') ? data.url : `${API_BASE_URL}${data.url}`;
@@ -206,7 +208,7 @@ export default function AddonsManagement() {
 
       // Upload icon file if method is upload and a new file is selected
       let finalIconRelativePath: string | null = iconRelativePath;
-      
+
       // If user selected a new file, upload it (this handles both new addons and editing existing ones)
       if (iconMethod === 'upload' && iconFile) {
         try {
@@ -228,7 +230,7 @@ export default function AddonsManagement() {
         default_selected: addonDefaultSelected,
         centers: selectedCenters, // Include selected centers
       };
-      
+
       // Add icon based on selected method
       if (iconMethod === 'paste' && addonIconSvg.trim()) {
         // User is using SVG paste method
@@ -447,12 +449,12 @@ export default function AddonsManagement() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {addon.icon_svg ? (
-                        <div 
+                        <div
                           className="w-10 h-10 flex items-center justify-center"
                           dangerouslySetInnerHTML={{ __html: addon.icon_svg }}
                         />
                       ) : addon.icon_url ? (
-                        <img 
+                        <img
                           src={getStaticAssetUrl(addon.icon_url) || ''}
                           alt={addon.name}
                           className="w-10 h-10 object-contain"
@@ -612,7 +614,7 @@ export default function AddonsManagement() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Ikona (opcjonalne)
               </label>
-              
+
               {/* Method selection */}
               <div className="mb-3 flex gap-4">
                 <label className="flex items-center cursor-pointer">
@@ -664,8 +666,8 @@ export default function AddonsManagement() {
                     <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
                       <p className="text-xs text-gray-600 mb-1">Wybrany plik: {iconFile.name}</p>
                       {iconFile.type.startsWith('image/') && (
-                        <img 
-                          src={URL.createObjectURL(iconFile)} 
+                        <img
+                          src={URL.createObjectURL(iconFile)}
                           alt="Preview"
                           className="w-20 h-20 object-contain bg-white border border-gray-300 rounded"
                         />
@@ -675,8 +677,8 @@ export default function AddonsManagement() {
                   {iconUploadUrl && (
                     <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
                       <p className="text-xs text-green-600 mb-1">Ikona została załadowana:</p>
-                      <img 
-                        src={iconUploadUrl} 
+                      <img
+                        src={iconUploadUrl}
                         alt="Uploaded icon"
                         className="w-20 h-20 object-contain bg-white border border-gray-300 rounded"
                       />
@@ -711,11 +713,11 @@ export default function AddonsManagement() {
                   {addonIconSvg && addonIconSvg.trim() && (
                     <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
                       <p className="text-xs text-gray-600 mb-2">Podgląd ikony:</p>
-                      <div 
+                      <div
                         className="flex items-center justify-center w-20 h-20 bg-white border border-gray-300 rounded"
-                        style={{ 
+                        style={{
                           minWidth: '80px',
-                          minHeight: '80px'
+                          minHeight: '80px',
                         }}
                         dangerouslySetInnerHTML={{ __html: addonIconSvg }}
                       />
@@ -823,4 +825,3 @@ export default function AddonsManagement() {
     </div>
   );
 }
-

@@ -127,4 +127,3 @@ const getStepLabel = (stepNumber: StepNumber): string => {
   };
   return labels[stepNumber];
 };
-

@@ -31,6 +31,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
   const [paymentAmount, setPaymentAmount] = useState<'full' | 'deposit'>('full');
   const router = useRouter();
   const pathname = usePathname();
+  const safePathname = pathname || '';
 
   // Calculate payment amounts for Step 5
   // Use basePrice from reservation context if totalPrice is not available
@@ -110,7 +111,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
     // Default navigation logic
     if (!currentStep) {
       // If currentStep is not provided, try to extract from pathname
-      const pathParts = pathname.split('/').filter(Boolean);
+      const pathParts = safePathname.split('/').filter(Boolean);
       const stepIndex = pathParts.indexOf('step');
       if (stepIndex !== -1 && stepIndex + 1 < pathParts.length) {
         const step = parseInt(pathParts[stepIndex + 1], 10);
@@ -128,7 +129,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
   const navigateToStep = (step: StepNumber) => {
     if (step < TOTAL_STEPS) {
       // Navigate to next step
-      const pathParts = pathname.split('/').filter(Boolean);
+      const pathParts = safePathname.split('/').filter(Boolean);
       const campIdIndex = pathParts.indexOf('camps');
       if (campIdIndex !== -1 && campIdIndex + 1 < pathParts.length) {
         const campId = pathParts[campIdIndex + 1];
@@ -148,7 +149,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
   const baseItem = reservation.items.find((item: ReservationItem) => item.type === 'base');
   const transportItem = reservation.items.find((item: ReservationItem) => item.type === 'transport');
   const additionalItems = reservation.items.filter((item: ReservationItem) => item.type !== 'base' && item.type !== 'transport');
-  
+
   // Load transport data from sessionStorage
   const step2Data = loadStep2FormData();
   const transportData = step2Data?.transportData;
@@ -247,14 +248,14 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                 <div className="text-sm text-gray-600 mb-1 ml-4">
                   Transport: <span className="font-bold uppercase">WYJAZD:</span> {
                     transportData.departureType === 'zbiorowy' && transportData.departureCity && transportData.departureCity.trim() !== '' && transportData.departureCity !== 'Nie wybrano'
-                      ? transportData.departureCity 
+                      ? transportData.departureCity
                       : 'własny'
                   }
                 </div>
                 <div className="text-sm text-gray-600 mb-1 ml-4">
                   Transport: <span className="font-bold uppercase">POWRÓT:</span> {
                     transportData.returnType === 'zbiorowy' && transportData.returnCity && transportData.returnCity.trim() !== '' && transportData.returnCity !== 'Nie wybrano'
-                      ? transportData.returnCity 
+                      ? transportData.returnCity
                       : 'własny'
                   }
                 </div>
@@ -296,7 +297,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                   const displayPrice = isPromotionNotReducingPrice && item.metadata?.originalPrice !== undefined
                     ? item.metadata.originalPrice
                     : item.price;
-                  
+
                   return (
                     <div
                       key={item.id}
@@ -318,7 +319,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                     </div>
                   );
                 })}
-              
+
               {/* Transport - special formatting */}
               {transportItem && (
                 <>
@@ -333,14 +334,14 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                       <div className="text-xs sm:text-sm text-gray-600 ml-4">
                         Transport: <span className="font-bold uppercase">WYJAZD:</span> {
                           transportData.departureType === 'zbiorowy' && transportData.departureCity && transportData.departureCity.trim() !== '' && transportData.departureCity !== 'Nie wybrano'
-                            ? transportData.departureCity 
+                            ? transportData.departureCity
                             : 'własny'
                         }
                       </div>
                       <div className="text-xs sm:text-sm text-gray-600 ml-4">
                         Transport: <span className="font-bold uppercase">POWRÓT:</span> {
                           transportData.returnType === 'zbiorowy' && transportData.returnCity && transportData.returnCity.trim() !== '' && transportData.returnCity !== 'Nie wybrano'
-                            ? transportData.returnCity 
+                            ? transportData.returnCity
                             : 'własny'
                         }
                       </div>

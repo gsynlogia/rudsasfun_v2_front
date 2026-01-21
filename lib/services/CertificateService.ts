@@ -122,4 +122,3 @@ class CertificateService {
 }
 
 export const certificateService = CertificateService.getInstance();
-

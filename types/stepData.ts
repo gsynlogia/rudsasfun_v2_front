@@ -3,9 +3,9 @@
  * Used to initialize forms and merge with saved data
  */
 
-import type { Step1FormData, Step2FormData, Step3FormData } from '@/utils/sessionStorage';
-import type { ReservationState } from '@/types/reservation';
 import { withDefaults } from '@/types/defaults';
+import type { ReservationState } from '@/types/reservation';
+import type { Step1FormData, Step2FormData, Step3FormData } from '@/utils/sessionStorage';
 
 // Re-export withDefaults from defaults.ts
 export { withDefaults };
@@ -115,4 +115,6 @@ export const defaultReservationState: ReservationState = {
     },
   ],
   totalPrice: 2200,
+  currentStep: 1,
+  reservationNumber: null,
 };

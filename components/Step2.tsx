@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import DashedLine from './DashedLine';
-import AddonsSection from './step2/AddonsSection';
-import ProtectionSection from './step2/ProtectionSection';
-import PromotionsSection from './step2/PromotionsSection';
-import TransportSection from './step2/TransportSection';
-import SourceSection from './step2/SourceSection';
+
 import type { StepComponentProps } from '@/types/reservation';
 import { saveStep2FormData, loadStep2FormData, type Step2FormData } from '@/utils/sessionStorage';
+
+import DashedLine from './DashedLine';
+import AddonsSection from './step2/AddonsSection';
+import PromotionsSection from './step2/PromotionsSection';
+import ProtectionSection from './step2/ProtectionSection';
+import SourceSection from './step2/SourceSection';
+import TransportSection from './step2/TransportSection';
 
 /**
  * Step2 Component - Reservation Details
@@ -20,16 +22,16 @@ export default function Step2({ onNext, onPrevious, disabled = false }: StepComp
     // Validate transport section
     const validateTransport = (window as any).validateStep2;
     const transportValid = validateTransport ? validateTransport() : false;
-    
+
     // Validate source section
     const validateSource = (window as any).validateSourceSection;
     const sourceValid = validateSource ? validateSource() : false;
-    
+
     // Validate promotions section
     // IMPORTANT: If validation function is not loaded yet, return false to prevent bypassing validation
     const validatePromotions = (window as any).validatePromotionsSection;
     const promotionsValid = validatePromotions ? validatePromotions() : false;
-    
+
     return transportValid && sourceValid && promotionsValid;
   }, []);
 

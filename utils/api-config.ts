@@ -142,4 +142,3 @@ export function getStaticAssetUrl(iconUrl: string | null | undefined): string | 
   // Add /static/ prefix and prepend API_BASE_URL
   return `${baseUrl}/static/${cleanPath}`;
 }
-
