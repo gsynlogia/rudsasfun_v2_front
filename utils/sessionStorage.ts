@@ -68,6 +68,8 @@ export interface ReservationStorageState {
       end_date: string;
     };
   };
+  currentStep?: number;
+  reservationNumber?: string | null;
 }
 
 /**
@@ -148,7 +150,13 @@ export function loadReservationState(): ReservationStorageState | null {
   try {
     const data = sessionStorage.getItem(STORAGE_KEYS.RESERVATION_STATE);
     if (!data) return null;
-    return JSON.parse(data) as ReservationStorageState;
+    const parsed = JSON.parse(data) as ReservationStorageState;
+    // Backward compatibility defaults
+    return {
+      ...parsed,
+      currentStep: parsed.currentStep ?? 1,
+      reservationNumber: parsed.reservationNumber ?? null,
+    };
   } catch (error) {
     console.error('Error loading reservation state from sessionStorage:', error);
     return null;

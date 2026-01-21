@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 
 import UniversalModal from '@/components/admin/UniversalModal';
 import { useReservation } from '@/context/ReservationContext';
+import { logGtmEvent, buildStepEventData } from '@/utils/gtm-logger';
 import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
 import { reservationService, ReservationService } from '@/lib/services/ReservationService';
 import type { StepComponentProps, ReservationItem } from '@/types/reservation';
@@ -46,7 +47,7 @@ interface Source {
 export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabled = false }: StepComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { reservation } = useReservation();
+  const { reservation, setReservationNumber } = useReservation();
   const [sources, setSources] = useState<Source[]>([]);
 
   // Initialize state from sessionStorage or defaults
@@ -76,6 +77,18 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
   const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
   const [step1Diet, setStep1Diet] = useState<{ id: number; name: string; price: number } | null>(null);
+
+  const makeReservationNumber = (id: number) => {
+    const year = new Date().getFullYear();
+    return `REZ-${year}-${String(id).padStart(3, '0')}`;
+  };
+
+  const logCompletion = async (reservationId: number, reservationNumber: string) => {
+    await logGtmEvent(
+      'reservation_completed',
+      buildStepEventData(5, { ...reservation, reservationNumber }, { reservationId, reservationNumber })
+    );
+  };
 
   // Load online payments status on mount
   useEffect(() => {
@@ -604,6 +617,9 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
       setIsCreatingReservation(false);
 
       console.log('✅ Rezerwacja utworzona:', reservationResponse);
+      const reservationNumber = makeReservationNumber(reservationResponse.id);
+      setReservationNumber(reservationNumber);
+      await logCompletion(reservationResponse.id, reservationNumber);
 
       // Get payment amount
       const paymentAmount = formData.paymentAmount === 'full' ? totalPrice : depositAmount;
@@ -769,6 +785,9 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
       setIsCreatingReservation(false);
 
       console.log('✅ Rezerwacja utworzona (płatność później):', reservationResponse);
+      const reservationNumber = makeReservationNumber(reservationResponse.id);
+      setReservationNumber(reservationNumber);
+      await logCompletion(reservationResponse.id, reservationNumber);
 
       // Clear session storage
       clearAllSessionData();

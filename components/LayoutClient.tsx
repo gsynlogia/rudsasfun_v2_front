@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useLayoutEffect, useState } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
+import { logGtmEvent, buildStepEventData } from '@/utils/gtm-logger';
 import { authService } from '@/lib/services/AuthService';
 import type { LayoutProps, StepNumber, ReservationCamp } from '@/types/reservation';
 import { formatDateRange } from '@/utils/api';
@@ -33,7 +34,7 @@ export default function LayoutClient({
   const TOTAL_STEPS = 5;
   const router = useRouter();
   const pathname = usePathname();
-  const { updateReservationCamp, setBasePrice, reservation } = useReservation();
+  const { updateReservationCamp, setBasePrice, reservation, setCurrentStep } = useReservation();
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
 
@@ -65,6 +66,10 @@ export default function LayoutClient({
     };
   });
 
+useEffect(() => {
+  setCurrentStep(currentStep);
+}, [currentStep, setCurrentStep]);
+
   // Common validation function for current step
   const validateCurrentStep = (): boolean => {
     let isValid = false; // Default to false - require validation function to be loaded
@@ -90,6 +95,11 @@ export default function LayoutClient({
     }
 
     return isValid;
+  };
+
+  const logStepEvent = () => {
+    if (isAdmin) return;
+    logGtmEvent('reservation_step', buildStepEventData(currentStep, reservation));
   };
 
   // Navigate to specific step using URL
@@ -131,6 +141,7 @@ export default function LayoutClient({
       // Navigate to new step URL
       const newPath = `/camps/${campId}/edition/${editionId}/step/${step}`;
       await router.push(newPath);
+      setCurrentStep(step);
     }
   };
 
@@ -144,6 +155,7 @@ export default function LayoutClient({
 
       // Only proceed if validation passes
       if (isValid) {
+        logStepEvent();
         stepClickHandler((currentStep + 1) as StepNumber);
       } else {
         // Scroll to top to show validation errors
