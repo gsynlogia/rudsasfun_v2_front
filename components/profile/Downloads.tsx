@@ -66,7 +66,7 @@ export default function Downloads() {
                   month: '2-digit',
                   year: 'numeric',
                 });
-                
+
                 allContractsList.push({
                   id: `uploaded-contract-${file.id}`,
                   type: 'uploaded_contract',
