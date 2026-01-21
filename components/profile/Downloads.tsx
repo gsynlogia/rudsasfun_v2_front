@@ -2,7 +2,6 @@
 
 import { FileText, Download, CheckCircle, XCircle, Calendar, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
@@ -35,7 +34,6 @@ export default function Downloads() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
-  const router = useRouter();
 
   // Load user's contracts from backend
   useEffect(() => {
