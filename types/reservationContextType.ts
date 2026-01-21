@@ -10,6 +10,8 @@ export interface ReservationContextType {
   updateReservationItem: (id: string, item: Partial<ReservationItem>) => void;
   updateReservationCamp: (camp: ReservationCamp) => void;
   setBasePrice: (price: number) => void;
+  setCurrentStep: (step: number) => void;
+  setReservationNumber: (reservationNumber: string | null) => void;
   resetReservation: () => void;
 }
 

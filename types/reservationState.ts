@@ -6,4 +6,6 @@ export interface ReservationState {
   items: ReservationItem[];
   totalPrice: number;
   camp?: ReservationCamp;
+  currentStep: number;
+  reservationNumber?: string | null;
 }

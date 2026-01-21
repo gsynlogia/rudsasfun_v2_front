@@ -19,6 +19,8 @@ const getDefaultReservationState = (): ReservationState => {
       },
     ],
     totalPrice: DEFAULT_BASE_PRICE,
+    currentStep: 1,
+    reservationNumber: null,
   };
 };
 
@@ -170,6 +172,20 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
     }));
   }, []);
 
+  const setCurrentStep = useCallback((step: number) => {
+    setReservation((prev: ReservationState) => ({
+      ...prev,
+      currentStep: step,
+    }));
+  }, []);
+
+  const setReservationNumber = useCallback((reservationNumber: string | null) => {
+    setReservation((prev: ReservationState) => ({
+      ...prev,
+      reservationNumber,
+    }));
+  }, []);
+
   const setBasePrice = useCallback((price: number) => {
     setReservation((prev: ReservationState) => {
       // Update basePrice
@@ -204,6 +220,8 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
     updateReservationItem,
     updateReservationCamp,
     setBasePrice,
+    setCurrentStep,
+    setReservationNumber,
     resetReservation,
   };
 

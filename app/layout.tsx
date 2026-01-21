@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { getGtmId, isGtmEnabled } from '@/utils/gtm-config';
 
 import './globals.css';
 import { ToastProvider } from '@/components/ToastContainer';
@@ -29,6 +30,8 @@ export default function RootLayout({
 }>) {
   // Check if portal is offline for maintenance
   const isOffPortal = process.env.NEXT_PUBLIC_OFF_PORTAL === 'true';
+  const gtmEnabled = isGtmEnabled();
+  const gtmId = getGtmId();
 
   return (
     <html lang="en">
@@ -39,30 +42,34 @@ export default function RootLayout({
             __html: `window.dataLayer = window.dataLayer || [];`,
           }}
         />
-        {/* Google Tag Manager */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        {/* Google Tag Manager (conditional) */}
+        {gtmEnabled && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-5HRXDZP');`,
-          }}
-        />
+})(window,document,'script','dataLayer','${gtmId}');`,
+            }}
+          />
+        )}
         {/* End Google Tag Manager */}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {/* Google Tag Manager (noscript) */}
-        <noscript>
-          <iframe
-            src="https://www.googletagmanager.com/ns.html?id=GTM-5HRXDZP"
-            height="0"
-            width="0"
-            style={{ display: 'none', visibility: 'hidden' }}
-          />
-        </noscript>
+        {gtmEnabled && (
+          <noscript>
+            <iframe
+              src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+              height="0"
+              width="0"
+              style={{ display: 'none', visibility: 'hidden' }}
+            />
+          </noscript>
+        )}
         {/* End Google Tag Manager (noscript) */}
         {isOffPortal ? (
           <MaintenancePage />
