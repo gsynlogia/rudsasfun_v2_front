@@ -87,7 +87,7 @@ export default function Downloads() {
             const dateStr = reservation.created_at
               ? new Date(reservation.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
               : new Date().toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            
+
             allContractsList.push({
               id: `contract-html-${reservation.id}`,
               type: 'contract',
