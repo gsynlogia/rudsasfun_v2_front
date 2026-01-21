@@ -3,7 +3,7 @@
 import { Shield } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
 import { logGtmEvent, buildStepEventData } from '@/utils/gtm-logger';
@@ -69,6 +69,16 @@ export default function LayoutClient({
 useEffect(() => {
   setCurrentStep(currentStep);
 }, [currentStep, setCurrentStep]);
+
+const lastLoggedStepRef = useRef<number | null>(null);
+
+useEffect(() => {
+  if (isAdmin) return;
+  if (lastLoggedStepRef.current === currentStep) return;
+  logStepEvent();
+  lastLoggedStepRef.current = currentStep;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [currentStep, isAdmin, reservation]);
 
   // Common validation function for current step
   const validateCurrentStep = (): boolean => {
