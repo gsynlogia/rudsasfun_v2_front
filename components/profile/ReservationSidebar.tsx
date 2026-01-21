@@ -57,6 +57,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
   const [uploadingCard, setUploadingCard] = useState(false);
   const [showQualificationCardModal, setShowQualificationCardModal] = useState(false);
   const [cardDataCompleted, setCardDataCompleted] = useState(false);
+  const [autoContractTriggered, setAutoContractTriggered] = useState(false);
 
   const reservationIdNum = parseInt(reservationId);
   const isValidReservationId = !isNaN(reservationIdNum);
@@ -151,6 +152,24 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       loadContractStatus();
     }
   }, [reservationId]);
+
+  // Auto-generate contract on view load if missing
+  useEffect(() => {
+    const autoGenerate = async () => {
+      if (!isValidReservationId || autoContractTriggered) return;
+      try {
+        setAutoContractTriggered(true);
+        setIsGenerating(true);
+        await contractService.generateContract(reservationIdNum);
+        await loadContractStatus();
+      } catch (err) {
+        console.warn('Auto contract generation failed', err);
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+    autoGenerate();
+  }, [isValidReservationId, reservationIdNum, autoContractTriggered]);
 
   // Load contract status
   const loadContractStatus = async () => {
@@ -364,7 +383,6 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                 </button> */}
                 <button
                   onClick={() => {
-                    // Format reservation number: REZ-YYYY-XXX
                     const formatReservationNumber = (reservationId: number, createdAt: string) => {
                       const year = new Date(createdAt).getFullYear();
                       const paddedId = String(reservationId).padStart(3, '0');

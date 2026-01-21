@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { API_BASE_URL } from '@/utils/api-config';
 import { authService } from '@/lib/services/AuthService';
@@ -8,14 +8,15 @@ import { authService } from '@/lib/services/AuthService';
 /**
  * Contract HTML Page
  * Route: /profil/aktualne-rezerwacje/[id]/umowa
- * Displays contract HTML as standalone page (no layout)
+ * Renders pełny HTML umowy (bez auto-print). Przeznaczone do otwarcia w nowej karcie.
  */
 export default function ContractHtmlPage() {
   const params = useParams();
-  const reservationId = params.id as string; // e.g., "REZ-2025-016" or reservation ID
+  const reservationId = params?.id ? String(params.id) : ''; // e.g., "REZ-2025-016" or reservation ID
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const printedRef = useRef(false);
 
   useEffect(() => {
     const fetchContractHtml = async () => {
@@ -51,7 +52,7 @@ export default function ContractHtmlPage() {
           
           reservationIdNum = foundReservation.id;
         } else {
-          reservationIdNum = parseInt(reservationId);
+          reservationIdNum = parseInt(reservationId, 10);
         }
 
         if (isNaN(reservationIdNum)) {
@@ -79,13 +80,38 @@ export default function ContractHtmlPage() {
           throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
         }
 
-        const html = await response.text();
-        
-        // Replace entire document with contract HTML
-        // Backend already provides full API URLs for images and includes auto-print script
+        let html = await response.text();
+
+        // Usuń skrypty auto-print (window.print) aby nie wywoływać drukowania
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          doc.querySelectorAll('script').forEach((script) => {
+            if (script.textContent && script.textContent.toLowerCase().includes('window.print')) {
+              script.remove();
+            }
+          });
+          html = doc.documentElement.outerHTML;
+        } catch (e) {
+          console.warn('Nie udało się wyczyścić skryptów print:', e);
+        }
+
+        // Replace entire document with cleaned contract HTML
         document.open();
         document.write(html);
         document.close();
+
+        // Jednorazowe wywołanie print – ochrona przed wielokrotnym uruchomieniem
+        if (!printedRef.current) {
+          printedRef.current = true;
+          setTimeout(() => {
+            try {
+              window.print();
+            } catch {
+              // ignore
+            }
+          }, 500);
+        }
       } catch (err) {
         console.error('Error fetching contract HTML:', err);
         setError(err instanceof Error ? err.message : 'Nie udało się załadować umowy');

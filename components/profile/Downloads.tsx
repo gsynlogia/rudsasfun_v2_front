@@ -2,6 +2,7 @@
 
 import { FileText, Download, CheckCircle, XCircle, Calendar, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
@@ -33,6 +34,7 @@ export default function Downloads() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+  const router = useRouter();
 
   // Load user's contracts from backend
   useEffect(() => {
@@ -48,47 +50,63 @@ export default function Downloads() {
         // Store reservations for later use
         const reservationsList = reservations;
 
-        // Fetch ALL contract files for each reservation (both SYSTEM and USER)
+        // Fetch contract files; systemowe zamieniamy na link HTML, user-uploads zostawiamy do pobrania
         const allContractsList: Document[] = [];
         
         for (const reservation of reservations) {
           try {
             // Get ALL contract files for this reservation (both system-generated and user-uploaded)
             const contractFiles = await contractService.getContractFiles(reservation.id);
+            const campName = reservation.camp_name || 'Brak danych';
+            const participantName = reservation.participant_first_name && reservation.participant_last_name
+              ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
+              : 'Brak danych';
+
+            // User-uploaded contracts (zostawiamy do pobrania)
+            contractFiles
+              .filter(file => file.source === 'user')
+              .forEach((file) => {
+                const date = new Date(file.uploaded_at);
+                const dateStr = date.toLocaleDateString('pl-PL', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                });
+                
+                allContractsList.push({
+                  id: `uploaded-contract-${file.id}`,
+                  type: 'uploaded_contract',
+                  name: `Umowa wgrana (${dateStr}) - ${campName}`,
+                  reservationId: reservation.id,
+                  reservationName: campName,
+                  participantName,
+                  date: dateStr,
+                  amount: reservation.total_price || 0,
+                  status: 'available',
+                  fileId: file.id,
+                  source: file.source,
+                  contract_status: reservation.contract_status || null,
+                });
+              });
+
+            // Systemowe kontrakty prezentujemy jako HTML link (zawsze)
+            const dateStr = reservation.created_at
+              ? new Date(reservation.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              : new Date().toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
             
-            contractFiles.forEach((file) => {
-              const campName = reservation.camp_name || 'Brak danych';
-              const participantName = reservation.participant_first_name && reservation.participant_last_name
-                ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
-                : 'Brak danych';
-              
-              const date = new Date(file.uploaded_at);
-              const dateStr = date.toLocaleDateString('pl-PL', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              });
-              
-              // Determine document type based on source
-              const isSystem = file.source === 'system';
-              const documentType = isSystem ? 'contract' as const : 'uploaded_contract' as const;
-              
-              allContractsList.push({
-                id: `${isSystem ? 'contract' : 'uploaded-contract'}-${file.id}`,
-                type: documentType,
-                name: isSystem 
-                  ? `Umowa wygenerowana (${dateStr}) - ${campName}`
-                  : `Umowa wgrana (${dateStr}) - ${campName}`,
-                reservationId: reservation.id,
-                reservationName: campName,
-                participantName: participantName,
-                date: dateStr,
-                amount: reservation.total_price || 0,
-                status: 'available' as const,
-                fileId: file.id,
-                source: file.source,
-                contract_status: (reservation && reservation.contract_status) ? reservation.contract_status : null,
-              });
+            allContractsList.push({
+              id: `contract-html-${reservation.id}`,
+              type: 'contract',
+              name: `Umowa (HTML) - ${campName}`,
+              reservationId: reservation.id,
+              reservationName: campName,
+              participantName,
+              date: dateStr,
+              amount: reservation.total_price || 0,
+              status: 'available',
+              source: 'system',
+              contract_status: reservation.contract_status || null,
+              isHtml: true,
             });
           } catch (error) {
             // Ignore errors for individual reservations
@@ -171,39 +189,6 @@ export default function Downloads() {
           console.error('Error loading CMS documents:', error);
         }
 
-        // Check which contracts/cards have HTML versions
-        const contractsWithHtml = new Set<number>();
-        const cardsWithHtml = new Set<number>();
-        
-        for (const reservation of reservations) {
-          try {
-            const contractHtmlCheck = await contractService.checkHtmlExists(reservation.id);
-            if (contractHtmlCheck.exists) {
-              contractsWithHtml.add(reservation.id);
-            }
-            
-            const cardHtmlCheck = await qualificationCardService.checkHtmlExists(reservation.id);
-            if (cardHtmlCheck.exists) {
-              cardsWithHtml.add(reservation.id);
-            }
-          } catch (error) {
-            // Ignore errors
-          }
-        }
-
-        // Mark HTML documents
-        allContractsList.forEach(doc => {
-          if (doc.source === 'system' && doc.reservationId && contractsWithHtml.has(doc.reservationId)) {
-            doc.isHtml = true;
-          }
-        });
-
-        allQualificationCardsList.forEach(doc => {
-          if (doc.source === 'system' && doc.reservationId && cardsWithHtml.has(doc.reservationId)) {
-            doc.isHtml = true;
-          }
-        });
-
         // Combine all documents
         const documentsList: Document[] = [...allContractsList, ...allQualificationCardsList, ...cmsDocumentsList];
 
@@ -226,7 +211,7 @@ export default function Downloads() {
 
   const handleDownloadDocument = async (document: Document) => {
     if (document.type === 'contract') {
-      // For HTML contracts, open in new tab instead of downloading
+      // Systemowa umowa: otwieramy HTML w nowej karcie; dla wgranych plików (user/system) zostawiamy download
       if (document.isHtml && document.reservationId) {
         try {
           const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
@@ -246,16 +231,15 @@ export default function Downloads() {
           console.error('Error opening contract HTML:', error);
         }
       }
-      
-      // Download contract - use reservationId if fileId is 0 or missing (file system fallback)
+
       try {
         setDownloadingIds(prev => new Set(prev).add(document.id));
         if (document.fileId && document.fileId > 0) {
-          // Use file ID if available and valid
           await contractService.downloadContractFile(document.fileId);
+        } else if (document.reservationId) {
+          await contractService.downloadContract(document.reservationId);
         } else {
-          // Use reservation ID for file system files (fileId = 0)
-          await contractService.downloadContract(document.reservationId!);
+          throw new Error('Brak danych umowy');
         }
       } catch (error) {
         console.error('Error downloading contract:', error);
