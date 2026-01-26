@@ -1172,6 +1172,17 @@ export default function ReservationDetailPage() {
                       </div>
                     );
                   }
+                  // Fallback: użyj promotion_name z API (dla nieaktywnych promocji)
+                  if (reservation.promotion_name) {
+                    return (
+                      <div>
+                        <p className="text-sm text-gray-900">{reservation.promotion_name}</p>
+                        <p className="text-sm text-gray-500 mt-1 italic">
+                          (promocja nieaktywna - dane historyczne)
+                        </p>
+                      </div>
+                    );
+                  }
                   return (
                     <p className="text-sm text-gray-900">
                       <MissingInfo field={`promocja ID: ${reservation.selected_promotion}`} />
