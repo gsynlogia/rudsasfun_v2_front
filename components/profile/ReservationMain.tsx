@@ -21,13 +21,15 @@ interface ReservationMainProps {
   isDetailsExpanded: boolean;
   onToggleDetails: () => void;
   onReservationUpdate?: (updatedReservation: ReservationResponse) => void;
+  /** Base path for navigation (e.g., '/profil' or '/client-view/123') */
+  basePath?: string;
 }
 
 /**
  * ReservationMain Component
  * Left part of reservation card with main details
  */
-export default function ReservationMain({ reservation, isDetailsExpanded, onToggleDetails, onReservationUpdate }: ReservationMainProps) {
+export default function ReservationMain({ reservation, isDetailsExpanded, onToggleDetails, onReservationUpdate, basePath = '/profil' }: ReservationMainProps) {
   const router = useRouter();
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
   const [manualPayments, setManualPayments] = useState<ManualPaymentResponse[]>([]);
@@ -1329,7 +1331,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         ) : (
           <button
             onClick={() => {
-              router.push(`/profil/aktualne-rezerwacje/${reservationNumber}`);
+              router.push(`${basePath}/aktualne-rezerwacje/${reservationNumber}`);
             }}
             className="text-xs sm:text-sm text-[#03adf0] hover:text-[#0288c7] flex items-center gap-1 mx-auto transition-colors"
           >

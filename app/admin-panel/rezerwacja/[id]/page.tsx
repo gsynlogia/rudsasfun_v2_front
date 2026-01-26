@@ -890,7 +890,28 @@ export default function ReservationDetailPage() {
                 <span>Zmiana w rezerwacji</span>
               </button>
               <button
-                onClick={() => {/* TODO: Zobacz profil klienta */}}
+                onClick={async () => {
+                  if (!reservation?.id) return;
+                  try {
+                    // Fetch client info from reservation
+                    const response = await authenticatedApiCall<{
+                      user_id: number;
+                      user_email: string | null;
+                      user_name: string | null;
+                      can_view: boolean;
+                    }>(`/api/admin/client-view/from-reservation/${reservation.id}`);
+
+                    if (response.can_view) {
+                      // Open client view in new window
+                      window.open(`/client-view/${response.user_id}`, '_blank');
+                    } else {
+                      alert('Nie można wyświetlić profilu tego klienta');
+                    }
+                  } catch (err) {
+                    console.error('Error opening client view:', err);
+                    alert(err instanceof Error ? err.message : 'Błąd podczas otwierania profilu klienta');
+                  }
+                }}
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200"
                 style={{ borderRadius: 0 }}
               >

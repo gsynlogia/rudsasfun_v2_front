@@ -9,11 +9,16 @@ import { reservationService, type ReservationResponse } from '@/lib/services/Res
 
 import ReservationCard from './ReservationCard';
 
+interface CurrentReservationsProps {
+  /** Optional user ID for admin client view mode */
+  viewAsUserId?: number;
+}
+
 /**
  * CurrentReservations Component
  * Main component displaying current reservations list
  */
-export default function CurrentReservations() {
+export default function CurrentReservations({ viewAsUserId }: CurrentReservationsProps = {}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { showSuccess, showWarning, showError } = useToast();
@@ -47,7 +52,7 @@ export default function CurrentReservations() {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await reservationService.getMyReservations(0, 100);
+        const data = await reservationService.getMyReservations(0, 100, viewAsUserId);
 
         // Map backend data to frontend format
         const mappedReservations = data.map((reservation: ReservationResponse) => {
@@ -185,7 +190,7 @@ export default function CurrentReservations() {
     };
 
     loadReservations();
-  }, []);
+  }, [viewAsUserId]);
 
   // Auto-generate contracts for loaded reservations (one pass; force generate per rezerwacja)
   useEffect(() => {
@@ -229,7 +234,11 @@ export default function CurrentReservations() {
       ) : (
         <div className="space-y-4 sm:space-y-6">
           {reservations.map((reservation) => (
-            <ReservationCard key={reservation.id} reservation={reservation} />
+            <ReservationCard
+              key={reservation.id}
+              reservation={reservation}
+              basePath={viewAsUserId ? `/client-view/${viewAsUserId}` : '/profil'}
+            />
           ))}
         </div>
       )}

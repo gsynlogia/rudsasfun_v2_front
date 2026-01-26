@@ -327,7 +327,7 @@ class ReservationService {
    * @param limit Maximum number of records to return
    * @returns Array of reservation responses for the logged-in user
    */
-  async getMyReservations(skip: number = 0, limit: number = 100): Promise<ReservationResponse[]> {
+  async getMyReservations(skip: number = 0, limit: number = 100, viewAsUserId?: number): Promise<ReservationResponse[]> {
     // Import authService to get token
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
@@ -336,7 +336,13 @@ class ReservationService {
       throw new Error('Not authenticated');
     }
 
-    const response = await fetch(`${this.API_URL}/my?skip=${skip}&limit=${limit}`, {
+    // Build URL with optional view_as_user_id for admin client view
+    let url = `${this.API_URL}/my?skip=${skip}&limit=${limit}`;
+    if (viewAsUserId !== undefined) {
+      url += `&view_as_user_id=${viewAsUserId}`;
+    }
+
+    const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',

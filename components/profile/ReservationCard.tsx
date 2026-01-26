@@ -9,13 +9,15 @@ import ReservationSidebar from './ReservationSidebar';
 
 interface ReservationCardProps {
   reservation: ReservationResponse;
+  /** Base path for navigation (e.g., '/profil' or '/client-view/123') */
+  basePath?: string;
 }
 
 /**
  * ReservationCard Component
  * Container for reservation details with main content and sidebar
  */
-export default function ReservationCard({ reservation }: ReservationCardProps) {
+export default function ReservationCard({ reservation, basePath = '/profil' }: ReservationCardProps) {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
 
   const toggleDetails = () => {
@@ -31,6 +33,7 @@ export default function ReservationCard({ reservation }: ReservationCardProps) {
             reservation={reservation}
             isDetailsExpanded={isDetailsExpanded}
             onToggleDetails={toggleDetails}
+            basePath={basePath}
           />
         </div>
 
@@ -40,6 +43,7 @@ export default function ReservationCard({ reservation }: ReservationCardProps) {
             reservationId={String(reservation.id)}
             reservation={reservation}
             isDetailsExpanded={isDetailsExpanded}
+            basePath={basePath}
           />
         </div>
       </div>

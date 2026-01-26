@@ -21,6 +21,8 @@ interface ReservationSidebarProps {
   reservationId: string;
   reservation: ReservationResponse;
   isDetailsExpanded: boolean;
+  /** Base path for navigation (e.g., '/profil' or '/client-view/123') */
+  basePath?: string;
 }
 
 interface FileHistoryItem {
@@ -35,7 +37,7 @@ interface FileHistoryItem {
  * ReservationSidebar Component
  * Right sidebar showing reservation progress and document status
  */
-export default function ReservationSidebar({ reservationId, reservation, isDetailsExpanded }: ReservationSidebarProps) {
+export default function ReservationSidebar({ reservationId, reservation, isDetailsExpanded, basePath = '/profil' }: ReservationSidebarProps) {
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
   const [qualificationCard, setQualificationCard] = useState<QualificationCardResponse | null>(null);
@@ -270,7 +272,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       // Contract exists (either was already there or just generated)
       // Redirect to downloads page
       console.log(`[Redirect] Redirecting to downloads page for reservation ${reservationIdNum}`);
-      router.push('/profil/do-pobrania');
+      router.push(`${basePath}/do-pobrania`);
     } catch (error) {
       console.error('Error handling contract:', error);
       alert('Nie udało się przetworzyć umowy. Spróbuj ponownie.');
@@ -309,7 +311,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       }
 
       // Redirect to downloads page instead of downloading directly
-      router.push('/profil/do-pobrania');
+      router.push(`${basePath}/do-pobrania`);
     } catch (error: any) {
       console.error('Error with qualification card:', error);
       alert(error.message || 'Nie udało się przetworzyć karty kwalifikacyjnej. Spróbuj ponownie.');
@@ -375,7 +377,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               <div className="w-full flex flex-col gap-1.5 sm:gap-2">
                 <button
                   onClick={() => {
-                    router.push('/profil/do-pobrania');
+                    router.push(`${basePath}/do-pobrania`);
                   }}
                   className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] text-white text-[10px] sm:text-xs rounded hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-1"
                 >
@@ -501,7 +503,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                         return `REZ-${year}-${paddedId}`;
                       };
                       const reservationNumber = formatReservationNumber(reservationIdNum, reservation.created_at);
-                      const url = `/profil/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
+                      const url = `${basePath}/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
                       window.open(url, '_blank');
                     } catch (error: any) {
                       console.error('Error opening qualification card:', error);
