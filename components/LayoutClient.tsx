@@ -166,7 +166,6 @@ useEffect(() => {
 
       // Only proceed if validation passes
       if (isValid) {
-        logStepEvent();
         stepClickHandler((currentStep + 1) as StepNumber);
       } else {
         // Scroll to top to show validation errors

@@ -52,12 +52,12 @@ async function persistGtmEvent(payload: PersistedGtmPayload) {
 export function pushGtmEvent(event: string, data: ReservationEvent) {
   if (!isGtmEnabled()) return;
   const payload = buildPayload(event, data);
-  // Ensure stringified payload to avoid [object Object] in GTM
   if (typeof window !== 'undefined') {
     (window as any).dataLayer = (window as any).dataLayer || [];
     (window as any).dataLayer.push({
       event: payload.event,
-      payload: JSON.stringify(payload),
+      gtmId: payload.gtmId,
+      reservation_data: payload.data,
     });
   }
 }
