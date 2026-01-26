@@ -2,7 +2,7 @@
 
 import { Search, ChevronUp, ChevronDown, Columns, GripVertical, Filter, X as XIcon } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 
 import { authenticatedApiCall } from '@/utils/api-auth';
 
@@ -20,6 +20,7 @@ interface BackendReservation {
   camp_id?: number;
   property_id?: number;
   selected_promotion?: string | null;
+  promotion_name?: string | null;  // Added: backend returns this directly
   status: string;
   total_price: number;
   created_at: string;
@@ -30,6 +31,20 @@ interface BackendReservation {
     phoneNumber: string;
   }>;
   invoice_email?: string;
+}
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+interface PaginatedReservationsResponse {
+  items: BackendReservation[];
+  pagination: PaginationInfo;
 }
 
 interface Reservation {
@@ -77,7 +92,7 @@ const mapBackendToFrontend = (backendReservation: BackendReservation): Reservati
     campName: backendReservation.camp_name || 'Nieznany obóz',
     campLocation: campLocation,
     tag: backendReservation.property_tag || null,
-    promotionName: null, // Will be populated after fetching promotions
+    promotionName: backendReservation.promotion_name || null,  // Use backend value directly
     status: status,
     totalPrice: backendReservation.total_price || 0,
     createdAt: backendReservation.created_at.split('T')[0],
@@ -96,15 +111,32 @@ export default function ReservationsTable() {
   const [error, setError] = useState<string | null>(null);
 
   // State for search, sorting, and pagination
-  const [searchQuery, setSearchQuery] = useState('');
+  // Initialize from URL params
+  const searchFromUrl = searchParams?.get('search') || '';
+  const pageFromUrl = searchParams?.get('page');
+
+  const [searchQuery, setSearchQuery] = useState(searchFromUrl);
+  const [debouncedSearch, setDebouncedSearch] = useState(searchFromUrl);
   const [sortColumn, setSortColumn] = useState<string | null>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-
-  // Initialize currentPage from URL params or default to 1
-  const pageFromUrl = searchParams?.get('page');
   const [currentPage, setCurrentPage] = useState(pageFromUrl ? parseInt(pageFromUrl, 10) : 1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const ITEMS_PER_PAGE = 10; // Server-side pagination: always 10 items per page
   const [pageInputValue, setPageInputValue] = useState('');
+
+  // Server-side pagination metadata
+  const [serverPagination, setServerPagination] = useState<PaginationInfo | null>(null);
+
+  // Debounce search input (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      // Reset to page 1 when search changes
+      if (searchQuery !== debouncedSearch) {
+        setCurrentPage(1);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Column configuration state
   const STORAGE_KEY = 'reservations_list_columns';
@@ -141,9 +173,11 @@ export default function ReservationsTable() {
 
   // Filter modal state: which column has filter modal open
   const [openFilterColumn, setOpenFilterColumn] = useState<string | null>(null);
+  // Temporary filter selections (before applying)
+  const [tempFilterValues, setTempFilterValues] = useState<string[]>([]);
 
   // Convert column config to visibility map for easy access
-  const visibleColumns = useMemo(() => {
+  const _visibleColumns = useMemo(() => {
     const map: Record<string, boolean> = {};
     columnConfig.forEach(col => {
       map[col.key] = col.visible;
@@ -254,39 +288,22 @@ export default function ReservationsTable() {
     return Array.from(values).sort();
   };
 
-  // Handle filter toggle for a column value
-  const handleFilterToggle = (columnKey: string, value: string) => {
-    const updated = columnConfig.map(col => {
-      if (col.key === columnKey) {
-        const filters = col.filters || [];
-        const newFilters = filters.includes(value)
-          ? filters.filter(f => f !== value)
-          : [...filters, value];
-        return { ...col, filters: newFilters };
-      }
-      return col;
-    });
-    setColumnConfig(updated);
-    saveColumnPreferences(updated);
-
-    // Update URL with filters
-    const filtersForUrl: Record<string, string[]> = {};
-    updated.forEach(col => {
-      if (col.filters && col.filters.length > 0) {
-        filtersForUrl[col.key] = col.filters;
-      }
-    });
-    updateFiltersInUrl(filtersForUrl);
-
-    setCurrentPage(1);
-    updatePageInUrl(1);
+  // Handle filter toggle for a column value (updates temp state only)
+  const handleFilterToggle = (_columnKey: string, value: string) => {
+    setTempFilterValues(prev =>
+      prev.includes(value)
+        ? prev.filter(v => v !== value)
+        : [...prev, value],
+    );
   };
 
-  // Clear all filters for a column
-  const handleClearColumnFilters = (columnKey: string) => {
+  // Apply filters from modal (called when clicking "Zastosuj")
+  const handleApplyFilters = () => {
+    if (!openFilterColumn) return;
+
     const updated = columnConfig.map(col => {
-      if (col.key === columnKey) {
-        return { ...col, filters: [] };
+      if (col.key === openFilterColumn) {
+        return { ...col, filters: [...tempFilterValues] };
       }
       return col;
     });
@@ -303,7 +320,25 @@ export default function ReservationsTable() {
     updateFiltersInUrl(filtersForUrl);
 
     setCurrentPage(1);
-    updatePageInUrl(1);
+    setOpenFilterColumn(null);
+  };
+
+  // Clear all temp filters in modal
+  const handleClearTempFilters = () => {
+    setTempFilterValues([]);
+  };
+
+  // Open filter modal and initialize temp values
+  const openFilterModal = (columnKey: string) => {
+    const currentFilters = columnConfig.find(c => c.key === columnKey)?.filters || [];
+    setTempFilterValues([...currentFilters]);
+    setOpenFilterColumn(columnKey);
+  };
+
+  // Close filter modal without applying
+  const closeFilterModal = () => {
+    setOpenFilterColumn(null);
+    setTempFilterValues([]);
   };
 
   // Remove single filter value
@@ -328,7 +363,7 @@ export default function ReservationsTable() {
     updateFiltersInUrl(filtersForUrl);
 
     setCurrentPage(1);
-    updatePageInUrl(1);
+    // URL updated via useEffect
   };
 
   // Check if column has active filters
@@ -453,30 +488,23 @@ export default function ReservationsTable() {
     }
   }, [searchParams]);
 
-  // Update URL when currentPage changes
-  const updatePageInUrl = (page: number) => {
-    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
-    if (page === 1) {
-      params.delete('page');
-    } else {
-      params.set('page', page.toString());
-    }
-    const newUrl = params.toString() ? `/admin-panel?${params.toString()}` : '/admin-panel';
-    router.replace(newUrl);
-  };
-
-  // Sync filters to URL when columnConfig changes
-  const updateFiltersInUrl = (filters: Record<string, string[]>) => {
+  // Update URL with all params (search, page, filters)
+  const updateFullUrl = useCallback(() => {
     const params = new URLSearchParams();
 
-    // Add filter params
-    Object.entries(filters).forEach(([columnKey, values]) => {
-      if (values.length > 0) {
-        params.set(`filter_${columnKey}`, values.join(','));
+    // Add search param
+    if (debouncedSearch) {
+      params.set('search', debouncedSearch);
+    }
+
+    // Add filter params from columnConfig
+    columnConfig.forEach(col => {
+      if (col.filters && col.filters.length > 0) {
+        params.set(`filter_${col.key}`, col.filters.join(','));
       }
     });
 
-    // Update page param if needed
+    // Add page param
     if (currentPage > 1) {
       params.set('page', currentPage.toString());
     }
@@ -484,145 +512,102 @@ export default function ReservationsTable() {
     const queryString = params.toString();
     const url = `/admin-panel${queryString ? `?${queryString}` : ''}`;
     router.replace(url, { scroll: false });
+  }, [debouncedSearch, currentPage, columnConfig, router]);
+
+  // Update URL when any relevant state changes
+  useEffect(() => {
+    updateFullUrl();
+  }, [updateFullUrl]);
+
+  // Wrapper for filter URL updates (called by filter handlers)
+  const updateFiltersInUrl = (_filters: Record<string, string[]>) => {
+    // URL is automatically updated via useEffect when columnConfig changes
+    // This function is kept for compatibility with existing filter handlers
   };
 
-  // Fetch reservations and promotions
+  // Build filter params for API
+  const getActiveFilters = useMemo(() => {
+    const filters: Record<string, string[]> = {};
+    columnConfig.forEach(col => {
+      if (col.filters && col.filters.length > 0) {
+        filters[col.key] = col.filters;
+      }
+    });
+    return filters;
+  }, [columnConfig]);
+
+  // Fetch reservations with server-side pagination, search, and filters
   useEffect(() => {
     const fetchReservations = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await authenticatedApiCall<BackendReservation[]>('/api/reservations/');
-        const mapped = data.map(mapBackendToFrontend);
 
-        // Fetch promotions for reservations that have selected_promotion
-        const reservationsWithPromotions = await Promise.all(
-          mapped.map(async (reservation) => {
-            if (!reservation.selectedPromotion || !reservation.campId || !reservation.propertyId) {
-              return reservation;
-            }
+        // Build query params
+        const params = new URLSearchParams();
+        params.set('page', currentPage.toString());
+        params.set('limit', ITEMS_PER_PAGE.toString());
 
-            try {
-              const relationId = typeof reservation.selectedPromotion === 'number'
-                ? reservation.selectedPromotion
-                : parseInt(String(reservation.selectedPromotion));
+        if (debouncedSearch) {
+          params.set('search', debouncedSearch);
+        }
 
-              if (isNaN(relationId)) {
-                return reservation;
-              }
+        // Add filter params (all columns)
+        if (getActiveFilters.status) {
+          params.set('filter_status', getActiveFilters.status.join(','));
+        }
+        if (getActiveFilters.campName) {
+          params.set('filter_campName', getActiveFilters.campName.join(','));
+        }
+        if (getActiveFilters.tag) {
+          params.set('filter_tag', getActiveFilters.tag.join(','));
+        }
+        if (getActiveFilters.promotionName) {
+          params.set('filter_promotionName', getActiveFilters.promotionName.join(','));
+        }
+        if (getActiveFilters.participantName) {
+          params.set('filter_participantName', getActiveFilters.participantName.join(','));
+        }
+        if (getActiveFilters.email) {
+          params.set('filter_email', getActiveFilters.email.join(','));
+        }
+        if (getActiveFilters.campLocation) {
+          params.set('filter_campLocation', getActiveFilters.campLocation.join(','));
+        }
+        if (getActiveFilters.totalPrice) {
+          params.set('filter_totalPrice', getActiveFilters.totalPrice.join(','));
+        }
+        if (getActiveFilters.createdAt) {
+          params.set('filter_createdAt', getActiveFilters.createdAt.join(','));
+        }
 
-              // Fetch turnus promotions
-              const turnusPromotions = await authenticatedApiCall<any[]>(
-                `/api/camps/${reservation.campId}/properties/${reservation.propertyId}/promotions`,
-              );
-
-              // Find promotion by relation_id
-              const foundPromotion = turnusPromotions.find(
-                (p: any) => p.relation_id === relationId || p.id === relationId,
-              );
-
-              if (foundPromotion && foundPromotion.general_promotion_id) {
-                // Fetch general promotion details
-                try {
-                  const generalPromotion = await authenticatedApiCall<any>(
-                    `/api/general-promotions/${foundPromotion.general_promotion_id}`,
-                  );
-                  return {
-                    ...reservation,
-                    promotionName: generalPromotion.name || 'Nieznana promocja',
-                  };
-                } catch (err) {
-                  // If general promotion not found, use name from turnus promotion
-                  return {
-                    ...reservation,
-                    promotionName: foundPromotion.name || 'Nieznana promocja',
-                  };
-                }
-              }
-
-              return reservation;
-            } catch (err) {
-              console.warn(`[ReservationsTable] Could not fetch promotion for reservation ${reservation.id}:`, err);
-              return reservation;
-            }
-          }),
+        const response = await authenticatedApiCall<PaginatedReservationsResponse>(
+          `/api/reservations/paginated?${params.toString()}`,
         );
-
-        setAllReservations(reservationsWithPromotions);
+        const mapped = response.items.map(mapBackendToFrontend);
+        setAllReservations(mapped);
+        setServerPagination(response.pagination);
       } catch (err) {
         console.error('[ReservationsTable] Error fetching reservations:', err);
         setError(err instanceof Error ? err.message : 'Błąd podczas ładowania rezerwacji');
         setAllReservations([]);
+        setServerPagination(null);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchReservations();
-  }, []);
+  }, [currentPage, debouncedSearch, getActiveFilters]);
 
-  // Filter and sort reservations
+  // Sort reservations (filtering is now server-side)
   const filteredReservations = useMemo(() => {
-    let filtered = [...allReservations];
+    const filtered = [...allReservations];
 
-    // Column filters (Excel-like filters)
-    columnConfig.forEach(col => {
-      if (col.filters && col.filters.length > 0) {
-        filtered = filtered.filter(reservation => {
-          let value: string | null = null;
-          switch (col.key) {
-            case 'reservationName':
-              value = reservation.reservationName;
-              break;
-            case 'participantName':
-              value = reservation.participantName;
-              break;
-            case 'email':
-              value = reservation.email;
-              break;
-            case 'campName':
-              value = reservation.campName;
-              break;
-            case 'campLocation':
-              value = reservation.campLocation;
-              break;
-            case 'tag':
-              value = reservation.tag || '-';
-              break;
-            case 'promotionName':
-              value = reservation.promotionName || '-';
-              break;
-            case 'status':
-              value = reservation.status;
-              break;
-            case 'totalPrice':
-              value = reservation.totalPrice.toFixed(2);
-              break;
-            case 'createdAt':
-              value = new Date(reservation.createdAt).toLocaleDateString('pl-PL');
-              break;
-          }
-          return value !== null && col.filters!.includes(value);
-        });
-      }
-    });
+    // Note: Column filters (status, campName, tag) are now server-side
+    // Note: Search is now server-side
 
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        res =>
-          res.reservationName.toLowerCase().includes(query) ||
-          res.participantName.toLowerCase().includes(query) ||
-          res.email.toLowerCase().includes(query) ||
-          res.campName.toLowerCase().includes(query) ||
-          res.campLocation.toLowerCase().includes(query) ||
-          (res.tag && res.tag.toLowerCase().includes(query)) ||
-          (res.promotionName && res.promotionName.toLowerCase().includes(query)),
-      );
-    }
-
-    // Sorting
+    // Sorting (client-side for current page)
     if (sortColumn) {
       filtered.sort((a, b) => {
         let aValue: string | number;
@@ -684,13 +669,12 @@ export default function ReservationsTable() {
     }
 
     return filtered;
-  }, [searchQuery, sortColumn, sortDirection, allReservations, columnConfig]);
+  }, [sortColumn, sortDirection, allReservations]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredReservations.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedReservations = filteredReservations.slice(startIndex, endIndex);
+  // Pagination - use server-side metadata
+  const totalPages = serverPagination?.total_pages || 1;
+  // With server-side pagination, filteredReservations already contains only current page items
+  const paginatedReservations = filteredReservations;
 
   // Handle column sort
   const handleSort = (column: string) => {
@@ -701,7 +685,7 @@ export default function ReservationsTable() {
       setSortDirection('asc');
     }
     setCurrentPage(1);
-    updatePageInUrl(1);
+    // URL updated via useEffect
   };
 
   // Handle row click - navigate to detail page with current page info
@@ -718,7 +702,7 @@ export default function ReservationsTable() {
   // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    updatePageInUrl(page);
+    // URL updated via useEffect
     setPageInputValue(''); // Clear input after page change
   };
 
@@ -830,30 +814,16 @@ export default function ReservationsTable() {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              setCurrentPage(1);
-              updatePageInUrl(1);
+              // Page reset and URL update handled by debounce effect
             }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
             style={{ borderRadius: 0 }}
           />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-700">Na stronie:</label>
-          <select
-            value={itemsPerPage}
-            onChange={(e) => {
-              setItemsPerPage(Number(e.target.value));
-              setCurrentPage(1);
-              updatePageInUrl(1);
-            }}
-            className="px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
-            style={{ borderRadius: 0 }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
+          <span className="text-sm text-gray-700">
+            {serverPagination ? `${serverPagination.total} rezerwacji (${ITEMS_PER_PAGE} na stronie)` : 'Ładowanie...'}
+          </span>
         </div>
       </div>
 
@@ -900,7 +870,11 @@ export default function ReservationsTable() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenFilterColumn(isFilterOpen ? null : columnKey);
+                              if (isFilterOpen) {
+                                closeFilterModal();
+                              } else {
+                                openFilterModal(columnKey);
+                              }
                             }}
                             className={`p-1 hover:bg-gray-200 transition-colors ${
                               hasFilters ? 'text-[#03adf0]' : 'text-gray-400'
@@ -1027,10 +1001,10 @@ export default function ReservationsTable() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {totalPages > 1 && serverPagination && (
           <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex items-center justify-between">
             <div className="text-sm text-gray-700">
-              Wyświetlanie {startIndex + 1} - {Math.min(endIndex, filteredReservations.length)} z {filteredReservations.length} rezerwacji
+              Strona {currentPage} z {totalPages} ({serverPagination.total} rezerwacji)
             </div>
             <div className="flex flex-col items-end gap-2">
               <div className="flex gap-2">
@@ -1096,7 +1070,7 @@ export default function ReservationsTable() {
 
       <UniversalModal
         isOpen={!!openFilterColumn}
-        onClose={() => setOpenFilterColumn(null)}
+        onClose={closeFilterModal}
         title={`Filtruj ${openFilterColumn ? (COLUMN_DEFINITIONS[openFilterColumn as keyof typeof COLUMN_DEFINITIONS] || openFilterColumn) : ''}`}
         maxWidth="md"
       >
@@ -1104,14 +1078,14 @@ export default function ReservationsTable() {
           <div className="p-4 sm:p-6">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs sm:text-sm font-medium text-gray-900">
-                Wybierz wartości do filtrowania
+                Wybierz wartości do filtrowania ({tempFilterValues.length} zaznaczonych)
               </span>
-              {hasActiveFilters(openFilterColumn) && (
+              {tempFilterValues.length > 0 && (
                 <button
-                  onClick={() => handleClearColumnFilters(openFilterColumn)}
+                  onClick={handleClearTempFilters}
                   className="text-xs text-[#03adf0] hover:text-[#0288c7]"
                 >
-                  Wyczyść
+                  Wyczyść zaznaczenia
                 </button>
               )}
             </div>
@@ -1119,8 +1093,7 @@ export default function ReservationsTable() {
               <div className="max-h-[360px] overflow-y-auto">
                 {getUniqueColumnValues(openFilterColumn).length > 0 ? (
                   getUniqueColumnValues(openFilterColumn).map((value) => {
-                    const columnFilters = columnConfig.find(c => c.key === openFilterColumn)?.filters || [];
-                    const isSelected = columnFilters.includes(value);
+                    const isSelected = tempFilterValues.includes(value);
                     return (
                       <label
                         key={value}
@@ -1150,6 +1123,23 @@ export default function ReservationsTable() {
                   </div>
                 )}
               </div>
+            </div>
+            {/* Action buttons */}
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={closeFilterModal}
+                className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
+                style={{ borderRadius: 0 }}
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={handleApplyFilters}
+                className="px-4 py-2 text-sm text-white bg-[#03adf0] hover:bg-[#0288c7] transition-colors"
+                style={{ borderRadius: 0 }}
+              >
+                Zastosuj
+              </button>
             </div>
           </div>
         )}
