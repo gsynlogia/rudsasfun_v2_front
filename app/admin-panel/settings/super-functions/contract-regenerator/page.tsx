@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, RefreshCw, FileText, CheckCircle, XCircle, Loader2, Search, ChevronLeft, ChevronRight, FileQuestion, X, Calendar } from 'lucide-react';
+import { ArrowLeft, RefreshCw, FileText, CheckCircle, XCircle, Loader2, Search, ChevronLeft, ChevronRight, FileQuestion, X, Calendar, AlertTriangle, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
@@ -10,6 +10,12 @@ import { authService } from '@/lib/services/AuthService';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
+
+interface Mismatch {
+  field: string;
+  html: string;
+  profile: string;
+}
 
 interface ContractItem {
   reservation_id: number;
@@ -23,11 +29,11 @@ interface ContractItem {
   participant_first_name: string;
   participant_last_name: string;
   participant_gender: string;
-  gender_in_contract: string | null;
-  gender_match: boolean;
   needs_regeneration: boolean;
   has_contract: boolean;
   total_price: number;
+  mismatches: Mismatch[];
+  mismatch_count: number;
 }
 
 interface PaginationInfo {
@@ -373,8 +379,9 @@ function ContractRegeneratorContent() {
     return null;
   }
 
-  const contractsNeedingRegeneration = contracts.filter(c => c.needs_regeneration).length;
+  const contractsWithMismatch = contracts.filter(c => c.needs_regeneration && c.has_contract).length;
   const contractsWithoutContract = contracts.filter(c => !c.has_contract).length;
+  const totalMismatches = contracts.reduce((sum, c) => sum + (c.mismatch_count || 0), 0);
 
   return (
     <AdminLayout>
@@ -439,8 +446,8 @@ function ContractRegeneratorContent() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-white"
               >
                 <option value="">Status umowy...</option>
-                <option value="ok">OK</option>
-                <option value="needs_regeneration">Wymaga regeneracji</option>
+                <option value="ok">OK - dane zgodne</option>
+                <option value="data_mismatch">Niespójność danych</option>
                 <option value="no_contract">Brak umowy</option>
               </select>
             </div>
@@ -508,9 +515,9 @@ function ContractRegeneratorContent() {
               {pagination ? (
                 <>
                   Wyświetlanie <strong>{contracts.length}</strong> z <strong>{pagination.total}</strong> rezerwacji
-                  {contractsNeedingRegeneration > 0 && (
+                  {contractsWithMismatch > 0 && (
                     <span className="text-red-600 ml-2">
-                      ({contractsNeedingRegeneration} wymaga regeneracji)
+                      ({contractsWithMismatch} z niespójnością danych, {totalMismatches} różnic)
                     </span>
                   )}
                   {contractsWithoutContract > 0 && (
@@ -524,7 +531,7 @@ function ContractRegeneratorContent() {
               )}
             </p>
           </div>
-          {contractsNeedingRegeneration > 0 && (
+          {contractsWithMismatch > 0 && (
             <button
               onClick={handleRegenerateAll}
               disabled={regeneratingAll}
@@ -538,7 +545,7 @@ function ContractRegeneratorContent() {
               ) : (
                 <>
                   <RefreshCw className="w-4 h-4" />
-                  <span>Przegeneruj wszystkie ({contractsNeedingRegeneration})</span>
+                  <span>Przegeneruj niespójne ({contractsWithMismatch})</span>
                 </>
               )}
             </button>
@@ -613,17 +620,31 @@ function ContractRegeneratorContent() {
                       key={contract.reservation_id}
                       className="hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3">
                         {!contract.has_contract ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                             <FileQuestion className="w-3 h-3" />
                             Brak umowy
                           </span>
                         ) : contract.needs_regeneration ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            <XCircle className="w-3 h-3" />
-                            Wymaga regeneracji
-                          </span>
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              <AlertTriangle className="w-3 h-3" />
+                              Niespójność ({contract.mismatch_count})
+                            </span>
+                            {contract.mismatches && contract.mismatches.length > 0 && (
+                              <div className="text-xs text-red-600 max-w-xs">
+                                {contract.mismatches.slice(0, 3).map((m, i) => (
+                                  <div key={i} className="truncate" title={`${m.field}: HTML="${m.html}" vs Profil="${m.profile}"`}>
+                                    <strong>{m.field}:</strong> {m.html} ≠ {m.profile}
+                                  </div>
+                                ))}
+                                {contract.mismatches.length > 3 && (
+                                  <div className="text-gray-500 italic">...i {contract.mismatches.length - 3} więcej</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             <CheckCircle className="w-3 h-3" />
