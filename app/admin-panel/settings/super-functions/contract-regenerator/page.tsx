@@ -271,19 +271,25 @@ function ContractRegeneratorContent() {
     try {
       setRegenerating(reservationId);
       setError(null);
+      console.log(`[Regenerate] Starting for reservation ${reservationId}`);
 
-      await authenticatedApiCall(
+      const result = await authenticatedApiCall(
         `${API_BASE_URL}/api/contracts/regenerator/regenerate/${reservationId}`,
         {
           method: 'POST',
         },
       );
 
+      console.log(`[Regenerate] Success:`, result);
+      alert(`Umowa przegenerowana pomyślnie dla rezerwacji ${reservationId}`);
+
       // Refresh contracts list
       await fetchContracts(currentPage, appliedFilters);
     } catch (err) {
       console.error('Error regenerating contract:', err);
-      setError(err instanceof Error ? err.message : 'Błąd podczas regeneracji umowy');
+      const errorMsg = err instanceof Error ? err.message : 'Błąd podczas regeneracji umowy';
+      setError(errorMsg);
+      alert(`Błąd: ${errorMsg}`);
     } finally {
       setRegenerating(null);
     }
@@ -691,7 +697,8 @@ function ContractRegeneratorContent() {
                               </button>
                             )}
                             <button
-                              onClick={(e) => { e.stopPropagation(); handleRegenerate(contract.reservation_id); }}
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRegenerate(contract.reservation_id); }}
                               disabled={regenerating === contract.reservation_id}
                               className="text-green-600 hover:text-green-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                               title={contract.has_contract ? "Regeneruj umowę" : "Wygeneruj umowę"}
@@ -777,7 +784,8 @@ function ContractRegeneratorContent() {
                                   {contract.mismatch_count > 0 && (
                                     <div className="flex justify-end pt-2">
                                       <button
-                                        onClick={(e) => { e.stopPropagation(); handleRegenerate(contract.reservation_id); }}
+                                        type="button"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRegenerate(contract.reservation_id); }}
                                         disabled={regenerating === contract.reservation_id}
                                         className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                       >
