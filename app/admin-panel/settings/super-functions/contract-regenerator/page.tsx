@@ -17,6 +17,14 @@ interface Mismatch {
   profile: string;
 }
 
+interface ComparisonItem {
+  category: string;
+  field: string;
+  html: string;
+  profile: string;
+  match: boolean;
+}
+
 interface ContractItem {
   reservation_id: number;
   reservation_number: string;
@@ -34,6 +42,7 @@ interface ContractItem {
   total_price: number;
   mismatches: Mismatch[];
   mismatch_count: number;
+  comparison_data: ComparisonItem[];
 }
 
 interface PaginationInfo {
@@ -702,10 +711,18 @@ function ContractRegeneratorContent() {
                         <tr key={`expanded-${contract.reservation_id}`} className="bg-gray-50">
                           <td colSpan={7} className="px-4 py-4">
                             <div className="bg-white border border-gray-200 rounded-lg p-4">
-                              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                                <FileText className="w-4 h-4" />
-                                Szczegóły umowy - {contract.reservation_number}
-                              </h4>
+                              <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                  <FileText className="w-4 h-4" />
+                                  Porównanie umowy HTML z profilem - {contract.reservation_number}
+                                </h4>
+                                {contract.has_contract && contract.mismatch_count > 0 && (
+                                  <span className="text-sm text-red-600 font-medium flex items-center gap-1">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    {contract.mismatch_count} niespójności
+                                  </span>
+                                )}
+                              </div>
                               
                               {!contract.has_contract ? (
                                 <div className="text-center py-6 text-gray-500">
@@ -713,52 +730,66 @@ function ContractRegeneratorContent() {
                                   <p>Brak wygenerowanej umowy HTML dla tej rezerwacji.</p>
                                   <p className="text-sm">Kliknij przycisk &quot;Generuj&quot; aby utworzyć umowę.</p>
                                 </div>
-                              ) : contract.mismatches && contract.mismatches.length > 0 ? (
-                                <div className="space-y-3">
-                                  <div className="text-sm text-red-600 font-medium flex items-center gap-2">
-                                    <AlertTriangle className="w-4 h-4" />
-                                    Znaleziono {contract.mismatch_count} niespójności między umową HTML a profilem:
-                                  </div>
-                                  <div className="overflow-x-auto">
-                                    <table className="min-w-full text-sm border border-gray-200 rounded">
-                                      <thead className="bg-gray-100">
-                                        <tr>
-                                          <th className="px-3 py-2 text-left font-medium text-gray-700 border-b">Pole</th>
-                                          <th className="px-3 py-2 text-left font-medium text-gray-700 border-b">W umowie HTML</th>
-                                          <th className="px-3 py-2 text-left font-medium text-gray-700 border-b">Powinno być (profil)</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {contract.mismatches.map((mismatch, idx) => (
-                                          <tr key={idx} className="border-b last:border-b-0 bg-red-50">
-                                            <td className="px-3 py-2 font-medium text-gray-800">
-                                              {mismatch.field}
-                                            </td>
-                                            <td className="px-3 py-2 text-red-600 line-through">
-                                              {mismatch.html || <span className="italic text-gray-400">brak</span>}
-                                            </td>
-                                            <td className="px-3 py-2 text-green-700 font-semibold">
-                                              {mismatch.profile || <span className="italic text-gray-400">brak</span>}
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                  <div className="flex justify-end">
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleRegenerate(contract.reservation_id); }}
-                                      disabled={regenerating === contract.reservation_id}
-                                      className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                    >
-                                      {regenerating === contract.reservation_id ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                      ) : (
-                                        <RefreshCw className="w-4 h-4" />
-                                      )}
-                                      Przegeneruj umowę
-                                    </button>
-                                  </div>
+                              ) : contract.comparison_data && contract.comparison_data.length > 0 ? (
+                                <div className="space-y-4">
+                                  {/* Group by category */}
+                                  {(() => {
+                                    const categories = [...new Set(contract.comparison_data.map(item => item.category))];
+                                    return categories.map((category) => {
+                                      const categoryItems = contract.comparison_data.filter(item => item.category === category);
+                                      const hasMismatch = categoryItems.some(item => !item.match);
+                                      return (
+                                        <div key={category} className={`border rounded-lg overflow-hidden ${hasMismatch ? 'border-red-300' : 'border-gray-200'}`}>
+                                          <div className={`px-3 py-2 text-sm font-semibold ${hasMismatch ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700'}`}>
+                                            {category}
+                                            {hasMismatch && <span className="ml-2 text-xs">(niespójność)</span>}
+                                          </div>
+                                          <table className="min-w-full text-sm">
+                                            <thead className="bg-gray-50">
+                                              <tr>
+                                                <th className="px-3 py-2 text-left font-medium text-gray-600 w-1/4">Pole</th>
+                                                <th className="px-3 py-2 text-left font-medium text-gray-600 w-5/12">W umowie HTML</th>
+                                                <th className="px-3 py-2 text-left font-medium text-gray-600 w-5/12">W profilu</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                              {categoryItems.map((item, idx) => (
+                                                <tr key={idx} className={item.match ? 'bg-white' : 'bg-red-50'}>
+                                                  <td className="px-3 py-2 font-medium text-gray-700">
+                                                    {item.field}
+                                                  </td>
+                                                  <td className={`px-3 py-2 ${!item.match ? 'text-red-600 line-through' : 'text-gray-800'}`}>
+                                                    {item.html || <span className="italic text-gray-400">brak</span>}
+                                                  </td>
+                                                  <td className={`px-3 py-2 ${!item.match ? 'text-green-700 font-semibold' : 'text-gray-800'}`}>
+                                                    {item.profile || <span className="italic text-gray-400">brak</span>}
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
+                                  
+                                  {/* Regenerate button */}
+                                  {contract.mismatch_count > 0 && (
+                                    <div className="flex justify-end pt-2">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleRegenerate(contract.reservation_id); }}
+                                        disabled={regenerating === contract.reservation_id}
+                                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                      >
+                                        {regenerating === contract.reservation_id ? (
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                          <RefreshCw className="w-4 h-4" />
+                                        )}
+                                        Przegeneruj umowę ({contract.mismatch_count} różnic)
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               ) : (
                                 <div className="text-center py-6 text-green-600">
