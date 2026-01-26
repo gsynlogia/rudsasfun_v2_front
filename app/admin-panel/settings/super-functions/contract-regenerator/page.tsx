@@ -1,9 +1,9 @@
 'use client';
 
-import { ArrowLeft, RefreshCw, FileText, CheckCircle, XCircle, Loader2, Search, ChevronLeft, ChevronRight, FileQuestion } from 'lucide-react';
+import { ArrowLeft, RefreshCw, FileText, CheckCircle, XCircle, Loader2, Search, ChevronLeft, ChevronRight, FileQuestion, X, Calendar } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import { authService } from '@/lib/services/AuthService';
@@ -44,6 +44,30 @@ interface ApiResponse {
   pagination: PaginationInfo;
 }
 
+interface SearchFilters {
+  search: string;
+  reservationNumber: string;
+  contractStatus: string;
+  campName: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+// Skeleton row component
+function SkeletonRow() {
+  return (
+    <tr className="animate-pulse">
+      <td className="px-4 py-3"><div className="h-6 w-24 bg-gray-200 rounded-full"></div></td>
+      <td className="px-4 py-3"><div className="h-4 w-28 bg-gray-200 rounded"></div></td>
+      <td className="px-4 py-3"><div className="h-4 w-32 bg-gray-200 rounded"></div></td>
+      <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 rounded"></div></td>
+      <td className="px-4 py-3"><div className="h-4 w-36 bg-gray-200 rounded"></div></td>
+      <td className="px-4 py-3"><div className="h-4 w-28 bg-gray-200 rounded"></div></td>
+      <td className="px-4 py-3"><div className="h-4 w-24 bg-gray-200 rounded"></div></td>
+    </tr>
+  );
+}
+
 /**
  * Admin Panel - Umowy Regenerator
  * Route: /admin-panel/settings/super-functions/contract-regenerator
@@ -51,37 +75,58 @@ interface ApiResponse {
  * Super function for regenerating contracts with gender verification
  * Only accessible for user ID 0
  */
-export default function ContractRegeneratorPage() {
+function ContractRegeneratorContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Initialize filters from URL params
+  const getInitialFilters = useCallback((): SearchFilters => ({
+    search: searchParams?.get('search') || '',
+    reservationNumber: searchParams?.get('reservation_number') || '',
+    contractStatus: searchParams?.get('status') || '',
+    campName: searchParams?.get('camp') || '',
+    dateFrom: searchParams?.get('date_from') || '',
+    dateTo: searchParams?.get('date_to') || '',
+  }), [searchParams]);
+  
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [contracts, setContracts] = useState<ContractItem[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loadingContracts, setLoadingContracts] = useState(true);
+  const [showSkeleton, setShowSkeleton] = useState(false);
   const [regenerating, setRegenerating] = useState<number | null>(null);
   const [regeneratingAll, setRegeneratingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Filter state - local inputs
+  const [filters, setFilters] = useState<SearchFilters>(getInitialFilters);
+  // Applied filters (what's actually being searched)
+  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(getInitialFilters);
+  
+  const [currentPage, setCurrentPage] = useState(() => {
+    const pageParam = searchParams?.get('page');
+    return pageParam ? parseInt(pageParam, 10) : 1;
+  });
   const [pageSize] = useState(20);
+  
+  // Debounce timer ref
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
     const checkAccess = async () => {
-      // Check if user is authenticated
       if (!authService.isAuthenticated()) {
         router.push('/admin-panel/login');
         return;
       }
 
-      // Verify token and get user info
       const user = await authService.verifyToken();
       if (!user) {
         router.push('/admin-panel/login');
         return;
       }
 
-      // Only user ID 0 can access
       if (user.id !== 0) {
         router.push('/admin-panel/settings');
         return;
@@ -94,49 +139,117 @@ export default function ContractRegeneratorPage() {
     checkAccess();
   }, [router]);
 
-  const fetchContracts = useCallback(async (page: number, search: string) => {
+  // Update URL with current filters
+  const updateURL = useCallback((newFilters: SearchFilters, page: number) => {
+    const params = new URLSearchParams();
+    
+    if (newFilters.search) params.set('search', newFilters.search);
+    if (newFilters.reservationNumber) params.set('reservation_number', newFilters.reservationNumber);
+    if (newFilters.contractStatus) params.set('status', newFilters.contractStatus);
+    if (newFilters.campName) params.set('camp', newFilters.campName);
+    if (newFilters.dateFrom) params.set('date_from', newFilters.dateFrom);
+    if (newFilters.dateTo) params.set('date_to', newFilters.dateTo);
+    if (page > 1) params.set('page', page.toString());
+    
+    const queryString = params.toString();
+    const newUrl = queryString 
+      ? `${window.location.pathname}?${queryString}`
+      : window.location.pathname;
+    
+    window.history.replaceState({}, '', newUrl);
+  }, []);
+
+  const fetchContracts = useCallback(async (page: number, searchFilters: SearchFilters) => {
     try {
       setLoadingContracts(true);
       setError(null);
+      
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pageSize.toString(),
       });
-      if (search) {
-        params.append('search', search);
-      }
+      
+      if (searchFilters.search) params.append('search', searchFilters.search);
+      if (searchFilters.reservationNumber) params.append('reservation_number', searchFilters.reservationNumber);
+      if (searchFilters.contractStatus) params.append('contract_status', searchFilters.contractStatus);
+      if (searchFilters.campName) params.append('camp_name', searchFilters.campName);
+      if (searchFilters.dateFrom) params.append('date_from', searchFilters.dateFrom);
+      if (searchFilters.dateTo) params.append('date_to', searchFilters.dateTo);
+      
       const data = await authenticatedApiCall<ApiResponse>(
         `${API_BASE_URL}/api/contracts/regenerator/list?${params.toString()}`,
       );
       setContracts(data.items);
       setPagination(data.pagination);
+      setShowSkeleton(false);
     } catch (err) {
       console.error('Error fetching contracts:', err);
       setError(err instanceof Error ? err.message : 'Błąd podczas ładowania umów');
+      setShowSkeleton(false);
     } finally {
       setLoadingContracts(false);
     }
   }, [pageSize]);
 
+  // Fetch on initial load and when appliedFilters or page changes
   useEffect(() => {
     if (!isAuthorized) return;
-    fetchContracts(currentPage, searchTerm);
-  }, [isAuthorized, currentPage, searchTerm, fetchContracts]);
+    fetchContracts(currentPage, appliedFilters);
+    updateURL(appliedFilters, currentPage);
+  }, [isAuthorized, currentPage, appliedFilters, fetchContracts, updateURL]);
 
-  const handleSearch = () => {
+  // Debounced filter change handler
+  const handleFilterChange = useCallback((field: keyof SearchFilters, value: string) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+    
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Show skeleton after 300ms
+    debounceTimerRef.current = setTimeout(() => {
+      setShowSkeleton(true);
+      setCurrentPage(1);
+      setAppliedFilters(prev => ({ ...prev, [field]: value }));
+    }, 300);
+  }, []);
+
+  // Immediate search (for Enter key or button click)
+  const handleImmediateSearch = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    setShowSkeleton(true);
     setCurrentPage(1);
-    setSearchTerm(searchInput);
-  };
+    setAppliedFilters(filters);
+  }, [filters]);
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSearch();
+      handleImmediateSearch();
     }
   };
+
+  const handleClearFilters = useCallback(() => {
+    const emptyFilters: SearchFilters = {
+      search: '',
+      reservationNumber: '',
+      contractStatus: '',
+      campName: '',
+      dateFrom: '',
+      dateTo: '',
+    };
+    setFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
+    setCurrentPage(1);
+  }, []);
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
   };
+  
+  const hasActiveFilters = Object.values(appliedFilters).some(v => v !== '');
 
   const handleRegenerate = async (reservationId: number) => {
     try {
@@ -151,7 +264,7 @@ export default function ContractRegeneratorPage() {
       );
 
       // Refresh contracts list
-      await fetchContracts(currentPage, searchTerm);
+      await fetchContracts(currentPage, appliedFilters);
     } catch (err) {
       console.error('Error regenerating contract:', err);
       setError(err instanceof Error ? err.message : 'Błąd podczas regeneracji umowy');
@@ -186,7 +299,7 @@ export default function ContractRegeneratorPage() {
       );
 
       // Refresh contracts list
-      await fetchContracts(currentPage, searchTerm);
+      await fetchContracts(currentPage, appliedFilters);
     } catch (err) {
       console.error('Error regenerating all contracts:', err);
       setError(err instanceof Error ? err.message : 'Błąd podczas regeneracji wszystkich umów');
@@ -291,34 +404,98 @@ export default function ContractRegeneratorPage() {
 
         {/* Search Bar */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-md">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            {/* Name search */}
+            <div className="relative">
               <input
                 type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Szukaj po numerze rezerwacji, imieniu lub nazwisku..."
+                placeholder="Imię lub nazwisko..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm"
               />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
+            
+            {/* Reservation number */}
+            <div className="relative">
+              <input
+                type="text"
+                value={filters.reservationNumber}
+                onChange={(e) => handleFilterChange('reservationNumber', e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Nr rezerwacji (np. 505)..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm"
+              />
+              <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </div>
+            
+            {/* Contract status */}
+            <div>
+              <select
+                value={filters.contractStatus}
+                onChange={(e) => handleFilterChange('contractStatus', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-white"
+              >
+                <option value="">Status umowy...</option>
+                <option value="ok">OK</option>
+                <option value="needs_regeneration">Wymaga regeneracji</option>
+                <option value="no_contract">Brak umowy</option>
+              </select>
+            </div>
+            
+            {/* Camp name */}
+            <div className="relative">
+              <input
+                type="text"
+                value={filters.campName}
+                onChange={(e) => handleFilterChange('campName', e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Nazwa obozu..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm"
+              />
+            </div>
+            
+            {/* Date from */}
+            <div className="relative">
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm"
+              />
+              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </div>
+            
+            {/* Date to */}
+            <div className="relative">
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm"
+              />
+              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </div>
+          </div>
+          
+          {/* Action buttons */}
+          <div className="flex items-center gap-3 mt-3">
             <button
-              onClick={handleSearch}
-              className="px-4 py-2 bg-[#03adf0] text-white font-medium rounded-lg hover:bg-[#0288c7] transition-colors text-sm"
+              onClick={handleImmediateSearch}
+              className="px-4 py-2 bg-[#03adf0] text-white font-medium rounded-lg hover:bg-[#0288c7] transition-colors text-sm flex items-center gap-2"
             >
+              <Search className="w-4 h-4" />
               Szukaj
             </button>
-            {searchTerm && (
+            {hasActiveFilters && (
               <button
-                onClick={() => {
-                  setSearchInput('');
-                  setSearchTerm('');
-                  setCurrentPage(1);
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                onClick={handleClearFilters}
+                className="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-colors text-sm flex items-center gap-2"
               >
-                Wyczyść
+                <X className="w-4 h-4" />
+                Wyczyść filtry
               </button>
             )}
           </div>
@@ -370,15 +547,36 @@ export default function ContractRegeneratorPage() {
 
         {/* Contracts Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          {loadingContracts ? (
+          {(loadingContracts && !showSkeleton) ? (
             <div className="p-8 text-center">
               <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#03adf0] mb-4" />
               <p className="text-sm text-gray-600">Ładowanie rezerwacji...</p>
             </div>
+          ) : showSkeleton ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Numer rezerwacji</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Uczestnik</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Płeć</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Obóz</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Data utworzenia</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Akcje</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <SkeletonRow key={i} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : contracts.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-sm text-gray-600">
-                {searchTerm ? 'Nie znaleziono rezerwacji pasujących do wyszukiwania' : 'Brak rezerwacji do wyświetlenia'}
+                {hasActiveFilters ? 'Nie znaleziono rezerwacji pasujących do wyszukiwania' : 'Brak rezerwacji do wyświetlenia'}
               </p>
             </div>
           ) : (
@@ -548,5 +746,23 @@ export default function ContractRegeneratorPage() {
         )}
       </div>
     </AdminLayout>
+  );
+}
+
+// Wrapper component with Suspense for useSearchParams
+export default function ContractRegeneratorPage() {
+  return (
+    <Suspense fallback={
+      <AdminLayout>
+        <div className="w-full flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#03adf0]"></div>
+            <p className="mt-4 text-sm text-gray-600">Ładowanie...</p>
+          </div>
+        </div>
+      </AdminLayout>
+    }>
+      <ContractRegeneratorContent />
+    </Suspense>
   );
 }
