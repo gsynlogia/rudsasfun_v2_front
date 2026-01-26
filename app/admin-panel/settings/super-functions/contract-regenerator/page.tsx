@@ -1,9 +1,9 @@
 'use client';
 
-import { ArrowLeft, RefreshCw, FileText, CheckCircle, XCircle, Loader2, Search, ChevronLeft, ChevronRight, FileQuestion, X, Calendar, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, RefreshCw, FileText, CheckCircle, XCircle, Loader2, Search, ChevronLeft, ChevronRight, ChevronDown, FileQuestion, X, Calendar, AlertTriangle, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import { authService } from '@/lib/services/AuthService';
@@ -104,6 +104,7 @@ function ContractRegeneratorContent() {
   const [regenerating, setRegenerating] = useState<number | null>(null);
   const [regeneratingAll, setRegeneratingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedRow, setExpandedRow] = useState<number | null>(null);
   
   // Filter state - local inputs
   const [filters, setFilters] = useState<SearchFilters>(getInitialFilters);
@@ -616,96 +617,160 @@ function ContractRegeneratorContent() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {contracts.map((contract) => (
-                    <tr
-                      key={contract.reservation_id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        {!contract.has_contract ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                            <FileQuestion className="w-3 h-3" />
-                            Brak umowy
-                          </span>
-                        ) : contract.needs_regeneration ? (
-                          <div className="space-y-1">
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              <AlertTriangle className="w-3 h-3" />
-                              Niespójność ({contract.mismatch_count})
-                            </span>
-                            {contract.mismatches && contract.mismatches.length > 0 && (
-                              <div className="text-xs text-red-600 max-w-xs">
-                                {contract.mismatches.slice(0, 3).map((m, i) => (
-                                  <div key={i} className="truncate" title={`${m.field}: HTML="${m.html}" vs Profil="${m.profile}"`}>
-                                    <strong>{m.field}:</strong> {m.html} ≠ {m.profile}
-                                  </div>
-                                ))}
-                                {contract.mismatches.length > 3 && (
-                                  <div className="text-gray-500 italic">...i {contract.mismatches.length - 3} więcej</div>
-                                )}
-                              </div>
+                    <React.Fragment key={contract.reservation_id}>
+                      <tr
+                        onClick={() => setExpandedRow(expandedRow === contract.reservation_id ? null : contract.reservation_id)}
+                        className={`hover:bg-gray-50 transition-colors cursor-pointer ${expandedRow === contract.reservation_id ? 'bg-blue-50' : ''}`}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedRow === contract.reservation_id ? 'rotate-180' : ''}`} />
+                            {!contract.has_contract ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                <FileQuestion className="w-3 h-3" />
+                                Brak umowy
+                              </span>
+                            ) : contract.needs_regeneration ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <AlertTriangle className="w-3 h-3" />
+                                Niespójność ({contract.mismatch_count})
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <CheckCircle className="w-3 h-3" />
+                                OK
+                              </span>
                             )}
                           </div>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <CheckCircle className="w-3 h-3" />
-                            OK
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {contract.reservation_number}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {contract.participant_first_name} {contract.participant_last_name}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {contract.participant_gender}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        <div>{contract.camp_name || 'Brak danych'}</div>
-                        {contract.property_name && (
-                          <div className="text-xs text-gray-500">{contract.property_name}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        {contract.created_at
-                          ? new Date(contract.created_at).toLocaleDateString('pl-PL', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : 'Brak danych'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center gap-2">
-                          {contract.has_contract && (
-                            <button
-                              onClick={() => handleOpenContract(contract.reservation_number)}
-                              className="text-[#03adf0] hover:text-[#0288c7] transition-colors flex items-center gap-1"
-                              title="Otwórz umowę w nowej karcie"
-                            >
-                              <FileText className="w-4 h-4" />
-                              <span>Zobacz</span>
-                            </button>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {contract.reservation_number}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {contract.participant_first_name} {contract.participant_last_name}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {contract.participant_gender}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          <div>{contract.camp_name || 'Brak danych'}</div>
+                          {contract.property_name && (
+                            <div className="text-xs text-gray-500">{contract.property_name}</div>
                           )}
-                          <button
-                            onClick={() => handleRegenerate(contract.reservation_id)}
-                            disabled={regenerating === contract.reservation_id}
-                            className="text-green-600 hover:text-green-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={contract.has_contract ? "Regeneruj umowę" : "Wygeneruj umowę"}
-                          >
-                            {regenerating === contract.reservation_id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <RefreshCw className="w-4 h-4" />
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {contract.created_at
+                            ? new Date(contract.created_at).toLocaleDateString('pl-PL', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : 'Brak danych'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center gap-2">
+                            {contract.has_contract && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOpenContract(contract.reservation_number); }}
+                                className="text-[#03adf0] hover:text-[#0288c7] transition-colors flex items-center gap-1"
+                                title="Otwórz umowę w nowej karcie"
+                              >
+                                <FileText className="w-4 h-4" />
+                                <span>Zobacz</span>
+                              </button>
                             )}
-                            <span>{contract.has_contract ? 'Regeneruj' : 'Generuj'}</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleRegenerate(contract.reservation_id); }}
+                              disabled={regenerating === contract.reservation_id}
+                              className="text-green-600 hover:text-green-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={contract.has_contract ? "Regeneruj umowę" : "Wygeneruj umowę"}
+                            >
+                              {regenerating === contract.reservation_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-4 h-4" />
+                              )}
+                              <span>{contract.has_contract ? 'Regeneruj' : 'Generuj'}</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Expanded row with full contract details */}
+                      {expandedRow === contract.reservation_id && (
+                        <tr key={`expanded-${contract.reservation_id}`} className="bg-gray-50">
+                          <td colSpan={7} className="px-4 py-4">
+                            <div className="bg-white border border-gray-200 rounded-lg p-4">
+                              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                <FileText className="w-4 h-4" />
+                                Szczegóły umowy - {contract.reservation_number}
+                              </h4>
+                              
+                              {!contract.has_contract ? (
+                                <div className="text-center py-6 text-gray-500">
+                                  <FileQuestion className="w-12 h-12 mx-auto mb-2 text-orange-400" />
+                                  <p>Brak wygenerowanej umowy HTML dla tej rezerwacji.</p>
+                                  <p className="text-sm">Kliknij przycisk &quot;Generuj&quot; aby utworzyć umowę.</p>
+                                </div>
+                              ) : contract.mismatches && contract.mismatches.length > 0 ? (
+                                <div className="space-y-3">
+                                  <div className="text-sm text-red-600 font-medium flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    Znaleziono {contract.mismatch_count} niespójności między umową HTML a profilem:
+                                  </div>
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full text-sm border border-gray-200 rounded">
+                                      <thead className="bg-gray-100">
+                                        <tr>
+                                          <th className="px-3 py-2 text-left font-medium text-gray-700 border-b">Pole</th>
+                                          <th className="px-3 py-2 text-left font-medium text-gray-700 border-b">W umowie HTML</th>
+                                          <th className="px-3 py-2 text-left font-medium text-gray-700 border-b">Powinno być (profil)</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {contract.mismatches.map((mismatch, idx) => (
+                                          <tr key={idx} className="border-b last:border-b-0 bg-red-50">
+                                            <td className="px-3 py-2 font-medium text-gray-800">
+                                              {mismatch.field}
+                                            </td>
+                                            <td className="px-3 py-2 text-red-600 line-through">
+                                              {mismatch.html || <span className="italic text-gray-400">brak</span>}
+                                            </td>
+                                            <td className="px-3 py-2 text-green-700 font-semibold">
+                                              {mismatch.profile || <span className="italic text-gray-400">brak</span>}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <div className="flex justify-end">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleRegenerate(contract.reservation_id); }}
+                                      disabled={regenerating === contract.reservation_id}
+                                      className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                      {regenerating === contract.reservation_id ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <RefreshCw className="w-4 h-4" />
+                                      )}
+                                      Przegeneruj umowę
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-center py-6 text-green-600">
+                                  <CheckCircle className="w-12 h-12 mx-auto mb-2" />
+                                  <p className="font-medium">Wszystkie dane w umowie są zgodne z profilem.</p>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
