@@ -335,7 +335,25 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
 
       {/* Document Cards */}
       <div className="space-y-3 sm:space-y-4">
-        {/* Agreement Card */}
+        {/* Agreement Card - TEMPORARILY DISABLED */}
+        <div>
+          <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Umowa</p>
+          <div className="border-2 border-dashed border-orange-300 rounded-lg p-3 sm:p-4 bg-orange-50 relative">
+            <div className="flex flex-col items-center gap-2 sm:gap-3 py-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 sm:w-10 sm:h-10 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p className="text-xs sm:text-sm text-orange-700 text-center font-medium">
+                Trwa aktualizacja modułu &quot;Umowy&quot;
+              </p>
+              <p className="text-[10px] sm:text-xs text-orange-600 text-center">
+                Przepraszamy za utrudnienia. Moduł będzie dostępny wkrótce.
+              </p>
+            </div>
+          </div>
+        </div>
+        {/* 
+        ORIGINAL AGREEMENT CARD - COMMENTED OUT FOR UPDATE
         <div>
           <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Umowa</p>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
@@ -355,32 +373,6 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
               <p className="text-[10px] sm:text-xs text-gray-600 text-center">Umowa</p>
               <div className="w-full flex flex-col gap-1.5 sm:gap-2">
-                {/* <button
-                  onClick={handleDownloadContract}
-                  disabled={isGenerating || loadingContract}
-                  className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 border border-gray-300 text-[10px] sm:text-xs rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                >
-                  {isGenerating || loadingContract ? (
-                    <>
-                      <span className="animate-spin">⏳</span>
-                      <span>{isGenerating ? (hasContract ? 'Pobieranie...' : 'Generowanie...') : 'Sprawdzanie...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      {hasContract ? (
-                        <>
-                          <Download className="w-3 h-3" />
-                          <span>Pobierz umowę</span>
-                        </>
-                      ) : (
-                        <>
-                          <FileText className="w-3 h-3" />
-                          <span>Podpisz umowę</span>
-                        </>
-                      )}
-                    </>
-                  )}
-                </button> */}
                 <button
                   onClick={() => {
                     router.push('/profil/do-pobrania');
@@ -434,6 +426,8 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
             </div>
           </div>
         </div>
+        END OF ORIGINAL AGREEMENT CARD 
+        */}
 
         {/* Umowa Information */}
         <div className="bg-blue-50 border-l-4 border-blue-400 p-2 sm:p-3 rounded">
