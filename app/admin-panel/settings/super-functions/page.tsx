@@ -123,6 +123,26 @@ export default function SuperFunctionsPage() {
               </div>
             </div>
 
+            {/* Logi systemowe */}
+            <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-[#03adf0] transition-colors">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Logi systemowe
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Przeglądanie logów systemowych aplikacji
+                  </p>
+                </div>
+                <Link
+                  href="/admin-panel/settings/super-functions/system-logs"
+                  className="px-6 py-2 bg-[#03adf0] text-white font-medium rounded-lg hover:bg-[#0288c7] transition-colors inline-block"
+                >
+                  Uruchom
+                </Link>
+              </div>
+            </div>
+
             {/* Inteligentna analiza rezerwacji - WYŁĄCZONA */}
             {/*
             <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-[#03adf0] transition-colors">

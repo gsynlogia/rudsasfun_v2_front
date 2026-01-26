@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
@@ -888,6 +888,14 @@ export default function ReservationDetailPage() {
               >
                 <Edit className="w-4 h-4" />
                 <span>Zmiana w rezerwacji</span>
+              </button>
+              <button
+                onClick={() => {/* TODO: Zobacz profil klienta */}}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200"
+                style={{ borderRadius: 0 }}
+              >
+                <User className="w-4 h-4" />
+                <span>Zobacz profil klienta</span>
               </button>
               <button
                 onClick={() => setShowDeleteModal(true)}
