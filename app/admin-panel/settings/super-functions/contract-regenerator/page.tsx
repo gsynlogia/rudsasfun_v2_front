@@ -34,6 +34,9 @@ interface ContractItem {
   created_at: string | null;
   camp_name: string | null;
   property_name: string | null;
+  property_city: string | null;
+  property_start_date: string | null;
+  property_end_date: string | null;
   participant_first_name: string;
   participant_last_name: string;
   participant_gender: string;
@@ -729,6 +732,28 @@ function ContractRegeneratorContent() {
                                     {contract.mismatch_count} niespójności
                                   </span>
                                 )}
+                              </div>
+                              
+                              {/* Camp and turnus info */}
+                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                  <div>
+                                    <span className="font-medium text-blue-800">Ośrodek:</span>
+                                    <span className="ml-2 text-blue-900">{contract.camp_name || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-blue-800">Turnus:</span>
+                                    <span className="ml-2 text-blue-900">{contract.property_name || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium text-blue-800">Daty:</span>
+                                    <span className="ml-2 text-blue-900">
+                                      {contract.property_start_date && contract.property_end_date 
+                                        ? `${contract.property_start_date} - ${contract.property_end_date}`
+                                        : '-'}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                               
                               {!contract.has_contract ? (
