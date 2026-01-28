@@ -443,8 +443,8 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               <p className="text-xs sm:text-sm font-semibold text-blue-900 mb-0.5 sm:mb-1 uppercase">
                 WAŻNE INFORMACJE
               </p>
-              <p className="text-xs sm:text-sm text-blue-800 leading-tight uppercase">
-                MASZ <strong>2 DNI</strong> NA WGRANIE PODPISANEJ UMOWY. MOŻESZ PODPISAĆ UMOWĘ <strong>ODRĘCZNIE</strong> LUB <strong>PODPISEM ZAUFANYM</strong>.
+              <p className="text-xs sm:text-sm text-blue-800 leading-tight">
+                Szanowni Państwo, z uwagi na aktualizacje modułów &quot;Umowy&quot; i &quot;Karty&quot;, dokumenty te będą dostępne w późniejszym terminie. Poinformujemy Państwa.
               </p>
             </div>
           </div>

@@ -108,6 +108,33 @@ export default function ClientViewLayout({
 
           {/* Right Content Area - narrower to make room for wider sidebar */}
           <div className="flex-1 w-full lg:pl-6">
+            {/* System Update Alert */}
+            <div className="mb-4 sm:mb-6 relative">
+              {/* Main alert with clipped corners */}
+              <div 
+                className="bg-red-600 p-4 sm:p-5"
+                style={{ clipPath: 'polygon(0 0, calc(100% - 35px) 0, 100% 35px, 100% 100%, 35px 100%, 0 calc(100% - 35px))' }}
+              >
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0">
+                    <svg className="w-6 h-6 sm:w-7 sm:h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm sm:text-base font-semibold text-white mb-2">
+                      Pracujemy nad ulepszeniem systemu
+                    </h4>
+                    <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
+                      Aby był jeszcze lepszy, szybszy i wygodniejszy w obsłudze. W trakcie zmian mogą pojawić się drobne błędy — przepraszamy za ewentualne niedogodności.
+                    </p>
+                    <p className="text-xs sm:text-sm text-white/90 leading-relaxed mt-3">
+                      Aktualnie nie generujemy umów ani kart kwalifikacyjnych. Zgodnie z regulaminem, rezerwacja dokonana w Panelu Klienta stanowi umowę wstępną. Poinformujemy SMSem o gotowej umowie. Dziękujemy za cierpliwość.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
             {children}
           </div>
         </div>
