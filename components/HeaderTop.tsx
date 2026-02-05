@@ -14,9 +14,11 @@ import { authService } from '@/lib/services/AuthService';
  */
 interface HeaderTopProps {
   fixed?: boolean;
+  hideLogo?: boolean;
+  fixedHeight?: boolean; // For admin panel - fixed 64px height to match sidebar
 }
 
-export default function HeaderTop({ fixed = false }: HeaderTopProps) {
+export default function HeaderTop({ fixed = false, hideLogo = false, fixedHeight = false }: HeaderTopProps) {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
@@ -64,74 +66,80 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
   return (
     <header className={headerClasses}>
       {/* Top navigation bar - White background with bottom shadow */}
-      <div className="bg-white w-full" style={{ boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)' }}>
-        <div className="max-w-container px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between">
-          {/* Logo on the left */}
-          <div className="flex items-center">
-            <Link href="/" className="cursor-pointer">
-              <Image
-                src="/logo.png"
-                alt="Radsas Fun Logo"
-                width={150}
-                height={60}
-                className="h-5 sm:h-7 md:h-10 lg:max-h-[60px] w-auto"
-                style={{ maxHeight: '60px', height: 'auto', width: 'auto', cursor: 'pointer' }}
-                priority
-              />
-            </Link>
-          </div>
+      <div className="bg-white w-full" style={{ boxShadow: fixedHeight ? 'none' : '0 4px 6px -2px rgba(0, 0, 0, 0.1)', height: fixedHeight ? '64px' : 'auto' }}>
+        <div className={`${hideLogo ? 'px-6' : 'max-w-container px-3 sm:px-6'} ${fixedHeight ? 'h-full' : 'py-2 sm:py-3'} flex items-center ${hideLogo ? 'justify-end' : 'justify-between'}`}>
+          {/* Logo on the left - hidden in admin panel where sidebar has logo */}
+          {!hideLogo && (
+            <div className="flex items-center">
+              <Link href="/" className="cursor-pointer">
+                <Image
+                  src="/logo.png"
+                  alt="Radsas Fun Logo"
+                  width={150}
+                  height={60}
+                  className="h-5 sm:h-7 md:h-10 lg:max-h-[60px] w-auto"
+                  style={{ maxHeight: '60px', height: 'auto', width: 'auto', cursor: 'pointer' }}
+                  priority
+                />
+              </Link>
+            </div>
+          )}
 
           {/* Utility links and icons on the right - hidden on mobile/tablet */}
           <div className="hidden lg:flex items-center gap-6 text-sm">
-            {/* Text links */}
-            <div className="flex items-center gap-6">
-              <Link
-                href="https://radsas-fun.pl/fotorelacja/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-600 hover:text-[#03adf0] transition-colors"
-              >
-                Fotorelacje
-              </Link>
-              <Link
-                href="https://radsas-fun.pl/o-nas/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1"
-              >
-                Poznaj nas
-                <svg className="w-3 h-3 text-[#03adf0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </Link>
-              <Link
-                href="https://radsas-fun.pl/blog/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-600 hover:text-[#03adf0] transition-colors"
-              >
-                Blog
-              </Link>
-              <Link
-                href="https://radsas-fun.pl/sklep/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-600 hover:text-[#03adf0] transition-colors"
-              >
-                Sklep
-              </Link>
-              <Link
-                href="https://radsas-fun.pl/kontakt/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-600 hover:text-[#03adf0] transition-colors"
-              >
-                Kontakt
-              </Link>
-            </div>
+            {/* Text links - hidden in admin panel */}
+            {!fixedHeight && (
+              <>
+                <div className="flex items-center gap-6">
+                  <Link
+                    href="https://radsas-fun.pl/fotorelacja/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-600 hover:text-[#03adf0] transition-colors"
+                  >
+                    Fotorelacje
+                  </Link>
+                  <Link
+                    href="https://radsas-fun.pl/o-nas/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1"
+                  >
+                    Poznaj nas
+                    <svg className="w-3 h-3 text-[#03adf0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </Link>
+                  <Link
+                    href="https://radsas-fun.pl/blog/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-600 hover:text-[#03adf0] transition-colors"
+                  >
+                    Blog
+                  </Link>
+                  <Link
+                    href="https://radsas-fun.pl/sklep/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-600 hover:text-[#03adf0] transition-colors"
+                  >
+                    Sklep
+                  </Link>
+                  <Link
+                    href="https://radsas-fun.pl/kontakt/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-600 hover:text-[#03adf0] transition-colors"
+                  >
+                    Kontakt
+                  </Link>
+                </div>
 
-            {/* Vertical separator */}
-            <div className="h-6 w-px bg-gray-300"></div>
+                {/* Vertical separator */}
+                <div className="h-6 w-px bg-gray-300"></div>
+              </>
+            )}
 
             {/* Icons */}
             <div className="flex items-center gap-4">
@@ -145,66 +153,68 @@ export default function HeaderTop({ fixed = false }: HeaderTopProps) {
                 {/* <div className="w-5 h-5 bg-[#D62828] rounded-full flex items-center justify-center text-white text-xs font-semibold">2</div> */}
               </div>
 
-              {/* User account dropdown */}
-              <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-                  className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <span className="text-sm">Moje konto</span>
-                  <svg
-                    className={`w-3 h-3 text-[#03adf0] transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+              {/* User account dropdown - hidden in admin panel (has logout in sidebar) */}
+              {!fixedHeight && (
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+                    className="text-gray-600 hover:text-[#03adf0] transition-colors flex items-center gap-1"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span className="text-sm">Moje konto</span>
+                    <svg
+                      className={`w-3 h-3 text-[#03adf0] transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
 
-                {/* Dropdown menu */}
-                {accountDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                    {isAuthenticated ? (
-                      <>
+                  {/* Dropdown menu */}
+                  {accountDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                      {isAuthenticated ? (
+                        <>
+                          <Link
+                            href="/profil/aktualne-rezerwacje"
+                            onClick={() => setAccountDropdownOpen(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                          >
+                            Moje konto
+                          </Link>
+                          {/* TODO: Currently not used in the system - commented out for future use */}
+                          {/* <Link
+                            href="/profil/aktualne-rezerwacje"
+                            onClick={() => setAccountDropdownOpen(false)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                          >
+                            Moje rezerwacje
+                          </Link> */}
+                          <div className="border-t border-gray-200 my-1"></div>
+                          <button
+                            onClick={handleLogout}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            Wyloguj się
+                          </button>
+                        </>
+                      ) : (
                         <Link
-                          href="/profil/aktualne-rezerwacje"
+                          href="/login"
                           onClick={() => setAccountDropdownOpen(false)}
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                         >
-                          Moje konto
+                          Zaloguj się
                         </Link>
-                        {/* TODO: Currently not used in the system - commented out for future use */}
-                        {/* <Link
-                          href="/profil/aktualne-rezerwacje"
-                          onClick={() => setAccountDropdownOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                        >
-                          Moje rezerwacje
-                        </Link> */}
-                        <div className="border-t border-gray-200 my-1"></div>
-                        <button
-                          onClick={handleLogout}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          Wyloguj się
-                        </button>
-                      </>
-                    ) : (
-                      <Link
-                        href="/login"
-                        onClick={() => setAccountDropdownOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                      >
-                        Zaloguj się
-                      </Link>
-                    )}
-                  </div>
-                )}
-              </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

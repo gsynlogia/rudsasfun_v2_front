@@ -1,13 +1,16 @@
 'use client';
 
-import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User } from 'lucide-react';
+import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User, Tent, Users, Utensils, Shield, Gift, Bus, FileCheck, Receipt, Heart, MessageSquare, CheckCircle2, RotateCcw } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
+import { useToast } from '@/components/ToastContainer';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { contractService } from '@/lib/services/ContractService';
+import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
+import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
@@ -86,6 +89,10 @@ interface ReservationDetails {
   contract_rejection_reason?: string | null;
   qualification_card_status?: string | null;
   qualification_card_rejection_reason?: string | null;
+  // Archive info
+  is_archived?: boolean;
+  archived_at?: string | null;
+  archive_id?: number | null;  // ID from archive_reservations table (needed to fetch archived notes)
 }
 
 interface Addon {
@@ -121,10 +128,22 @@ interface Diet {
   price: number;
 }
 
+interface ReservationNote {
+  id: number;
+  reservation_id: number;
+  admin_user_id: number | null;
+  admin_user_name: string | null;
+  admin_user_login: string | null;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function ReservationDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { showSuccess, showError } = useToast();
   // params.id contains the reservation number (e.g., REZ-2025-001)
   const reservationNumber = typeof params?.id === 'string'
     ? params.id
@@ -154,6 +173,9 @@ export default function ReservationDetailPage() {
   const [savingPromotion, setSavingPromotion] = useState(false);
   const [diets, setDiets] = useState<Map<number, Diet>>(new Map());
   const [transportCities, setTransportCities] = useState<Array<{ city: string; departure_price: number | null; return_price: number | null }>>([]);
+  // Dostępne opcje dla turnusu (do wyświetlania nawet gdy rezerwacja nie ma wybranych)
+  const [availableProtections, setAvailableProtections] = useState<Protection[]>([]);
+  const [availableAddons, setAvailableAddons] = useState<Addon[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [contractHtmlExists, setContractHtmlExists] = useState(false);
@@ -174,10 +196,27 @@ export default function ReservationDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingReservation, setDeletingReservation] = useState(false);
   const [showJustificationModal, setShowJustificationModal] = useState(false);
+  
+  // Restore reservation states
+  const [restoringReservation, setRestoringReservation] = useState(false);
+  const [showNoSpotsModal, setShowNoSpotsModal] = useState(false);
+  const [noSpotsMessage, setNoSpotsMessage] = useState('');
   const [editingJustification, setEditingJustification] = useState(false);
   const [justificationDraft, setJustificationDraft] = useState<Record<string, any>>({});
   const [savingJustification, setSavingJustification] = useState(false);
   const [justificationError, setJustificationError] = useState<string | null>(null);
+  const [payments, setPayments] = useState<PaymentResponse[]>([]);
+  const [manualPayments, setManualPayments] = useState<ManualPaymentResponse[]>([]);
+  
+  // Notes state (admin only)
+  const [notes, setNotes] = useState<ReservationNote[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editingNoteContent, setEditingNoteContent] = useState('');
+  const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
+  
   const contractUploadInputRef = useRef<HTMLInputElement>(null);
   const cardUploadInputRef = useRef<HTMLInputElement>(null);
 
@@ -395,6 +434,41 @@ export default function ReservationDetailPage() {
         } else {
           setTransportCities([]);
         }
+
+        // ========================================
+        // ZAWSZE pobierać dostępne opcje dla turnusu
+        // (do wyświetlania sekcji nawet gdy rezerwacja nie ma wybranych)
+        // ========================================
+        if (reservationData.camp_id && reservationData.property_id) {
+          // Pobierz dostępne ochrony dla turnusu
+          try {
+            const turnusProtections = await authenticatedApiCall<any[]>(
+              `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/protections`,
+            );
+            const protectionsList: Protection[] = turnusProtections.map((p: any) => ({
+              id: p.general_protection_id || p.id,
+              name: p.name || `Ochrona #${p.id}`,
+              price: typeof p.price === 'number' ? p.price : 0,
+            }));
+            setAvailableProtections(protectionsList);
+          } catch (err) {
+            console.warn('Could not fetch available protections:', err);
+            setAvailableProtections([]);
+          }
+        }
+
+        // Pobierz dostępne dodatki dla miasta ośrodka
+        if (reservationData.property_city) {
+          try {
+            const addonsResponse = await authenticatedApiCall<{ addons: Addon[]; total: number }>(
+              `/api/addons/public?city=${encodeURIComponent(reservationData.property_city)}`,
+            );
+            setAvailableAddons(addonsResponse.addons || []);
+          } catch (err) {
+            console.warn('Could not fetch available addons:', err);
+            setAvailableAddons([]);
+          }
+        }
       } catch (err) {
         console.error('Error fetching reservation details:', err);
         setError(err instanceof Error ? err.message : 'Błąd podczas ładowania szczegółów rezerwacji');
@@ -409,9 +483,20 @@ export default function ReservationDetailPage() {
   }, [reservationNumber]);
 
   // Load document files and check HTML existence
+  // Skip for archived reservations - documents are in archive tables
   useEffect(() => {
     const loadDocuments = async () => {
       if (!reservation) return;
+      
+      // Skip loading documents for archived reservations
+      // They don't exist in the main tables anymore
+      if (reservation.is_archived) {
+        setContractHtmlExists(false);
+        setCardHtmlExists(false);
+        setContractFiles([]);
+        setCardFiles([]);
+        return;
+      }
 
       try {
         // Check if HTML exists
@@ -435,6 +520,171 @@ export default function ReservationDetailPage() {
     loadDocuments();
   }, [reservation]);
 
+  // Load payments data
+  // Skip for archived reservations - payments are in archive tables
+  useEffect(() => {
+    const loadPayments = async () => {
+      if (!reservation) return;
+      
+      // Skip loading payments for archived reservations
+      // They don't exist in the main tables anymore
+      if (reservation.is_archived) {
+        setPayments([]);
+        setManualPayments([]);
+        return;
+      }
+
+      try {
+        // Fetch all Tpay payments
+        const allPayments = await paymentService.listPayments(0, 1000);
+        // Filter payments for this reservation
+        const reservationPayments = allPayments.filter(p => {
+          const orderId = p.order_id || '';
+          if (orderId === String(reservation.id)) return true;
+          if (orderId === `RES-${reservation.id}`) return true;
+          const match = orderId.match(/^RES-(\d+)(?:-|$)/);
+          if (match && parseInt(match[1], 10) === reservation.id) return true;
+          const addonMatch = orderId.match(/^ADDON-(\d+)-/);
+          if (addonMatch && parseInt(addonMatch[1], 10) === reservation.id) return true;
+          return false;
+        });
+        setPayments(reservationPayments);
+
+        // Fetch manual payments
+        try {
+          const manualPaymentsData = await manualPaymentService.getByReservation(reservation.id);
+          setManualPayments(manualPaymentsData);
+        } catch (err) {
+          console.warn('Could not fetch manual payments:', err);
+          setManualPayments([]);
+        }
+      } catch (err) {
+        console.error('Error loading payments:', err);
+      }
+    };
+
+    loadPayments();
+  }, [reservation]);
+
+  // Load admin notes (both for active and archived reservations)
+  useEffect(() => {
+    const loadNotes = async () => {
+      if (!reservation) return;
+      
+      console.log('DEBUG loadNotes - reservation:', {
+        id: reservation.id,
+        is_archived: reservation.is_archived,
+        archive_id: reservation.archive_id,
+        keys: Object.keys(reservation)
+      });
+      
+      try {
+        setLoadingNotes(true);
+        
+        let notesData: ReservationNote[];
+        
+        if (reservation.is_archived && reservation.archive_id) {
+          // For archived reservations, fetch from archived notes endpoint
+          notesData = await authenticatedApiCall<ReservationNote[]>(
+            `/api/reservations/archived/${reservation.archive_id}/notes`
+          );
+        } else {
+          // For active reservations, fetch from regular notes endpoint
+          notesData = await authenticatedApiCall<ReservationNote[]>(
+            `/api/reservations/${reservation.id}/notes`
+          );
+        }
+        
+        setNotes(notesData);
+      } catch (err) {
+        console.error('Error loading notes:', err);
+        // Don't show error - notes are optional and may fail for non-admins
+        setNotes([]);
+      } finally {
+        setLoadingNotes(false);
+      }
+    };
+
+    loadNotes();
+  }, [reservation]);
+
+  // Notes management functions
+  const handleCreateNote = async () => {
+    if (!reservation || !newNoteContent.trim()) return;
+
+    try {
+      setSavingNote(true);
+      const newNote = await authenticatedApiCall<ReservationNote>(
+        `/api/reservations/${reservation.id}/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content: newNoteContent.trim() }),
+        }
+      );
+      setNotes(prev => [newNote, ...prev]);
+      setNewNoteContent('');
+      showSuccess('Notatka została dodana');
+    } catch (err) {
+      console.error('Error creating note:', err);
+      showError('Błąd podczas tworzenia notatki');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleUpdateNote = async (noteId: number) => {
+    if (!reservation || !editingNoteContent.trim()) return;
+
+    try {
+      setSavingNote(true);
+      const updatedNote = await authenticatedApiCall<ReservationNote>(
+        `/api/reservations/${reservation.id}/notes/${noteId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ content: editingNoteContent.trim() }),
+        }
+      );
+      setNotes(prev => prev.map(n => n.id === noteId ? updatedNote : n));
+      setEditingNoteId(null);
+      setEditingNoteContent('');
+      showSuccess('Notatka została zaktualizowana');
+    } catch (err) {
+      console.error('Error updating note:', err);
+      showError('Błąd podczas aktualizacji notatki');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: number) => {
+    if (!reservation) return;
+
+    try {
+      setDeletingNoteId(noteId);
+      await authenticatedApiCall(
+        `/api/reservations/${reservation.id}/notes/${noteId}`,
+        { method: 'DELETE' }
+      );
+      setNotes(prev => prev.filter(n => n.id !== noteId));
+      showSuccess('Notatka została usunięta');
+    } catch (err) {
+      console.error('Error deleting note:', err);
+      showError('Błąd podczas usuwania notatki');
+    } finally {
+      setDeletingNoteId(null);
+    }
+  };
+
+  const startEditingNote = (note: ReservationNote) => {
+    setEditingNoteId(note.id);
+    setEditingNoteContent(note.content);
+  };
+
+  const cancelEditingNote = () => {
+    setEditingNoteId(null);
+    setEditingNoteContent('');
+  };
+
   // Synchronizuj justificationDraft z reservation (tylko gdy modal nie jest otwarty)
   useEffect(() => {
     if (!showJustificationModal && reservation) {
@@ -446,6 +696,23 @@ export default function ReservationDetailPage() {
     if (!dateString) return 'Brak danych';
     try {
       return new Date(dateString).toLocaleDateString('pl-PL');
+    } catch {
+      return 'Brak danych';
+    }
+  };
+
+  const formatDateTime = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Brak danych';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('pl-PL', {
+        timeZone: 'Europe/Warsaw',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
     } catch {
       return 'Brak danych';
     }
@@ -844,191 +1111,605 @@ export default function ReservationDetailPage() {
   return (
     <SectionGuard section="reservations">
       <AdminLayout>
-        <div className="h-full flex flex-col animate-fadeIn">
-          {/* Header */}
-          <div className="mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => {
-                  // Build return URL with page and filters
-                  const returnParams = new URLSearchParams();
-                  if (fromPage) {
-                    returnParams.set('page', fromPage);
-                  }
-                  // Add all filter params
-                  filterParams.forEach((value, key) => {
-                    returnParams.set(key, value);
-                  });
-                  const returnUrl = returnParams.toString()
-                    ? `/admin-panel?${returnParams.toString()}`
-                    : '/admin-panel';
-                  router.push(returnUrl);
-                }}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded"
-                style={{ borderRadius: 0, cursor: 'pointer' }}
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                  Szczegóły rezerwacji: {reservationNumber}
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Status: <span className="font-medium">{reservation.status || 'Brak danych'}</span> |
-                  Utworzona: {formatDate(reservation.created_at || null)} |
-                  Zaktualizowana: {formatDate(reservation.updated_at || null)}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/edit/1/step`)}
-                className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200"
-                style={{ borderRadius: 0 }}
-              >
-                <Edit className="w-4 h-4" />
-                <span>Zmiana w rezerwacji</span>
-              </button>
-              <button
-                onClick={async () => {
-                  if (!reservation?.id) return;
-                  try {
-                    // Fetch client info from reservation
-                    const response = await authenticatedApiCall<{
-                      user_id: number;
-                      user_email: string | null;
-                      user_name: string | null;
-                      can_view: boolean;
-                    }>(`/api/admin/client-view/from-reservation/${reservation.id}`);
-
-                    if (response.can_view) {
-                      // Open client view in new window
-                      window.open(`/client-view/${response.user_id}`, '_blank');
+        <div className="h-full flex flex-col animate-fadeIn -m-4">
+          {/* Header - ciemny pasek jak w PaymentsManagement */}
+          <div className="bg-slate-800 shadow-md p-3 sticky top-0 z-20 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    // Check if there's browser history to go back to
+                    // window.history.length > 1 means there's history
+                    // But we also need to check if we came from within the app
+                    if (window.history.length > 1 && document.referrer.includes(window.location.host)) {
+                      // Use browser back - preserves all URL params from previous page
+                      router.back();
                     } else {
-                      alert('Nie można wyświetlić profilu tego klienta');
+                      // No history (new tab) - navigate to admin-panel with any saved params
+                      const returnParams = new URLSearchParams();
+                      if (fromPage) {
+                        returnParams.set('page', fromPage);
+                      }
+                      filterParams.forEach((value, key) => {
+                        returnParams.set(key, value);
+                      });
+                      const returnUrl = returnParams.toString()
+                        ? `/admin-panel?${returnParams.toString()}`
+                        : '/admin-panel';
+                      router.push(returnUrl);
                     }
-                  } catch (err) {
-                    console.error('Error opening client view:', err);
-                    alert(err instanceof Error ? err.message : 'Błąd podczas otwierania profilu klienta');
-                  }
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200"
-                style={{ borderRadius: 0 }}
-              >
-                <User className="w-4 h-4" />
-                <span>Zobacz profil klienta</span>
-              </button>
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white hover:bg-red-700 transition-all duration-200"
-                style={{ borderRadius: 0 }}
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Usuń rezerwację</span>
-              </button>
+                  }}
+                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 transition-all duration-200 rounded"
+                  style={{ borderRadius: 0, cursor: 'pointer' }}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-white">
+                    Szczegóły rezerwacji: {reservationNumber}
+                  </h1>
+                  <p className="text-sm text-slate-400 mt-1">
+                    Status: <span className="font-medium text-slate-300">{reservation.status || 'Brak danych'}</span> |
+                    Utworzona: {formatDateTime(reservation.created_at || null)} |
+                    Zaktualizowana: {formatDateTime(reservation.updated_at || null)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+              {/* Hide edit button for archived reservations */}
+              {!reservation.is_archived && (
+                <button
+                  onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/edit/1/step`)}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200"
+                  style={{ borderRadius: 0 }}
+                >
+                  <Edit className="w-4 h-4" />
+                  <span>Zmiana w rezerwacji</span>
+                </button>
+              )}
+              {/* For archived reservations: Restore button, for active: View client profile */}
+              {reservation.is_archived ? (
+                <button
+                  onClick={async () => {
+                    if (!reservation?.id || restoringReservation) return;
+                    
+                    setRestoringReservation(true);
+                    try {
+                      const response = await authenticatedApiCall<{
+                        message: string;
+                        reservation_id: number;
+                        reservation_number: string;
+                        original_id: number;
+                        turnus: string;
+                        available_spots_after: number;
+                      }>(`/api/reservations/restore/${reservation.id}`, {
+                        method: 'POST'
+                      });
+                      
+                      showSuccess(`Rezerwacja została przywrócona pomyślnie! Turnus: ${response.turnus}`, 5000);
+                      
+                      // Redirect to the restored reservation using the preserved reservation_number
+                      router.push(`/admin-panel/rezerwacja/${response.reservation_number}`);
+                    } catch (err) {
+                      console.error('Error restoring reservation:', err);
+                      const errorMessage = err instanceof Error ? err.message : 'Błąd podczas przywracania rezerwacji';
+                      
+                      // Check if it's a "no spots" error
+                      if (errorMessage.includes('Brak wolnych miejsc')) {
+                        setNoSpotsMessage(errorMessage);
+                        setShowNoSpotsModal(true);
+                      } else {
+                        showError(errorMessage, 5000);
+                      }
+                    } finally {
+                      setRestoringReservation(false);
+                    }
+                  }}
+                  disabled={restoringReservation}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ borderRadius: 0 }}
+                >
+                  {restoringReservation ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Przywracanie...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Przywróć rezerwację</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
+                    if (!reservation?.id) return;
+                    try {
+                      // Fetch client info from reservation
+                      const response = await authenticatedApiCall<{
+                        user_id: number;
+                        user_email: string | null;
+                        user_name: string | null;
+                        can_view: boolean;
+                      }>(`/api/admin/client-view/from-reservation/${reservation.id}`);
+
+                      if (response.can_view) {
+                        // Open client view in new window
+                        window.open(`/client-view/${response.user_id}`, '_blank');
+                      } else {
+                        alert('Nie można wyświetlić profilu tego klienta');
+                      }
+                    } catch (err) {
+                      console.error('Error opening client view:', err);
+                      alert(err instanceof Error ? err.message : 'Błąd podczas otwierania profilu klienta');
+                    }
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200"
+                  style={{ borderRadius: 0 }}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Zobacz profil klienta</span>
+                </button>
+              )}
+              {/* Hide delete button for archived reservations */}
+              {!reservation.is_archived && (
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white hover:bg-red-700 transition-all duration-200"
+                  style={{ borderRadius: 0 }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Usuń rezerwację</span>
+                </button>
+              )}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 overflow-auto">
+          {/* Archived reservation banner - styled like profile alert */}
+          {reservation.is_archived && (
+            <div className="mx-4 mt-4 relative">
+              <div 
+                className="bg-red-600 p-4 sm:p-5"
+                style={{ clipPath: 'polygon(0 0, calc(100% - 35px) 0, 100% 35px, 100% 100%, 35px 100%, 0 calc(100% - 35px))' }}
+              >
+                <div className="flex gap-3 sm:gap-4">
+                  <div className="flex-shrink-0">
+                    <svg className="w-6 h-6 sm:w-7 sm:h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-base sm:text-lg">Rezerwacja zarchiwizowana</h3>
+                    <p className="text-white/90 text-sm mt-1">
+                      Ta rezerwacja została zarchiwizowana{reservation.archived_at ? ` dnia ${new Date(reservation.archived_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}.
+                      Dane są tylko do odczytu. Edycja i usuwanie są niedostępne.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="p-4 flex-1 overflow-auto">
+            {/* Płatności - na samej górze */}
+            {(() => {
+              // Oblicz rzeczywiste wpłaty
+              const tpayPaid = payments
+                .filter(p => p.status === 'paid' || p.status === 'completed' || p.status === 'success')
+                .reduce((sum, p) => sum + (p.paid_amount || p.amount || 0), 0);
+              const manualPaid = manualPayments.reduce((sum, mp) => sum + (mp.amount || 0), 0);
+              const totalPaid = tpayPaid + manualPaid;
+              const totalAmount = reservation.total_price || 0;
+              const remainingAmount = Math.max(0, totalAmount - totalPaid);
+
+              // Połącz i posortuj wszystkie płatności
+              const allPaymentsList = [
+                ...payments
+                  .filter(p => p.status === 'paid' || p.status === 'completed' || p.status === 'success')
+                  .map(p => ({
+                    amount: p.paid_amount || p.amount || 0,
+                    date: p.paid_at || p.created_at,
+                    method: p.channel_id === 64 ? 'BLIK' : p.channel_id === 53 ? 'Karta' : 'Online',
+                    source: 'tpay' as const,
+                  })),
+                ...manualPayments.map(mp => ({
+                  amount: mp.amount || 0,
+                  date: mp.created_at,
+                  method: mp.payment_method || 'Ręczna',
+                  source: 'manual' as const,
+                })),
+              ].sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+
+              return (
+                <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+                    <h2 className="text-sm font-semibold text-slate-700">Płatności</h2>
+                    <button
+                      onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments${fromPage ? `?fromPage=${fromPage}` : ''}`)}
+                      className="text-xs text-[#03adf0] hover:text-[#0288c7] hover:underline"
+                    >
+                      Zarządzaj płatnościami
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="text-center p-3 bg-gray-50 rounded">
+                      <p className="text-xs text-gray-500 mb-1">Kwota całkowita</p>
+                      <p className="text-lg font-bold text-gray-900">{formatCurrency(totalAmount)}</p>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded">
+                      <p className="text-xs text-gray-500 mb-1">Wpłacono</p>
+                      <p className="text-lg font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+                    </div>
+                    <div className={`text-center p-3 rounded ${remainingAmount > 0 ? 'bg-red-50' : 'bg-green-50'}`}>
+                      <p className="text-xs text-gray-500 mb-1">Pozostało</p>
+                      <p className={`text-lg font-bold ${remainingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatCurrency(remainingAmount)}
+                      </p>
+                    </div>
+                  </div>
+                  {allPaymentsList.length > 0 ? (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">Historia wpłat ({allPaymentsList.length})</p>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {allPaymentsList.map((payment, idx) => (
+                          <div key={idx} className="flex justify-between text-sm py-1 border-b border-gray-50 last:border-0">
+                            <span className="text-gray-600">
+                              {payment.method} - {formatDate(payment.date)}
+                            </span>
+                            <span className="text-gray-900 font-medium">{formatCurrency(payment.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">Brak zarejestrowanych wpłat</p>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {/* Obóz i Turnus */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Obóz i Turnus</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Obóz:</label>
-                  <p className="text-sm text-gray-900">{reservation.camp_name || <MissingInfo field="camp_name" />}</p>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Obóz i Turnus</h2>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Obóz</span>
+                  <span className="text-sm text-gray-900">{reservation.camp_name || <MissingInfo field="camp_name" />}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Turnus:</label>
-                  <p className="text-sm text-gray-900">{reservation.property_name || <MissingInfo field="property_name" />}</p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Turnus</span>
+                  <span className="text-sm text-gray-900">{reservation.property_name || <MissingInfo field="property_name" />}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Miasto:</label>
-                  <p className="text-sm text-gray-900">{reservation.property_city || <MissingInfo field="property_city" />}</p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Miasto</span>
+                  <span className="text-sm text-gray-900">{reservation.property_city || <MissingInfo field="property_city" />}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Okres:</label>
-                  <p className="text-sm text-gray-900">{reservation.property_period || <MissingInfo field="property_period" />}</p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Okres</span>
+                  <span className="text-sm text-gray-900">{reservation.property_period || <MissingInfo field="property_period" />}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Data rozpoczęcia:</label>
-                  <p className="text-sm text-gray-900">{formatDate(reservation.property_start_date || null)}</p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Data rozpoczęcia</span>
+                  <span className="text-sm text-gray-900">{formatDate(reservation.property_start_date || null)}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Data zakończenia:</label>
-                  <p className="text-sm text-gray-900">{formatDate(reservation.property_end_date || null)}</p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Data zakończenia</span>
+                  <span className="text-sm text-gray-900">{formatDate(reservation.property_end_date || null)}</span>
                 </div>
               </div>
             </div>
 
             {/* Dane uczestnika */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Dane uczestnika</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Imię:</label>
-                  <p className="text-sm text-gray-900">{reservation.participant_first_name || <MissingInfo field="participant_first_name" />}</p>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Dane uczestnika</h2>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Imię</span>
+                  <span className="text-sm text-gray-900">{reservation.participant_first_name || <MissingInfo field="participant_first_name" />}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Nazwisko:</label>
-                  <p className="text-sm text-gray-900">{reservation.participant_last_name || <MissingInfo field="participant_last_name" />}</p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Nazwisko</span>
+                  <span className="text-sm text-gray-900">{reservation.participant_last_name || <MissingInfo field="participant_last_name" />}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Rocznik:</label>
-                  <p className="text-sm text-gray-900">{reservation.participant_age || <MissingInfo field="participant_age" />}</p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Rocznik</span>
+                  <span className="text-sm text-gray-900">{reservation.participant_age || <MissingInfo field="participant_age" />}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Płeć:</label>
-                  <p className="text-sm text-gray-900">{reservation.participant_gender || <MissingInfo field="participant_gender" />}</p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Płeć</span>
+                  <span className="text-sm text-gray-900">{reservation.participant_gender || <MissingInfo field="participant_gender" />}</span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Miasto:</label>
-                  <p className="text-sm text-gray-900">{reservation.participant_city || <MissingInfo field="participant_city" />}</p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Miasto</span>
+                  <span className="text-sm text-gray-900">{reservation.participant_city || <MissingInfo field="participant_city" />}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Notatki wewnętrzne - tylko dla administratorów (zajmuje 3 wiersze w trzeciej kolumnie) */}
+            <div className="bg-yellow-100 rounded-lg shadow border border-yellow-300 p-4 xl:row-span-3 flex flex-col">
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-300">
+                <MessageSquare className="w-4 h-4 text-yellow-700" />
+                <h2 className="text-sm font-semibold text-yellow-800">Notatki wewnętrzne</h2>
+                <span className="text-xs text-yellow-700 ml-auto">(tylko dla pracowników)</span>
+              </div>
+              
+              {/* Formularz dodawania nowej notatki */}
+              <div className="mb-3">
+                <textarea
+                  value={newNoteContent}
+                  onChange={(e) => setNewNoteContent(e.target.value)}
+                  placeholder="Dodaj notatkę..."
+                  className="w-full border border-yellow-400 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white resize-none"
+                  rows={2}
+                />
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={handleCreateNote}
+                    disabled={savingNote || !newNoteContent.trim()}
+                    className="px-4 py-1.5 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {savingNote ? 'Dodawanie...' : 'Dodaj notatkę'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista notatek - przewijalna z max wysokością */}
+              <div className="overflow-y-scroll space-y-2 pr-1 max-h-[380px]">
+                {loadingNotes ? (
+                  <div className="text-sm text-yellow-700 text-center py-4">Ładowanie notatek...</div>
+                ) : notes.length === 0 ? (
+                  <div className="text-sm text-yellow-700 text-center py-4 italic">Brak notatek</div>
+                ) : (
+                  notes.map((note) => (
+                    <div key={note.id} className="bg-white rounded border border-yellow-300 p-2.5">
+                      {editingNoteId === note.id ? (
+                        <div>
+                          <textarea
+                            value={editingNoteContent}
+                            onChange={(e) => setEditingNoteContent(e.target.value)}
+                            className="w-full border border-yellow-400 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none"
+                            rows={3}
+                          />
+                          <div className="flex justify-end gap-2 mt-2">
+                            <button
+                              type="button"
+                              onClick={cancelEditingNote}
+                              className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                            >
+                              Anuluj
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateNote(note.id)}
+                              disabled={savingNote || !editingNoteContent.trim()}
+                              className="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50"
+                            >
+                              {savingNote ? 'Zapisywanie...' : 'Zapisz'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <div className="flex items-center gap-1.5 text-xs text-yellow-800">
+                              <User className="w-3 h-3" />
+                              <span className="font-medium">{note.admin_user_name || note.admin_user_login || 'Administrator'}</span>
+                              <span className="text-yellow-600">•</span>
+                              <span>{formatDateTime(note.created_at)}</span>
+                              {note.updated_at !== note.created_at && (
+                                <>
+                                  <span className="text-yellow-600">•</span>
+                                  <span className="italic">edyt.</span>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => startEditingNote(note)}
+                                className="p-1 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-200 rounded"
+                                title="Edytuj notatkę"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteNote(note.id)}
+                                disabled={deletingNoteId === note.id}
+                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+                                title="Usuń notatkę"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.content}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Dokumenty */}
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 xl:row-span-2">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Dokumenty</h2>
+              <div className="space-y-4">
+                {/* Umowa */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">Umowa:</label>
+                        <p className="text-sm text-gray-900">
+                          {reservation.contract_status === 'approved' ? (
+                            <span className="text-green-600 font-medium">✓ Zatwierdzona</span>
+                          ) : reservation.contract_status || 'Brak'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <button
+                        onClick={openContractHtmlPreview}
+                        className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200"
+                        title="Podgląd umowy"
+                      >
+                        Podgląd
+                      </button>
+                      <button
+                        onClick={openContractHtmlEditor}
+                        className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200"
+                        title="Edytuj umowę"
+                      >
+                        Edytuj
+                      </button>
+                      <input
+                        ref={contractUploadInputRef}
+                        type="file"
+                        accept=".pdf"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !reservation) return;
+                          try {
+                            setUploadingContract(true);
+                            await contractService.uploadContract(reservation.id, file);
+                            alert('Umowa została przesłana pomyślnie');
+                            const contractFilesData = await contractService.getContractFiles(reservation.id);
+                            setContractFiles(contractFilesData.filter(f => f.source === 'user'));
+                            if (contractUploadInputRef.current) {
+                              contractUploadInputRef.current.value = '';
+                            }
+                          } catch (err) {
+                            alert(err instanceof Error ? err.message : 'Nie udało się przesłać umowy');
+                          } finally {
+                            setUploadingContract(false);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => contractUploadInputRef.current?.click()}
+                        disabled={uploadingContract}
+                        className="px-2 py-1 bg-[#03adf0] text-white text-xs rounded hover:bg-[#0288c7] disabled:opacity-50"
+                        title="Wgraj umowę"
+                      >
+                        <Upload className="w-3 h-3 inline mr-1" />
+                        {uploadingContract ? '...' : 'Wgraj'}
+                      </button>
+                    </div>
+                  </div>
+                  {contractFiles.length > 0 && (
+                    <div className="space-y-1">
+                      {contractFiles.map((file) => (
+                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-1.5 rounded text-xs">
+                          <span className="truncate">{file.file_name}</span>
+                          <div className="flex gap-1">
+                            <button onClick={async () => { try { await contractService.downloadContractFile(file.id); } catch {} }} className="text-[#03adf0]"><Download className="w-3 h-3" /></button>
+                            <button onClick={async () => { try { await contractService.updateContractStatus(reservation.id, 'approved'); window.location.reload(); } catch {} }} disabled={reservation.contract_status === 'approved'} className="px-1.5 bg-green-600 text-white rounded disabled:opacity-50">✓</button>
+                            <button onClick={() => { setRejectingDocumentType('contract'); setRejectionReason(''); }} className="px-1.5 bg-red-600 text-white rounded">✗</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-gray-200"></div>
+
+                {/* Karta kwalifikacyjna */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">Karta kwalifikacyjna:</label>
+                        <p className="text-sm text-gray-900">
+                          {reservation.qualification_card_status === 'approved' ? (
+                            <span className="text-green-600 font-medium">✓ Zatwierdzona</span>
+                          ) : reservation.qualification_card_status || 'Brak'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        ref={cardUploadInputRef}
+                        type="file"
+                        accept=".pdf"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !reservation) return;
+                          try {
+                            setUploadingCard(true);
+                            await qualificationCardService.uploadQualificationCard(reservation.id, file);
+                            alert('Karta kwalifikacyjna została przesłana pomyślnie');
+                            const cardFilesData = await qualificationCardService.getQualificationCardFiles(reservation.id);
+                            setCardFiles(cardFilesData.filter(f => f.source === 'user'));
+                            if (cardUploadInputRef.current) {
+                              cardUploadInputRef.current.value = '';
+                            }
+                          } catch (err) {
+                            alert(err instanceof Error ? err.message : 'Nie udało się przesłać karty');
+                          } finally {
+                            setUploadingCard(false);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => cardUploadInputRef.current?.click()}
+                        disabled={uploadingCard}
+                        className="px-2 py-1 bg-[#03adf0] text-white text-xs rounded hover:bg-[#0288c7] disabled:opacity-50"
+                        title="Wgraj kartę"
+                      >
+                        <Upload className="w-3 h-3 inline mr-1" />
+                        {uploadingCard ? '...' : 'Wgraj'}
+                      </button>
+                    </div>
+                  </div>
+                  {cardFiles.length > 0 && (
+                    <div className="space-y-1">
+                      {cardFiles.map((file) => (
+                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-1.5 rounded text-xs">
+                          <span className="truncate">{file.file_name}</span>
+                          <div className="flex gap-1">
+                            <button onClick={async () => { try { await qualificationCardService.downloadQualificationCardFile(file.id); } catch {} }} className="text-[#03adf0]"><Download className="w-3 h-3" /></button>
+                            <button onClick={async () => { try { await qualificationCardService.updateQualificationCardStatus(reservation.id, 'approved'); window.location.reload(); } catch {} }} disabled={reservation.qualification_card_status === 'approved'} className="px-1.5 bg-green-600 text-white rounded disabled:opacity-50">✓</button>
+                            <button onClick={() => { setRejectingDocumentType('card'); setRejectionReason(''); }} className="px-1.5 bg-red-600 text-white rounded">✗</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Opiekunowie */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 lg:col-span-2">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Opiekunowie</h2>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Opiekunowie</h2>
               {reservation.parents_data && Array.isArray(reservation.parents_data) && reservation.parents_data.length > 0 ? (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {reservation.parents_data.map((parent, index) => (
-                    <div key={index} className="border border-gray-200 rounded p-4">
-                      <h3 className="text-sm font-medium text-gray-700 mb-2">Opiekun {index + 1}</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Imię i nazwisko:</label>
-                          <p className="text-sm text-gray-900">
-                            {parent?.firstName || ''} {parent?.lastName || ''}
-                            {(!parent?.firstName && !parent?.lastName) && <MissingInfo field="parent.name" />}
+                    <div key={index} className="bg-gray-50 rounded p-3">
+                      <h3 className="text-xs font-medium text-gray-500 mb-2">Opiekun {index + 1}</h3>
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-900">
+                          {parent?.firstName || ''} {parent?.lastName || ''}
+                          {(!parent?.firstName && !parent?.lastName) && <MissingInfo field="parent.name" />}
+                        </p>
+                        <p className="text-sm text-gray-600">{parent?.email || <MissingInfo field="parent.email" />}</p>
+                        <p className="text-sm text-gray-600">{parent?.phoneNumber || <MissingInfo field="parent.phoneNumber" />}</p>
+                        {(parent?.street || parent?.city || parent?.postalCode) && (
+                          <p className="text-sm text-gray-600">
+                            {parent?.street && <span>{parent.street}, </span>}
+                            {parent?.postalCode && <span>{parent.postalCode} </span>}
+                            {parent?.city && <span>{parent.city}</span>}
                           </p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Email:</label>
-                          <p className="text-sm text-gray-900">{parent?.email || <MissingInfo field="parent.email" />}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Telefon:</label>
-                          <p className="text-sm text-gray-900">{parent?.phoneNumber || <MissingInfo field="parent.phoneNumber" />}</p>
-                        </div>
-                        {parent?.street && (
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">Ulica:</label>
-                            <p className="text-sm text-gray-900">{parent.street}</p>
-                          </div>
-                        )}
-                        {parent?.city && (
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">Miasto:</label>
-                            <p className="text-sm text-gray-900">{parent.city}</p>
-                          </div>
-                        )}
-                        {parent?.postalCode && (
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">Kod pocztowy:</label>
-                            <p className="text-sm text-gray-900">{parent.postalCode}</p>
-                          </div>
                         )}
                       </div>
                     </div>
@@ -1039,68 +1720,10 @@ export default function ReservationDetailPage() {
               )}
             </div>
 
-            {/* Dieta główna */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Dieta główna</h2>
-              {reservation.diet ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Dieta:</label>
-                    <p className="text-sm text-gray-900">
-                      {reservation.diet_name || (diets.get(reservation.diet)?.name || `Dieta ID: ${reservation.diet}`)}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Cena:</label>
-                    <p className="text-sm text-gray-900">
-                      {reservation.diet_price !== null && reservation.diet_price !== undefined
-                        ? formatCurrency(reservation.diet_price)
-                        : diets.get(reservation.diet)
-                        ? formatCurrency(diets.get(reservation.diet)!.price)
-                        : formatCurrency(0)}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Dieta:</label>
-                    <p className="text-sm text-gray-900 italic">Dieta standardowa (domyślna)</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Cena:</label>
-                    <p className="text-sm text-gray-900">{formatCurrency(0)}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Dodatkowe diety */}
-            {reservation.selected_diets && reservation.selected_diets.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900 mb-3">Dodatkowe diety</h2>
-                <div className="space-y-2">
-                  {reservation.selected_diets.map((dietId) => {
-                    const diet = diets.get(dietId);
-                    return (
-                      <div key={dietId} className="flex justify-between items-center border-b border-gray-200 pb-2">
-                        <span className="text-sm text-gray-900">
-                          {diet ? diet.name : `Dieta ID: ${dietId}`}
-                        </span>
-                        {diet && (
-                          <span className="text-sm text-gray-600">{formatCurrency(diet.price)}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* Ochrony */}
-            {reservation.selected_protection && reservation.selected_protection.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900 mb-3">Ochrony</h2>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Ochrony</h2>
+              {reservation.selected_protection && reservation.selected_protection.length > 0 ? (
                 <div className="space-y-2">
                   {reservation.selected_protection.map((protectionIdValue) => {
                     let generalProtectionId: number | null = null;
@@ -1115,49 +1738,44 @@ export default function ReservationDetailPage() {
                         generalProtectionId = parsedId;
                       }
                     }
-
                     const protection = generalProtectionId ? protections.get(generalProtectionId) : null;
                     return (
-                      <div key={String(protectionIdValue)} className="flex justify-between items-center border-b border-gray-200 pb-2">
-                        <span className="text-sm text-gray-900">
-                          {protection ? protection.name : `Ochrona ID: ${protectionIdValue}`}
-                        </span>
-                        {protection && (
-                          <span className="text-sm text-gray-600">{formatCurrency(protection.price)}</span>
-                        )}
+                      <div key={String(protectionIdValue)} className="flex justify-between items-center">
+                        <span className="text-sm text-gray-900">{protection ? protection.name : `Ochrona ID: ${protectionIdValue}`}</span>
+                        {protection && <span className="text-sm font-medium text-gray-900">{formatCurrency(protection.price)}</span>}
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-gray-500 italic">Nie wybrano</p>
+              )}
+            </div>
 
             {/* Dodatki */}
-            {reservation.selected_addons && reservation.selected_addons.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900 mb-3">Dodatki</h2>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Dodatki</h2>
+              {reservation.selected_addons && reservation.selected_addons.length > 0 ? (
                 <div className="space-y-2">
                   {reservation.selected_addons.map((addonIdValue) => {
                     const addonId = typeof addonIdValue === 'number' ? addonIdValue : parseInt(String(addonIdValue));
                     const addon = addons.get(addonId);
                     return (
-                      <div key={String(addonIdValue)} className="flex justify-between items-center border-b border-gray-200 pb-2">
-                        <span className="text-sm text-gray-900">
-                          {addon ? addon.name : `Dodatek ID: ${addonIdValue}`}
-                        </span>
-                        {addon && (
-                          <span className="text-sm text-gray-600">{formatCurrency(addon.price)}</span>
-                        )}
+                      <div key={String(addonIdValue)} className="flex justify-between items-center">
+                        <span className="text-sm text-gray-900">{addon ? addon.name : `Dodatek ID: ${addonIdValue}`}</span>
+                        {addon && <span className="text-sm font-medium text-gray-900">{formatCurrency(addon.price)}</span>}
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-gray-500 italic">Nie wybrano</p>
+              )}
+            </div>
 
             {/* Promocje */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Promocje</h2>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Promocje</h2>
               <div className="space-y-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   <label className="text-sm font-medium text-gray-700">Promocja:</label>
@@ -1557,149 +2175,108 @@ export default function ReservationDetailPage() {
             </div>
 
             {/* Transport */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Transport</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Wyjazd:</label>
-                  <p className="text-sm text-gray-900">
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Transport</h2>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Wyjazd</span>
+                  <span className="text-sm text-gray-900">
                     {reservation.departure_type === 'zbiorowy' ? 'Zbiorowy' : 'Własny'}
-                    {reservation.departure_type === 'zbiorowy' && reservation.departure_city && (
-                      <span className="ml-2">({reservation.departure_city})</span>
-                    )}
-                  </p>
+                    {reservation.departure_type === 'zbiorowy' && reservation.departure_city && ` (${reservation.departure_city})`}
+                  </span>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Powrót:</label>
-                  <p className="text-sm text-gray-900">
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Powrót</span>
+                  <span className="text-sm text-gray-900">
                     {reservation.return_type === 'zbiorowy' ? 'Zbiorowy' : 'Własny'}
-                    {reservation.return_type === 'zbiorowy' && reservation.return_city && (
-                      <span className="ml-2">({reservation.return_city})</span>
-                    )}
-                  </p>
+                    {reservation.return_type === 'zbiorowy' && reservation.return_city && ` (${reservation.return_city})`}
+                  </span>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm font-medium text-gray-700">Różne miasta wyjazdu i powrotu:</label>
-                  <p className="text-sm text-gray-900">
-                    {reservation.transport_different_cities ? 'Tak' : 'Nie'}
-                    {reservation.transport_different_cities && (
-                      <span className="ml-2 text-orange-600 font-medium">
-                        ⚠️ Klient wybrał różne miasta dla wyjazdu i powrotu
-                      </span>
-                    )}
-                  </p>
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Różne miasta</span>
+                  <span className="text-sm text-gray-900">{reservation.transport_different_cities ? 'Tak' : 'Nie'}</span>
                 </div>
                 {transportPrice > 0 && (
-                  <div className="md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">Kwota transportu:</label>
-                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(transportPrice)}</p>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Kwota</span>
+                    <span className="text-sm font-medium text-gray-900">{formatCurrency(transportPrice)}</span>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Źródło */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Źródło</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Źródło:</label>
-                  <p className="text-sm text-gray-900">
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Źródło</h2>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Źródło</span>
+                  <span className="text-sm text-gray-900">
                     {reservation.source_name || reservation.selected_source || <MissingInfo field="selected_source" />}
-                  </p>
+                  </span>
                 </div>
                 {reservation.source_inne_text && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Inne (szczegóły):</label>
-                    <p className="text-sm text-gray-900">{reservation.source_inne_text}</p>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Szczegóły</span>
+                    <span className="text-sm text-gray-900">{reservation.source_inne_text}</span>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Faktura */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 lg:col-span-2">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Faktura</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Czy chce fakturę:</label>
-                  <p className="text-sm text-gray-900">{reservation.wants_invoice ? 'Tak' : 'Nie'}</p>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Faktura</h2>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Chce fakturę</span>
+                  <span className="text-sm text-gray-900">{reservation.wants_invoice ? 'Tak' : 'Nie'}</span>
                 </div>
                 {reservation.wants_invoice && (
                   <>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Typ faktury:</label>
-                      <p className="text-sm text-gray-900">
+                    <div className="flex justify-between">
+                      <span className="text-xs text-gray-500">Typ</span>
+                      <span className="text-sm text-gray-900">
                         {reservation.invoice_type === 'private' ? 'Osoba prywatna' : 'Firma'}
-                      </p>
+                      </span>
                     </div>
                     {reservation.invoice_type === 'private' ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Imię:</label>
-                          <p className="text-sm text-gray-900">{reservation.invoice_first_name || <MissingInfo field="invoice_first_name" />}</p>
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Imię i nazwisko</span>
+                          <span className="text-sm text-gray-900">{reservation.invoice_first_name} {reservation.invoice_last_name}</span>
                         </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Nazwisko:</label>
-                          <p className="text-sm text-gray-900">{reservation.invoice_last_name || <MissingInfo field="invoice_last_name" />}</p>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Email</span>
+                          <span className="text-sm text-gray-900">{reservation.invoice_email || <MissingInfo field="invoice_email" />}</span>
                         </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Email:</label>
-                          <p className="text-sm text-gray-900">{reservation.invoice_email || <MissingInfo field="invoice_email" />}</p>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Telefon</span>
+                          <span className="text-sm text-gray-900">{reservation.invoice_phone || <MissingInfo field="invoice_phone" />}</span>
                         </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Telefon:</label>
-                          <p className="text-sm text-gray-900">{reservation.invoice_phone || <MissingInfo field="invoice_phone" />}</p>
-                        </div>
-                      </div>
+                      </>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Nazwa firmy:</label>
-                          <p className="text-sm text-gray-900">{reservation.invoice_company_name || <MissingInfo field="invoice_company_name" />}</p>
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">Firma</span>
+                          <span className="text-sm text-gray-900">{reservation.invoice_company_name || <MissingInfo field="invoice_company_name" />}</span>
                         </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">NIP:</label>
-                          <p className="text-sm text-gray-900">{reservation.invoice_nip || <MissingInfo field="invoice_nip" />}</p>
+                        <div className="flex justify-between">
+                          <span className="text-xs text-gray-500">NIP</span>
+                          <span className="text-sm text-gray-900">{reservation.invoice_nip || <MissingInfo field="invoice_nip" />}</span>
                         </div>
-                      </div>
+                      </>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Ulica:</label>
-                        <p className="text-sm text-gray-900">{reservation.invoice_street || <MissingInfo field="invoice_street" />}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Kod pocztowy:</label>
-                        <p className="text-sm text-gray-900">{reservation.invoice_postal_code || <MissingInfo field="invoice_postal_code" />}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Miasto:</label>
-                        <p className="text-sm text-gray-900">{reservation.invoice_city || <MissingInfo field="invoice_city" />}</p>
-                      </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-gray-500">Adres</span>
+                      <span className="text-sm text-gray-900">{reservation.invoice_street}, {reservation.invoice_postal_code} {reservation.invoice_city}</span>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Typ dostawy:</label>
-                      <p className="text-sm text-gray-900">
+                    <div className="flex justify-between">
+                      <span className="text-xs text-gray-500">Dostawa</span>
+                      <span className="text-sm text-gray-900">
                         {reservation.delivery_type === 'electronic' ? 'Elektroniczna' : 'Papierowa'}
-                      </p>
+                      </span>
                     </div>
-                    {reservation.delivery_type === 'paper' && reservation.delivery_different_address && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Ulica dostawy:</label>
-                          <p className="text-sm text-gray-900">{reservation.delivery_street || <MissingInfo field="delivery_street" />}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Kod pocztowy dostawy:</label>
-                          <p className="text-sm text-gray-900">{reservation.delivery_postal_code || <MissingInfo field="delivery_postal_code" />}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Miasto dostawy:</label>
-                          <p className="text-sm text-gray-900">{reservation.delivery_city || <MissingInfo field="delivery_city" />}</p>
-                        </div>
-                      </div>
-                    )}
                   </>
                 )}
               </div>
@@ -1707,68 +2284,48 @@ export default function ReservationDetailPage() {
 
             {/* Choroby i informacje zdrowotne */}
             {(reservation.health_questions || reservation.health_details || reservation.additional_notes) && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900 mb-3">Choroby i informacje zdrowotne</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+                <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Zdrowie</h2>
+                <div className="space-y-2">
                   {reservation.health_questions && typeof reservation.health_questions === 'object' && (
                     <>
-                      {/* Choroby przewlekłe */}
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Choroby przewlekłe:</label>
-                        {reservation.health_questions.chronicDiseases === 'Tak' || reservation.health_questions.chronicDiseases === 'tak' || reservation.health_questions.chronicDiseases === true ? (
-                          reservation.health_details && typeof reservation.health_details === 'object' && reservation.health_details.chronicDiseases && reservation.health_details.chronicDiseases.trim() !== '' ? (
-                            <div className="mt-1">
-                              <p className="text-sm text-gray-900 font-medium">Tak</p>
-                              <p className="text-sm text-gray-700 mt-1">{reservation.health_details.chronicDiseases}</p>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-900 mt-1">Tak</p>
-                          )
-                        ) : (
-                          <p className="text-sm text-gray-900 mt-1">Nie</p>
-                        )}
+                      <div className="flex justify-between">
+                        <span className="text-xs text-gray-500">Choroby przewlekłe</span>
+                        <span className="text-sm text-gray-900">
+                          {reservation.health_questions.chronicDiseases === 'Tak' || reservation.health_questions.chronicDiseases === 'tak' || reservation.health_questions.chronicDiseases === true ? 'Tak' : 'Nie'}
+                        </span>
                       </div>
-
-                      {/* Dysfunkcje */}
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Dysfunkcje:</label>
-                        {reservation.health_questions.dysfunctions === 'Tak' || reservation.health_questions.dysfunctions === 'tak' || reservation.health_questions.dysfunctions === true ? (
-                          reservation.health_details && typeof reservation.health_details === 'object' && reservation.health_details.dysfunctions && reservation.health_details.dysfunctions.trim() !== '' ? (
-                            <div className="mt-1">
-                              <p className="text-sm text-gray-900 font-medium">Tak</p>
-                              <p className="text-sm text-gray-700 mt-1">{reservation.health_details.dysfunctions}</p>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-900 mt-1">Tak</p>
-                          )
-                        ) : (
-                          <p className="text-sm text-gray-900 mt-1">Nie</p>
-                        )}
+                      {(reservation.health_questions.chronicDiseases === 'Tak' || reservation.health_questions.chronicDiseases === 'tak' || reservation.health_questions.chronicDiseases === true) &&
+                        reservation.health_details?.chronicDiseases && (
+                        <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">{reservation.health_details.chronicDiseases}</p>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-xs text-gray-500">Dysfunkcje</span>
+                        <span className="text-sm text-gray-900">
+                          {reservation.health_questions.dysfunctions === 'Tak' || reservation.health_questions.dysfunctions === 'tak' || reservation.health_questions.dysfunctions === true ? 'Tak' : 'Nie'}
+                        </span>
                       </div>
-
-                      {/* Leczenie psychiatryczne/psychologiczne */}
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Leczenie psychiatryczne/psychologiczne:</label>
-                        {reservation.health_questions.psychiatric === 'Tak' || reservation.health_questions.psychiatric === 'tak' || reservation.health_questions.psychiatric === true ? (
-                          reservation.health_details && typeof reservation.health_details === 'object' && reservation.health_details.psychiatric && reservation.health_details.psychiatric.trim() !== '' ? (
-                            <div className="mt-1">
-                              <p className="text-sm text-gray-900 font-medium">Tak</p>
-                              <p className="text-sm text-gray-700 mt-1">{reservation.health_details.psychiatric}</p>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-900 mt-1">Tak</p>
-                          )
-                        ) : (
-                          <p className="text-sm text-gray-900 mt-1">Nie</p>
-                        )}
+                      {(reservation.health_questions.dysfunctions === 'Tak' || reservation.health_questions.dysfunctions === 'tak' || reservation.health_questions.dysfunctions === true) &&
+                        reservation.health_details?.dysfunctions && (
+                        <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">{reservation.health_details.dysfunctions}</p>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-xs text-gray-500">Psychiatryczne</span>
+                        <span className="text-sm text-gray-900">
+                          {reservation.health_questions.psychiatric === 'Tak' || reservation.health_questions.psychiatric === 'tak' || reservation.health_questions.psychiatric === true ? 'Tak' : 'Nie'}
+                        </span>
                       </div>
+                      {(reservation.health_questions.psychiatric === 'Tak' || reservation.health_questions.psychiatric === 'tak' || reservation.health_questions.psychiatric === true) &&
+                        reservation.health_details?.psychiatric && (
+                        <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">{reservation.health_details.psychiatric}</p>
+                      )}
                     </>
                   )}
                   {reservation.additional_notes && (
-                    <div className="md:col-span-2">
-                      <label className="text-sm font-medium text-gray-700">Uwagi dodatkowe:</label>
-                      <p className="text-sm text-gray-900 mt-1 whitespace-pre-wrap">{reservation.additional_notes}</p>
-                    </div>
+                    <>
+                      <div className="text-xs text-gray-500 mt-2">Uwagi dodatkowe</div>
+                      <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded whitespace-pre-wrap">{reservation.additional_notes}</p>
+                    </>
                   )}
                 </div>
               </div>
@@ -1776,315 +2333,75 @@ export default function ReservationDetailPage() {
 
             {/* Informacje dodatkowe */}
             {reservation.participant_additional_info && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900 mb-3">Informacje dodatkowe</h2>
-                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded whitespace-pre-wrap">{reservation.participant_additional_info}</p>
+              <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+                <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Informacje dodatkowe</h2>
+                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded whitespace-pre-wrap">{reservation.participant_additional_info}</p>
               </div>
             )}
 
             {/* Prośba o zakwaterowanie */}
             {reservation.accommodation_request && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900 mb-3">Prośba o zakwaterowanie</h2>
-                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded">{reservation.accommodation_request}</p>
+              <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+                <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Zakwaterowanie</h2>
+                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{reservation.accommodation_request}</p>
               </div>
             )}
 
-            {/* Zgody */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Zgody</h2>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className={`w-4 h-4 rounded ${reservation.consent1 ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className="text-sm text-gray-900">Zgoda 1 (Regulamin portalu i Polityka prywatności)</span>
+            {/* Dieta */}
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Dieta</h2>
+              {reservation.diet ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Wybrana dieta</span>
+                    <span className="text-sm text-gray-900">
+                      {reservation.diet_name || (diets.get(reservation.diet)?.name || `Dieta ID: ${reservation.diet}`)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Cena</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {reservation.diet_price !== null && reservation.diet_price !== undefined
+                        ? formatCurrency(reservation.diet_price)
+                        : diets.get(reservation.diet)
+                        ? formatCurrency(diets.get(reservation.diet)!.price)
+                        : formatCurrency(0)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`w-4 h-4 rounded ${reservation.consent2 ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className="text-sm text-gray-900">Zgoda 2 (Warunki uczestnictwa)</span>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Wybrana dieta</span>
+                    <span className="text-sm text-gray-900 italic">Standardowa (domyślna)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Cena</span>
+                    <span className="text-sm font-medium text-gray-900">{formatCurrency(0)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`w-4 h-4 rounded ${reservation.consent3 ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className="text-sm text-gray-900">Zgoda 3 (Zdjęcia i ich udostępnianie)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`w-4 h-4 rounded ${reservation.consent4 ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className="text-sm text-gray-900">Zgoda 4 (Składki na fundusze gwarancyjne)</span>
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Dokumenty */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-semibold text-gray-900">Dokumenty</h2>
-              </div>
-              <div className="space-y-4">
-                {/* Umowa */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Status umowy:</label>
-                        <p className="text-sm text-gray-900">
-                          {reservation.contract_status || 'Brak'}
-                        </p>
-                      </div>
-                      {reservation.contract_status === 'approved' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          ✓ Zatwierdzona
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={openContractHtmlPreview}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200"
-                        title="Podgląd umowy (HTML)"
-                      >
-                        Podgląd HTML
-                      </button>
-                      <button
-                        onClick={openContractHtmlEditor}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200"
-                        title="Edytuj umowę (HTML)"
-                      >
-                        Edytuj umowę
-                      </button>
-                      <input
-                        ref={contractUploadInputRef}
-                        type="file"
-                        accept=".pdf"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file || !reservation) return;
-
-                          try {
-                            setUploadingContract(true);
-                            await contractService.uploadContract(reservation.id, file);
-                            alert('Umowa została przesłana pomyślnie');
-                            // Reload documents
-                            const contractFilesData = await contractService.getContractFiles(reservation.id);
-                            setContractFiles(contractFilesData.filter(f => f.source === 'user'));
-                            if (contractUploadInputRef.current) {
-                              contractUploadInputRef.current.value = '';
-                            }
-                          } catch (err) {
-                            alert(err instanceof Error ? err.message : 'Nie udało się przesłać umowy');
-                          } finally {
-                            setUploadingContract(false);
-                          }
-                        }}
-                        className="hidden"
-                      />
-                      <button
-                        onClick={() => contractUploadInputRef.current?.click()}
-                        disabled={uploadingContract}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-[#03adf0] text-white text-xs rounded hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Wgraj umowę za klienta"
-                      >
-                        <Upload className="w-3 h-3" />
-                        {uploadingContract ? 'Wgrywanie...' : 'Wgraj umowę'}
-                      </button>
-                    </div>
-                  </div>
-                  {contractHtmlExists ? (
-                    <div className="bg-green-50 border border-green-200 rounded p-2">
-                      <p className="text-sm text-green-800 font-medium">✓ Dokumenty dostępne dla klienta</p>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 border border-gray-200 rounded p-2">
-                      <p className="text-sm text-gray-600">Brak</p>
-                    </div>
-                  )}
-                  {contractFiles.length > 0 && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Wgrane dokumenty:</label>
-                      {contractFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-gray-600" />
-                            <span className="text-sm text-gray-900">{file.file_name}</span>
-                            <span className="text-xs text-gray-500">
-                              ({new Date(file.uploaded_at).toLocaleDateString('pl-PL')})
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={async () => {
-                                try {
-                                  await contractService.downloadContractFile(file.id);
-                                } catch (err) {
-                                  alert(err instanceof Error ? err.message : 'Błąd podczas pobierania pliku');
-                                }
-                              }}
-                              className="p-1 text-[#03adf0] hover:bg-blue-50 rounded"
-                              title="Pobierz"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  await contractService.updateContractStatus(reservation.id, 'approved');
-                                  alert('Umowa została zatwierdzona. Email został wysłany do klienta.');
-                                  window.location.reload();
-                                } catch (err) {
-                                  alert(err instanceof Error ? err.message : 'Błąd podczas zatwierdzania');
-                                }
-                              }}
-                              disabled={reservation.contract_status === 'approved'}
-                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Zatwierdź
-                            </button>
-                            <button
-                              onClick={() => {
-                                setRejectingDocumentType('contract');
-                                setRejectionReason('');
-                              }}
-                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                            >
-                              Odrzuć
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {reservation.contract_rejection_reason && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Powód odrzucenia umowy:</label>
-                      <p className="text-sm text-gray-900">{reservation.contract_rejection_reason}</p>
-                    </div>
-                  )}
+            {/* Zgody */}
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Zgody</h2>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${reservation.consent1 ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  <span className="text-xs text-gray-600">Regulamin i polityka prywatności</span>
                 </div>
-
-                <div className="border-t border-gray-200"></div>
-
-                {/* Karta kwalifikacyjna */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Status karty kwalifikacyjnej:</label>
-                        <p className="text-sm text-gray-900">
-                          {reservation.qualification_card_status || 'Brak'}
-                        </p>
-                      </div>
-                      {reservation.qualification_card_status === 'approved' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          ✓ Zatwierdzona
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={cardUploadInputRef}
-                        type="file"
-                        accept=".pdf"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file || !reservation) return;
-
-                          try {
-                            setUploadingCard(true);
-                            await qualificationCardService.uploadQualificationCard(reservation.id, file);
-                            alert('Karta kwalifikacyjna została przesłana pomyślnie');
-                            // Reload documents
-                            const cardFilesData = await qualificationCardService.getQualificationCardFiles(reservation.id);
-                            setCardFiles(cardFilesData.filter(f => f.source === 'user'));
-                            if (cardUploadInputRef.current) {
-                              cardUploadInputRef.current.value = '';
-                            }
-                          } catch (err) {
-                            alert(err instanceof Error ? err.message : 'Nie udało się przesłać karty kwalifikacyjnej');
-                          } finally {
-                            setUploadingCard(false);
-                          }
-                        }}
-                        className="hidden"
-                      />
-                      <button
-                        onClick={() => cardUploadInputRef.current?.click()}
-                        disabled={uploadingCard}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-[#03adf0] text-white text-xs rounded hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Wgraj kartę kwalifikacyjną za klienta"
-                      >
-                        <Upload className="w-3 h-3" />
-                        {uploadingCard ? 'Wgrywanie...' : 'Wgraj kartę'}
-                      </button>
-                    </div>
-                  </div>
-                  {cardHtmlExists ? (
-                    <div className="bg-green-50 border border-green-200 rounded p-2">
-                      <p className="text-sm text-green-800 font-medium">✓ Dokumenty dostępne dla klienta</p>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 border border-gray-200 rounded p-2">
-                      <p className="text-sm text-gray-600">Brak</p>
-                    </div>
-                  )}
-                  {cardFiles.length > 0 && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Wgrane dokumenty:</label>
-                      {cardFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-gray-600" />
-                            <span className="text-sm text-gray-900">{file.file_name}</span>
-                            <span className="text-xs text-gray-500">
-                              ({new Date(file.uploaded_at).toLocaleDateString('pl-PL')})
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={async () => {
-                                try {
-                                  await qualificationCardService.downloadQualificationCardFile(file.id);
-                                } catch (err) {
-                                  alert(err instanceof Error ? err.message : 'Błąd podczas pobierania pliku');
-                                }
-                              }}
-                              className="p-1 text-[#03adf0] hover:bg-blue-50 rounded"
-                              title="Pobierz"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  await qualificationCardService.updateQualificationCardStatus(reservation.id, 'approved');
-                                  alert('Karta kwalifikacyjna została zatwierdzona. Email został wysłany do klienta.');
-                                  window.location.reload();
-                                } catch (err) {
-                                  alert(err instanceof Error ? err.message : 'Błąd podczas zatwierdzania');
-                                }
-                              }}
-                              disabled={reservation.qualification_card_status === 'approved'}
-                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Zatwierdź
-                            </button>
-                            <button
-                              onClick={() => {
-                                setRejectingDocumentType('card');
-                                setRejectionReason('');
-                              }}
-                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                            >
-                              Odrzuć
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {reservation.qualification_card_rejection_reason && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Powód odrzucenia karty:</label>
-                      <p className="text-sm text-gray-900">{reservation.qualification_card_rejection_reason}</p>
-                    </div>
-                  )}
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${reservation.consent2 ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  <span className="text-xs text-gray-600">Warunki uczestnictwa</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${reservation.consent3 ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  <span className="text-xs text-gray-600">Zdjęcia i ich udostępnianie</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${reservation.consent4 ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  <span className="text-xs text-gray-600">Składki na fundusze gwarancyjne</span>
                 </div>
               </div>
             </div>
@@ -2119,66 +2436,128 @@ export default function ReservationDetailPage() {
               </div>
             </UniversalModal>
 
-            {/* Modal usuwania rezerwacji */}
-            {showDeleteModal && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                  <h3 className="text-lg font-semibold mb-4 text-red-600">
-                    Usuń rezerwację
-                  </h3>
-                  <p className="text-sm text-gray-700 mb-4">
-                    Czy na pewno chcesz usunąć rezerwację <strong>{reservationNumber}</strong>?
-                  </p>
-                  <p className="text-xs text-gray-500 mb-4">
-                    Ta operacja jest nieodwracalna. Zostaną usunięte wszystkie powiązane dane:
-                    płatności, faktury, dokumenty, pliki i wszystkie relacje. Dostępność turnusu zostanie zwiększona o 1.
-                  </p>
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={() => setShowDeleteModal(false)}
-                      disabled={deletingReservation}
-                      className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Anuluj
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!reservation) return;
-                        try {
-                          setDeletingReservation(true);
-                          await authenticatedApiCall(`/api/reservations/${reservation.id}`, {
-                            method: 'DELETE',
-                          });
-                          alert('Rezerwacja została usunięta pomyślnie. Dostępność turnusu została zwiększona o 1.');
-                          // Build return URL with page and filters
-                          const returnParams = new URLSearchParams();
-                          if (fromPage) {
-                            returnParams.set('page', fromPage);
-                          }
-                          // Add all filter params
-                          filterParams.forEach((value, key) => {
-                            returnParams.set(key, value);
-                          });
-                          const returnUrl = returnParams.toString()
-                            ? `/admin-panel?${returnParams.toString()}`
-                            : '/admin-panel';
-                          router.push(returnUrl);
-                        } catch (err) {
-                          alert(err instanceof Error ? err.message : 'Błąd podczas usuwania rezerwacji');
-                        } finally {
-                          setDeletingReservation(false);
-                          setShowDeleteModal(false);
-                        }
-                      }}
-                      disabled={deletingReservation}
-                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {deletingReservation ? 'Usuwanie...' : 'Usuń rezerwację'}
-                    </button>
+            {/* Modal archiwizacji rezerwacji */}
+            <UniversalModal
+              isOpen={showDeleteModal}
+              onClose={() => !deletingReservation && setShowDeleteModal(false)}
+              title="Archiwizuj rezerwację"
+              maxWidth="md"
+            >
+              <div className="p-4 sm:p-6">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Trash2 className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-700 mb-2">
+                      Czy na pewno chcesz zarchiwizować rezerwację <strong className="text-gray-900">{reservationNumber}</strong>?
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Rezerwacja zostanie przeniesiona do archiwum wraz ze wszystkimi powiązanymi danymi
+                      (płatności, faktury, dokumenty). Pliki zostaną zachowane.
+                    </p>
                   </div>
                 </div>
+                
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
+                  <div className="flex items-center gap-2 text-amber-800 text-sm">
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                    <span>Dostępność turnusu zostanie zwiększona o 1</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-amber-800 text-sm mt-1">
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                    <span>W razie potrzeby rezerwację można przywrócić z archiwum</span>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    disabled={deletingReservation}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    style={{ borderRadius: 0 }}
+                  >
+                    Anuluj
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!reservation) return;
+                      try {
+                        setDeletingReservation(true);
+                        await authenticatedApiCall(`/api/reservations/${reservation.id}`, {
+                          method: 'DELETE',
+                        });
+                        showSuccess('Rezerwacja została zarchiwizowana. Dostępność turnusu została zwiększona o 1.');
+                        // Build return URL with page and filters
+                        const returnParams = new URLSearchParams();
+                        if (fromPage) {
+                          returnParams.set('page', fromPage);
+                        }
+                        // Add all filter params
+                        filterParams.forEach((value, key) => {
+                          returnParams.set(key, value);
+                        });
+                        const returnUrl = returnParams.toString()
+                          ? `/admin-panel?${returnParams.toString()}`
+                          : '/admin-panel';
+                        router.push(returnUrl);
+                      } catch (err) {
+                        showError(err instanceof Error ? err.message : 'Błąd podczas archiwizacji rezerwacji');
+                      } finally {
+                        setDeletingReservation(false);
+                        setShowDeleteModal(false);
+                      }
+                    }}
+                    disabled={deletingReservation}
+                    className="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    style={{ borderRadius: 0 }}
+                  >
+                    {deletingReservation ? 'Archiwizowanie...' : 'Archiwizuj'}
+                  </button>
+                </div>
               </div>
-            )}
+            </UniversalModal>
+
+            {/* Modal braku miejsc na turnusie */}
+            <UniversalModal
+              isOpen={showNoSpotsModal}
+              onClose={() => setShowNoSpotsModal(false)}
+              title="Nie można przywrócić rezerwacji"
+              maxWidth="md"
+            >
+              <div className="p-4 sm:p-6">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <X className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-700 mb-2">
+                      Nie można przywrócić rezerwacji <strong className="text-gray-900">{reservationNumber}</strong>
+                    </p>
+                    <p className="text-sm text-red-600 font-medium">
+                      {noSpotsMessage}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6">
+                  <p className="text-sm text-gray-600">
+                    Aby przywrócić tę rezerwację, musisz najpierw zwolnić miejsce na tym turnusie
+                    (np. przenieść inną rezerwację na inny turnus lub zarchiwizować inną rezerwację).
+                  </p>
+                </div>
+                
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setShowNoSpotsModal(false)}
+                    className="px-4 py-2 text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 transition-colors"
+                    style={{ borderRadius: 0 }}
+                  >
+                    Rozumiem
+                  </button>
+                </div>
+              </div>
+            </UniversalModal>
 
             {/* Modal odrzucenia */}
             {rejectingDocumentType && (
@@ -2498,47 +2877,8 @@ export default function ReservationDetailPage() {
               </div>
             )}
 
-            {/* Płatności */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 lg:col-span-2">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Płatności</h2>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Cena całkowita:</label>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(reservation.total_price || 0)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Zaliczka:</label>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(reservation.deposit_amount || null)}</p>
-                  </div>
-                </div>
-                <div className="border-t border-gray-200 pt-4">
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Historia płatności (zahardkodowane):</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                      <span className="text-sm text-gray-900">Zaliczka - {formatDate(reservation.created_at)}</span>
-                      <span className="text-sm font-medium text-gray-900">{formatCurrency(reservation.deposit_amount)}</span>
-                    </div>
-                    {reservation.deposit_amount && reservation.total_price && reservation.deposit_amount < reservation.total_price && (
-                      <>
-                        <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                          <span className="text-sm text-gray-900">Płatność częściowa - {formatDate(reservation.updated_at || null)}</span>
-                          <span className="text-sm font-medium text-gray-900">
-                            {formatCurrency((reservation.total_price - reservation.deposit_amount) / 2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                          <span className="text-sm text-gray-900">Płatność końcowa - {formatDate(reservation.updated_at || null)}</span>
-                          <span className="text-sm font-medium text-gray-900">
-                            {formatCurrency((reservation.total_price - reservation.deposit_amount) / 2)}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
             </div>
+
           </div>
         </div>
       </AdminLayout>

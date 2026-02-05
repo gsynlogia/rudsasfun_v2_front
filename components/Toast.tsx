@@ -1,12 +1,13 @@
 'use client';
 
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export type ToastType = 'success' | 'warning' | 'error' | 'info';
 
 export interface Toast {
   id: string;
+  title?: string;
   message: string;
   type: ToastType;
   duration?: number;
@@ -18,57 +19,68 @@ interface ToastProps {
 }
 
 export default function ToastComponent({ toast, onClose }: ToastProps) {
+  const [progress, setProgress] = useState(100);
+
   useEffect(() => {
     if (toast.duration && toast.duration > 0) {
+      const startTime = Date.now();
+      const duration = toast.duration;
+
+      // Update progress bar every 50ms
+      const progressInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
+        setProgress(remaining);
+      }, 50);
+
       const timer = setTimeout(() => {
         onClose(toast.id);
       }, toast.duration);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        clearInterval(progressInterval);
+      };
     }
   }, [toast.id, toast.duration, onClose]);
 
+  // Nowy styl - pełne kolorowe tło, biały tekst (jak na załączniku)
   const getToastStyles = () => {
     switch (toast.type) {
       case 'success':
         return {
-          bg: 'bg-green-50',
-          border: 'border-green-200',
-          text: 'text-green-800',
-          icon: 'text-green-600',
-          iconBg: 'bg-green-100',
+          bg: 'bg-green-600',
+          progressBg: 'bg-green-800',
+          text: 'text-white',
+          iconBg: 'bg-white/20',
         };
       case 'warning':
         return {
-          bg: 'bg-yellow-50',
-          border: 'border-yellow-200',
-          text: 'text-yellow-800',
-          icon: 'text-yellow-600',
-          iconBg: 'bg-yellow-100',
+          bg: 'bg-yellow-500',
+          progressBg: 'bg-yellow-700',
+          text: 'text-white',
+          iconBg: 'bg-white/20',
         };
       case 'error':
         return {
-          bg: 'bg-red-50',
-          border: 'border-red-200',
-          text: 'text-red-800',
-          icon: 'text-red-600',
-          iconBg: 'bg-red-100',
+          bg: 'bg-rose-500',
+          progressBg: 'bg-rose-700',
+          text: 'text-white',
+          iconBg: 'bg-white/20',
         };
       case 'info':
         return {
-          bg: 'bg-blue-50',
-          border: 'border-blue-200',
-          text: 'text-blue-800',
-          icon: 'text-blue-600',
-          iconBg: 'bg-blue-100',
+          bg: 'bg-blue-500',
+          progressBg: 'bg-blue-700',
+          text: 'text-white',
+          iconBg: 'bg-white/20',
         };
       default:
         return {
-          bg: 'bg-gray-50',
-          border: 'border-gray-200',
-          text: 'text-gray-800',
-          icon: 'text-gray-600',
-          iconBg: 'bg-gray-100',
+          bg: 'bg-gray-600',
+          progressBg: 'bg-gray-800',
+          text: 'text-white',
+          iconBg: 'bg-white/20',
         };
     }
   };
@@ -76,15 +88,15 @@ export default function ToastComponent({ toast, onClose }: ToastProps) {
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return <CheckCircle className="w-5 h-5" />;
+        return <CheckCircle className="w-8 h-8" />;
       case 'warning':
-        return <AlertCircle className="w-5 h-5" />;
+        return <AlertCircle className="w-8 h-8" />;
       case 'error':
-        return <AlertCircle className="w-5 h-5" />;
+        return <AlertCircle className="w-8 h-8" />;
       case 'info':
-        return <Info className="w-5 h-5" />;
+        return <Info className="w-8 h-8" />;
       default:
-        return <Info className="w-5 h-5" />;
+        return <Info className="w-8 h-8" />;
     }
   };
 
@@ -92,21 +104,34 @@ export default function ToastComponent({ toast, onClose }: ToastProps) {
 
   return (
     <div
-      className={`${styles.bg} ${styles.border} border-l-4 rounded-lg shadow-lg p-4 mb-3 flex items-start gap-3 animate-in slide-in-from-top-5 fade-in duration-300`}
+      className={`${styles.bg} rounded-2xl shadow-2xl overflow-hidden mb-4 animate-in slide-in-from-bottom-5 fade-in duration-300`}
     >
-      <div className={`${styles.iconBg} ${styles.icon} rounded-full p-1 flex-shrink-0`}>
-        {getIcon()}
+      <div className="px-8 py-6 flex items-center gap-5">
+        <div className={`${styles.iconBg} ${styles.text} rounded-full p-3 flex-shrink-0`}>
+          {getIcon()}
+        </div>
+        <div className="flex-1 min-w-0">
+          {toast.title && (
+            <div className={`${styles.text} font-bold text-xl`}>
+              {toast.title}
+            </div>
+          )}
+          <div className={`${styles.text} text-lg ${toast.title ? 'opacity-90 mt-1' : 'font-semibold'}`}>
+            {toast.message}
+          </div>
+        </div>
+        <button
+          onClick={() => onClose(toast.id)}
+          className={`${styles.text} hover:opacity-70 transition-opacity flex-shrink-0 p-2`}
+          aria-label="Zamknij"
+        >
+          <X className="w-6 h-6" />
+        </button>
       </div>
-      <div className={`flex-1 ${styles.text} text-sm font-medium`}>
-        {toast.message}
-      </div>
-      <button
-        onClick={() => onClose(toast.id)}
-        className={`${styles.text} hover:opacity-70 transition-opacity flex-shrink-0`}
-        aria-label="Zamknij"
-      >
-        <X className="w-4 h-4" />
-      </button>
+      {/* Progress bar - ciemniejszy pasek na dole pokazujący czas do zniknięcia */}
+      {toast.duration && toast.duration > 0 && (
+        <div className={`h-1.5 ${styles.progressBg}`} style={{ width: `${progress}%` }} />
+      )}
     </div>
   );
 }

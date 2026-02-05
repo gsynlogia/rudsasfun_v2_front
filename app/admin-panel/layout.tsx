@@ -3,12 +3,14 @@
 import { usePathname } from 'next/navigation';
 
 import AuthGuard from '@/components/admin/AuthGuard';
+import { SidebarProvider } from '@/context/SidebarContext';
 
 /**
  * Admin Panel Layout
  * Protects all admin panel routes with authentication
  * Only authenticated admin users can access
  * Login page is excluded from protection
+ * SidebarProvider is here to persist sidebar state across SPA navigation
  */
 export default function AdminPanelLayout({
   children,
@@ -26,9 +28,12 @@ export default function AdminPanelLayout({
 
   // Allow all authenticated users to access admin panel
   // Section-level permissions are checked individually
+  // SidebarProvider wraps everything to persist state during SPA navigation
   return (
-    <AuthGuard requireAdmin={false}>
-      {children}
-    </AuthGuard>
+    <SidebarProvider>
+      <AuthGuard requireAdmin={false}>
+        {children}
+      </AuthGuard>
+    </SidebarProvider>
   );
 }

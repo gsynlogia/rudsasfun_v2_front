@@ -3,17 +3,17 @@
 import { Suspense } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
-import ReservationsTable from '@/components/admin/ReservationsTable';
+import ReservationsTableNew from '@/components/admin/ReservationsTableNew';
 import SectionGuard from '@/components/admin/SectionGuard';
 
 /**
  * Admin Panel Main Page
  * Route: /admin-panel
  *
- * Displays reservations table
+ * Displays reservations table with full payment details (like PaymentsManagement)
  */
 function ReservationsTableWrapper() {
-  return <ReservationsTable />;
+  return <ReservationsTableNew />;
 }
 
 export default function AdminPanelPage() {

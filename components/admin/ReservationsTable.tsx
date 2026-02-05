@@ -120,11 +120,51 @@ export default function ReservationsTable() {
   const [sortColumn, setSortColumn] = useState<string | null>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(pageFromUrl ? parseInt(pageFromUrl, 10) : 1);
-  const ITEMS_PER_PAGE = 10; // Server-side pagination: always 10 items per page
+  const [itemsPerPage, setItemsPerPage] = useState(10); // Default, will be updated from user settings
   const [pageInputValue, setPageInputValue] = useState('');
 
   // Server-side pagination metadata
   const [serverPagination, setServerPagination] = useState<PaginationInfo | null>(null);
+  
+  // Load user settings (items_per_page) on mount
+  // First check localStorage for immediate value, then sync from API
+  useEffect(() => {
+    const loadUserSettings = async () => {
+      try {
+        // First, check localStorage for immediate value (faster)
+        const localItemsPerPage = localStorage.getItem('admin_items_per_page');
+        if (localItemsPerPage) {
+          const parsed = parseInt(localItemsPerPage, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            setItemsPerPage(parsed);
+          }
+        }
+
+        // Then fetch from API to ensure sync with database
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const adminUserId = payload.admin_user_id;
+        if (!adminUserId) return;
+        
+        const settings = await authenticatedApiCall<{ items_per_page: number }>(
+          `/api/admin-users/${adminUserId}/settings`
+        );
+        
+        if (settings?.items_per_page) {
+          setItemsPerPage(settings.items_per_page);
+          // Update localStorage to stay in sync
+          localStorage.setItem('admin_items_per_page', settings.items_per_page.toString());
+        }
+      } catch (err) {
+        console.error('Failed to load user settings:', err);
+        // Keep localStorage value or default on error
+      }
+    };
+    
+    loadUserSettings();
+  }, []);
 
   // Debounce search input (300ms delay)
   useEffect(() => {
@@ -546,7 +586,7 @@ export default function ReservationsTable() {
         // Build query params
         const params = new URLSearchParams();
         params.set('page', currentPage.toString());
-        params.set('limit', ITEMS_PER_PAGE.toString());
+        params.set('limit', itemsPerPage.toString());
 
         if (debouncedSearch) {
           params.set('search', debouncedSearch);
@@ -598,7 +638,7 @@ export default function ReservationsTable() {
     };
 
     fetchReservations();
-  }, [currentPage, debouncedSearch, getActiveFilters]);
+  }, [currentPage, itemsPerPage, debouncedSearch, getActiveFilters]);
 
   // Sort reservations (filtering is now server-side)
   const filteredReservations = useMemo(() => {
@@ -822,7 +862,7 @@ export default function ReservationsTable() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-700">
-            {serverPagination ? `${serverPagination.total} rezerwacji (${ITEMS_PER_PAGE} na stronie)` : 'Ładowanie...'}
+            {serverPagination ? `${serverPagination.total} rezerwacji (${itemsPerPage} na stronie)` : 'Ładowanie...'}
           </span>
         </div>
       </div>

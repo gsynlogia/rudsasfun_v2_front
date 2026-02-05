@@ -337,20 +337,41 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
 
       {/* Document Cards */}
       <div className="space-y-3 sm:space-y-4">
-        {/* Agreement Card - TEMPORARILY DISABLED */}
+        {/* Agreement Card */}
         <div>
           <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Umowa</p>
-          <div className="border-2 border-dashed border-orange-300 rounded-lg p-3 sm:p-4 bg-orange-50 relative">
-            <div className="flex flex-col items-center gap-2 sm:gap-3 py-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 sm:w-10 sm:h-10 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <p className="text-xs sm:text-sm text-orange-700 text-center font-medium">
-                Trwa aktualizacja modułu &quot;Umowy&quot;
-              </p>
-              <p className="text-[10px] sm:text-xs text-orange-600 text-center">
-                Przepraszamy za utrudnienia. Moduł będzie dostępny wkrótce.
-              </p>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
+            <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
+              {(() => {
+                const status = reservation.contract_status;
+                if (status === 'approved') {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full" />;
+                } else if (status === 'rejected') {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full" />;
+                } else {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full" />;
+                }
+              })()}
+            </div>
+            <div className="flex flex-col items-center gap-2 sm:gap-3">
+              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
+              <p className="text-[10px] sm:text-xs text-gray-600 text-center">Umowa</p>
+              <button
+                onClick={() => {
+                  const formatReservationNumber = (reservationId: number, createdAt: string) => {
+                    const year = new Date(createdAt).getFullYear();
+                    const paddedId = String(reservationId).padStart(3, '0');
+                    return `REZ-${year}-${paddedId}`;
+                  };
+                  const reservationNumber = formatReservationNumber(reservationIdNum, reservation.created_at);
+                  const url = `${basePath}/aktualne-rezerwacje/${reservationNumber}/umowa`;
+                  window.open(url, '_blank');
+                }}
+                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] text-white text-[10px] sm:text-xs rounded hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-1"
+              >
+                <FileText className="w-3 h-3" />
+                <span>Umowa</span>
+              </button>
             </div>
           </div>
         </div>
@@ -431,39 +452,81 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         END OF ORIGINAL AGREEMENT CARD 
         */}
 
-        {/* Umowa Information */}
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-2 sm:p-3 rounded">
-          <div className="flex items-start gap-1.5 sm:gap-2">
-            <div className="flex-shrink-0 mt-0.5">
-              <svg className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
+        {/* Qualification Card */}
+        <div>
+          <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Karta kwalifikacyjna</p>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
+            <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
+              {(() => {
+                const status = reservation.qualification_card_status;
+                if (status === 'approved') {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full" />;
+                } else if (status === 'rejected') {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full" />;
+                } else {
+                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full" />;
+                }
+              })()}
             </div>
-            <div className="flex-1">
-              <p className="text-xs sm:text-sm font-semibold text-blue-900 mb-0.5 sm:mb-1 uppercase">
-                WAŻNE INFORMACJE
+            <div className="flex flex-col items-center gap-2 sm:gap-3">
+              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
+              <p className="text-[10px] sm:text-xs text-gray-600 text-center">
+                {loadingCard ? 'Ładowanie...' : 'Karta kwalifikacyjna'}
               </p>
-              <p className="text-xs sm:text-sm text-blue-800 leading-tight">
-                Szanowni Państwo, z uwagi na aktualizacje modułów &quot;Umowy&quot; i &quot;Karty&quot;, dokumenty te będą dostępne w późniejszym terminie. Poinformujemy Państwa.
-              </p>
+              <button
+                onClick={async () => {
+                  try {
+                    if (!cardDataCompleted) {
+                      setShowQualificationCardModal(true);
+                      return;
+                    }
+                    const formatReservationNumber = (reservationId: number, createdAt: string) => {
+                      const year = new Date(createdAt).getFullYear();
+                      const paddedId = String(reservationId).padStart(3, '0');
+                      return `REZ-${year}-${paddedId}`;
+                    };
+                    const reservationNumber = formatReservationNumber(reservationIdNum, reservation.created_at);
+                    const url = `${basePath}/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
+                    window.open(url, '_blank');
+                  } catch (error: any) {
+                    console.error('Error opening qualification card:', error);
+                    alert(error.message || 'Nie udało się otworzyć karty kwalifikacyjnej. Spróbuj ponownie.');
+                  }
+                }}
+                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] hover:bg-[#0299d6] text-white text-[10px] sm:text-xs rounded transition-colors text-center"
+              >
+                Karta kwalifikacyjna
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Qualification Card - TEMPORARILY DISABLED */}
+        {/* Authorization Card */}
         <div>
-          <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Karta kwalifikacyjna</p>
-          <div className="border-2 border-dashed border-orange-300 rounded-lg p-3 sm:p-4 bg-orange-50 relative">
-            <div className="flex flex-col items-center gap-2 sm:gap-3 py-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 sm:w-10 sm:h-10 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <p className="text-xs sm:text-sm text-orange-700 text-center font-medium">
-                Trwa aktualizacja modułu &quot;Karta kwalifikacyjna&quot;
-              </p>
-              <p className="text-[10px] sm:text-xs text-orange-600 text-center">
-                Przepraszamy za utrudnienia. Moduł będzie dostępny wkrótce.
-              </p>
+          <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Upoważnienia</p>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
+            <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full" />
+            </div>
+            <div className="flex flex-col items-center gap-2 sm:gap-3">
+              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
+              <p className="text-[10px] sm:text-xs text-gray-600 text-center">Upoważnienia</p>
+              <button
+                onClick={() => {
+                  const formatReservationNumber = (reservationId: number, createdAt: string) => {
+                    const year = new Date(createdAt).getFullYear();
+                    const paddedId = String(reservationId).padStart(3, '0');
+                    return `REZ-${year}-${paddedId}`;
+                  };
+                  const reservationNumber = formatReservationNumber(reservationIdNum, reservation.created_at);
+                  const url = `${basePath}/aktualne-rezerwacje/${reservationNumber}/upowaznienia`;
+                  window.open(url, '_blank');
+                }}
+                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] text-white text-[10px] sm:text-xs rounded hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-1"
+              >
+                <FileText className="w-3 h-3" />
+                <span>Upoważnienia</span>
+              </button>
             </div>
           </div>
         </div>

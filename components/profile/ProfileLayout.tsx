@@ -61,7 +61,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
         {/* Content Layout */}
         <div className="flex flex-col lg:flex-row gap-0">
           {/* Desktop Sidebar - Inside wrapper, wider to fit all text */}
-          <div className="hidden lg:block flex-shrink-0 lg:w-[400px]">
+          <div className="hidden lg:block flex-shrink-0 lg:w-[400px] sticky top-4 self-start">
             <ProfileSidebar />
           </div>
 
