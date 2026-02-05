@@ -1,0 +1,4 @@
+083ad02
+# RWD: Mobile-first implementacja profilu klienta
+# Data: 2026-02-05
+# Poprzedni commit przed RWD: 11fd498
