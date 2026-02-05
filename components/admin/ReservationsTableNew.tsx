@@ -4240,16 +4240,6 @@ export default function ReservationsTableNew() {
             <span className="hidden xl:inline">Kolumny</span>
           </button>
           
-          <button
-            onClick={handleManualSync}
-            disabled={isSyncing}
-            className="px-3 py-1.5 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-colors text-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Zweryfikuj płatności Tpay"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span className="hidden xl:inline">{isSyncing ? 'Sync...' : 'Weryfikuj'}</span>
-          </button>
-          
           {/* Results count - pushed to right */}
           <span className="ml-auto text-xs text-slate-300 whitespace-nowrap">Znaleziono: <strong className="text-white">{serverPagination?.total || 0}</strong> | Na stronie: <strong className="text-white">{itemsPerPage}</strong></span>
         </div>
