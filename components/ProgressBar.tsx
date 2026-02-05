@@ -85,33 +85,15 @@ export default function ProgressBar({ steps, onStepClick }: ProgressBarProps) {
         ))}
       </div>
 
-      {/* Mobile view - compact horizontal with better scroll */}
-      <div className="sm:hidden">
-        {/* Step indicator bar */}
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-600">
-            Krok {steps.find(s => s.active)?.number || 1} z {steps.length}
-          </span>
-          <span className="text-xs font-semibold text-[#03adf0]">
-            {steps.find(s => s.active)?.label || steps[0].label}
-          </span>
-        </div>
-        {/* Progress bar */}
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
-          <div 
-            className="h-full bg-[#03adf0] rounded-full transition-all duration-300"
-            style={{ 
-              width: `${((steps.filter(s => s.completed).length + (steps.find(s => s.active) ? 0.5 : 0)) / steps.length) * 100}%` 
-            }}
-          />
-        </div>
-        {/* Step circles - scrollable */}
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide -mx-3 px-3 pb-2">
+      {/* Mobile view - full width with connected circles */}
+      <div className="sm:hidden pb-4">
+        {/* Step circles - full width distributed */}
+        <div className="flex items-start justify-between relative">
           {steps.map((step, index) => (
-            <div key={step.number} className="flex flex-col items-center flex-shrink-0 min-w-[56px] relative">
+            <div key={step.number} className="flex flex-col items-center flex-1 relative z-10">
               <button
                 onClick={() => onStepClick(step.number)}
-                className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm mb-1 relative z-10 ${getStepStyles(step)}`}
+                className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm mb-1.5 ${getStepStyles(step)}`}
                 aria-label={`Przejdź do kroku ${step.number}: ${step.label}`}
               >
                 {step.completed ? (
@@ -133,23 +115,19 @@ export default function ProgressBar({ steps, onStepClick }: ProgressBarProps) {
                   step.number
                 )}
               </button>
-              <span className={`text-[9px] text-center leading-tight max-w-[56px] ${getLabelStyles(step)}`}>
+              <span className={`text-[9px] text-center leading-tight px-0.5 ${getLabelStyles(step)}`}>
                 {step.label}
               </span>
-              {/* Line between circles */}
+              {/* Connecting line between circles */}
               {index < steps.length - 1 && (
                 <div
-                  className="absolute top-4 left-1/2 h-0.5 z-0"
-                  style={{
-                    marginLeft: '4px',
-                    width: 'calc(56px - 4px)',
-                  }}
+                  className="absolute top-[18px] left-1/2 h-0.5 z-0"
+                  style={{ width: '100%' }}
                 >
                   <div
                     className={`h-full ${
-                      step.completed || step.active ? 'bg-[#03adf0]' : 'bg-gray-200'
+                      step.completed ? 'bg-[#03adf0]' : 'bg-gray-200'
                     }`}
-                    style={{ width: '100%' }}
                   />
                 </div>
               )}
