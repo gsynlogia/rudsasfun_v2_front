@@ -23,7 +23,8 @@ export default function NavigationButtons({
   const isLastStep = currentStep === totalSteps;
 
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0 pt-4 sm:pt-6">
+    <div className="hidden lg:flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0 pt-4 sm:pt-6">
+      {/* Desktop Navigation - Hidden on mobile (sticky bar is used instead) */}
       {!isFirstStep ? (
         <button
           onClick={onPrevious}

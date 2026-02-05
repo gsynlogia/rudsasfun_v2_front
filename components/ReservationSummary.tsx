@@ -196,19 +196,19 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
   return (
     <div className="bg-white rounded-xl lg:rounded-tr-[60px] p-4 sm:p-6">
       <div className="flex flex-col items-start mb-4 sm:mb-6">
-        {/* Icon */}
-        <div className="w-16 h-16 sm:w-20 sm:h-20 mb-3 sm:mb-4 flex items-center justify-start">
-          <Image
-            src="/reservation_icon.svg"
-            alt="Reservation icon"
-            width={80}
-            height={80}
-            className="w-full h-full"
-          />
+        {/* Icon and Title Row - Mobile: smaller, inline */}
+        <div className="flex items-center gap-3 lg:flex-col lg:items-start w-full mb-3 lg:mb-0">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-20 lg:h-20 lg:mb-4 flex items-center justify-start flex-shrink-0">
+            <Image
+              src="/reservation_icon.svg"
+              alt="Reservation icon"
+              width={80}
+              height={80}
+              className="w-full h-full"
+            />
+          </div>
+          <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-800 lg:mb-4">Twoja rezerwacja</h3>
         </div>
-
-        {/* Title under icon */}
-        <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">Twoja rezerwacja</h3>
 
         {/* Base price */}
         {baseItem && (
@@ -434,10 +434,10 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
         )}
       </div>
 
-      {/* Button */}
+      {/* Button - Hidden on mobile (sticky bar is used instead) */}
       <button
         onClick={handleNextClick}
-        className="w-full bg-[#03adf0] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+        className="hidden lg:flex w-full bg-[#03adf0] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium hover:bg-[#0288c7] transition-colors items-center justify-center gap-2 text-sm sm:text-base"
       >
         {currentStep === TOTAL_STEPS ? 'Zapłać teraz' : 'przejdź dalej'}
         {currentStep !== TOTAL_STEPS && (

@@ -251,7 +251,7 @@ useEffect(() => {
       <HeaderTop />
       <HeaderSecondary />
 
-      <main className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
+      <main className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-24 lg:pb-8" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Breadcrumbs */}
         <div className="mb-3 sm:mb-4">
           <nav className="text-xs sm:text-sm text-gray-500">
@@ -352,7 +352,7 @@ useEffect(() => {
             {/* Main Content Layout */}
             <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
               {/* Left Column - Form Steps */}
-              <div className="flex-1 lg:w-[75%] w-full">
+              <div className="flex-1 lg:w-[75%] w-full order-1 lg:order-1">
                 {children}
                 {/* Navigation Buttons - inside left column, aligned to right */}
                 <NavigationButtons
@@ -363,15 +363,75 @@ useEffect(() => {
                 />
               </div>
 
-              {/* Right Column - Summary - Mobile: below, Desktop: sticky */}
+              {/* Right Column - Summary - Mobile: after form, Desktop: sticky sidebar */}
               <aside
-                className="lg:w-[25%] w-full order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start"
+                className="lg:w-[25%] w-full order-2 lg:order-2 lg:sticky lg:top-4 lg:self-start"
                 style={{
                   alignSelf: 'flex-start',
                 }}
               >
-                <ReservationSummary currentStep={currentStep} onNext={handleNext} />
+                {/* Desktop Summary - always visible */}
+                <div className="hidden lg:block">
+                  <ReservationSummary currentStep={currentStep} onNext={handleNext} />
+                </div>
+                {/* Mobile Summary - compact card */}
+                <div className="lg:hidden">
+                  <ReservationSummary currentStep={currentStep} onNext={handleNext} />
+                </div>
               </aside>
+            </div>
+            
+            {/* Mobile Sticky Bottom Bar - Back, Price and Next Button */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40 px-4 py-3 safe-area-bottom">
+              <div className="flex items-center justify-between gap-2 max-w-container mx-auto">
+                {/* Back button - only show if not first step */}
+                {currentStep > 1 ? (
+                  <button
+                    onClick={handlePrevious}
+                    className="text-gray-600 hover:text-[#03adf0] p-2 rounded-lg transition-colors flex items-center justify-center"
+                    aria-label="Wróć"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                ) : (
+                  <div className="w-9"></div>
+                )}
+                
+                {/* Price display */}
+                <div className="flex flex-col items-center flex-1">
+                  <span className="text-[10px] text-gray-500">Do zapłaty</span>
+                  <span className="text-base font-bold text-[#03adf0]">
+                    {reservation.totalPrice?.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'} zł
+                  </span>
+                </div>
+                
+                {/* Next/Pay button */}
+                {currentStep < TOTAL_STEPS ? (
+                  <button
+                    onClick={handleNext}
+                    className="bg-[#03adf0] text-white px-4 py-2 rounded-lg font-medium hover:bg-[#0288c7] transition-colors flex items-center gap-1.5 text-sm whitespace-nowrap"
+                  >
+                    Dalej
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const { handleStep5Payment } = (window as any);
+                      if (handleStep5Payment && typeof handleStep5Payment === 'function') {
+                        handleStep5Payment();
+                      }
+                    }}
+                    className="bg-[#03adf0] text-white px-4 py-2 rounded-lg font-medium hover:bg-[#0288c7] transition-colors flex items-center gap-1.5 text-sm whitespace-nowrap"
+                  >
+                    Zapłać
+                  </button>
+                )}
+              </div>
             </div>
           </>
         )}
