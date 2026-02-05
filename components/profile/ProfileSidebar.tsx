@@ -9,6 +9,7 @@ import { authService, type User } from '@/lib/services/AuthService';
 
 interface ProfileSidebarProps {
   onClose?: () => void;
+  isMobile?: boolean;
 }
 
 interface MenuItem {
@@ -115,7 +116,7 @@ function shortenEmail(email: string | null | undefined): string {
   }
 }
 
-export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
+export default function ProfileSidebar({ onClose, isMobile = false }: ProfileSidebarProps) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,6 +144,88 @@ export default function ProfileSidebar({ onClose }: ProfileSidebarProps) {
     loadUser();
   }, []);
 
+  // Mobile version - simplified, full width
+  if (isMobile) {
+    return (
+      <aside className="w-full h-full flex-shrink-0 bg-white">
+        {/* Welcome section for mobile */}
+        <div className="px-4 py-4 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/wzor-dekoracyjny-3.svg"
+              alt="Avatar"
+              width={50}
+              height={50}
+              className="flex-shrink-0"
+            />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-gray-900 truncate">
+                {isLoading ? (
+                  'Witaj!'
+                ) : (
+                  <>
+                    Witaj! <span className="text-[#03adf0]">
+                      {user?.email ? shortenEmail(user.email) : (user?.login ? shortenEmail(user.login) : 'Użytkowniku')}
+                    </span>
+                  </>
+                )}
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        {/* Menu items - mobile optimized */}
+        <nav className="py-2">
+          {menuItems.map((item, index) => {
+            const isActive = pathname === item.href;
+            const isLast = index === menuItems.length - 1;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => onClose?.()}
+                className={`
+                  flex items-center gap-3 px-4 py-3.5 transition-colors
+                  ${!isLast ? 'border-b border-gray-100' : ''}
+                  ${isActive
+                    ? 'bg-[#EAF6FE] border-l-4 border-l-[#03adf0]'
+                    : 'bg-white hover:bg-gray-50 border-l-4 border-l-transparent'
+                  }
+                `}
+              >
+                {/* Icon */}
+                <svg
+                  className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-[#03adf0]' : 'text-gray-400'}`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  dangerouslySetInnerHTML={{ __html: item.iconSvg }}
+                />
+                {/* Label */}
+                <span className={`text-sm flex-1 ${isActive ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
+                  {item.label}
+                </span>
+                {/* Arrow */}
+                <svg
+                  className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-[#03adf0]' : 'text-gray-300'}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth="2"
+                >
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+    );
+  }
+
+  // Desktop version - original design with blue tab
   return (
     <aside className="w-[400px] h-full lg:h-auto flex-shrink-0 relative">
       {/* Blue vertical tab on the left edge with vertical text and icons in one line */}
