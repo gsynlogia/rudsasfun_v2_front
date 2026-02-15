@@ -19,15 +19,19 @@ import { getApiBaseUrlRuntime } from '@/utils/api-config';
  */
 export default function SettingsPage() {
   const pathname = usePathname();
-  const [isUserZero, setIsUserZero] = useState(false);
+  const [canAccessSuperFunctions, setCanAccessSuperFunctions] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkUser = async () => {
       if (authService.isAuthenticated()) {
         const user = await authService.verifyToken();
-        if (user && user.id === 0) {
-          setIsUserZero(true);
+        if (user) {
+          setCanAccessSuperFunctions(
+            user.id === 0 ||
+            user.user_type === 'admin' ||
+            !!(user.groups && user.groups.includes('admin'))
+          );
         }
       }
       setLoading(false);
@@ -56,8 +60,8 @@ export default function SettingsPage() {
     },
   ];
 
-  // Add super functions section only for user ID 0
-  if (!loading && isUserZero) {
+  // Super funkcje: dostępne dla każdego administratora (id 0, user_type admin, grupa admin)
+  if (!loading && canAccessSuperFunctions) {
     sections.push({
       id: 'super-functions',
       href: '/admin-panel/settings/super-functions',

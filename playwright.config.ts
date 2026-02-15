@@ -45,6 +45,13 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'chromium-logged-in',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: process.env.PLAYWRIGHT_AUTH_FILE || './playwright/.auth/user.json',
+      },
+    },
   ],
 
   /* Run your local dev server before starting the tests */

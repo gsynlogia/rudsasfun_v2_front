@@ -3,17 +3,18 @@
 import { Suspense } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
-import PaymentsManagement from '@/components/admin/PaymentsManagement';
+import ReservationsTableNew from '@/components/admin/ReservationsTableNew';
 import SectionGuard from '@/components/admin/SectionGuard';
 
 /**
  * Admin Panel - Payments Page
  * Route: /admin-panel/payments
  *
- * Displays payments management with detailed payment verification
+ * Ta sama tabela co /admin-panel; filtry i wyszukiwarka identyczne.
+ * Klik wiersza prowadzi do szczegółów płatności rezerwacji (/admin-panel/rezerwacja/[id]/payments).
  */
-function PaymentsManagementWrapper() {
-  return <PaymentsManagement />;
+function PaymentsTableWrapper() {
+  return <ReservationsTableNew detailTarget="payment" tableModule="payments" />;
 }
 
 export default function PaymentsPage() {
@@ -28,7 +29,7 @@ export default function PaymentsPage() {
             </div>
           </div>
         }>
-          <PaymentsManagementWrapper />
+          <PaymentsTableWrapper />
         </Suspense>
       </AdminLayout>
     </SectionGuard>

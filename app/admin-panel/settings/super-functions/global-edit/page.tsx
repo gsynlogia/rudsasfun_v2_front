@@ -107,21 +107,22 @@ export default function GlobalEditPage() {
 
   useEffect(() => {
     const checkAccess = async () => {
-      // Check if user is authenticated
       if (!authService.isAuthenticated()) {
         router.push('/admin-panel/login');
         return;
       }
 
-      // Verify token and get user info
       const user = await authService.verifyToken();
       if (!user) {
         router.push('/admin-panel/login');
         return;
       }
 
-      // Only user ID 0 can access
-      if (user.id !== 0) {
+      const canAccess =
+        user.id === 0 ||
+        user.user_type === 'admin' ||
+        !!(user.groups && user.groups.includes('admin'));
+      if (!canAccess) {
         router.push('/admin-panel/settings');
         return;
       }

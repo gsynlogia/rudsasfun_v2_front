@@ -293,7 +293,11 @@ function SystemLogsContent() {
         return;
       }
 
-      if (user.id !== 0) {
+      const canAccess =
+        user.id === 0 ||
+        user.user_type === 'admin' ||
+        !!(user.groups && user.groups.includes('admin'));
+      if (!canAccess) {
         router.push('/admin-panel/settings');
         return;
       }

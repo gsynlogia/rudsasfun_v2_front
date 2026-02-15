@@ -1,13 +1,30 @@
 'use client';
 
-import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User, Tent, Users, Utensils, Shield, Gift, Bus, FileCheck, Receipt, Heart, MessageSquare, CheckCircle2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User, Tent, Users, Utensils, Shield, Gift, Bus, FileCheck, Receipt, Heart, MessageSquare, CheckCircle2, RotateCcw, CheckCircle, XCircle } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+const RESERVATION_PANELS = [
+  { id: 'platnosci', label: 'Płatności', icon: Receipt },
+  { id: 'dokumenty', label: 'Dokumenty', icon: FileText },
+  { id: 'dane', label: 'Dane uczestnika i opiekunów', icon: Users },
+  { id: 'promocje-transport', label: 'Promocje i transport', icon: Bus },
+  { id: 'zdrowie', label: 'Zdrowie', icon: Heart },
+  { id: 'informacje', label: 'Informacje i wniosek', icon: FileCheck },
+  { id: 'inne', label: 'Dodatki, diety, faktura, źródło', icon: Utensils },
+] as const;
+type PanelId = typeof RESERVATION_PANELS[number]['id'];
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
 import { useToast } from '@/components/ToastContainer';
 import UniversalModal from '@/components/admin/UniversalModal';
+import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
+import { ContractForm } from '@/components/profile/ContractForm';
+import { QualificationForm } from '@/components/profile/QualificationForm';
+import type { ReservationData } from '@/lib/contractReservationMapping';
+import { mapReservationToContractForm } from '@/lib/contractReservationMapping';
+import { mapReservationToQualificationForm } from '@/lib/qualificationReservationMapping';
 import { contractService } from '@/lib/services/ContractService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
@@ -47,6 +64,7 @@ interface ReservationDetails {
   selected_protection?: (string | number)[] | null;
   selected_promotion?: string | null;
   promotion_name?: string | null;
+  promotion_price?: number | null;
   promotion_justification?: any;
   departure_type?: string | null;
   departure_city?: string | null;
@@ -139,11 +157,74 @@ interface ReservationNote {
   updated_at: string;
 }
 
+/** Formularz uzasadnienia odrzucenia dokumentu (umowa lub karta) – wyświetlany w prawym panelu. */
+function RejectDocumentPanelContent({
+  documentId,
+  onSuccess,
+  onCancel,
+}: {
+  documentId: number;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) {
+      alert('Podaj uzasadnienie odrzucenia');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await authenticatedApiCall(`/api/signed-documents/${documentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'rejected', rejection_reason: reason.trim() }),
+      });
+      onSuccess();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Błąd podczas odrzucania dokumentu');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      <label className="block text-sm font-medium text-gray-700">Uzasadnienie odrzucenia</label>
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Podaj uzasadnienie odrzucenia..."
+        className="w-full h-32 p-2 border border-gray-300 rounded text-gray-900"
+      />
+      <div className="flex gap-2 justify-end">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 cursor-pointer"
+        >
+          Anuluj
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer"
+        >
+          {submitting ? 'Zapisywanie...' : 'Zapisz'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ReservationDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showSuccess, showError } = useToast();
+  const { openDocument, close: closeRightPanel } = useAdminRightPanel();
   // params.id contains the reservation number (e.g., REZ-2025-001)
   const reservationNumber = typeof params?.id === 'string'
     ? params.id
@@ -189,8 +270,11 @@ export default function ReservationDetailPage() {
   const [contractHtmlError, setContractHtmlError] = useState<string | null>(null);
   const [_rejectingContract, _setRejectingContract] = useState(false);
   const [_rejectingCard, _setRejectingCard] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [rejectingDocumentType, setRejectingDocumentType] = useState<'contract' | 'card' | null>(null);
+  const [latestSignedContract, setLatestSignedContract] = useState<{ id: number; status: string; client_message: string | null } | null>(null);
+  const [latestSignedCard, setLatestSignedCard] = useState<{ id: number; status: string; client_message: string | null } | null>(null);
+  const [qualificationCardSignedPayload, setQualificationCardSignedPayload] = useState<Record<string, unknown> | null>(null);
+  const [contractSignedPayload, setContractSignedPayload] = useState<Record<string, unknown> | null>(null);
+  const [signedDocumentsList, setSignedDocumentsList] = useState<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null }>>([]);
   const [uploadingContract, setUploadingContract] = useState(false);
   const [uploadingCard, setUploadingCard] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -216,9 +300,56 @@ export default function ReservationDetailPage() {
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState('');
   const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
+
+  const [activePanel, setActivePanel] = useState<PanelId>('platnosci');
+
+  const setPanelFromHash = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash.slice(1);
+    const valid = RESERVATION_PANELS.some((p) => p.id === hash);
+    if (valid) {
+      setActivePanel(hash as PanelId);
+    } else {
+      setActivePanel('platnosci');
+      if (!hash) window.history.replaceState(null, '', `${window.location.pathname}#platnosci`);
+    }
+  }, []);
+
+  useEffect(() => {
+    setPanelFromHash();
+    window.addEventListener('hashchange', setPanelFromHash);
+    return () => window.removeEventListener('hashchange', setPanelFromHash);
+  }, [setPanelFromHash]);
+
+  const goToPanel = useCallback((id: PanelId) => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = id;
+    }
+    setActivePanel(id);
+  }, []);
+
+  // Informacje dodatkowe dotyczące uczestnika (sekcja z kroku 1 – edycja tylko tego pola)
+  const [participantAdditionalInfo, setParticipantAdditionalInfo] = useState('');
+  const [savingParticipantAdditionalInfo, setSavingParticipantAdditionalInfo] = useState(false);
+
+  // Wniosek o zakwaterowanie uczestnika (krok 1 – edycja tylko tego pola)
+  const [accommodationRequest, setAccommodationRequest] = useState('');
+  const [savingAccommodationRequest, setSavingAccommodationRequest] = useState(false);
   
   const contractUploadInputRef = useRef<HTMLInputElement>(null);
   const cardUploadInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (reservation) {
+      setParticipantAdditionalInfo(reservation.participant_additional_info ?? '');
+    }
+  }, [reservation?.id, reservation?.participant_additional_info]);
+
+  useEffect(() => {
+    if (reservation) {
+      setAccommodationRequest(reservation.accommodation_request ?? '');
+    }
+  }, [reservation?.id, reservation?.accommodation_request]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -482,43 +613,55 @@ export default function ReservationDetailPage() {
     }
   }, [reservationNumber]);
 
-  // Load document files and check HTML existence
-  // Skip for archived reservations - documents are in archive tables
-  useEffect(() => {
-    const loadDocuments = async () => {
-      if (!reservation) return;
-      
-      // Skip loading documents for archived reservations
-      // They don't exist in the main tables anymore
-      if (reservation.is_archived) {
-        setContractHtmlExists(false);
-        setCardHtmlExists(false);
-        setContractFiles([]);
-        setCardFiles([]);
-        return;
-      }
-
+  // Load document files and check HTML existence (wywoływane z useEffect i po zapisie umowy)
+  const loadDocuments = useCallback(async () => {
+    if (!reservation) return;
+    if (reservation.is_archived) {
+      setContractHtmlExists(false);
+      setCardHtmlExists(false);
+      setContractFiles([]);
+      setCardFiles([]);
+      setLatestSignedContract(null);
+      setLatestSignedCard(null);
+      setQualificationCardSignedPayload(null);
+      setSignedDocumentsList([]);
+      return;
+    }
+    try {
+      const contractHtmlCheck = await contractService.checkHtmlExists(reservation.id);
+      setContractHtmlExists(contractHtmlCheck.exists);
+      const cardHtmlCheck = await qualificationCardService.checkHtmlExists(reservation.id);
+      setCardHtmlExists(cardHtmlCheck.exists);
+      const contractFilesData = await contractService.getContractFiles(reservation.id);
+      setContractFiles(contractFilesData.filter(f => f.source === 'user'));
+      const cardFilesData = await qualificationCardService.getQualificationCardFiles(reservation.id);
+      setCardFiles(cardFilesData.filter(f => f.source === 'user'));
+      const signedDocs = await authenticatedApiCall<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null }>>(
+        `/api/signed-documents/reservation/${reservation.id}`,
+      );
+      setSignedDocumentsList(signedDocs);
+      const contractDoc = signedDocs.find(d => d.document_type === 'contract');
+      const cardDoc = signedDocs.find(d => d.document_type === 'qualification_card');
+      setLatestSignedContract(contractDoc ? { id: contractDoc.id, status: contractDoc.status, client_message: contractDoc.client_message } : null);
+      setLatestSignedCard(cardDoc ? { id: cardDoc.id, status: cardDoc.status, client_message: cardDoc.client_message } : null);
       try {
-        // Check if HTML exists
-        const contractHtmlCheck = await contractService.checkHtmlExists(reservation.id);
-        setContractHtmlExists(contractHtmlCheck.exists);
-
-        const cardHtmlCheck = await qualificationCardService.checkHtmlExists(reservation.id);
-        setCardHtmlExists(cardHtmlCheck.exists);
-
-        // Load uploaded files
-        const contractFilesData = await contractService.getContractFiles(reservation.id);
-        setContractFiles(contractFilesData.filter(f => f.source === 'user'));
-
-        const cardFilesData = await qualificationCardService.getQualificationCardFiles(reservation.id);
-        setCardFiles(cardFilesData.filter(f => f.source === 'user'));
-      } catch (err) {
-        console.error('Error loading documents:', err);
+        setContractSignedPayload(contractDoc?.payload ? JSON.parse(contractDoc.payload) : null);
+      } catch {
+        setContractSignedPayload(null);
       }
-    };
-
-    loadDocuments();
+      try {
+        setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload) : null);
+      } catch {
+        setQualificationCardSignedPayload(null);
+      }
+    } catch (err) {
+      console.error('Error loading documents:', err);
+    }
   }, [reservation]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   // Load payments data
   // Skip for archived reservations - payments are in archive tables
@@ -1055,6 +1198,8 @@ export default function ReservationDetailPage() {
       await contractService.updateContractHtml(reservation.id, contractHtmlDraft);
       setContractHtmlExists(true);
       setShowContractHtmlModal(false);
+      showSuccess('Zmiany w umowie zostały zapisane. Klient musi ponownie podpisać kartę kwalifikacyjną.');
+      await loadDocuments();
     } catch (err) {
       setContractHtmlError(err instanceof Error ? err.message : 'Nie udało się zapisać umowy');
     } finally {
@@ -1111,7 +1256,9 @@ export default function ReservationDetailPage() {
   return (
     <SectionGuard section="reservations">
       <AdminLayout>
-        <div className="h-full flex flex-col animate-fadeIn -m-4">
+        <div className="h-full min-h-0 flex flex-col lg:flex-row animate-fadeIn -m-4">
+          {/* Lewa kolumna: header, banner, karta z zakładkami */}
+          <div className="flex-1 min-w-0 flex flex-col min-h-0">
           {/* Header - ciemny pasek jak w PaymentsManagement */}
           <div className="bg-slate-800 shadow-md p-3 sticky top-0 z-20 mb-4">
             <div className="flex items-center justify-between">
@@ -1267,22 +1414,19 @@ export default function ReservationDetailPage() {
             </div>
           </div>
 
-          {/* Archived reservation banner - styled like profile alert */}
+          {/* Archived reservation banner - delikatny, czerwony, bez border-left */}
           {reservation.is_archived && (
-            <div className="mx-4 mt-4 relative">
-              <div 
-                className="bg-red-600 p-4 sm:p-5"
-                style={{ clipPath: 'polygon(0 0, calc(100% - 35px) 0, 100% 35px, 100% 100%, 35px 100%, 0 calc(100% - 35px))' }}
-              >
+            <div className="mx-4 mt-4">
+              <div className="rounded-xl bg-red-50 p-4 sm:p-5 shadow-sm ring-1 ring-red-100/80">
                 <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0">
-                    <svg className="w-6 h-6 sm:w-7 sm:h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                    <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                     </svg>
                   </div>
-                  <div>
-                    <h3 className="text-white font-semibold text-base sm:text-lg">Rezerwacja zarchiwizowana</h3>
-                    <p className="text-white/90 text-sm mt-1">
+                  <div className="min-w-0">
+                    <h3 className="text-red-800 font-semibold text-base sm:text-lg">Rezerwacja zarchiwizowana</h3>
+                    <p className="text-red-700/90 text-sm mt-1">
                       Ta rezerwacja została zarchiwizowana{reservation.archived_at ? ` dnia ${new Date(reservation.archived_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}.
                       Dane są tylko do odczytu. Edycja i usuwanie są niedostępne.
                     </p>
@@ -1292,9 +1436,42 @@ export default function ReservationDetailPage() {
             </div>
           )}
 
-          <div className="p-4 flex-1 overflow-auto">
-            {/* Płatności - na samej górze */}
-            {(() => {
+          <div className="p-4 flex-1 min-h-0 overflow-hidden lg:h-[calc(100vh-11rem)]">
+            <div className="relative h-full min-h-0">
+            <div className="flex flex-col h-full min-h-0 min-w-0 overflow-hidden rounded-none border border-gray-200 bg-white shadow-sm">
+              <nav
+                className="flex-shrink-0 flex flex-nowrap rounded-none border-b border-gray-200 bg-gray-50/80 overflow-x-auto"
+                role="tablist"
+                aria-label="Sekcje rezerwacji"
+              >
+                {RESERVATION_PANELS.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activePanel === id}
+                    aria-controls={`panel-${id}`}
+                    id={`tab-${id}`}
+                    onClick={() => goToPanel(id)}
+                    className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap rounded-none border border-transparent -mb-px cursor-pointer ${
+                      activePanel === id
+                        ? 'bg-[#1d283d] text-white border-t border-x border-[#1d283d] border-b-0'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" aria-hidden />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </nav>
+                <div
+                  id="panel-content"
+                  className="flex-1 overflow-auto min-h-0 min-w-0 rounded-none p-4 border-t-0"
+                  role="tabpanel"
+                  aria-labelledby={`tab-${activePanel}`}
+                >
+            {/* Płatności */}
+            {activePanel === 'platnosci' && (() => {
               // Oblicz rzeczywiste wpłaty
               const tpayPaid = payments
                 .filter(p => p.status === 'paid' || p.status === 'completed' || p.status === 'success')
@@ -1370,8 +1547,8 @@ export default function ReservationDetailPage() {
               );
             })()}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {/* Obóz i Turnus */}
+            {activePanel === 'dane' && (
+            <div className="space-y-4">
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Obóz i Turnus</h2>
               <div className="space-y-2">
@@ -1428,118 +1605,14 @@ export default function ReservationDetailPage() {
                 </div>
               </div>
             </div>
-
-            {/* Notatki wewnętrzne - tylko dla administratorów (zajmuje 3 wiersze w trzeciej kolumnie) */}
-            <div className="bg-yellow-100 rounded-lg shadow border border-yellow-300 p-4 xl:row-span-3 flex flex-col">
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-300">
-                <MessageSquare className="w-4 h-4 text-yellow-700" />
-                <h2 className="text-sm font-semibold text-yellow-800">Notatki wewnętrzne</h2>
-                <span className="text-xs text-yellow-700 ml-auto">(tylko dla pracowników)</span>
-              </div>
-              
-              {/* Formularz dodawania nowej notatki */}
-              <div className="mb-3">
-                <textarea
-                  value={newNoteContent}
-                  onChange={(e) => setNewNoteContent(e.target.value)}
-                  placeholder="Dodaj notatkę..."
-                  className="w-full border border-yellow-400 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white resize-none"
-                  rows={2}
-                />
-                <div className="flex justify-end mt-2">
-                  <button
-                    type="button"
-                    onClick={handleCreateNote}
-                    disabled={savingNote || !newNoteContent.trim()}
-                    className="px-4 py-1.5 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {savingNote ? 'Dodawanie...' : 'Dodaj notatkę'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Lista notatek - przewijalna z max wysokością */}
-              <div className="overflow-y-scroll space-y-2 pr-1 max-h-[380px]">
-                {loadingNotes ? (
-                  <div className="text-sm text-yellow-700 text-center py-4">Ładowanie notatek...</div>
-                ) : notes.length === 0 ? (
-                  <div className="text-sm text-yellow-700 text-center py-4 italic">Brak notatek</div>
-                ) : (
-                  notes.map((note) => (
-                    <div key={note.id} className="bg-white rounded border border-yellow-300 p-2.5">
-                      {editingNoteId === note.id ? (
-                        <div>
-                          <textarea
-                            value={editingNoteContent}
-                            onChange={(e) => setEditingNoteContent(e.target.value)}
-                            className="w-full border border-yellow-400 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none"
-                            rows={3}
-                          />
-                          <div className="flex justify-end gap-2 mt-2">
-                            <button
-                              type="button"
-                              onClick={cancelEditingNote}
-                              className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                            >
-                              Anuluj
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateNote(note.id)}
-                              disabled={savingNote || !editingNoteContent.trim()}
-                              className="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50"
-                            >
-                              {savingNote ? 'Zapisywanie...' : 'Zapisz'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="flex items-start justify-between gap-2 mb-1.5">
-                            <div className="flex items-center gap-1.5 text-xs text-yellow-800">
-                              <User className="w-3 h-3" />
-                              <span className="font-medium">{note.admin_user_name || note.admin_user_login || 'Administrator'}</span>
-                              <span className="text-yellow-600">•</span>
-                              <span>{formatDateTime(note.created_at)}</span>
-                              {note.updated_at !== note.created_at && (
-                                <>
-                                  <span className="text-yellow-600">•</span>
-                                  <span className="italic">edyt.</span>
-                                </>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-0.5 flex-shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => startEditingNote(note)}
-                                className="p-1 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-200 rounded"
-                                title="Edytuj notatkę"
-                              >
-                                <Edit className="w-3 h-3" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteNote(note.id)}
-                                disabled={deletingNoteId === note.id}
-                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
-                                title="Usuń notatkę"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.content}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
+            )}
 
-            {/* Dokumenty */}
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 xl:row-span-2">
-              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Dokumenty</h2>
+            {activePanel === 'dokumenty' && (
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 flex flex-col min-h-0 h-full">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100 flex-shrink-0">Dokumenty</h2>
+              <div className="flex gap-4 min-h-0 flex-1 overflow-hidden">
+                <div className="flex-1 min-w-0 overflow-y-auto min-h-0">
               <div className="space-y-4">
                 {/* Umowa */}
                 <div className="space-y-2">
@@ -1548,23 +1621,29 @@ export default function ReservationDetailPage() {
                       <div>
                         <label className="text-xs font-medium text-gray-700">Umowa:</label>
                         <p className="text-sm text-gray-900">
-                          {reservation.contract_status === 'approved' ? (
+                          {latestSignedContract?.status === 'accepted' || reservation.contract_status === 'approved' ? (
                             <span className="text-green-600 font-medium">✓ Zatwierdzona</span>
-                          ) : reservation.contract_status || 'Brak'}
+                          ) : latestSignedContract?.status === 'rejected' ? (
+                            <span className="text-red-600">Odrzucona{latestSignedContract.client_message ? `: ${latestSignedContract.client_message}` : ''}</span>
+                          ) : latestSignedContract?.status === 'in_verification' ? (
+                            <span className="text-amber-600">W trakcie weryfikacji</span>
+                          ) : (
+                            reservation.contract_status || 'Brak'
+                          )}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
                         onClick={openContractHtmlPreview}
-                        className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200"
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 text-sm font-medium hover:bg-gray-200 cursor-pointer"
                         title="Podgląd umowy"
                       >
                         Podgląd
                       </button>
                       <button
                         onClick={openContractHtmlEditor}
-                        className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200"
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 text-sm font-medium hover:bg-gray-200 cursor-pointer"
                         title="Edytuj umowę"
                       >
                         Edytuj
@@ -1596,23 +1675,90 @@ export default function ReservationDetailPage() {
                       <button
                         onClick={() => contractUploadInputRef.current?.click()}
                         disabled={uploadingContract}
-                        className="px-2 py-1 bg-[#03adf0] text-white text-xs rounded hover:bg-[#0288c7] disabled:opacity-50"
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-[#03adf0] text-white text-sm font-medium hover:bg-[#0288c7] disabled:opacity-50 cursor-pointer"
                         title="Wgraj umowę"
                       >
-                        <Upload className="w-3 h-3 inline mr-1" />
+                        <Upload className="w-4 h-4 flex-shrink-0" />
                         {uploadingContract ? '...' : 'Wgraj'}
                       </button>
                     </div>
                   </div>
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-none border border-gray-200 flex-wrap gap-3">
+                    <span className="text-sm text-gray-700">
+                      {latestSignedContract
+                        ? `Podpisany dokument: ${latestSignedContract.status === 'accepted' ? 'Zaakceptowana' : latestSignedContract.status === 'rejected' ? `Odrzucona${latestSignedContract.client_message ? ` – ${latestSignedContract.client_message}` : ''}` : 'W trakcie weryfikacji'}`
+                        : 'Podpisany dokument: Brak podpisanego dokumentu do weryfikacji (po podpisie przez klienta pojawią się przyciski).'}
+                    </span>
+                    {latestSignedContract && (
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                          if (!reservation) return;
+                          openDocument(
+                            <ContractForm
+                              reservationId={reservation.id}
+                              reservationData={mapReservationToContractForm(reservation as unknown as ReservationData)}
+                              signedPayload={contractSignedPayload ?? undefined}
+                            />,
+                            'Podgląd umowy'
+                          );
+                        }}
+                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
+                        >
+                          <FileText className="w-4 h-4 flex-shrink-0" />
+                          Podgląd umowy
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await authenticatedApiCall(`/api/signed-documents/${latestSignedContract.id}`, {
+                                method: 'PATCH',
+                                body: JSON.stringify({ status: 'accepted' }),
+                              });
+                              window.location.reload();
+                            } catch (e) {
+                              alert(e instanceof Error ? e.message : 'Błąd akceptacji');
+                            }
+                          }}
+                          disabled={latestSignedContract.status === 'accepted'}
+                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        >
+                          <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                          Zaakceptuj umowę
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!latestSignedContract) return;
+                            openDocument(
+                              <RejectDocumentPanelContent
+                                documentId={latestSignedContract.id}
+                                onSuccess={() => {
+                                  closeRightPanel();
+                                  showSuccess('Umowa została odrzucona.');
+                                  window.location.reload();
+                                }}
+                                onCancel={closeRightPanel}
+                              />,
+                              'Odrzuć umowę'
+                            );
+                          }}
+                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors cursor-pointer"
+                        >
+                          <XCircle className="w-4 h-4 flex-shrink-0" />
+                          Odrzuć umowę
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   {contractFiles.length > 0 && (
                     <div className="space-y-1">
                       {contractFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-1.5 rounded text-xs">
+                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-2 rounded-none border border-gray-200 text-sm">
                           <span className="truncate">{file.file_name}</span>
                           <div className="flex gap-1">
-                            <button onClick={async () => { try { await contractService.downloadContractFile(file.id); } catch {} }} className="text-[#03adf0]"><Download className="w-3 h-3" /></button>
-                            <button onClick={async () => { try { await contractService.updateContractStatus(reservation.id, 'approved'); window.location.reload(); } catch {} }} disabled={reservation.contract_status === 'approved'} className="px-1.5 bg-green-600 text-white rounded disabled:opacity-50">✓</button>
-                            <button onClick={() => { setRejectingDocumentType('contract'); setRejectionReason(''); }} className="px-1.5 bg-red-600 text-white rounded">✗</button>
+                            <button onClick={async () => { try { await contractService.downloadContractFile(file.id); } catch {} }} className="inline-flex items-center justify-center p-2 rounded-none text-[#03adf0] hover:bg-gray-100 cursor-pointer" title="Pobierz"><Download className="w-4 h-4" /></button>
                           </div>
                         </div>
                       ))}
@@ -1629,9 +1775,15 @@ export default function ReservationDetailPage() {
                       <div>
                         <label className="text-xs font-medium text-gray-700">Karta kwalifikacyjna:</label>
                         <p className="text-sm text-gray-900">
-                          {reservation.qualification_card_status === 'approved' ? (
+                          {latestSignedCard?.status === 'accepted' || reservation.qualification_card_status === 'approved' ? (
                             <span className="text-green-600 font-medium">✓ Zatwierdzona</span>
-                          ) : reservation.qualification_card_status || 'Brak'}
+                          ) : latestSignedCard?.status === 'rejected' ? (
+                            <span className="text-red-600">Odrzucona{latestSignedCard.client_message ? `: ${latestSignedCard.client_message}` : ''}</span>
+                          ) : latestSignedCard?.status === 'in_verification' ? (
+                            <span className="text-amber-600">W trakcie weryfikacji</span>
+                          ) : (
+                            reservation.qualification_card_status || 'Brak'
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1663,23 +1815,91 @@ export default function ReservationDetailPage() {
                       <button
                         onClick={() => cardUploadInputRef.current?.click()}
                         disabled={uploadingCard}
-                        className="px-2 py-1 bg-[#03adf0] text-white text-xs rounded hover:bg-[#0288c7] disabled:opacity-50"
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-[#03adf0] text-white text-sm font-medium hover:bg-[#0288c7] disabled:opacity-50 cursor-pointer"
                         title="Wgraj kartę"
                       >
-                        <Upload className="w-3 h-3 inline mr-1" />
+                        <Upload className="w-4 h-4 flex-shrink-0" />
                         {uploadingCard ? '...' : 'Wgraj'}
                       </button>
                     </div>
                   </div>
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-none border border-gray-200 flex-wrap gap-3">
+                    <span className="text-sm text-gray-700">
+                      {latestSignedCard
+                        ? `Podpisany dokument: ${latestSignedCard.status === 'accepted' ? 'Zaakceptowana' : latestSignedCard.status === 'rejected' ? `Odrzucona${latestSignedCard.client_message ? ` – ${latestSignedCard.client_message}` : ''}` : 'W trakcie weryfikacji'}`
+                        : 'Podpisany dokument: Brak podpisanego dokumentu do weryfikacji (po podpisie przez klienta pojawią się przyciski).'}
+                    </span>
+                    {latestSignedCard && (
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                          if (!reservation) return;
+                          openDocument(
+                            <QualificationForm
+                              reservationId={reservation.id}
+                              reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
+                              signedPayload={qualificationCardSignedPayload ?? undefined}
+                              onSaveSuccess={(msg) => showSuccess(msg)}
+                            />,
+                            'Podgląd karty'
+                          );
+                        }}
+                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
+                        >
+                          <FileText className="w-4 h-4 flex-shrink-0" />
+                          Podgląd karty
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await authenticatedApiCall(`/api/signed-documents/${latestSignedCard.id}`, {
+                                method: 'PATCH',
+                                body: JSON.stringify({ status: 'accepted' }),
+                              });
+                              window.location.reload();
+                            } catch (e) {
+                              alert(e instanceof Error ? e.message : 'Błąd akceptacji');
+                            }
+                          }}
+                          disabled={latestSignedCard.status === 'accepted'}
+                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        >
+                          <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                          Zaakceptuj kartę
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!latestSignedCard) return;
+                            openDocument(
+                              <RejectDocumentPanelContent
+                                documentId={latestSignedCard.id}
+                                onSuccess={() => {
+                                  closeRightPanel();
+                                  showSuccess('Karta kwalifikacyjna została odrzucona.');
+                                  window.location.reload();
+                                }}
+                                onCancel={closeRightPanel}
+                              />,
+                              'Odrzuć kartę kwalifikacyjną'
+                            );
+                          }}
+                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors cursor-pointer"
+                        >
+                          <XCircle className="w-4 h-4 flex-shrink-0" />
+                          Odrzuć kartę
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   {cardFiles.length > 0 && (
                     <div className="space-y-1">
                       {cardFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-1.5 rounded text-xs">
+                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-2 rounded-none border border-gray-200 text-sm">
                           <span className="truncate">{file.file_name}</span>
                           <div className="flex gap-1">
-                            <button onClick={async () => { try { await qualificationCardService.downloadQualificationCardFile(file.id); } catch {} }} className="text-[#03adf0]"><Download className="w-3 h-3" /></button>
-                            <button onClick={async () => { try { await qualificationCardService.updateQualificationCardStatus(reservation.id, 'approved'); window.location.reload(); } catch {} }} disabled={reservation.qualification_card_status === 'approved'} className="px-1.5 bg-green-600 text-white rounded disabled:opacity-50">✓</button>
-                            <button onClick={() => { setRejectingDocumentType('card'); setRejectionReason(''); }} className="px-1.5 bg-red-600 text-white rounded">✗</button>
+                            <button onClick={async () => { try { await qualificationCardService.downloadQualificationCardFile(file.id); } catch {} }} className="inline-flex items-center justify-center p-2 rounded-none text-[#03adf0] hover:bg-gray-100 cursor-pointer" title="Pobierz"><Download className="w-4 h-4" /></button>
                           </div>
                         </div>
                       ))}
@@ -1687,9 +1907,39 @@ export default function ReservationDetailPage() {
                   )}
                 </div>
               </div>
+                </div>
+                <div className="w-80 xl:w-96 flex-shrink-0 flex flex-col min-h-0 border-l border-gray-200 pl-4">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-2 pb-2 border-b border-gray-100 flex-shrink-0">Wersje dokumentów z bazy</h3>
+                  <div className="overflow-y-auto min-h-0 flex-1 space-y-2 pr-1">
+                    {signedDocumentsList.length === 0 ? (
+                      <p className="text-sm text-gray-500 italic">Brak wpisów w bazie dla tej rezerwacji.</p>
+                    ) : (
+                      signedDocumentsList.map((doc) => (
+                        <div key={doc.id} className="bg-gray-50 rounded border border-gray-200 p-2 text-sm">
+                          <div className="font-medium text-gray-800">
+                            {doc.document_type === 'contract' ? 'Umowa' : doc.document_type === 'qualification_card' ? 'Karta kwalifikacyjna' : doc.document_type}
+                          </div>
+                          <div className="flex justify-between gap-1 mt-1 text-xs text-gray-600">
+                            <span>{formatDateTime(doc.created_at)}</span>
+                            <span className={
+                              doc.status === 'accepted' ? 'text-green-600' : doc.status === 'rejected' ? 'text-red-600' : 'text-amber-600'
+                            }>
+                              {doc.status === 'accepted' ? 'Zaakceptowana' : doc.status === 'rejected' ? 'Odrzucona' : 'W weryfikacji'}
+                            </span>
+                          </div>
+                          {doc.client_message && (
+                            <p className="text-xs text-gray-500 mt-1 truncate" title={doc.client_message}>{doc.client_message}</p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
+            )}
 
-            {/* Opiekunowie */}
+            {activePanel === 'dane' && (
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Opiekunowie</h2>
               {reservation.parents_data && Array.isArray(reservation.parents_data) && reservation.parents_data.length > 0 ? (
@@ -1719,9 +1969,12 @@ export default function ReservationDetailPage() {
                 <MissingInfo field="parents_data" />
               )}
             </div>
+            )}
 
+            {activePanel === 'inne' && (
+            <>
             {/* Ochrony */}
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Ochrony</h2>
               {reservation.selected_protection && reservation.selected_protection.length > 0 ? (
                 <div className="space-y-2">
@@ -1772,9 +2025,12 @@ export default function ReservationDetailPage() {
                 <p className="text-sm text-gray-500 italic">Nie wybrano</p>
               )}
             </div>
+            </>
+            )}
 
-            {/* Promocje */}
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+            {activePanel === 'promocje-transport' && (
+            <>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Promocje</h2>
               <div className="space-y-4">
                 <div className="flex items-center gap-3 flex-wrap">
@@ -1823,7 +2079,12 @@ export default function ReservationDetailPage() {
                   if (reservation.promotion_name) {
                     return (
                       <div>
-                        <p className="text-sm text-gray-900">{reservation.promotion_name}</p>
+                        <p className="text-sm text-gray-900 flex items-center justify-between gap-2">
+                          <span>{reservation.promotion_name}</span>
+                          {reservation.promotion_price != null && reservation.promotion_price !== undefined && (
+                            <span className="text-gray-700">{formatCurrency(reservation.promotion_price)}</span>
+                          )}
+                        </p>
                         <p className="text-sm text-gray-500 mt-1 italic">
                           (promocja nieaktywna - dane historyczne)
                         </p>
@@ -1848,7 +2109,7 @@ export default function ReservationDetailPage() {
                             setEditingJustification(true);
                             setJustificationError(null);
                           }}
-                          className="text-xs px-2 py-1 text-[#03adf0] hover:text-[#0288c7] hover:underline"
+                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium text-[#03adf0] hover:text-[#0288c7] hover:bg-gray-100 cursor-pointer"
                         >
                           Edytuj
                         </button>
@@ -2069,7 +2330,7 @@ export default function ReservationDetailPage() {
                               }
                             }}
                             disabled={savingJustification}
-                            className="px-3 py-1.5 text-xs bg-[#03adf0] text-white rounded hover:bg-[#0288c7] disabled:opacity-60"
+                            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-60 cursor-pointer"
                           >
                             {savingJustification ? 'Zapisywanie...' : 'Zapisz'}
                           </button>
@@ -2081,7 +2342,7 @@ export default function ReservationDetailPage() {
                               setJustificationError(null);
                             }}
                             disabled={savingJustification}
-                            className="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-60"
+                            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium border border-gray-300 hover:bg-gray-100 disabled:opacity-60 cursor-pointer"
                           >
                             Anuluj
                           </button>
@@ -2174,7 +2435,6 @@ export default function ReservationDetailPage() {
               </div>
             </div>
 
-            {/* Transport */}
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Transport</h2>
               <div className="space-y-2">
@@ -2204,9 +2464,12 @@ export default function ReservationDetailPage() {
                 )}
               </div>
             </div>
+            </>
+            )}
 
-            {/* Źródło */}
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+            {activePanel === 'inne' && (
+            <>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Źródło</h2>
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -2224,8 +2487,7 @@ export default function ReservationDetailPage() {
               </div>
             </div>
 
-            {/* Faktura */}
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Faktura</h2>
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -2281,9 +2543,11 @@ export default function ReservationDetailPage() {
                 )}
               </div>
             </div>
+            </>
+            )}
 
-            {/* Choroby i informacje zdrowotne */}
-            {(reservation.health_questions || reservation.health_details || reservation.additional_notes) && (
+            {activePanel === 'zdrowie' && (
+            (reservation.health_questions || reservation.health_details || reservation.additional_notes) ? (
               <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
                 <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Zdrowie</h2>
                 <div className="space-y-2">
@@ -2329,26 +2593,100 @@ export default function ReservationDetailPage() {
                   )}
                 </div>
               </div>
+            ) : (
+              <p className="text-sm text-gray-500">Brak informacji o zdrowiu</p>
+            )
             )}
 
-            {/* Informacje dodatkowe */}
-            {reservation.participant_additional_info && (
-              <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-                <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Informacje dodatkowe</h2>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded whitespace-pre-wrap">{reservation.participant_additional_info}</p>
+            {activePanel === 'informacje' && (
+            <>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Informacje dodatkowe dotyczące uczestnika</h2>
+              <textarea
+                value={participantAdditionalInfo}
+                onChange={(e) => setParticipantAdditionalInfo(e.target.value)}
+                placeholder="Opcjonalne – można uzupełnić z poziomu administracji"
+                className="w-full text-sm text-gray-900 border border-gray-300 rounded p-2 min-h-[80px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows={3}
+              />
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!reservation) return;
+                    setSavingParticipantAdditionalInfo(true);
+                    try {
+                      const result = await authenticatedApiCall<{ participant_additional_info: string | null }>(
+                        `/api/reservations/${reservation.id}/participant-additional-info`,
+                        {
+                          method: 'PATCH',
+                          body: JSON.stringify({
+                            participant_additional_info: participantAdditionalInfo.trim() || null,
+                          }),
+                        }
+                      );
+                      setReservation((prev) => prev ? { ...prev, participant_additional_info: result.participant_additional_info ?? null } : null);
+                      showSuccess('Informacje dodatkowe zostały zapisane.');
+                    } catch {
+                      showError('Nie udało się zapisać informacji dodatkowych.');
+                    } finally {
+                      setSavingParticipantAdditionalInfo(false);
+                    }
+                  }}
+                  disabled={savingParticipantAdditionalInfo}
+                  className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {savingParticipantAdditionalInfo ? 'Zapisywanie…' : 'Zapisz'}
+                </button>
               </div>
-            )}
+            </div>
 
-            {/* Prośba o zakwaterowanie */}
-            {reservation.accommodation_request && (
-              <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
-                <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Zakwaterowanie</h2>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{reservation.accommodation_request}</p>
-              </div>
-            )}
-
-            {/* Dieta */}
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Wniosek o zakwaterowanie uczestnika</h2>
+              <textarea
+                value={accommodationRequest}
+                onChange={(e) => setAccommodationRequest(e.target.value)}
+                placeholder="Opcjonalne – np. z kim dziecko chce być zakwaterowane"
+                className="w-full text-sm text-gray-900 border border-gray-300 rounded p-2 min-h-[80px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows={3}
+              />
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!reservation) return;
+                    setSavingAccommodationRequest(true);
+                    try {
+                      const result = await authenticatedApiCall<{ accommodation_request: string | null }>(
+                        `/api/reservations/${reservation.id}/accommodation-request`,
+                        {
+                          method: 'PATCH',
+                          body: JSON.stringify({
+                            accommodation_request: accommodationRequest.trim() || null,
+                          }),
+                        }
+                      );
+                      setReservation((prev) => prev ? { ...prev, accommodation_request: result.accommodation_request ?? null } : null);
+                      showSuccess('Wniosek o zakwaterowanie został zapisany.');
+                    } catch {
+                      showError('Nie udało się zapisać wniosku o zakwaterowanie.');
+                    } finally {
+                      setSavingAccommodationRequest(false);
+                    }
+                  }}
+                  disabled={savingAccommodationRequest}
+                  className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {savingAccommodationRequest ? 'Zapisywanie…' : 'Zapisz'}
+                </button>
+              </div>
+            </div>
+            </>
+            )}
+
+            {activePanel === 'inne' && (
+            <>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Dieta</h2>
               {reservation.diet ? (
                 <div className="space-y-2">
@@ -2405,7 +2743,122 @@ export default function ReservationDetailPage() {
                 </div>
               </div>
             </div>
+            </>
+            )}
 
+              </div>
+              </div>
+            </div>
+          </div>
+          </div>
+          {/* Rightbar – niezależny prawy pasek */}
+          <aside
+            role="complementary"
+            aria-label="Notatki i wydarzenia rezerwacji"
+            className="flex-shrink-0 w-full lg:w-[320px] xl:w-[360px] flex flex-col border-t lg:border-t-0 lg:border-l border-[#1d283d] rounded-none bg-[#1d283d] overflow-hidden min-h-[280px] lg:h-[calc(100vh-11rem)] lg:min-h-0 z-20"
+          >
+                <div className="p-3 min-h-[6rem] flex items-center border-b border-white/20 flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-white flex-shrink-0" />
+                    <div>
+                      <h2 className="text-sm font-semibold text-white leading-tight">Notatki wewnętrzne</h2>
+                      <span className="text-xs text-white/80 block mt-0.5">(tylko dla pracowników)</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-hidden flex flex-col min-h-0 min-w-0">
+                  <div className="flex-1 overflow-hidden flex flex-col min-h-0 p-3 bg-white">
+                  <div className="mb-2">
+                    <textarea
+                      value={newNoteContent}
+                      onChange={(e) => setNewNoteContent(e.target.value)}
+                      placeholder="Dodaj notatkę..."
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d283d] bg-white resize-none text-gray-900"
+                      rows={2}
+                    />
+                    <div className="flex justify-end mt-1">
+                      <button
+                        type="button"
+                        onClick={handleCreateNote}
+                        disabled={savingNote || !newNoteContent.trim()}
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-none text-sm font-medium bg-[#1d283d] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        {savingNote ? 'Dodawanie...' : 'Dodaj notatkę'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="overflow-y-auto flex-1 space-y-2 min-h-0 pr-1">
+                    {loadingNotes ? (
+                      <div className="text-sm text-gray-600 text-center py-3">Ładowanie notatek...</div>
+                    ) : notes.length === 0 ? (
+                      <div className="text-sm text-gray-500 text-center py-3 italic">Brak notatek</div>
+                    ) : (
+                      notes.map((note) => (
+                        <div key={note.id} className="bg-gray-50 rounded border border-gray-200 p-2">
+                          {editingNoteId === note.id ? (
+                            <div>
+                              <textarea
+                                value={editingNoteContent}
+                                onChange={(e) => setEditingNoteContent(e.target.value)}
+                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d283d] resize-none text-gray-900"
+                                rows={3}
+                              />
+                              <div className="flex justify-end gap-1 mt-1">
+                                <button type="button" onClick={cancelEditingNote} className="inline-flex items-center gap-2 px-2 py-1.5 rounded-none text-xs font-medium bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer">Anuluj</button>
+                                <button type="button" onClick={() => handleUpdateNote(note.id)} disabled={savingNote || !editingNoteContent.trim()} className="inline-flex items-center gap-2 px-2 py-1.5 rounded-none text-xs font-medium bg-[#1d283d] text-white hover:opacity-90 disabled:opacity-50 cursor-pointer">{savingNote ? 'Zapisywanie...' : 'Zapisz'}</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="flex items-start justify-between gap-1 mb-1">
+                                <div className="flex items-center gap-1 text-xs text-gray-700 min-w-0">
+                                  <User className="w-3 h-3 flex-shrink-0" />
+                                  <span className="font-medium truncate">{note.admin_user_name || note.admin_user_login || 'Administrator'}</span>
+                                  <span className="text-gray-500 flex-shrink-0">•</span>
+                                  <span className="truncate">{formatDateTime(note.created_at)}</span>
+                                </div>
+                                <div className="flex items-center gap-0.5 flex-shrink-0">
+                                  <button type="button" onClick={() => startEditingNote(note)} className="p-1 rounded-none text-[#1d283d] hover:bg-gray-200 cursor-pointer" title="Edytuj"><Edit className="w-3 h-3" /></button>
+                                  <button type="button" onClick={() => handleDeleteNote(note.id)} disabled={deletingNoteId === note.id} className="p-1 rounded-none text-red-600 hover:bg-red-50 disabled:opacity-50 cursor-pointer" title="Usuń"><Trash2 className="w-3 h-3" /></button>
+                                </div>
+                              </div>
+                              <p className="text-xs text-gray-800 whitespace-pre-wrap break-words">{note.content}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 flex flex-col border-t border-white/20 p-3 bg-[#1d283d] overflow-y-auto">
+                  <h3 className="text-sm font-semibold text-white mb-2">Zdarzenia klienta</h3>
+                  <div className="space-y-2 text-sm text-white/90">
+                    <div className="flex justify-between gap-2 py-1.5 border-b border-white/20">
+                      <span>Rezerwacja utworzona</span>
+                      <span className="text-white/70 whitespace-nowrap">{reservation?.created_at ? formatDateTime(reservation.created_at) : '–'}</span>
+                    </div>
+                    <div className="flex justify-between gap-2 py-1.5 border-b border-white/20">
+                      <span>Ostatnia aktualizacja</span>
+                      <span className="text-white/70 whitespace-nowrap">{reservation?.updated_at ? formatDateTime(reservation.updated_at) : '–'}</span>
+                    </div>
+                    <div className="flex justify-between gap-2 py-1.5 border-b border-white/20">
+                      <span>Umowa wysłana</span>
+                      <span className="text-white/70">–</span>
+                    </div>
+                    <div className="flex justify-between gap-2 py-1.5 border-b border-white/20">
+                      <span>Umowa podpisana</span>
+                      <span className="text-white/70">–</span>
+                    </div>
+                    <div className="flex justify-between gap-2 py-1.5">
+                      <span>Pierwsza wpłata</span>
+                      <span className="text-white/70">–</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-white/60 mt-2 italic">(lista zdarzeń – w przygotowaniu)</p>
+                </div>
+                </div>
+              </aside>
+            <>
             <UniversalModal
               isOpen={showPromotionModal}
               onClose={handleCancelPromotion}
@@ -2420,7 +2873,7 @@ export default function ReservationDetailPage() {
                   <button
                     type="button"
                     onClick={handleCancelPromotion}
-                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
+                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 cursor-pointer"
                   >
                     Wróć
                   </button>
@@ -2428,7 +2881,7 @@ export default function ReservationDetailPage() {
                     type="button"
                     onClick={handleConfirmPromotion}
                     disabled={savingPromotion}
-                    className="px-4 py-2 bg-[#03adf0] text-white rounded hover:bg-[#0288c7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {savingPromotion ? 'Zapisywanie...' : 'Zapisz'}
                   </button>
@@ -2474,8 +2927,7 @@ export default function ReservationDetailPage() {
                   <button
                     onClick={() => setShowDeleteModal(false)}
                     disabled={deletingReservation}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    style={{ borderRadius: 0 }}
+                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     Anuluj
                   </button>
@@ -2509,8 +2961,7 @@ export default function ReservationDetailPage() {
                       }
                     }}
                     disabled={deletingReservation}
-                    className="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    style={{ borderRadius: 0 }}
+                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {deletingReservation ? 'Archiwizowanie...' : 'Archiwizuj'}
                   </button>
@@ -2559,58 +3010,6 @@ export default function ReservationDetailPage() {
               </div>
             </UniversalModal>
 
-            {/* Modal odrzucenia */}
-            {rejectingDocumentType && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                  <h3 className="text-lg font-semibold mb-4">
-                    Odrzuć {rejectingDocumentType === 'contract' ? 'umowę' : 'kartę kwalifikacyjną'}
-                  </h3>
-                  <textarea
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    placeholder="Podaj uzasadnienie odrzucenia..."
-                    className="w-full h-32 p-2 border border-gray-300 rounded mb-4"
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={() => {
-                        setRejectingDocumentType(null);
-                        setRejectionReason('');
-                      }}
-                      className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-                    >
-                      Anuluj
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!rejectionReason.trim()) {
-                          alert('Podaj uzasadnienie odrzucenia');
-                          return;
-                        }
-                        try {
-                          if (rejectingDocumentType === 'contract') {
-                            await contractService.updateContractStatus(reservation!.id, 'rejected', rejectionReason);
-                          } else {
-                            await qualificationCardService.updateQualificationCardStatus(reservation!.id, 'rejected', rejectionReason);
-                          }
-                          alert(`Dokument został odrzucony. Email z uzasadnieniem został wysłany do klienta.`);
-                          setRejectingDocumentType(null);
-                          setRejectionReason('');
-                          window.location.reload();
-                        } catch (err) {
-                          alert(err instanceof Error ? err.message : 'Błąd podczas odrzucania dokumentu');
-                        }
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                    >
-                      Odrzuć
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <UniversalModal
               isOpen={showContractHtmlModal}
               onClose={() => {
@@ -2643,7 +3042,7 @@ export default function ReservationDetailPage() {
                       setShowContractHtmlModal(false);
                       setContractHtmlError(null);
                     }}
-                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 cursor-pointer"
                   >
                     Anuluj
                   </button>
@@ -2651,7 +3050,7 @@ export default function ReservationDetailPage() {
                     type="button"
                     onClick={handleSaveContractHtml}
                     disabled={savingContractHtml || loadingContractHtml}
-                    className="px-4 py-2 bg-[#03adf0] text-white rounded hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {savingContractHtml ? 'Zapisywanie...' : 'Zapisz'}
                   </button>
@@ -2859,7 +3258,7 @@ export default function ReservationDetailPage() {
                         setShowJustificationModal(false);
                         setJustificationError(null);
                       }}
-                      className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100"
+                      className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium border border-gray-300 hover:bg-gray-100 cursor-pointer"
                       disabled={savingJustification}
                     >
                       Anuluj
@@ -2867,7 +3266,7 @@ export default function ReservationDetailPage() {
                     <button
                       type="button"
                       onClick={handleSaveJustification}
-                      className="px-4 py-2 text-sm bg-[#03adf0] text-white rounded hover:bg-[#0288c7] disabled:opacity-60"
+                      className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                       disabled={savingJustification}
                     >
                       {savingJustification ? 'Zapisywanie...' : 'Zapisz'}
@@ -2876,10 +3275,7 @@ export default function ReservationDetailPage() {
                 </div>
               </div>
             )}
-
-            </div>
-
-          </div>
+            </>
         </div>
       </AdminLayout>
     </SectionGuard>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Search, ChevronUp, ChevronDown, Check, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, FileSpreadsheet, XCircle, RotateCcw, RefreshCw, Trash2, Columns, GripVertical, Filter, X as XIcon, Info, Calendar } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useState, useMemo, useEffect, Fragment, useCallback, useRef } from 'react';
 
@@ -16,6 +17,7 @@ import { getApiBaseUrlRuntime } from '@/utils/api-config';
  */
 interface SearchFilters {
   search: string;
+  phone: string;
   reservationNumber: string;
   paymentStatus: string;
   campName: string;
@@ -142,6 +144,7 @@ interface PaginatedPaymentsResponse {
 import PaymentConfirmationModal from './PaymentConfirmationModal';
 import RefundConfirmationModal from './RefundConfirmationModal';
 import UniversalModal from './UniversalModal';
+import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
 
 
 /**
@@ -874,10 +877,21 @@ const mapReservationToPaymentFormat = async (
     mp => mp.reservation_id === reservation.id,
   );
   const participantName = `${reservation.participant_first_name || ''} ${reservation.participant_last_name || ''}`.trim();
-  const firstParent = reservation.parents_data && reservation.parents_data.length > 0
-    ? reservation.parents_data[0]
-    : null;
-  const email = (firstParent && firstParent.email) ? firstParent.email : (reservation.invoice_email || '');
+  // Parse parents_data if string; support camelCase and snake_case
+  let parentsList: Array<Record<string, unknown>> = [];
+  const rawParents = reservation.parents_data;
+  if (Array.isArray(rawParents)) {
+    parentsList = rawParents as Array<Record<string, unknown>>;
+  } else if (typeof rawParents === 'string' && rawParents.trim()) {
+    try {
+      const parsed = JSON.parse(rawParents) as unknown;
+      parentsList = Array.isArray(parsed) ? (parsed as Array<Record<string, unknown>>) : [];
+    } catch {
+      parentsList = [];
+    }
+  }
+  const firstParent = parentsList.length > 0 ? parentsList[0] : null;
+  const email = (firstParent && ((firstParent.email as string) || (firstParent as Record<string, string>).email)) ? (firstParent.email as string) : (reservation.invoice_email || '');
   const campName = reservation.camp_name || 'Nieznany obóz';
   const tripName = reservation.property_name || `${reservation.property_period || ''} - ${reservation.property_city || ''}`.trim() || 'Nieznany turnus';
 
@@ -990,13 +1004,13 @@ const mapReservationToPaymentFormat = async (
 
   // === NEW FIELDS MAPPING ===
   
-  // Guardian data from parents_data (camelCase from backend)
+  // Guardian data from parents_data (camelCase or snake_case from backend)
   const guardian = firstParent;
-  const guardianName = guardian 
-    ? `${guardian.firstName || ''} ${guardian.lastName || ''}`.trim() || null 
+  const guardianName = guardian
+    ? `${(guardian.firstName as string) || (guardian.first_name as string) || ''} ${(guardian.lastName as string) || (guardian.last_name as string) || ''}`.trim() || null
     : null;
-  const guardianPhone = guardian?.phoneNumber || null;
-  const guardianEmail = guardian?.email || null;
+  const guardianPhone = (guardian?.phoneNumber as string) || (guardian?.phone_number as string) || (guardian?.phone as string) || null;
+  const guardianEmail = (guardian?.email as string) || (reservation.invoice_email as string) || null;
   
   // Location (period - city)
   const location = reservation.property_period && reservation.property_city
@@ -1141,19 +1155,160 @@ const mapReservationToPaymentFormat = async (
   };
 };
 
+/** Props dla treści prawego panelu „Wybierz kolumny” */
+interface ColumnPanelContentProps {
+  config: Array<{ key: string; visible: boolean; filters?: string[] }>;
+  columnDefinitions: Record<string, string>;
+  onToggle: (key: string) => void;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
+  onReset: () => void;
+  onSave: () => void;
+  onClose: () => void;
+  onDragStart: (index: number) => void;
+  onDragOver: (e: React.DragEvent, index: number) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent, index: number) => void;
+  draggedColumnIndex: number | null;
+  draggedOverIndex: number | null;
+}
+
+function ColumnPanelContent({
+  config,
+  columnDefinitions,
+  onToggle,
+  onSelectAll,
+  onDeselectAll,
+  onReset,
+  onSave,
+  onClose,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  draggedColumnIndex,
+  draggedOverIndex,
+}: ColumnPanelContentProps) {
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <span className="text-xs sm:text-sm font-medium text-gray-900">
+          Wybierz i przeciągnij aby zmienić kolejność
+        </span>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onSelectAll} className="text-xs text-[#03adf0] hover:text-[#0288c7] whitespace-nowrap">
+            Zaznacz wszystkie
+          </button>
+          <span className="text-gray-300">|</span>
+          <button type="button" onClick={onDeselectAll} className="text-xs text-[#03adf0] hover:text-[#0288c7] whitespace-nowrap">
+            Odznacz wszystkie
+          </button>
+          <span className="text-gray-300">|</span>
+          <button type="button" onClick={onReset} className="text-xs text-[#03adf0] hover:text-[#0288c7]">
+            Resetuj
+          </button>
+        </div>
+      </div>
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="max-h-[60vh] min-h-[280px] overflow-y-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2">
+            {config.map((col, index) => (
+              <div
+                key={col.key}
+                draggable
+                onDragStart={() => onDragStart(index)}
+                onDragOver={(e) => onDragOver(e, index)}
+                onDragLeave={onDragLeave}
+                onDrop={(e) => onDrop(e, index)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors ${
+                  draggedOverIndex === index ? 'bg-blue-100 ring-1 ring-blue-200' : ''
+                } ${draggedColumnIndex === index ? 'opacity-50' : ''} ${col.visible ? 'bg-blue-50/70' : ''}`}
+                style={{ cursor: 'grab' }}
+              >
+                <span
+                  className="flex items-center justify-center w-8 h-8 min-w-8 min-h-8 rounded bg-gray-200 text-gray-600 flex-shrink-0 cursor-grab hover:bg-gray-300 active:cursor-grabbing"
+                  title="Przeciągnij aby zmienić kolejność"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <GripVertical className="w-5 h-5" strokeWidth={2} />
+                </span>
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={col.visible}
+                  onClick={() => onToggle(col.key)}
+                  className={`w-6 h-6 min-w-6 min-h-6 rounded border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:ring-offset-1 ${
+                    col.visible ? 'bg-[#03adf0] border-[#03adf0]' : 'bg-white border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  {col.visible && <Check className="w-4 h-4 text-white stroke-[2.5]" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggle(col.key)}
+                  className="text-sm text-gray-900 flex-1 truncate text-left py-1 cursor-pointer hover:text-[#03adf0] focus:outline-none focus:ring-0"
+                  title={`${columnDefinitions[col.key] || col.key} — kliknij aby zaznaczyć/odznaczyć`}
+                >
+                  {columnDefinitions[col.key] || col.key}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors" style={{ borderRadius: 0 }}>
+          Anuluj
+        </button>
+        <button type="button" onClick={onSave} className="px-4 py-2 text-sm text-white bg-[#03adf0] hover:bg-[#0288c7] transition-colors" style={{ borderRadius: 0 }}>
+          Zapisz
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** Cel kliknięcia wiersza: rezerwacja (szczegóły rezerwacji) lub payment (szczegóły płatności). */
+export type TableDetailTarget = 'reservation' | 'payment';
+/** Moduł tabeli: osobne ustawienia kolumn w localStorage i w chmurze (np. reservations vs payments). */
+export type TableModule = 'reservations' | 'payments';
+
+export interface ReservationsTableNewProps {
+  /** Gdzie kierować po kliknięciu wiersza: rezerwacja lub płatności */
+  detailTarget?: TableDetailTarget;
+  /** Klucz modułu: osobna konfiguracja kolumn (localStorage + cloud) dla rezerwacji i płatności */
+  tableModule?: TableModule;
+}
+
 /**
- * Payments Management Component
- * Displays reservations with detailed payment information
+ * Wspólna tabela rezerwacji z płatnościami.
+ * Używana na /admin-panel (rezerwacje → szczegóły rezerwacji) i /admin-panel/payments (→ szczegóły płatności).
+ * Ustawienia kolumn są per tableModule (reservations_list_columns / payments_list_columns i w API).
  */
-export default function ReservationsTableNew() {
+export default function ReservationsTableNew(props: ReservationsTableNewProps = {}) {
+  const { detailTarget = 'reservation', tableModule = 'reservations' } = props;
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { showInfo, showSuccess, showError } = useToast();
+  const { openDocument, close: closeRightPanel } = useAdminRightPanel();
   const [reservations, setReservations] = useState<ReservationPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [rowContextMenu, setRowContextMenu] = useState<{ x: number; y: number; url: string } | null>(null);
+  const rowContextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!rowContextMenu) return;
+    const close = (e: MouseEvent) => {
+      if (rowContextMenuRef.current && !rowContextMenuRef.current.contains(e.target as Node)) {
+        setRowContextMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [rowContextMenu]);
   
   // Archive filter: 'active' = current reservations, 'archived' = archived, 'all' = both
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>(
@@ -1163,6 +1318,7 @@ export default function ReservationsTableNew() {
   // Initialize filters from URL params
   const getInitialFilters = useCallback((): SearchFilters => ({
     search: searchParams?.get('search') || '',
+    phone: searchParams?.get('phone') || '',
     reservationNumber: searchParams?.get('reservation') || '',
     paymentStatus: searchParams?.get('status') || '',
     campName: searchParams?.get('camp') || '',
@@ -1174,6 +1330,10 @@ export default function ReservationsTableNew() {
   const [filters, setFilters] = useState<SearchFilters>(getInitialFilters);
   // Applied filters (what's actually being searched)
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(getInitialFilters);
+  // Ref with latest filters so Enter applies current input values (avoids stale closure)
+  const filtersRef = useRef<SearchFilters>(getInitialFilters());
+  // Data rezerwacji: jedna data vs zakres
+  const [dateFilterMode, setDateFilterMode] = useState<'single' | 'range'>('range');
   
   // Track if initial URL sync has been done
   const initialSyncDoneRef = useRef(false);
@@ -1202,11 +1362,13 @@ export default function ReservationsTableNew() {
     });
     const hasColumnFilters = Object.keys(columnFiltersFromUrl).length > 0;
     
-    const hasUrlFilters = searchFromUrl || reservationFromUrl || statusFromUrl || campFromUrl || dateFromUrl || dateToUrl || archiveFromUrl || hasColumnFilters;
+    const phoneFromUrl = searchParams?.get('phone') || '';
+    const hasUrlFilters = searchFromUrl || phoneFromUrl || reservationFromUrl || statusFromUrl || campFromUrl || dateFromUrl || dateToUrl || archiveFromUrl || hasColumnFilters;
     
     if (hasUrlFilters) {
       const urlFilters: SearchFilters = {
         search: searchFromUrl,
+        phone: phoneFromUrl,
         reservationNumber: reservationFromUrl,
         paymentStatus: statusFromUrl,
         campName: campFromUrl,
@@ -1215,6 +1377,12 @@ export default function ReservationsTableNew() {
       };
       setFilters(urlFilters);
       setAppliedFilters(urlFilters);
+      filtersRef.current = urlFilters;
+      if (dateFromUrl && dateToUrl && dateFromUrl === dateToUrl) {
+        setDateFilterMode('single');
+      } else if (dateFromUrl || dateToUrl) {
+        setDateFilterMode('range');
+      }
       
       // Set archive filter from URL
       if (archiveFromUrl) {
@@ -1294,6 +1462,7 @@ export default function ReservationsTableNew() {
   // Applied column filters - JSON string to trigger refetch only when filters actually change
   // This prevents modal from flickering when columnConfig updates
   const [appliedColumnFilters, setAppliedColumnFilters] = useState<string>('{}');
+  const [appliedColumnFiltersExclude, setAppliedColumnFiltersExclude] = useState<string>('{}');
 
   // State dla alertu o zmianach w płatnościach
   const [paymentChangesAlert, setPaymentChangesAlert] = useState<{
@@ -1304,30 +1473,27 @@ export default function ReservationsTableNew() {
     changedCount: 0,
   });
 
-  // Update URL with current filters
+  // Update URL with current filters (include and exclude column filters)
   const updateURL = useCallback((
-    newFilters: SearchFilters, 
-    page: number, 
+    newFilters: SearchFilters,
+    page: number,
     archive?: 'active' | 'archived' | 'all',
-    columnFilters?: string
+    columnFilters?: string,
+    columnFiltersExclude?: string
   ) => {
     const params = new URLSearchParams();
-    
-    // Search filters
+
     if (newFilters.search) params.set('search', newFilters.search);
+    if (newFilters.phone) params.set('phone', newFilters.phone);
     if (newFilters.reservationNumber) params.set('reservation', newFilters.reservationNumber);
     if (newFilters.paymentStatus) params.set('status', newFilters.paymentStatus);
     if (newFilters.campName) params.set('camp', newFilters.campName);
     if (newFilters.dateFrom) params.set('date_from', newFilters.dateFrom);
     if (newFilters.dateTo) params.set('date_to', newFilters.dateTo);
-    
-    // Pagination
+
     if (page > 1) params.set('page', page.toString());
-    
-    // Archive filter (only if not default 'active')
     if (archive && archive !== 'active') params.set('archive', archive);
-    
-    // Column filters (parse JSON and add each as separate param)
+
     if (columnFilters && columnFilters !== '{}') {
       try {
         const parsed = JSON.parse(columnFilters);
@@ -1337,32 +1503,49 @@ export default function ReservationsTableNew() {
           }
         });
       } catch (e) {
-        // Ignore parse errors
+        // ignore
       }
     }
-    
+    if (columnFiltersExclude && columnFiltersExclude !== '{}') {
+      try {
+        const parsed = JSON.parse(columnFiltersExclude);
+        Object.entries(parsed).forEach(([colKey, values]) => {
+          if (Array.isArray(values) && values.length > 0) {
+            params.set(`filter_${colKey}_exclude`, values.join(','));
+          }
+        });
+      } catch (e) {
+        // ignore
+      }
+    }
+
     const queryString = params.toString();
-    const newUrl = queryString 
-      ? `${window.location.pathname}?${queryString}`
-      : window.location.pathname;
-    
+    const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
     window.history.replaceState({}, '', newUrl);
   }, []);
 
   // Filter change handler - only updates local state, search happens on Enter or button click
   const handleFilterChange = useCallback((field: keyof SearchFilters, value: string) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
+    setFilters(prev => {
+      const next = { ...prev, [field]: value };
+      filtersRef.current = next;
+      return next;
+    });
     // No automatic search - user must press Enter or click Search button
   }, []);
 
-  // Immediate search (for Enter key or button click)
+  // Immediate search (for Enter key or button click) – uses ref so Enter gets latest typed values
   const handleImmediateSearch = useCallback(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
     setCurrentPage(1);
-    setAppliedFilters(filters);
-  }, [filters]);
+    const next = { ...filtersRef.current };
+    if (dateFilterMode === 'single' && next.dateFrom) {
+      next.dateTo = next.dateFrom;
+    }
+    setAppliedFilters(next);
+  }, [dateFilterMode]);
 
   // Handle Enter key in search inputs
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
@@ -1375,6 +1558,7 @@ export default function ReservationsTableNew() {
   const handleClearFilters = useCallback(() => {
     const emptyFilters: SearchFilters = {
       search: '',
+      phone: '',
       reservationNumber: '',
       paymentStatus: '',
       campName: '',
@@ -1383,16 +1567,17 @@ export default function ReservationsTableNew() {
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
+    filtersRef.current = emptyFilters;
     setCurrentPage(1);
   }, []);
 
   // Check if any filters are active
   const hasActiveFilters = Object.values(appliedFilters).some(v => v !== '');
 
-  // Update URL when any filter changes (search filters, page, archive, column filters)
+  // Update URL when any filter changes (search filters, page, archive, column filters + exclude)
   useEffect(() => {
-    updateURL(appliedFilters, currentPage, archiveFilter, appliedColumnFilters);
-  }, [appliedFilters, currentPage, archiveFilter, appliedColumnFilters, updateURL]);
+    updateURL(appliedFilters, currentPage, archiveFilter, appliedColumnFilters, appliedColumnFiltersExclude);
+  }, [appliedFilters, currentPage, archiveFilter, appliedColumnFilters, appliedColumnFiltersExclude, updateURL]);
 
   // Sync currentPage with URL params on mount and when searchParams change
   useEffect(() => {
@@ -1408,7 +1593,7 @@ export default function ReservationsTableNew() {
     }
   }, [searchParams]);
 
-  // Update URL when currentPage changes
+  // Update URL when currentPage changes (zachowaj bieżącą ścieżkę: /admin-panel lub /admin-panel/payments)
   const updatePageInUrl = (page: number) => {
     const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
     if (page === 1) {
@@ -1416,7 +1601,8 @@ export default function ReservationsTableNew() {
     } else {
       params.set('page', page.toString());
     }
-    const newUrl = params.toString() ? `/admin-panel?${params.toString()}` : '/admin-panel';
+    const basePath = pathname?.split('?')[0] || '/admin-panel';
+    const newUrl = params.toString() ? `${basePath}?${params.toString()}` : basePath;
     router.replace(newUrl);
   };
 
@@ -1443,20 +1629,22 @@ export default function ReservationsTableNew() {
     }
   };
 
-  // Column configuration state
-  const STORAGE_KEY = 'reservations_list_columns';
+  // Column configuration state (per tableModule: osobne ustawienia dla rezerwacji i płatności)
+  const STORAGE_KEY = tableModule === 'payments' ? 'payments_list_columns' : 'reservations_list_columns';
 
-  // Column configuration: array of {key, visible, filters?}
+  // Column configuration: array of {key, visible, filters?, exclude?}
   interface ColumnConfig {
     key: string;
     visible: boolean;
-    filters?: string[]; // Selected filter values for this column
+    filters?: string[]; // Selected filter values (include)
+    exclude?: string[]; // "All except" mode: values to exclude
   }
 
-  // Column definitions with labels
+  // Definicje i kolejność kolumn tabeli rezerwacji – wyłącznie poniższe 34 kolumny.
   const COLUMN_DEFINITIONS: Record<string, string> = {
     reservationName: 'Numer rezerwacji',
     participantName: 'Uczestnik',
+    guardianEmail: 'E-mail',
     totalAmount: 'Kwota całkowita',
     paidAmount: 'Całkowite wpłaty',
     remainingAmount: 'Pozostało do zapłaty',
@@ -1470,7 +1658,6 @@ export default function ReservationsTableNew() {
     participantCity: 'Miasto',
     guardianName: 'Opiekun 1',
     guardianPhone: 'Telefon',
-    guardianEmail: 'E-mail',
     campName: 'Nazwa obozu',
     location: 'Lokalizacja',
     propertyTag: 'Tag turnusu',
@@ -1487,15 +1674,19 @@ export default function ReservationsTableNew() {
     qualificationCardStatus: 'Karta kwalifikacyjna',
     contractStatus: 'Umowa',
     status: 'Status wpłaty',
-    // Stare kolumny (dla kompatybilności z localStorage)
-    protectionNames: 'Ochrona',
     depositAmount: 'Zaliczka',
   };
 
-  // Default column order and visibility (zgodnie z zadaniem)
-  const DEFAULT_COLUMN_ORDER = [
+  // Kolejność domyślna: rezerwacja → uczestnik → opiekun → płatności → obóz → transport → usługi dodatkowe → dokumenty
+  const DEFAULT_COLUMN_ORDER: (keyof typeof COLUMN_DEFINITIONS)[] = [
     'reservationName',
+    'createdAt',
     'participantName',
+    'participantAge',
+    'participantCity',
+    'guardianName',
+    'guardianPhone',
+    'guardianEmail',
     'totalAmount',
     'paidAmount',
     'remainingAmount',
@@ -1505,16 +1696,12 @@ export default function ReservationsTableNew() {
     'payment2Date',
     'payment3Amount',
     'payment3Date',
-    'participantAge',
-    'participantCity',
-    'guardianName',
-    'guardianPhone',
-    'guardianEmail',
+    'status',
+    'depositAmount',
     'campName',
     'location',
     'propertyTag',
     'promotionName',
-    'createdAt',
     'transportDeparture',
     'transportReturn',
     'hasOaza',
@@ -1525,21 +1712,28 @@ export default function ReservationsTableNew() {
     'hasTermy',
     'qualificationCardStatus',
     'contractStatus',
-    'status',
   ];
   const DEFAULT_COLUMNS = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true }));
 
   const [columnConfig, setColumnConfig] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [columnModalOpen, setColumnModalOpen] = useState(false);
+  const [resetColumnsModalOpen, setResetColumnsModalOpen] = useState(false);
   const [tempColumnConfig, setTempColumnConfig] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
 
   // Filter dropdown state: which column has filter dropdown open
   const [openFilterColumn, setOpenFilterColumn] = useState<string | null>(null);
-  
-  // Frozen filter options - captured when modal opens to prevent "jumping"
+  // Ref so fetch effect can skip full-page loading when modal is open (prevents modal blink)
+  const filterModalOpenRef = useRef<boolean>(false);
+  filterModalOpenRef.current = !!openFilterColumn;
+
+  // Frozen filter options - captured when modal opens; appended on "load more"
   const [frozenFilterOptions, setFrozenFilterOptions] = useState<string[]>([]);
+  const [filterModalHasMore, setFilterModalHasMore] = useState<boolean>(false);
+  const [filterModalOffset, setFilterModalOffset] = useState<number>(0);
+  const [isFilterLoadingMore, setIsFilterLoadingMore] = useState<boolean>(false);
+  const filterModalScrollRef = useRef<HTMLDivElement>(null);
   
   // Filter search state (for searching within filter modal)
   const [filterSearchQuery, setFilterSearchQuery] = useState<string>('');
@@ -1548,7 +1742,20 @@ export default function ReservationsTableNew() {
   const filterSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveToCloudTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [cloudSettingsLoaded, setCloudSettingsLoaded] = useState<boolean>(false);
-  
+
+  // Header quick-filter input per column (uses filter-search endpoint)
+  const [columnHeaderFilterInput, setColumnHeaderFilterInput] = useState<Record<string, string>>({});
+  // Która kolumna ma otwarty popover z powiększonym inputem (klik w pole pod ikoną filtra)
+  const [expandedFilterInputColumn, setExpandedFilterInputColumn] = useState<string | null>(null);
+  const headerFilterThRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+  const [headerFilterPopoverRect, setHeaderFilterPopoverRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const headerFilterPopoverInputRef = useRef<HTMLInputElement>(null);
+
+  // Normalize phone for filter API: digits only (e.g. +48 735 048 660 -> 48735048660)
+  const normalizePhoneForFilter = (raw: string): string => {
+    return (raw || '').replace(/\D/g, '');
+  };
+
   // Check if column is an amount/money column
   const isAmountColumn = (columnKey: string): boolean => {
     return ['totalAmount', 'paidAmount', 'remainingAmount', 'payment1Amount', 'payment2Amount', 'payment3Amount', 'depositAmount'].includes(columnKey);
@@ -1566,35 +1773,45 @@ export default function ReservationsTableNew() {
   // Load column configuration from cloud (priority) or localStorage (fallback)
   useEffect(() => {
     const loadColumnConfig = async () => {
-      // Helper to merge config with defaults
+      // Kolejność i widoczność = z zapisanej konfiguracji (localStorage/cloud). Dozwolone tylko kolumny z DEFAULT_COLUMN_ORDER (34 kolumny).
+      // Z zapisu brane są wyłącznie klucze z listy domyślnej; brakujące dopinane na końcu.
+      const allowedKeys = new Set(DEFAULT_COLUMN_ORDER);
       const mergeWithDefaults = (parsed: any[]): ColumnConfig[] => {
-        const savedKeys = new Set(parsed.map((col: { key: string }) => col.key));
-        const merged: ColumnConfig[] = parsed.map((col: any) => ({
-          key: col.key,
-          visible: col.visible !== false,
-          filters: col.filters || [],
+        const savedList = Array.isArray(parsed) ? parsed : [];
+        const seenKeys = new Set<string>();
+        const fromSaved: ColumnConfig[] = savedList
+          .filter((col: any) => col && col.key && allowedKeys.has(col.key))
+          .map((col: any) => {
+            seenKeys.add(col.key);
+            return {
+              key: col.key,
+              visible: col.visible !== false,
+              filters: Array.isArray(col.filters) ? col.filters : [],
+            };
+          });
+        const missingFromDefault = DEFAULT_COLUMN_ORDER.filter(key => !seenKeys.has(key));
+        const appended = missingFromDefault.map(key => ({
+          key,
+          visible: true,
+          filters: [] as string[],
         }));
-        DEFAULT_COLUMN_ORDER.forEach(key => {
-          if (!savedKeys.has(key)) {
-            merged.push({ key, visible: true, filters: [] });
-          }
-        });
-        return merged;
+        return [...fromSaved, ...appended];
       };
 
-      // Try to load from cloud first
+      // Try to load from cloud first (per tableModule: reservations_columns_config vs payments_columns_config)
       try {
         const cloudSettings = await authenticatedApiCall<{
           reservations_columns_config?: string | null;
+          payments_columns_config?: string | null;
         }>('/api/admin-users/me/settings');
-        
-        if (cloudSettings.reservations_columns_config) {
-          const parsed = JSON.parse(cloudSettings.reservations_columns_config);
+        const cloudKey = tableModule === 'payments' ? 'payments_columns_config' : 'reservations_columns_config';
+        const cloudJson = cloudSettings[cloudKey];
+        if (cloudJson) {
+          const parsed = JSON.parse(cloudJson);
           if (Array.isArray(parsed)) {
             const merged = mergeWithDefaults(parsed);
             setColumnConfig(merged);
             setTempColumnConfig([...merged]);
-            // Also update localStorage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
             setCloudSettingsLoaded(true);
             return;
@@ -1631,54 +1848,61 @@ export default function ReservationsTableNew() {
     };
 
     loadColumnConfig();
-  }, []);
+  }, [tableModule]);
 
-  // Load filters from URL (highest priority - overrides cloud settings)
-  // Also apply cloud filters when loaded and no URL filters
+  // Load filters from URL (include and exclude)
   useEffect(() => {
     if (!cloudSettingsLoaded) return;
 
     const filtersFromUrl: Record<string, string[]> = {};
+    const excludeFromUrl: Record<string, string[]> = {};
     if (searchParams) {
       searchParams.forEach((value, key) => {
         if (key.startsWith('filter_')) {
-          const columnKey = key.replace('filter_', '');
-          filtersFromUrl[columnKey] = value.split(',').filter(v => v);
+          if (key.endsWith('_exclude')) {
+            const columnKey = key.replace('filter_', '').replace('_exclude', '');
+            excludeFromUrl[columnKey] = value.split(',').filter(v => v);
+          } else {
+            const columnKey = key.replace('filter_', '');
+            filtersFromUrl[columnKey] = value.split(',').filter(v => v);
+          }
         }
       });
     }
 
-    // If URL has filters, apply them (highest priority)
-    if (Object.keys(filtersFromUrl).length > 0) {
-      setColumnConfig(prev => {
-        return prev.map(col => {
-          if (filtersFromUrl[col.key]) {
-            return { ...col, filters: filtersFromUrl[col.key] };
-          }
-          return col;
-        });
-      });
+    const hasUrlFilters = Object.keys(filtersFromUrl).length > 0 || Object.keys(excludeFromUrl).length > 0;
+    if (hasUrlFilters) {
+      setColumnConfig(prev => prev.map(col => ({
+        ...col,
+        filters: filtersFromUrl[col.key] || [],
+        exclude: excludeFromUrl[col.key] || [],
+      })));
       setAppliedColumnFilters(JSON.stringify(filtersFromUrl));
+      setAppliedColumnFiltersExclude(JSON.stringify(excludeFromUrl));
     } else {
-      // No URL filters - use filters from cloud/localStorage (already loaded in columnConfig)
       const filtersFromConfig: Record<string, string[]> = {};
+      const excludeFromConfig: Record<string, string[]> = {};
       columnConfig.forEach(col => {
-        if (col.filters && col.filters.length > 0) {
-          filtersFromConfig[col.key] = col.filters;
-        }
+        if (col.exclude && col.exclude.length > 0) excludeFromConfig[col.key] = col.exclude;
+        else if (col.filters && col.filters.length > 0) filtersFromConfig[col.key] = col.filters;
       });
-      if (Object.keys(filtersFromConfig).length > 0) {
+      if (Object.keys(filtersFromConfig).length > 0 || Object.keys(excludeFromConfig).length > 0) {
         setAppliedColumnFilters(JSON.stringify(filtersFromConfig));
-        // URL is updated automatically via useEffect
+        setAppliedColumnFiltersExclude(JSON.stringify(excludeFromConfig));
       }
     }
   }, [cloudSettingsLoaded]);
 
-  // Save column configuration to localStorage and cloud (debounced)
+  // Save column configuration to localStorage and cloud (debounced). Zapisujemy tylko dozwolone 34 kolumny; w stanie dopinamy brakujące.
   const saveColumnPreferences = (config: ColumnConfig[]) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-      setColumnConfig([...config]);
+      const allowedSet = new Set(DEFAULT_COLUMN_ORDER);
+      const toPersist = config.filter(c => c.key && allowedSet.has(c.key));
+      const seen = new Set(toPersist.map(c => c.key));
+      const appended = DEFAULT_COLUMN_ORDER.filter(k => !seen.has(k)).map(key => ({ key, visible: true, filters: [] as string[] }));
+      const fullConfig = [...toPersist, ...appended];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toPersist));
+      setColumnConfig([...fullConfig]);
       
       // Debounced save to cloud (1 second delay)
       if (saveToCloudTimeoutRef.current) {
@@ -1686,12 +1910,13 @@ export default function ReservationsTableNew() {
       }
       saveToCloudTimeoutRef.current = setTimeout(async () => {
         try {
+          const payload = tableModule === 'payments'
+            ? { payments_columns_config: JSON.stringify(toPersist) }
+            : { reservations_columns_config: JSON.stringify(toPersist) };
           await authenticatedApiCall('/api/admin-users/me/settings', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              reservations_columns_config: JSON.stringify(config),
-            }),
+            body: JSON.stringify(payload),
           });
         } catch (err) {
           console.warn('Could not save column preferences to cloud:', err);
@@ -1827,9 +2052,6 @@ export default function ReservationsTableNew() {
           };
           value = statusMapForFilter[reservation.paymentStatus] || reservation.paymentStatus;
           break;
-        case 'protectionNames':
-          value = reservation.protectionNames || '-';
-          break;
         case 'depositAmount':
           value = reservation.depositAmount ? reservation.depositAmount.toFixed(2) : '-';
           break;
@@ -1841,39 +2063,57 @@ export default function ReservationsTableNew() {
     return Array.from(values).sort();
   };
 
-  // Handle filter toggle for a column value
+  // Handle filter toggle: check/uncheck. When "all" selected and user unchecks one → switch to "all except" mode.
   const handleFilterToggle = (columnKey: string, value: string) => {
-    const updated = columnConfig.map(col => {
-      if (col.key === columnKey) {
-        const filters = col.filters || [];
-        const newFilters = filters.includes(value)
-          ? filters.filter(f => f !== value)
-          : [...filters, value];
-        return { ...col, filters: newFilters };
+    const displayed = getFilterDisplayValues(columnKey);
+    const col = columnConfig.find(c => c.key === columnKey);
+    const filters = col?.filters || [];
+    const exclude = col?.exclude || [];
+    const isChecked = exclude.length > 0 ? !exclude.includes(value) : filters.includes(value);
+
+    let updated: ColumnConfig[];
+    if (exclude.length > 0) {
+      // Already in "all except" mode
+      if (isChecked) {
+        updated = columnConfig.map(c => c.key === columnKey ? { ...c, exclude: exclude.filter(x => x !== value) } : c);
+      } else {
+        updated = columnConfig.map(c => c.key === columnKey ? { ...c, exclude: [...exclude, value] } : c);
       }
-      return col;
-    });
+    } else {
+      if (isChecked) {
+        const newFilters = filters.filter(f => f !== value);
+        const switchingToExclude = filters.length === displayed.length && filters.length > 0;
+        if (switchingToExclude) {
+          updated = columnConfig.map(c => c.key === columnKey ? { ...c, filters: [], exclude: [value] } : c);
+        } else {
+          updated = columnConfig.map(c => c.key === columnKey ? { ...c, filters: newFilters } : c);
+        }
+      } else {
+        updated = columnConfig.map(c => c.key === columnKey ? { ...c, filters: [...filters, value] } : c);
+      }
+    }
     setColumnConfig(updated);
     saveColumnPreferences(updated);
 
-    // Build filters object for API
     const filtersForApi: Record<string, string[]> = {};
-    updated.forEach(col => {
-      if (col.filters && col.filters.length > 0) {
-        filtersForApi[col.key] = col.filters;
+    const excludeForApi: Record<string, string[]> = {};
+    updated.forEach(c => {
+      if (c.exclude && c.exclude.length > 0) {
+        excludeForApi[c.key] = c.exclude;
+      } else if (c.filters && c.filters.length > 0) {
+        filtersForApi[c.key] = c.filters;
       }
     });
-    
-    // Update applied column filters to trigger API refetch (URL updated via useEffect)
     setAppliedColumnFilters(JSON.stringify(filtersForApi));
+    setAppliedColumnFiltersExclude(JSON.stringify(excludeForApi));
     setCurrentPage(1);
   };
 
-  // Clear all filters for a column
+  // Clear all filters for a column (include and exclude)
   const handleClearColumnFilters = (columnKey: string) => {
     const updated = columnConfig.map(col => {
       if (col.key === columnKey) {
-        return { ...col, filters: [] };
+        return { ...col, filters: [], exclude: [] };
       }
       return col;
     });
@@ -1881,50 +2121,66 @@ export default function ReservationsTableNew() {
     saveColumnPreferences(updated);
 
     const filtersForApi: Record<string, string[]> = {};
+    const excludeForApi: Record<string, string[]> = {};
     updated.forEach(col => {
-      if (col.filters && col.filters.length > 0) {
-        filtersForApi[col.key] = col.filters;
-      }
+      if (col.exclude && col.exclude.length > 0) excludeForApi[col.key] = col.exclude;
+      else if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.filters;
     });
-    
-    // Update applied column filters to trigger API refetch (URL updated via useEffect)
     setAppliedColumnFilters(JSON.stringify(filtersForApi));
+    setAppliedColumnFiltersExclude(JSON.stringify(excludeForApi));
+    setColumnHeaderFilterInput(prev => ({ ...prev, [columnKey]: '' }));
     setCurrentPage(1);
   };
 
-  // Search filter values in backend (debounced)
-  const handleFilterSearch = async (query: string, columnKey: string) => {
-    // Clear previous timeout
+  // Run modal filter search (shared by debounced onChange and Enter key)
+  const runModalFilterSearch = useCallback(async (query: string, columnKey: string | null) => {
+    if (!query.trim() || !columnKey) {
+      setFilterSearchResults([]);
+      setIsFilterSearching(false);
+      return;
+    }
+    setIsFilterSearching(true);
+    try {
+      const q = columnKey === 'guardianPhone' ? normalizePhoneForFilter(query) : query.trim();
+      const response = await authenticatedApiCall<{ results: string[]; total: number }>(
+        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(q)}&limit=50`
+      );
+      setFilterSearchResults(response.results || []);
+    } catch (err) {
+      console.error('Filter search error:', err);
+      setFilterSearchResults([]);
+    } finally {
+      setIsFilterSearching(false);
+    }
+  }, []);
+
+  // Search filter values in backend (debounced); Enter runs immediately
+  const handleFilterSearch = (query: string, columnKey: string | null) => {
     if (filterSearchTimeoutRef.current) {
       clearTimeout(filterSearchTimeoutRef.current);
+      filterSearchTimeoutRef.current = null;
     }
-    
     setFilterSearchQuery(query);
-    
-    // If query is empty, clear results
     if (!query.trim()) {
       setFilterSearchResults([]);
       setIsFilterSearching(false);
       return;
     }
-    
-    // Set searching state
-    setIsFilterSearching(true);
-    
-    // Debounce: wait 500ms after user stops typing
-    filterSearchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const response = await authenticatedApiCall<{ results: string[]; total: number }>(
-          `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(query)}&limit=50`
-        );
-        setFilterSearchResults(response.results);
-      } catch (err) {
-        console.error('Filter search error:', err);
-        setFilterSearchResults([]);
-      } finally {
-        setIsFilterSearching(false);
-      }
+    filterSearchTimeoutRef.current = setTimeout(() => {
+      filterSearchTimeoutRef.current = null;
+      runModalFilterSearch(query, columnKey);
     }, 500);
+  };
+
+  const handleModalFilterSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && openFilterColumn) {
+      if (filterSearchTimeoutRef.current) {
+        clearTimeout(filterSearchTimeoutRef.current);
+        filterSearchTimeoutRef.current = null;
+      }
+      const value = (e.currentTarget as HTMLInputElement).value;
+      runModalFilterSearch(value, openFilterColumn);
+    }
   };
   
   // Reset filter search when modal closes
@@ -1939,12 +2195,98 @@ export default function ReservationsTableNew() {
     }
   };
   
-  // Open filter modal and freeze options to prevent jumping
-  const handleOpenFilterModal = (columnKey: string) => {
-    // Freeze current options to prevent modal from "jumping" during data reload
-    const currentOptions = getUniqueColumnValues(columnKey);
-    setFrozenFilterOptions(currentOptions);
+  // Open filter modal: load first 10 unique values from DB
+  const handleOpenFilterModal = async (columnKey: string) => {
     setOpenFilterColumn(columnKey);
+    setFilterSearchQuery('');
+    setFilterSearchResults([]);
+    setFrozenFilterOptions([]);
+    setFilterModalOffset(0);
+    setFilterModalHasMore(false);
+    setIsFilterSearching(true);
+    try {
+      const response = await authenticatedApiCall<{ results: string[]; total: number; has_more: boolean }>(
+        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=&limit=10&offset=0`
+      );
+      setFrozenFilterOptions(response.results || []);
+      setFilterModalHasMore(response.has_more ?? false);
+      setFilterModalOffset(10);
+    } catch (err) {
+      console.error('Filter initial load error:', err);
+      setFrozenFilterOptions([]);
+    } finally {
+      setIsFilterSearching(false);
+    }
+  };
+
+  // Load next 10 options in filter modal (dynamic load more)
+  const handleLoadMoreFilterOptions = async () => {
+    if (!openFilterColumn || isFilterLoadingMore) return;
+    setIsFilterLoadingMore(true);
+    try {
+      const query = openFilterColumn === 'guardianPhone' ? normalizePhoneForFilter(filterSearchQuery) : filterSearchQuery.trim();
+      const response = await authenticatedApiCall<{ results: string[]; has_more: boolean }>(
+        `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=10&offset=${filterModalOffset}`
+      );
+      const newResults = response.results || [];
+      setFrozenFilterOptions(prev => [...prev, ...newResults]);
+      setFilterModalHasMore(response.has_more ?? false);
+      setFilterModalOffset(prev => prev + newResults.length);
+    } catch (err) {
+      console.error('Filter load more error:', err);
+    } finally {
+      setIsFilterLoadingMore(false);
+    }
+  };
+
+  // "Zaznacz wszystkie" = fetch ALL unique values from DB and select them
+  const handleSelectAllFilterValuesFromDb = async () => {
+    if (!openFilterColumn) return;
+    setIsFilterSearching(true);
+    try {
+      const allResults: string[] = [];
+      let offset = 0;
+      const limit = 100;
+      let hasMore = true;
+      const query = openFilterColumn === 'guardianPhone' ? normalizePhoneForFilter(filterSearchQuery) : filterSearchQuery.trim();
+      while (hasMore) {
+        const response = await authenticatedApiCall<{ results: string[]; has_more: boolean }>(
+          `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`
+        );
+        const chunk = response.results || [];
+        allResults.push(...chunk);
+        hasMore = response.has_more ?? false;
+        offset += chunk.length;
+        if (chunk.length < limit) break;
+      }
+      const updated = columnConfig.map(col => {
+        if (col.key === openFilterColumn) {
+          return { ...col, filters: allResults, exclude: undefined };
+        }
+        return col;
+      });
+      setColumnConfig(updated);
+      saveColumnPreferences(updated);
+      setFrozenFilterOptions(allResults.length > 0 ? allResults : frozenFilterOptions);
+      setFilterModalHasMore(false);
+      setFilterModalOffset(allResults.length);
+      const filtersForApi: Record<string, string[]> = {};
+      const excludeForApi: Record<string, string[]> = {};
+      updated.forEach(col => {
+        if (col.exclude && col.exclude.length > 0) {
+          excludeForApi[col.key] = col.exclude;
+        } else if (col.filters && col.filters.length > 0) {
+          filtersForApi[col.key] = col.filters;
+        }
+      });
+      setAppliedColumnFilters(JSON.stringify(filtersForApi));
+      setAppliedColumnFiltersExclude(JSON.stringify(excludeForApi));
+      setCurrentPage(1);
+    } catch (err) {
+      console.error('Select all from DB error:', err);
+    } finally {
+      setIsFilterSearching(false);
+    }
   };
   
   // Get values to display in filter modal (search results or default from current page)
@@ -1979,41 +2321,140 @@ export default function ReservationsTableNew() {
     return baseOptions;
   };
 
-  // Remove single filter value
-  const handleRemoveFilter = (columnKey: string, value: string) => {
+  // Run header filter search (used by debounced onChange and by Enter key)
+  const runHeaderFilterSearch = useCallback(async (columnKey: string, value: string) => {
+    if (!value.trim()) {
+      setColumnConfig(prev => {
+        const updated = prev.map(col =>
+          col.key === columnKey ? { ...col, filters: [] } : col
+        );
+        const filtersForApi: Record<string, string[]> = {};
+        updated.forEach(col => {
+          if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.filters;
+        });
+        setAppliedColumnFilters(JSON.stringify(filtersForApi));
+        setCurrentPage(1);
+        saveColumnPreferences(updated);
+        return updated;
+      });
+      return;
+    }
+    try {
+      const query = columnKey === 'guardianPhone' ? normalizePhoneForFilter(value) : value.trim();
+      const response = await authenticatedApiCall<{ results: string[]; total: number }>(
+        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(query)}&limit=20`
+      );
+      const results = response.results || [];
+      setColumnConfig(prev => {
+        const updated = prev.map(col =>
+          col.key === columnKey ? { ...col, filters: results } : col
+        );
+        const filtersForApi: Record<string, string[]> = {};
+        updated.forEach(col => {
+          if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.filters;
+        });
+        setAppliedColumnFilters(JSON.stringify(filtersForApi));
+        setCurrentPage(1);
+        saveColumnPreferences(updated);
+        return updated;
+      });
+    } catch (err) {
+      console.error('Header filter search error:', err);
+    }
+  }, []);
+
+  // Header quick-filter: tylko aktualizacja stanu inputu; wyszukiwanie wyłącznie po Enter
+  const handleHeaderFilterInputChange = (columnKey: string, value: string) => {
+    setColumnHeaderFilterInput(prev => ({ ...prev, [columnKey]: value }));
+  };
+
+  const handleHeaderFilterKeyDown = (columnKey: string, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const value = (e.currentTarget as HTMLInputElement).value;
+      runHeaderFilterSearch(columnKey, value);
+      setExpandedFilterInputColumn(null);
+      setHeaderFilterPopoverRect(null);
+    }
+  };
+
+  // Pozycjonowanie popovera filtra i focus inputa
+  useEffect(() => {
+    if (!expandedFilterInputColumn) {
+      setHeaderFilterPopoverRect(null);
+      return;
+    }
+    const th = headerFilterThRefs.current[expandedFilterInputColumn];
+    if (!th) return;
+    const updateRect = () => {
+      const r = th.getBoundingClientRect();
+      setHeaderFilterPopoverRect({ left: r.left, top: r.top, width: r.width, height: r.height });
+    };
+    updateRect();
+    requestAnimationFrame(() => headerFilterPopoverInputRef.current?.focus());
+    const onScrollOrResize = () => updateRect();
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [expandedFilterInputColumn]);
+
+  // Select all values currently displayed in filter modal (from DB/search results)
+  const handleSelectAllFilterValues = () => {
+    if (!openFilterColumn) return;
+    const displayed = getFilterDisplayValues(openFilterColumn);
+    if (displayed.length === 0) return;
     const updated = columnConfig.map(col => {
-      if (col.key === columnKey) {
-        const filters = col.filters || [];
-        return { ...col, filters: filters.filter(f => f !== value) };
+      if (col.key === openFilterColumn) {
+        return { ...col, filters: [...displayed] };
       }
       return col;
     });
     setColumnConfig(updated);
     saveColumnPreferences(updated);
-
     const filtersForApi: Record<string, string[]> = {};
     updated.forEach(col => {
       if (col.filters && col.filters.length > 0) {
         filtersForApi[col.key] = col.filters;
       }
     });
-    
-    // Update applied column filters to trigger API refetch (URL updated via useEffect)
     setAppliedColumnFilters(JSON.stringify(filtersForApi));
     setCurrentPage(1);
   };
 
-  // Check if column has active filters (for Excel-like column filtering)
-  const columnHasActiveFilters = (columnKey: string): boolean => {
-    const col = columnConfig.find(c => c.key === columnKey);
-    return col ? (col.filters?.length || 0) > 0 : false;
+  // Remove single filter value (from include or exclude pill)
+  const handleRemoveFilter = (columnKey: string, value: string) => {
+    const updated = columnConfig.map(col => {
+      if (col.key !== columnKey) return col;
+      const exclude = col.exclude || [];
+      if (exclude.includes(value)) {
+        return { ...col, exclude: exclude.filter(x => x !== value) };
+      }
+      const filters = col.filters || [];
+      return { ...col, filters: filters.filter(f => f !== value) };
+    });
+    setColumnConfig(updated);
+    saveColumnPreferences(updated);
+
+    const filtersForApi: Record<string, string[]> = {};
+    const excludeForApi: Record<string, string[]> = {};
+    updated.forEach(col => {
+      if (col.exclude && col.exclude.length > 0) excludeForApi[col.key] = col.exclude;
+      else if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.filters;
+    });
+    setAppliedColumnFilters(JSON.stringify(filtersForApi));
+    setAppliedColumnFiltersExclude(JSON.stringify(excludeForApi));
+    setColumnHeaderFilterInput(prev => ({ ...prev, [columnKey]: '' }));
+    setCurrentPage(1);
   };
 
-  // Handle column modal open
-  const handleOpenColumnModal = () => {
-    setTempColumnConfig([...columnConfig]);
-    setColumnModalOpen(true);
+  // Check if column has active filters (include or exclude)
+  const columnHasActiveFilters = (columnKey: string): boolean => {
+    const col = columnConfig.find(c => c.key === columnKey);
+    return col ? ((col.filters?.length || 0) > 0 || (col.exclude?.length || 0) > 0) : false;
   };
+
 
   // State for export loading
   const [isExporting, setIsExporting] = useState(false);
@@ -2093,6 +2534,9 @@ export default function ReservationsTableNew() {
       if (appliedFilters.search.trim()) {
         params.set('search', appliedFilters.search.trim());
       }
+      if (appliedFilters.phone && appliedFilters.phone.trim()) {
+        params.set('phone', appliedFilters.phone.trim());
+      }
       if (appliedFilters.reservationNumber && appliedFilters.reservationNumber.trim()) {
         params.set('reservation_number', appliedFilters.reservationNumber.trim());
       }
@@ -2130,6 +2574,10 @@ export default function ReservationsTableNew() {
           } else {
             params.set(`filter_${colKey}`, filters.join(','));
           }
+        }
+        const exclude = col.exclude || [];
+        if (exclude.length > 0) {
+          params.set(`filter_${col.key}_exclude`, exclude.join(','));
         }
       });
 
@@ -2369,9 +2817,6 @@ export default function ReservationsTableNew() {
               };
               value = statusMapExport[reservation.paymentStatus] || reservation.paymentStatus;
               break;
-            case 'protectionNames':
-              value = reservation.protectionNames || '';
-              break;
             case 'depositAmount':
               value = reservation.depositAmount?.toFixed(2) || '';
               break;
@@ -2397,7 +2842,7 @@ export default function ReservationsTableNew() {
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `rezerwacje_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `${tableModule === 'payments' ? 'platnosci' : 'rezerwacje'}_${new Date().toISOString().split('T')[0]}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -2425,15 +2870,35 @@ export default function ReservationsTableNew() {
     ));
   };
 
+  const handleSelectAllColumns = () => {
+    setTempColumnConfig(prev => prev.map(col => ({ ...col, visible: true })));
+  };
+
+  const handleDeselectAllColumns = () => {
+    setTempColumnConfig(prev => prev.map(col => ({ ...col, visible: false })));
+  };
+
   // Handle save column preferences
   const handleSaveColumnPreferences = () => {
     saveColumnPreferences(tempColumnConfig);
     setColumnModalOpen(false);
   };
 
-  // Handle reset column preferences
+  // Handle reset column preferences (inside column modal – only temp state)
   const handleResetColumnPreferences = () => {
     setTempColumnConfig([...DEFAULT_COLUMNS]);
+  };
+
+  // Apply reset to default column settings (after confirmation in dedicated modal)
+  const handleConfirmResetToDefaultColumns = () => {
+    const defaultConfig = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true, filters: [] }));
+    setColumnConfig(defaultConfig);
+    setTempColumnConfig(defaultConfig);
+    saveColumnPreferences(defaultConfig);
+    setAppliedColumnFilters('{}');
+    setCurrentPage(1);
+    setResetColumnsModalOpen(false);
+    showSuccess('Przywrócono domyślne ustawienia kolumn.');
   };
 
   // Drag and drop handlers
@@ -2463,6 +2928,43 @@ export default function ReservationsTableNew() {
     setDraggedColumnIndex(null);
     setDraggedOverIndex(null);
   };
+
+  const renderColumnPanelContent = () => (
+    <ColumnPanelContent
+      config={tempColumnConfig}
+      columnDefinitions={COLUMN_DEFINITIONS}
+      onToggle={handleColumnToggle}
+      onSelectAll={handleSelectAllColumns}
+      onDeselectAll={handleDeselectAllColumns}
+      onReset={handleResetColumnPreferences}
+      onSave={() => {
+        saveColumnPreferences(tempColumnConfig);
+        closeRightPanel();
+        setColumnModalOpen(false);
+      }}
+      onClose={() => {
+        closeRightPanel();
+        setColumnModalOpen(false);
+      }}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      draggedColumnIndex={draggedColumnIndex}
+      draggedOverIndex={draggedOverIndex}
+    />
+  );
+
+  const handleOpenColumnModal = () => {
+    setTempColumnConfig([...columnConfig]);
+    setColumnModalOpen(true);
+    openDocument(renderColumnPanelContent, 'Wybierz kolumny', () => setColumnModalOpen(false));
+  };
+
+  useEffect(() => {
+    if (!columnModalOpen) return;
+    openDocument(renderColumnPanelContent, 'Wybierz kolumny', () => setColumnModalOpen(false));
+  }, [columnModalOpen, tempColumnConfig, draggedColumnIndex, draggedOverIndex]);
 
   // Get ordered visible columns
   const orderedVisibleColumns = useMemo(() => {
@@ -2561,7 +3063,10 @@ export default function ReservationsTableNew() {
 
     const fetchPayments = async () => {
       try {
-        setIsLoading(true);
+        // When filter modal is open, don't show full-page skeleton – refresh in background so modal doesn't blink
+        if (!filterModalOpenRef.current) {
+          setIsLoading(true);
+        }
         setError(null);
 
         console.log(`Fetching payments page ${currentPage} with filters:`, appliedFilters);
@@ -2574,6 +3079,9 @@ export default function ReservationsTableNew() {
         // Add search filters
         if (appliedFilters.search && appliedFilters.search.trim()) {
           params.set('search', appliedFilters.search.trim());
+        }
+        if (appliedFilters.phone && appliedFilters.phone.trim()) {
+          params.set('phone', appliedFilters.phone.trim());
         }
         if (appliedFilters.reservationNumber && appliedFilters.reservationNumber.trim()) {
           params.set('reservation_number', appliedFilters.reservationNumber.trim());
@@ -2603,18 +3111,23 @@ export default function ReservationsTableNew() {
           'Zwrócone': 'returned',
         };
         
-        // Parse applied column filters from JSON string
+        // Parse applied column filters (include) and exclude from JSON
         const parsedColumnFilters: Record<string, string[]> = JSON.parse(appliedColumnFilters || '{}');
+        const parsedColumnFiltersExclude: Record<string, string[]> = JSON.parse(appliedColumnFiltersExclude || '{}');
         
         Object.entries(parsedColumnFilters).forEach(([colKey, filters]) => {
           if (filters && filters.length > 0) {
             if (colKey === 'status') {
-              // Map Polish names to English DB values for status
               const dbValues = filters.map(f => statusDisplayToDb[f] || f);
               params.set('filter_status', dbValues.join(','));
             } else {
               params.set(`filter_${colKey}`, filters.join(','));
             }
+          }
+        });
+        Object.entries(parsedColumnFiltersExclude).forEach(([colKey, excludeVals]) => {
+          if (excludeVals && excludeVals.length > 0) {
+            params.set(`filter_${colKey}_exclude`, excludeVals.join(','));
           }
         });
 
@@ -2709,14 +3222,25 @@ export default function ReservationsTableNew() {
             ? reservation.created_at.split('T')[0] 
             : new Date().toISOString().split('T')[0];
           
-          // Get guardian from parents_data
-          const parents = reservation.parents_data || [];
-          const firstParent = Array.isArray(parents) && parents.length > 0 ? parents[0] : null;
-          const guardianName = firstParent 
-            ? `${firstParent.firstName || ''} ${firstParent.lastName || ''}`.trim() || null
+          // Get guardian from parents_data (parse if string JSON; support camelCase and snake_case)
+          let parents: Array<Record<string, unknown>> = [];
+          const rawParents = reservation.parents_data as unknown;
+          if (Array.isArray(rawParents)) {
+            parents = rawParents as Array<Record<string, unknown>>;
+          } else if (typeof rawParents === 'string' && (rawParents as string).trim()) {
+            try {
+              const parsed = JSON.parse(rawParents as string) as unknown;
+              parents = Array.isArray(parsed) ? (parsed as Array<Record<string, unknown>>) : [];
+            } catch {
+              parents = [];
+            }
+          }
+          const firstParent = parents.length > 0 ? (parents[0] as Record<string, unknown>) : null;
+          const guardianName = firstParent
+            ? `${(firstParent.firstName as string) || (firstParent.first_name as string) || ''} ${(firstParent.lastName as string) || (firstParent.last_name as string) || ''}`.trim() || null
             : null;
-          const guardianPhone = firstParent?.phoneNumber || (firstParent as any)?.phone || null;
-          const guardianEmail = firstParent?.email || null;
+          const guardianPhone = (firstParent?.phoneNumber as string) || (firstParent?.phone_number as string) || (firstParent?.phone as string) || null;
+          const guardianEmail = (firstParent?.email as string) || (reservation.invoice_email as string) || null;
           
           // Map payment records
           const allPaymentRecords = [
@@ -2751,13 +3275,60 @@ export default function ReservationsTableNew() {
             : reservation.property_city || reservation.property_period || null;
           
           // Transport
-          const transportDeparture = reservation.departure_type === 'wlasny' 
-            ? 'Własny' 
+          const transportDeparture = reservation.departure_type === 'wlasny'
+            ? 'Własny'
             : reservation.departure_city || null;
-          const transportReturn = reservation.return_type === 'wlasny' 
-            ? 'Własny' 
+          const transportReturn = reservation.return_type === 'wlasny'
+            ? 'Własny'
             : reservation.return_city || null;
-          
+
+          // Oaza / Tarcza z selected_protection (protectionsCache lub protectionsMap)
+          const cacheKey = reservation.camp_id && reservation.property_id ? `${reservation.camp_id}_${reservation.property_id}` : '';
+          const turnusProtections = cacheKey ? protectionsCache.get(cacheKey) : null;
+          const effectiveProtections = turnusProtections && turnusProtections.size > 0 ? turnusProtections : protectionsMap;
+          const selectedProtectionsRaw = reservation.selected_protection;
+          const selectedProtectionsList: (string | number)[] = Array.isArray(selectedProtectionsRaw)
+            ? selectedProtectionsRaw
+            : typeof selectedProtectionsRaw === 'string' && selectedProtectionsRaw.trim()
+              ? (() => { try { const p = JSON.parse(selectedProtectionsRaw); return Array.isArray(p) ? p : [selectedProtectionsRaw]; } catch { return []; } })()
+              : [];
+          const protectionNameList: string[] = [];
+          selectedProtectionsList.forEach((protId: string | number) => {
+            const numericId = typeof protId === 'number' ? protId : (protId as string).match(/protection-(\d+)/)?.[1]
+              ? parseInt((protId as string).replace(/protection-/, ''), 10)
+              : parseInt(String(protId), 10);
+            if (!isNaN(numericId)) {
+              const data = effectiveProtections.get(numericId);
+              if (data?.name) protectionNameList.push(data.name);
+            }
+          });
+          const protectionNamesStr = protectionNameList.join(', ');
+          const protLower = protectionNamesStr.toLowerCase();
+          const hasOaza = protLower.includes('oaza');
+          const hasTarcza = protLower.includes('tarcza');
+
+          // Addony (Quad, Skuter, Energylandia, Termy) z selected_addons i addonsMap
+          const selectedAddonsRaw = reservation.selected_addons;
+          const selectedAddonsList: (string | number)[] = Array.isArray(selectedAddonsRaw)
+            ? selectedAddonsRaw
+            : typeof selectedAddonsRaw === 'string' && selectedAddonsRaw.trim()
+              ? (() => { try { const a = JSON.parse(selectedAddonsRaw); return Array.isArray(a) ? a : [selectedAddonsRaw]; } catch { return []; } })()
+              : [];
+          let hasQuad = false;
+          let hasSkuter = false;
+          let hasEnergylandia = false;
+          let hasTermy = false;
+          selectedAddonsList.forEach((addonId: string | number) => {
+            const data = addonsMap.get(String(addonId));
+            if (data?.name) {
+              const n = data.name.toLowerCase();
+              if (n.includes('quad')) hasQuad = true;
+              if (n.includes('skuter')) hasSkuter = true;
+              if (n.includes('energylandia')) hasEnergylandia = true;
+              if (n.includes('termy')) hasTermy = true;
+            }
+          });
+
           // Use reservation_number from API if available, otherwise generate from ID (fallback)
           const baseNumber = reservation.reservation_number || `REZ-${createdAtYear}-${reservation.id}`;
           const reservationNumber = reservation.is_archived
@@ -2791,7 +3362,7 @@ export default function ReservationsTableNew() {
               orderDate: createdAtFormatted,
             },
             promotionName: reservation.promotion_name || null,
-            protectionNames: null, // Would need additional mapping
+            protectionNames: protectionNamesStr || null,
             depositAmount: reservation.deposit_amount || 500,
             campId: reservation.camp_id || undefined,
             propertyId: reservation.property_id || undefined,
@@ -2807,12 +3378,12 @@ export default function ReservationsTableNew() {
             propertyTag: reservation.property_tag || null,
             transportDeparture,
             transportReturn,
-            hasOaza: false, // Would need protection mapping
-            hasTarcza: false,
-            hasQuad: false,
-            hasSkuter: false,
-            hasEnergylandia: false,
-            hasTermy: false,
+            hasOaza,
+            hasTarcza,
+            hasQuad,
+            hasSkuter,
+            hasEnergylandia,
+            hasTermy,
             contractStatus: reservation.contract_status || null,
             qualificationCardStatus: reservation.qualification_card_status || null,
             payment1: allPaymentRecords[0] || null,
@@ -2868,7 +3439,7 @@ export default function ReservationsTableNew() {
     };
 
     fetchPayments();
-  }, [isProtectionsAndAddonsLoaded, currentPage, itemsPerPage, appliedFilters, protectionsMap, addonsMap, appliedColumnFilters, archiveFilter]);
+  }, [isProtectionsAndAddonsLoaded, currentPage, itemsPerPage, appliedFilters, protectionsMap, addonsMap, appliedColumnFilters, appliedColumnFiltersExclude, archiveFilter]);
 
   // HTTP Polling dla wykrywania zmian w rezerwacjach (tylko gdy na stronie /admin-panel)
   useEffect(() => {
@@ -3032,8 +3603,6 @@ export default function ReservationsTableNew() {
           'returned': 'Zwrócone',
         };
         return statusMapCell[reservation.paymentStatus] || reservation.paymentStatus;
-      case 'protectionNames':
-        return reservation.protectionNames || '-';
       case 'depositAmount':
         return reservation.depositAmount ? reservation.depositAmount.toFixed(2) : '-';
       default:
@@ -3585,6 +4154,9 @@ export default function ReservationsTableNew() {
     if (appliedFilters.search && appliedFilters.search.trim()) {
       params.set('search', appliedFilters.search.trim());
     }
+    if (appliedFilters.phone && appliedFilters.phone.trim()) {
+      params.set('phone', appliedFilters.phone.trim());
+    }
     if (appliedFilters.reservationNumber && appliedFilters.reservationNumber.trim()) {
       params.set('reservation_number', appliedFilters.reservationNumber.trim());
     }
@@ -4042,7 +4614,7 @@ export default function ReservationsTableNew() {
       <div className="h-full flex flex-col">
         {/* Title bar for error state */}
         <div className="bg-white shadow-md p-3 mb-2">
-          <h1 className="text-lg sm:text-xl font-bold text-gray-900">Rezerwacje</h1>
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900">{tableModule === 'payments' ? 'Płatności' : 'Rezerwacje'}</h1>
         </div>
         <div className="bg-red-50 border-l-4 border-red-500 p-4">
           <p className="text-red-700 font-semibold">Błąd</p>
@@ -4065,7 +4637,7 @@ export default function ReservationsTableNew() {
         {/* All in one row */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Title */}
-          <h1 className="text-lg font-bold text-white whitespace-nowrap">Rezerwacje</h1>
+          <h1 className="text-lg font-bold text-white whitespace-nowrap">{tableModule === 'payments' ? 'Płatności' : 'Rezerwacje'}</h1>
           
           {/* Archive filter radio buttons */}
           <div className="flex items-center gap-3 bg-slate-700 px-3 py-1 rounded">
@@ -4128,6 +4700,16 @@ export default function ReservationsTableNew() {
             />
             <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           </div>
+
+          {/* Phone search */}
+          <input
+            type="text"
+            value={filters.phone}
+            onChange={(e) => handleFilterChange('phone', e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Telefon..."
+            className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white placeholder:text-slate-400 w-[120px]"
+          />
           
           {/* Reservation number search */}
           <input
@@ -4143,6 +4725,7 @@ export default function ReservationsTableNew() {
           <select
             value={filters.paymentStatus}
             onChange={(e) => handleFilterChange('paymentStatus', e.target.value)}
+            onKeyDown={handleSearchKeyDown}
             className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white min-w-[140px]"
           >
             <option value="">Status...</option>
@@ -4161,29 +4744,55 @@ export default function ReservationsTableNew() {
             className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white placeholder:text-slate-400 min-w-[100px] max-w-[150px]"
           />
           
-          {/* Date from */}
-          <div className="relative">
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-              className="pl-8 pr-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white w-[140px]"
-              title="Data od"
-            />
-            <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          </div>
-          
-          {/* Date to */}
-          <div className="relative">
-            <input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-              className="pl-8 pr-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white w-[140px]"
-              title="Data do"
-            />
-            <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          </div>
+          {/* Data rezerwacji: tryb jedna data / zakres */}
+          <select
+            value={dateFilterMode}
+            onChange={(e) => setDateFilterMode(e.target.value as 'single' | 'range')}
+            onKeyDown={handleSearchKeyDown}
+            className="px-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white"
+            title="Tryb daty"
+          >
+            <option value="single">Jedna data</option>
+            <option value="range">Zakres dat</option>
+          </select>
+          {dateFilterMode === 'single' ? (
+            <div className="relative">
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                className="pl-8 pr-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white w-[140px]"
+                title="Data rezerwacji"
+              />
+              <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            </div>
+          ) : (
+            <>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={filters.dateFrom}
+                  onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  className="pl-8 pr-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white w-[140px]"
+                  title="Data od"
+                />
+                <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              </div>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={filters.dateTo}
+                  onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  className="pl-8 pr-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white w-[140px]"
+                  title="Data do"
+                />
+                <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              </div>
+            </>
+          )}
 
           {/* Divider */}
           <div className="h-6 w-px bg-slate-500 mx-1 hidden sm:block" />
@@ -4239,6 +4848,14 @@ export default function ReservationsTableNew() {
             <Columns className="w-3.5 h-3.5" />
             <span className="hidden xl:inline">Kolumny</span>
           </button>
+          <button
+            onClick={() => setResetColumnsModalOpen(true)}
+            className="px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-500 transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
+            title="Resetuj do domyślnych ustawień kolumn"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="hidden xl:inline">Resetuj do domyślnych ustawień</span>
+          </button>
           
           {/* Results count - pushed to right */}
           <span className="ml-auto text-xs text-slate-300 whitespace-nowrap">Znaleziono: <strong className="text-white">{serverPagination?.total || 0}</strong> | Na stronie: <strong className="text-white">{itemsPerPage}</strong></span>
@@ -4246,41 +4863,61 @@ export default function ReservationsTableNew() {
         
         {/* Active column filters - small orange buttons with X to remove */}
         {(() => {
-          const activeFilters: { columnKey: string; columnName: string; value: string }[] = [];
+          const activeFilters: { columnKey: string; columnName: string; value: string; isExclude?: boolean }[] = [];
           columnConfig.forEach(col => {
+            const columnName = COLUMN_DEFINITIONS[col.key as keyof typeof COLUMN_DEFINITIONS] || col.key;
             if (col.filters && col.filters.length > 0) {
-              const columnName = COLUMN_DEFINITIONS[col.key as keyof typeof COLUMN_DEFINITIONS] || col.key;
               col.filters.forEach(value => {
                 activeFilters.push({ columnKey: col.key, columnName, value });
               });
             }
+            if (col.exclude && col.exclude.length > 0) {
+              col.exclude.forEach(value => {
+                activeFilters.push({ columnKey: col.key, columnName, value, isExclude: true });
+              });
+            }
           });
-          
+
           if (activeFilters.length === 0) return null;
-          
+
+          const maxVisiblePills = 5;
+          const visibleFilters = activeFilters.length > maxVisiblePills ? activeFilters.slice(0, maxVisiblePills) : activeFilters;
+          const hasMorePills = activeFilters.length > maxVisiblePills;
+
           return (
             <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-gray-200">
               <span className="text-xs text-gray-500 self-center mr-1">Aktywne filtry:</span>
-              {activeFilters.map((filter, idx) => (
+              {visibleFilters.map((filter, idx) => (
                 <button
-                  key={`${filter.columnKey}-${filter.value}-${idx}`}
+                  key={`${filter.columnKey}-${filter.value}-${filter.isExclude ? 'ex' : ''}-${idx}`}
                   onClick={() => handleRemoveFilter(filter.columnKey, filter.value)}
                   className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-500 text-white text-xs hover:bg-orange-600 transition-colors group"
-                  title={`Usuń filtr: ${filter.columnName} = ${filter.value}`}
+                  title={filter.isExclude ? `Usuń wykluczenie: ${filter.columnName} oprócz ${filter.value}` : `Usuń filtr: ${filter.columnName} = ${filter.value}`}
                 >
                   <span className="font-medium">{filter.columnName}:</span>
-                  <span>{filter.value}</span>
+                  <span>{filter.isExclude ? `oprócz ${filter.value}` : filter.value}</span>
                   <XIcon className="w-3 h-3 text-white group-hover:text-orange-100" />
                 </button>
               ))}
+              {hasMorePills && (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 bg-orange-500 text-white text-xs cursor-default"
+                  title={`Wybrano łącznie ${activeFilters.length} filtrów`}
+                >
+                  +więcej ({activeFilters.length})
+                </span>
+              )}
               {activeFilters.length > 1 && (
                 <button
                   onClick={() => {
-                    // Clear all column filters
-                    const updated = columnConfig.map(col => ({ ...col, filters: [] }));
+                    const updated = columnConfig.map(col => ({ ...col, filters: [], exclude: [] }));
                     setColumnConfig(updated);
                     saveColumnPreferences(updated);
                     setAppliedColumnFilters('{}');
+                    setAppliedColumnFiltersExclude('{}');
+                    setColumnHeaderFilterInput({});
+                    setExpandedFilterInputColumn(null);
+                    setHeaderFilterPopoverRect(null);
                     setCurrentPage(1);
                   }}
                   className="text-xs text-orange-600 hover:text-orange-800 underline ml-2"
@@ -4342,6 +4979,7 @@ export default function ReservationsTableNew() {
                   return (
                     <th
                       key={columnKey}
+                      ref={(el) => { headerFilterThRefs.current[columnKey] = el; }}
                       className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors relative"
                       style={{ cursor: 'pointer' }}
                     >
@@ -4372,6 +5010,18 @@ export default function ReservationsTableNew() {
                           </button>
                         </div>
                       </div>
+                      {/* Trigger: klik otwiera popover z dużym inputem (bez przesuwania tabeli) */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); setExpandedFilterInputColumn(columnKey); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedFilterInputColumn(columnKey); } }}
+                        className="mt-1 w-full min-w-0 h-7 px-2 flex items-center text-xs border border-gray-300 bg-white text-gray-700 truncate cursor-text hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-[#03adf0] focus:border-[#03adf0]"
+                        style={{ borderRadius: 2 }}
+                        title="Kliknij, aby wpisać (Enter = wyszukaj)"
+                      >
+                        {columnHeaderFilterInput[columnKey]?.trim() || <span className="text-gray-400">Szukaj {columnLabel.toLowerCase()}...</span>}
+                      </div>
                     </th>
                   );
                 })}
@@ -4379,29 +5029,40 @@ export default function ReservationsTableNew() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {paginatedReservations.length > 0 ? (
-                paginatedReservations.map((reservation) => {
+                paginatedReservations.map((reservation, rowIndex) => {
                   const isExpanded = expandedRows.has(reservation.id);
                   const activeItemsForReservation = reservation.paymentDetails.items.filter(item => item.status !== 'canceled' && item.status !== 'returned');
                   const allPaid = activeItemsForReservation.length > 0 && activeItemsForReservation.every(item => item.status === 'paid');
                   const hasPartiallyPaid = activeItemsForReservation.some(item => item.status === 'partially_paid');
                   const hasRemaining = reservation.paymentDetails.remainingAmount > 0;
                   const hasCanceledItems = reservation.paymentDetails.items.some(item => item.status === 'canceled');
+                  const basePath = `/admin-panel/rezerwacja/${reservation.reservationName}`;
+                  const detailPath = detailTarget === 'payment' ? `${basePath}/payments` : basePath;
+                  const reservationUrl = currentPage > 1
+                    ? `${detailPath}?fromPage=${currentPage}${detailTarget === 'reservation' ? '#dane' : ''}`
+                    : `${detailPath}${detailTarget === 'reservation' ? '#dane' : ''}`;
 
                   return (
-                    <Fragment key={reservation.id}>
+                    <Fragment key={`reservation-row-${rowIndex}`}>
                       <tr
                         className={`hover:bg-gray-50 transition-all duration-200 ${isExpanded ? 'bg-blue-50' : ''}`}
                         onClick={(e) => {
-                          // If clicking on expandable row content, don't navigate
                           const target = e.target as HTMLElement;
-                          if (target.closest('button, a, input, select')) {
-                            return;
-                          }
-                          // Navigate to reservation detail page with fromPage param
-                          const reservationUrl = currentPage > 1
-                            ? `/admin-panel/rezerwacja/${reservation.reservationName}?fromPage=${currentPage}`
-                            : `/admin-panel/rezerwacja/${reservation.reservationName}`;
+                          if (target.closest('button, a, input, select')) return;
                           router.push(reservationUrl);
+                        }}
+                        onAuxClick={(e) => {
+                          if (e.button !== 1) return;
+                          const target = e.target as HTMLElement;
+                          if (target.closest('button, a, input, select')) return;
+                          e.preventDefault();
+                          window.open(reservationUrl, '_blank', 'noopener,noreferrer');
+                        }}
+                        onContextMenu={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.closest('button, a, input, select')) return;
+                          e.preventDefault();
+                          setRowContextMenu({ x: e.clientX, y: e.clientY, url: reservationUrl });
                         }}
                         style={{ cursor: 'pointer' }}
                       >
@@ -4410,7 +5071,11 @@ export default function ReservationsTableNew() {
                           if (columnKey === 'reservationName') {
                             return (
                               <td key={columnKey} className="px-4 py-2">
-                                <div className="flex flex-col">
+                                <Link
+                                  href={reservationUrl}
+                                  className="flex flex-col text-inherit no-underline hover:underline focus:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <span className="text-sm font-medium text-gray-900">
                                     {reservation.reservationName}
                                   </span>
@@ -4429,7 +5094,7 @@ export default function ReservationsTableNew() {
                                       )}
                                     </div>
                                   )}
-                                </div>
+                                </Link>
                               </td>
                             );
                           } else if (columnKey === 'createdAt') {
@@ -4744,14 +5409,6 @@ export default function ReservationsTableNew() {
                                 </span>
                               </td>
                             );
-                          } else if (columnKey === 'protectionNames') {
-                            return (
-                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
-                                <span className="text-sm text-gray-600">
-                                  {reservation.protectionNames || '-'}
-                                </span>
-                              </td>
-                            );
                           } else if (columnKey === 'depositAmount') {
                             return (
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
@@ -4852,7 +5509,7 @@ export default function ReservationsTableNew() {
                                 <div className="mt-4 pt-4 border-t border-gray-200">
                                   <h4 className="text-sm font-semibold text-gray-900 mb-3">Elementy płatności</h4>
                                   <div className="space-y-2">
-                                  {reservation.paymentDetails.items.map((item) => {
+                                  {reservation.paymentDetails.items.map((item, itemIndex) => {
                                     const isItemChecked = isItemSelected(reservation.id, item.id);
                                     const isCanceled = item.status === 'canceled';
                                     const isPaid = item.status === 'paid';
@@ -4861,7 +5518,7 @@ export default function ReservationsTableNew() {
                                     const isReturned = item.status === 'returned';
 
                                     return (
-                                      <Fragment key={item.id}>
+                                      <Fragment key={`row-${rowIndex}-item-${itemIndex}`}>
                                         <div
                                           className={`flex items-center justify-between p-3 border ${
                                             isCanceled
@@ -4990,13 +5647,13 @@ export default function ReservationsTableNew() {
                                         {/* Installments sub-items - only show if partially_paid and has installments */}
                                         {isPartiallyPaid && item.installments && item.installments.length > 0 && (
                                           <div className="ml-8 mt-2 space-y-1">
-                                            {item.installments.map((installment) => {
+                                            {item.installments.map((installment, instIndex) => {
                                               // Check if this is deposit (number === 0)
                                               const isDeposit = installment.number === 0;
 
                                               return (
                                                 <div
-                                                  key={`installment-${installment.number}`}
+                                                  key={`row-${rowIndex}-item-${itemIndex}-inst-${instIndex}`}
                                                   className={`flex items-center justify-between p-2 border ${
                                                     installment.paid
                                                       ? 'bg-green-50 border-green-200'
@@ -5194,9 +5851,9 @@ export default function ReservationsTableNew() {
 
                                           return (
                                             <div className="space-y-2">
-                                              {invoices.map((invoice) => (
+                                              {invoices.map((invoice, invIndex) => (
                                                 <div
-                                                  key={invoice.id}
+                                                  key={`row-${rowIndex}-inv-${invIndex}`}
                                                   className={`flex items-center justify-between p-3 border ${
                                                     invoice.is_canceled
                                                       ? 'bg-red-50 border-red-200'
@@ -5301,7 +5958,7 @@ export default function ReservationsTableNew() {
 
                                         return (
                                           <div className="space-y-2">
-                                            {successfulPayments.map((payment) => {
+                                            {successfulPayments.map((payment, payIndex) => {
                                               const paymentDate = payment.payment_date
                                                 ? formatDate(payment.payment_date)
                                                 : (payment.paid_at
@@ -5315,7 +5972,7 @@ export default function ReservationsTableNew() {
 
                                               return (
                                                 <div
-                                                  key={payment.id}
+                                                  key={`row-${rowIndex}-pay-${payIndex}`}
                                                   className="flex items-center justify-between p-3 border bg-white border-gray-200"
                                                 >
                                                   <div className="flex items-center gap-3 flex-1">
@@ -5411,6 +6068,33 @@ export default function ReservationsTableNew() {
           </table>
         </div>
 
+        {/* Popover z powiększonym inputem filtra (bez cienia, wyśrodkowany w kolumnie) */}
+        {expandedFilterInputColumn && headerFilterPopoverRect && (
+          <div
+            className="fixed z-50 bg-white border border-gray-300"
+            style={{
+              left: headerFilterPopoverRect.left + (headerFilterPopoverRect.width / 2) - 140,
+              top: headerFilterPopoverRect.top + headerFilterPopoverRect.height + 2,
+              width: 280,
+              borderRadius: 4,
+            }}
+          >
+            <input
+              ref={headerFilterPopoverInputRef}
+              type={expandedFilterInputColumn === 'guardianPhone' ? 'tel' : isAmountColumn(expandedFilterInputColumn) ? 'text' : 'text'}
+              inputMode={isAmountColumn(expandedFilterInputColumn) ? 'decimal' : 'text'}
+              value={columnHeaderFilterInput[expandedFilterInputColumn] ?? ''}
+              onChange={(e) => handleHeaderFilterInputChange(expandedFilterInputColumn, e.target.value)}
+              onKeyDown={(e) => handleHeaderFilterKeyDown(expandedFilterInputColumn, e)}
+              onBlur={() => { setExpandedFilterInputColumn(null); setHeaderFilterPopoverRect(null); }}
+              placeholder={`Szukaj ${COLUMN_DEFINITIONS[expandedFilterInputColumn as keyof typeof COLUMN_DEFINITIONS] || expandedFilterInputColumn}... (Enter)`}
+              className="w-full py-2.5 px-3 text-sm border-0 focus:ring-0 focus:outline-none"
+              style={{ borderRadius: 4 }}
+              autoFocus
+            />
+          </div>
+        )}
+
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
@@ -5487,19 +6171,29 @@ export default function ReservationsTableNew() {
       >
         {openFilterColumn && (
           <div className="p-4 sm:p-6">
-            {/* Header with clear button */}
+            {/* Header with clear and select-all buttons */}
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs sm:text-sm font-medium text-gray-900">
                 Wybierz wartości do filtrowania
               </span>
-              {columnHasActiveFilters(openFilterColumn) && (
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handleClearColumnFilters(openFilterColumn)}
-                  className="text-xs text-[#03adf0] hover:text-[#0288c7]"
+                  type="button"
+                  onClick={handleSelectAllFilterValuesFromDb}
+                  disabled={isFilterSearching}
+                  className="text-xs text-[#03adf0] hover:text-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Wyczyść
+                  {isFilterSearching ? 'Ładowanie...' : 'Zaznacz wszystkie (z bazy)'}
                 </button>
-              )}
+                {columnHasActiveFilters(openFilterColumn) && (
+                  <button
+                    onClick={() => handleClearColumnFilters(openFilterColumn)}
+                    className="text-xs text-[#03adf0] hover:text-[#0288c7]"
+                  >
+                    Wyczyść
+                  </button>
+                )}
+              </div>
             </div>
             
             {/* Search input */}
@@ -5517,6 +6211,7 @@ export default function ReservationsTableNew() {
                       handleFilterSearch(e.target.value, openFilterColumn);
                     }
                   }}
+                  onKeyDown={handleModalFilterSearchKeyDown}
                   placeholder={openFilterColumn && isAmountColumn(openFilterColumn) 
                     ? "Wpisz kwotę (np. 100 lub 100,50)..." 
                     : "Szukaj w bazie..."}
@@ -5546,9 +6241,21 @@ export default function ReservationsTableNew() {
               )}
             </div>
             
-            {/* Values list - fixed height container */}
+            {/* Values list - fixed height, load more on scroll */}
             <div className="border border-gray-200" style={{ borderRadius: 0 }}>
-              <div className="h-[320px] overflow-y-auto">
+              <div
+                ref={filterModalScrollRef}
+                className="h-[320px] overflow-y-auto"
+                onScroll={() => {
+                  if (!filterModalHasMore || isFilterSearching || isFilterLoadingMore || !openFilterColumn) return;
+                  const el = filterModalScrollRef.current;
+                  if (!el) return;
+                  const { scrollTop, clientHeight, scrollHeight } = el;
+                  if (scrollTop + clientHeight >= scrollHeight - 80) {
+                    handleLoadMoreFilterOptions();
+                  }
+                }}
+              >
                 {/* Skeleton loader during search */}
                 {isFilterSearching ? (
                   <div className="animate-pulse">
@@ -5561,8 +6268,10 @@ export default function ReservationsTableNew() {
                   </div>
                 ) : getFilterDisplayValues(openFilterColumn).length > 0 ? (
                   getFilterDisplayValues(openFilterColumn).map((value) => {
-                    const columnFilters = columnConfig.find(c => c.key === openFilterColumn)?.filters || [];
-                    const isSelected = columnFilters.includes(value);
+                    const col = columnConfig.find(c => c.key === openFilterColumn);
+                    const exclude = col?.exclude || [];
+                    const filters = col?.filters || [];
+                    const isSelected = exclude.length > 0 ? !exclude.includes(value) : filters.includes(value);
                     return (
                       <label
                         key={value}
@@ -5593,6 +6302,20 @@ export default function ReservationsTableNew() {
                 )}
               </div>
             </div>
+
+            {/* Zastosuj: when in "all except" mode, apply and close */}
+            {openFilterColumn && (columnConfig.find(c => c.key === openFilterColumn)?.exclude?.length || 0) > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloseFilterModal}
+                  className="px-4 py-2 text-sm text-white bg-[#03adf0] hover:bg-[#0288c7]"
+                  style={{ borderRadius: 0 }}
+                >
+                  Zastosuj
+                </button>
+              </div>
+            )}
           </div>
         )}
       </UniversalModal>
@@ -5636,74 +6359,36 @@ export default function ReservationsTableNew() {
         }}
       />
 
-      {/* Column Selection Modal */}
+      {/* Ustawienia kolumn w prawym panelu (openDocument w handleOpenColumnModal) */}
+
+      {/* Modal potwierdzenia resetu kolumn do domyślnych */}
       <UniversalModal
-        isOpen={columnModalOpen}
-        onClose={handleCloseColumnModal}
-        title="Wybierz kolumny"
+        isOpen={resetColumnsModalOpen}
+        onClose={() => setResetColumnsModalOpen(false)}
+        title="Resetuj do domyślnych ustawień"
         maxWidth="md"
       >
         <div className="p-4 sm:p-6">
-          {/* Header with hint */}
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs sm:text-sm font-medium text-gray-900">
-              Wybierz i przeciągnij aby zmienić kolejność
-            </span>
+          <p className="text-sm text-gray-700 mb-4">
+            Przywrócenie domyślnych ustawień spowoduje <strong>utratę Twojej ustawionej kolejności i widoczności kolumn</strong> w tabeli rezerwacji. Dane w bazie nie zostaną w żaden sposób zmienione ani usunięte.
+          </p>
+          <p className="text-sm text-gray-600 mb-4">
+            Czy na pewno chcesz przywrócić domyślne ustawienia kolumn?
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
             <button
-              onClick={handleResetColumnPreferences}
-              className="text-xs text-[#03adf0] hover:text-[#0288c7]"
-            >
-              Resetuj
-            </button>
-          </div>
-          
-          {/* Columns list - fixed height container */}
-          <div className="border border-gray-200" style={{ borderRadius: 0 }}>
-            <div className="h-[320px] overflow-y-auto">
-              {tempColumnConfig.map((col, index) => (
-                <div
-                  key={col.key}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, index)}
-                  className={`flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-move transition-colors ${
-                    draggedOverIndex === index ? 'bg-blue-50' : ''
-                  } ${draggedColumnIndex === index ? 'opacity-50' : ''} ${col.visible ? 'bg-blue-50' : ''}`}
-                  style={{ cursor: 'grab' }}
-                >
-                  <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  <input
-                    type="checkbox"
-                    checked={col.visible}
-                    onChange={() => handleColumnToggle(col.key)}
-                    className="w-4 h-4 text-[#03adf0] border-gray-300 focus:ring-[#03adf0]"
-                    style={{ borderRadius: 0, cursor: 'pointer' }}
-                  />
-                  <span className="text-xs sm:text-sm text-gray-900 flex-1 truncate" title={COLUMN_DEFINITIONS[col.key as keyof typeof COLUMN_DEFINITIONS] || col.key}>
-                    {COLUMN_DEFINITIONS[col.key as keyof typeof COLUMN_DEFINITIONS] || col.key}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Footer with buttons */}
-          <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
-            <button
-              onClick={handleCloseColumnModal}
+              onClick={() => setResetColumnsModalOpen(false)}
               className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
               style={{ borderRadius: 0 }}
             >
               Anuluj
             </button>
             <button
-              onClick={handleSaveColumnPreferences}
+              onClick={handleConfirmResetToDefaultColumns}
               className="px-4 py-2 text-sm text-white bg-[#03adf0] hover:bg-[#0288c7] transition-colors"
               style={{ borderRadius: 0 }}
             >
-              Zapisz
+              Potwierdź
             </button>
           </div>
         </div>
@@ -5754,6 +6439,24 @@ export default function ReservationsTableNew() {
           background-color: #a1a1a1;
         }
       `}</style>
+      {rowContextMenu && (
+        <div
+          ref={rowContextMenuRef}
+          className="fixed z-[100] min-w-[180px] py-1 bg-white border border-gray-200 rounded shadow-lg"
+          style={{ left: rowContextMenu.x, top: rowContextMenu.y }}
+        >
+          <button
+            type="button"
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            onClick={() => {
+              window.open(rowContextMenu.url, '_blank', 'noopener,noreferrer');
+              setRowContextMenu(null);
+            }}
+          >
+            Otwórz w nowej karcie
+          </button>
+        </div>
+      )}
     </div>
   );
 }

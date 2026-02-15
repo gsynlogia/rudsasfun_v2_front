@@ -62,3 +62,4 @@ sticky-test-screenshots/
 /test-results/
 /playwright-report/
 /screenshots_playwright/
+/playwright/.auth/

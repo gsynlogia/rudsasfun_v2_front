@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 
 import AuthGuard from '@/components/admin/AuthGuard';
+import { AdminRightPanelProvider } from '@/context/AdminRightPanelContext';
 import { SidebarProvider } from '@/context/SidebarContext';
 
 /**
@@ -32,7 +33,9 @@ export default function AdminPanelLayout({
   return (
     <SidebarProvider>
       <AuthGuard requireAdmin={false}>
-        {children}
+        <AdminRightPanelProvider>
+          {children}
+        </AdminRightPanelProvider>
       </AuthGuard>
     </SidebarProvider>
   );

@@ -8,7 +8,7 @@ export interface UniversalModalProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full' | 'screen';
   showCloseButton?: boolean;
   className?: string;
   closeOnOverlayClick?: boolean;  // Allow closing by clicking overlay (default: true)
@@ -61,6 +61,7 @@ export default function UniversalModal({
     xl: 'max-w-xl',
     '2xl': 'max-w-2xl',
     full: 'max-w-full',
+    screen: 'max-w-[calc(100vw-2rem)]',
   };
 
   return (

@@ -1,10 +1,69 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Printer } from 'lucide-react';
 import Image from 'next/image';
+import { isValidPesel } from '@/lib/utils/pesel';
+import { authService } from '@/lib/services/AuthService';
+import type { SignedQualificationPayload } from '@/lib/qualificationReservationMapping';
+import { signedPayloadOverlayOnly, signedPayloadToFormState } from '@/lib/qualificationReservationMapping';
+
+function HealthTagInput({
+  tags,
+  onTagsChange,
+  placeholder,
+}: {
+  tags: string[];
+  onTagsChange: (tags: string[]) => void;
+  placeholder?: string;
+}) {
+  const [inputValue, setInputValue] = useState('');
+  const addTag = useCallback(() => {
+    const v = inputValue.trim();
+    if (v && !tags.includes(v)) {
+      onTagsChange([...tags, v]);
+      setInputValue('');
+    }
+  }, [inputValue, tags, onTagsChange]);
+  const removeTag = (index: number) => {
+    onTagsChange(tags.filter((_, i) => i !== index));
+  };
+  return (
+    <div className="border border-gray-300 rounded-lg p-2 bg-white min-h-[42px]">
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {tags.map((t, i) => (
+            <span
+              key={`${t}-${i}`}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#03adf0]/15 text-sm"
+            >
+              {t}
+              <button type="button" onClick={() => removeTag(i)} className="text-gray-600 hover:text-red-600" aria-label="Usuń">×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+        placeholder={placeholder}
+        className="input-line w-full border-0 p-0 focus:ring-0"
+      />
+    </div>
+  );
+}
+
+/** Pomoc: zamiana tekstu z bazy (szczegóły) na tablicę tagów (po przecinku). */
+function parseDetailToTags(detail: string | null | undefined): string[] {
+  if (!detail || typeof detail !== 'string') return [];
+  return detail.split(',').map((s) => s.trim()).filter(Boolean);
+}
 
 interface QualificationFormProps {
+  /** Id rezerwacji (numeryczny) – do zapisu podpisu w signed_documents */
+  reservationId?: number | null;
   reservationData?: {
     turnName?: string;
     campLocation?: string;
@@ -16,17 +75,126 @@ interface QualificationFormProps {
     parentAddress?: string;
     parentPhone?: string;
     reservationId?: string;
+    healthInfo?: string;
+    health_questions?: Record<string, string> | null;
+    health_details?: Record<string, string> | null;
+    additional_notes?: string | null;
+    additionalInfo?: string;
+    accommodationRequest?: string;
+    parentCount?: number;
+    childPesel?: string;
+    secondParentName?: string;
+    secondParentAddress?: string;
+    secondParentPhone?: string;
   };
+  /** Payload z signed_documents – overlay (szczepienia, upoważnienia, potwierdzenia). Baza = tylko rezerwacja (qualification_card_data nie jest wczytywane). */
+  signedPayload?: SignedQualificationPayload | null;
   printMode?: boolean;
+  /** Po udanym „Zapisz zmiany” – np. do pokazania toastu z informacją o źródle danych */
+  onSaveSuccess?: (message: string) => void;
 }
 
-export function QualificationForm({ reservationData, printMode = false }: QualificationFormProps) {
+export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, printMode = false, onSaveSuccess }: QualificationFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
+  const [currentDocumentId, setCurrentDocumentId] = useState<number | null>(null);
+  const [latestCardStatus, setLatestCardStatus] = useState<'in_verification' | 'accepted' | 'rejected' | null>(null);
   const [resendTimer, setResendTimer] = useState(60);
   const [showRegulationError, setShowRegulationError] = useState(false);
   const [showAuthorizationError, setShowAuthorizationError] = useState(false);
+  const [childPeselError, setChildPeselError] = useState<string | null>(null);
+  const [noPeselYearError, setNoPeselYearError] = useState<string | null>(null);
+  const [noSecondParent, setNoSecondParent] = useState(false);
+  const [secondParentName, setSecondParentName] = useState('');
+  const [secondParentAddress, setSecondParentAddress] = useState('');
+  const [secondParentPhone, setSecondParentPhone] = useState('');
+  const [secondParentError, setSecondParentError] = useState<string | null>(null);
+  const [childDOBError, setChildDOBError] = useState<string | null>(null);
+  const [secondParentNameError, setSecondParentNameError] = useState(false);
+  const [secondParentAddressError, setSecondParentAddressError] = useState(false);
+  const [secondParentPhoneError, setSecondParentPhoneError] = useState(false);
+
+  /** Sekcja II – stan zdrowia: 3 pytania z kroku 1 (tagi) + 4. pole dodatkowe */
+  const [healthChronicTags, setHealthChronicTags] = useState<string[]>([]);
+  const [healthDysfunctionsTags, setHealthDysfunctionsTags] = useState<string[]>([]);
+  const [healthPsychiatricTags, setHealthPsychiatricTags] = useState<string[]>([]);
+  const [healthAdditionalNotes, setHealthAdditionalNotes] = useState('');
+  /** Który modal tagów zdrowia jest otwarty: null | 'chronic' | 'dysfunctions' | 'psychiatric' */
+  const [healthTagModal, setHealthTagModal] = useState<null | 'chronic' | 'dysfunctions' | 'psychiatric'>(null);
+
+  /** Inicjalizacja sekcji zdrowia z rezerwacji (health_details, additional_notes) */
+  useEffect(() => {
+    if (!reservationData) return;
+    const hd = reservationData.health_details;
+    if (hd && typeof hd === 'object') {
+      setHealthChronicTags(parseDetailToTags(hd.chronicDiseases));
+      setHealthDysfunctionsTags(parseDetailToTags(hd.dysfunctions));
+      setHealthPsychiatricTags(parseDetailToTags(hd.psychiatric));
+    }
+    setHealthAdditionalNotes((reservationData.additional_notes ?? '').trim());
+  }, [reservationData?.health_details, reservationData?.additional_notes]);
+
+  /** Synchronizacja z reservationData (tylko rezerwacja, bez qualification_card_data) */
+  useEffect(() => {
+    if (!reservationData) return;
+    setFormData((prev) => ({
+      ...prev,
+      childPesel: reservationData.childPesel ?? prev.childPesel,
+    }));
+    if (reservationData.secondParentName != null) setSecondParentName(reservationData.secondParentName);
+    if (reservationData.secondParentAddress != null) setSecondParentAddress(reservationData.secondParentAddress);
+    if (reservationData.secondParentPhone != null) setSecondParentPhone(reservationData.secondParentPhone);
+  }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone]);
+
+  /** Overlay z signed_documents.payload: PESEL, drugi opiekun (gdy podpisano kartę), szczepienia, upoważnienia, potwierdzenia. Źródła: reservations + signed_documents. */
+  useEffect(() => {
+    const overlay = signedPayloadOverlayOnly(signedPayload ?? undefined);
+    if (!overlay) return;
+    setAuthorizations(overlay.authorizations);
+    if (overlay.secondParent) {
+      setSecondParentName(overlay.secondParent.name);
+      setSecondParentAddress(overlay.secondParent.address);
+      setSecondParentPhone(overlay.secondParent.phone);
+    }
+    setFormData((prev) => ({
+      ...prev,
+      childPesel: overlay.childPesel !== undefined && overlay.childPesel !== '' ? overlay.childPesel : prev.childPesel,
+      vaccination: overlay.vaccination,
+      regulationConfirm: overlay.regulationConfirm,
+      pickupInfo: overlay.pickupInfo,
+      independentReturn: overlay.independentReturn,
+      parentDeclaration: overlay.parentDeclaration,
+      directorConfirmation: overlay.directorConfirmation,
+      directorDate: overlay.directorDate,
+      directorSignature: overlay.directorSignature,
+      organizerSignature: overlay.organizerSignature,
+    }));
+  }, [signedPayload]);
+
+  /** Na wydruku (/druk/...) pola tylko do oglądania, bez żółtego tła i bez możliwości wypełniania. */
+  const isEditable = !printMode && !isSigned;
+
+  // Pobierz status najnowszego podpisanego dokumentu (karta) – czy można podpisać ponownie (tylko gdy odrzucona)
+  useEffect(() => {
+    if (printMode || reservationIdProp == null) return;
+    const token = authService.getToken();
+    if (!token) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    fetch(`${apiUrl}/api/signed-documents/reservation/${reservationIdProp}?document_type=qualification_card`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((docs: Array<{ status: string }>) => {
+        const latest = docs[0];
+        if (latest && (latest.status === 'in_verification' || latest.status === 'accepted' || latest.status === 'rejected')) {
+          setLatestCardStatus(latest.status as 'in_verification' | 'accepted' | 'rejected');
+        } else {
+          setLatestCardStatus(null);
+        }
+      })
+      .catch(() => setLatestCardStatus(null));
+  }, [reservationIdProp, printMode]);
 
   // Automatyczny druk w trybie printMode
   useEffect(() => {
@@ -58,22 +226,20 @@ export function QualificationForm({ reservationData, printMode = false }: Qualif
   };
 
   const [formData, setFormData] = useState({
-    // Dane uczestnika (domyślne wartości dla podglądu)
-    turnName: reservationData?.turnName || 'All in One - Młodzieżowy',
-    campLocation: reservationData?.campLocation || 'OK BEAVER, Wiele, Rogalewo 1',
-    campDates: reservationData?.campDates || '16.07.2026 - 25.07.2026',
+    // Dane z profilu rezerwacji (żółte pola – wczytywane z API, edytowalne przez klienta)
+    turnName: reservationData?.turnName ?? '',
+    campLocation: reservationData?.campLocation ?? '',
+    campDates: reservationData?.campDates ?? '',
+    childName: reservationData?.childName ?? '',
+    childDOB: reservationData?.childDOB ?? '',
+    childPesel: reservationData?.childPesel ?? '',
+    childAddress: reservationData?.childAddress ?? '',
+    parentNames: reservationData?.parentNames ?? '',
+    parentAddress: reservationData?.parentAddress ?? '',
+    parentPhone: reservationData?.parentPhone ?? '',
     
-    // Sekcja I - Dane uczestnika/dziecka
-    childName: reservationData?.childName || 'test test',
-    childDOB: reservationData?.childDOB || '21.01.2014',
-    childPesel: '',
-    childAddress: reservationData?.childAddress || 'Przylądź OODB1, 80-349 Gdańsk',
-    parentNames: reservationData?.parentNames || 'test test, test brąk',
-    parentAddress: reservationData?.parentAddress || 'Działczaś OOBB1, 80-349 Gdańsk brak, brak brak',
-    parentPhone: reservationData?.parentPhone || '+48 724680812',
-    
-    // Sekcja II - Informacja o stanie zdrowia
-    healthInfo: '',
+    // Sekcja II - Informacja o stanie zdrowia (z profilu: health_questions, health_details, additional_notes)
+    healthInfo: reservationData?.healthInfo ?? '',
     
     // Informacja o szczepieniach
     vaccination: {
@@ -89,7 +255,8 @@ export function QualificationForm({ reservationData, printMode = false }: Qualif
       otherDetails: ''
     },
     
-    vaccineInfo: '',
+    // Sekcja IV - Wniosek o zakwaterowanie (z profilu: accommodation_request)
+    vaccineInfo: reservationData?.accommodationRequest ?? '',
     
     // Sekcja III - Deklaracja
     parentDeclaration: '',
@@ -100,8 +267,8 @@ export function QualificationForm({ reservationData, printMode = false }: Qualif
     // Sekcja VI - Zgoda na samodzielny powrót
     independentReturn: false,
     
-    // Sekcja III - Informacje dodatkowe
-    additionalInfo: '',
+    // Sekcja III - Informacje dodatkowe (z profilu: participant_additional_info)
+    additionalInfo: reservationData?.additionalInfo ?? '',
     
     // Sekcja V - Odbiór dziecka
     pickupInfo: '',
@@ -169,84 +336,234 @@ export function QualificationForm({ reservationData, printMode = false }: Qualif
     }
   };
 
+  /** Walidacja pól obowiązkowych (ta sama co przy podpisywaniu). Zwraca true, gdy formularz jest poprawny.
+   * Zbiera wszystkie błędy naraz i ustawia state, żeby użytkownik widział czerwone ramki przy wszystkich błędnych polach (w tym drugi opiekun). */
+  const runValidation = (): boolean => {
+    setChildPeselError(null);
+    setNoPeselYearError(null);
+    setSecondParentError(null);
+    setChildDOBError(null);
+    setSecondParentNameError(false);
+    setSecondParentAddressError(false);
+    setSecondParentPhoneError(false);
+    setShowRegulationError(false);
+    setShowAuthorizationError(false);
+
+    let hasAnyError = false;
+    let firstErrorSection: Element | null = null;
+
+    if (!formData.regulationConfirm) {
+      setShowRegulationError(true);
+      hasAnyError = true;
+      const el = document.querySelector('.checkbox-single');
+      if (el && !firstErrorSection) firstErrorSection = el;
+    }
+
+    const dobRaw = (formData.childDOB || '').trim();
+    const hasDOB = /^\d{4}(-\d{2}-\d{2})?$/.test(dobRaw) || /^\d{4}$/.test(dobRaw);
+    if (!hasDOB) {
+      setChildDOBError('To pole jest obowiązkowe');
+      hasAnyError = true;
+      if (!firstErrorSection) firstErrorSection = document.getElementById('child-dob-field');
+    }
+
+    if (!formData.vaccination.measles) {
+      const peselTrim = formData.childPesel.trim();
+      if (!peselTrim || !isValidPesel(peselTrim)) {
+        setChildPeselError('To pole jest obowiązkowe');
+        hasAnyError = true;
+        if (!firstErrorSection) firstErrorSection = document.querySelector('[data-pesel-field]');
+      }
+    } else {
+      if (!formData.vaccination.calendar) {
+        const yearTrim = (formData.vaccination.measlesYear || '').trim();
+        if (!yearTrim) {
+          setNoPeselYearError('To pole jest obowiązkowe');
+          hasAnyError = true;
+          if (!firstErrorSection) firstErrorSection = document.getElementById('child-no-pesel-section');
+        }
+      }
+    }
+
+    const parentCount = reservationData?.parentCount ?? 0;
+    if (parentCount === 1 && !noSecondParent) {
+      const nameTrim = secondParentName.trim();
+      const addressTrim = secondParentAddress.trim();
+      const phoneTrim = secondParentPhone.trim();
+      if (!nameTrim || !addressTrim || !phoneTrim) {
+        setSecondParentNameError(!nameTrim);
+        setSecondParentAddressError(!addressTrim);
+        setSecondParentPhoneError(!phoneTrim);
+        hasAnyError = true;
+        if (!firstErrorSection) firstErrorSection = document.getElementById('no-second-parent-section');
+      }
+    }
+
+    const hasInvalidAuthorization = authorizations.some(auth => {
+      const hasStartedFilling =
+        auth.fullName.trim().length > 0 ||
+        auth.documentNumber.trim().length > 0 ||
+        auth.canPickup ||
+        auth.canTemporaryPickup;
+      if (hasStartedFilling) {
+        if (!auth.fullName.trim()) return true;
+        if (!auth.documentNumber.trim()) return true;
+        if (!auth.canPickup && !auth.canTemporaryPickup) return true;
+      }
+      return false;
+    });
+    if (hasInvalidAuthorization) {
+      setShowAuthorizationError(true);
+      hasAnyError = true;
+      if (!firstErrorSection) firstErrorSection = document.querySelector('.authorization-card');
+    }
+
+    if (firstErrorSection) {
+      firstErrorSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return !hasAnyError;
+  };
+
   const handlePrint = () => {
     if (printMode) {
       window.print();
     } else {
-      // Otwórz stronę druku w nowym oknie
+      if (!runValidation()) return;
       const reservationId = reservationData?.reservationId || '';
       window.open(`/druk/karta-kwalifikacyjna/${reservationId}`, '_blank');
     }
   };
 
-  const handleSignDocument = () => {
-    // Sprawdź czy zaznaczono checkbox z regulaminem
-    if (!formData.regulationConfirm) {
-      setShowRegulationError(true);
-      setShowAuthorizationError(false);
-      // Przewiń do sekcji V z regulaminem
-      const regulationSection = document.querySelector('.checkbox-single');
-      if (regulationSection) {
-        regulationSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      return;
-    }
-    
-    // Sprawdź walidację upoważnień
-    const hasInvalidAuthorization = authorizations.some(auth => {
-      // Sprawdź czy użytkownik zaczął wypełniać COKOLWIEK w tej sekcji
-      const hasStartedFilling = 
-        auth.fullName.trim().length > 0 || 
-        auth.documentNumber.trim().length > 0 || 
-        auth.canPickup || 
-        auth.canTemporaryPickup;
-      
-      // Jeśli zaczął wypełniać, musi wypełnić WSZYSTKO
-      if (hasStartedFilling) {
-        // Musi być wypełnione imię i nazwisko
-        if (!auth.fullName.trim()) {
-          return true;
-        }
-        // Musi być wypełniony numer dokumentu
-        if (!auth.documentNumber.trim()) {
-          return true;
-        }
-        // Musi być zaznaczony przynajmniej jeden checkbox
-        if (!auth.canPickup && !auth.canTemporaryPickup) {
-          return true;
-        }
-      }
-      return false;
-    });
-
-    if (hasInvalidAuthorization) {
-      setShowAuthorizationError(true);
-      setShowRegulationError(false);
-      // Przewiń do sekcji VI z upoważnieniami
-      const authSection = document.querySelector('.authorization-card');
-      if (authSection) {
-        authSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      return;
-    }
-    
-    // Jeśli wszystko OK, otwórz modal
-    setShowRegulationError(false);
-    setShowAuthorizationError(false);
-    setShowSignatureModal(true);
+  const getQualificationPayload = () => {
+    const fd = formData;
+    return {
+      signedAt: new Date().toISOString(),
+      numerRezerwacji: reservationData?.reservationId ?? '',
+      sekcjaI: {
+        nazwaTurnusu: fd.turnName,
+        miejsceKoloniiObozu: fd.campLocation,
+        termin: fd.campDates,
+        uczestnik: { imieNazwisko: fd.childName, dataUrodzenia: fd.childDOB, pesel: fd.childPesel, adres: fd.childAddress },
+        opiekunowie: { imionaNazwiska: fd.parentNames, adres: fd.parentAddress, telefon: fd.parentPhone },
+        drugiOpiekun: reservationData?.parentCount === 1 && !noSecondParent
+          ? { imieNazwisko: secondParentName, adres: secondParentAddress, telefon: secondParentPhone }
+          : null,
+      },
+      sekcjaII_stanZdrowia: {
+        chorobyPrzewlekle: healthChronicTags,
+        dysfunkcje: healthDysfunctionsTags,
+        problemyPsychiatryczne: healthPsychiatricTags,
+        dodatkoweInformacje: healthAdditionalNotes,
+        tekstZbiorczy: fd.healthInfo,
+      },
+      sekcjaII_szczepienia: {
+        zgodnieZKalendarzem: fd.vaccination.calendar,
+        tezec: fd.vaccination.tetanus,
+        tezecRok: fd.vaccination.tetanusYear,
+        odra: fd.vaccination.measles,
+        odraRok: fd.vaccination.measlesYear,
+        blonica: fd.vaccination.diphtheria,
+        blonicaRok: fd.vaccination.diphtheriaYear,
+        inne: fd.vaccination.other,
+        inneRok: fd.vaccination.otherYear,
+        inneSzczegoly: fd.vaccination.otherDetails,
+      },
+      sekcjaIII: { informacjeDodatkowe: fd.additionalInfo, deklaracjaOpiekuna: fd.parentDeclaration },
+      sekcjaIV: {
+        wniosekOZakwaterowanie: fd.vaccineInfo,
+        potwierdzenieRegulaminu: fd.regulationConfirm,
+        odbiorDziecka: fd.pickupInfo,
+        zgodaNaSamodzielnyPowrot: fd.independentReturn,
+      },
+      upowaznienia: authorizations.map(a => ({
+        imieNazwisko: a.fullName,
+        typDokumentu: a.documentType,
+        numerDokumentu: a.documentNumber,
+        odbiorStaly: a.canPickup,
+        odbiorTymczasowy: a.canTemporaryPickup,
+      })),
+      potwierdzenieKierownika: fd.directorConfirmation,
+      dataKierownika: fd.directorDate,
+      podpisKierownika: fd.directorSignature,
+      podpisOrganizatora: fd.organizerSignature,
+    };
   };
 
-  const handleResendCode = () => {
-    // Logika do ponownego wysłania kodu SMS
-    alert('Kod został wysłany ponownie');
-    setResendTimer(60);
+  const handleSignDocument = async () => {
+    if (!runValidation() || reservationIdProp == null) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const token = authService.getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${apiUrl}/api/signed-documents/request-sms-code`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reservation_id: reservationIdProp,
+          document_type: 'qualification_card',
+          payload: getQualificationPayload(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Nie udało się wysłać kodu SMS');
+      }
+      const data = await res.json();
+      setCurrentDocumentId(data.document_id);
+      setShowSignatureModal(true);
+      setResendTimer(60);
+      setSignatureCode('');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Nie udało się wysłać kodu SMS.');
+    }
   };
 
-  const handleConfirmSignature = () => {
-    if (signatureCode.length === 4) {
+  const handleResendCode = async () => {
+    if (resendTimer > 0 || reservationIdProp == null) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const token = authService.getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${apiUrl}/api/signed-documents/request-sms-code`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservation_id: reservationIdProp, document_type: 'qualification_card' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Nie udało się wysłać kodu ponownie');
+      }
+      setResendTimer(60);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Nie udało się wysłać kodu ponownie.');
+    }
+  };
+
+  const handleConfirmSignature = async () => {
+    if (signatureCode.length !== 4 || currentDocumentId == null) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const token = authService.getToken();
+    if (!token) {
+      setShowSignatureModal(false);
+      setSignatureCode('');
+      return;
+    }
+    try {
+      const res = await fetch(`${apiUrl}/api/signed-documents/verify-sms-code`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_id: currentDocumentId, code: signatureCode }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Nieprawidłowy kod');
+      }
       setIsSigned(true);
       setShowSignatureModal(false);
       setSignatureCode('');
+      setCurrentDocumentId(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Nieprawidłowy kod lub błąd weryfikacji.');
     }
   };
 
@@ -260,11 +577,104 @@ export function QualificationForm({ reservationData, printMode = false }: Qualif
     return () => clearInterval(timer);
   }, [resendTimer]);
 
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [saveMessage, setSaveMessage] = useState('');
+
+  const handleSaveChanges = async () => {
+    const reservationId = reservationData?.reservationId;
+    if (!reservationId || !reservationId.startsWith('REZ-')) {
+      setSaveMessage('Brak numeru rezerwacji');
+      setSaveStatus('error');
+      return;
+    }
+    const token = authService.getToken();
+    if (!token) {
+      setSaveMessage('Zaloguj się ponownie');
+      setSaveStatus('error');
+      return;
+    }
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    setSaveStatus('loading');
+    setSaveMessage('');
+    try {
+      const health_questions = {
+        chronicDiseases: healthChronicTags.length ? 'Tak' : 'Nie',
+        dysfunctions: healthDysfunctionsTags.length ? 'Tak' : 'Nie',
+        psychiatric: healthPsychiatricTags.length ? 'Tak' : 'Nie',
+      };
+      const health_details = {
+        chronicDiseases: healthChronicTags.join(', '),
+        dysfunctions: healthDysfunctionsTags.join(', '),
+        psychiatric: healthPsychiatricTags.join(', '),
+      };
+      const resRes = await fetch(`${apiUrl}/api/reservations/by-number/${reservationId}/partial`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          health_questions,
+          health_details,
+          additional_notes: healthAdditionalNotes.trim() || null,
+          accommodation_request: formData.vaccineInfo?.trim() || null,
+          participant_additional_info: formData.additionalInfo?.trim() || null,
+        }),
+      });
+      if (!resRes.ok) {
+        const err = await resRes.json().catch(() => ({}));
+        throw new Error(err.detail || 'Błąd zapisu rezerwacji');
+      }
+      const parts = secondParentName.trim().split(/\s+/);
+      const parent2_first_name = parts[0] ?? '';
+      const parent2_last_name = parts.slice(1).join(' ') ?? '';
+      const cardBody: Record<string, string | null> = {};
+      if (formData.childPesel) cardBody.participant_pesel = formData.childPesel;
+      if (secondParentName.trim()) {
+        cardBody.parent2_first_name = parent2_first_name;
+        cardBody.parent2_last_name = parent2_last_name;
+      }
+      if (secondParentAddress.trim()) cardBody.parent2_street = secondParentAddress.trim();
+      if (secondParentPhone.trim()) cardBody.parent2_phone = secondParentPhone.trim();
+      if (Object.keys(cardBody).length > 0) {
+        const resCard = await fetch(`${apiUrl}/api/qualification-cards/by-number/${reservationId}/data/partial`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(cardBody),
+        });
+        if (!resCard.ok) {
+          const err = await resCard.json().catch(() => ({}));
+          throw new Error(err.detail || 'Błąd zapisu danych karty');
+        }
+      }
+      setSaveStatus('ok');
+      const sourceMsg = signedPayload
+        ? 'Zapisano. Używane dane: rezerwacja i podpisany dokument (karta kwalifikacyjna).'
+        : 'Zapisano. Używane dane: rezerwacja.';
+      setSaveMessage(sourceMsg);
+      onSaveSuccess?.(sourceMsg);
+    } catch (e) {
+      setSaveStatus('error');
+      setSaveMessage(e instanceof Error ? e.message : 'Błąd zapisu');
+    }
+  };
+
   return (
     <>
       {/* Przycisk druku - ukryty przy druku i w printMode */}
       {!printMode && (
-        <div className="no-print max-w-[210mm] mx-auto px-4 pt-4 flex justify-end">
+        <div className="no-print max-w-[210mm] mx-auto px-4 pt-4 flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={handleSaveChanges}
+            disabled={saveStatus === 'loading'}
+            className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition text-sm font-medium disabled:opacity-50"
+          >
+            {saveStatus === 'loading' ? 'Zapisywanie...' : 'Zapisz zmiany'}
+          </button>
           <button
             onClick={handlePrint}
             className="flex items-center gap-2 bg-[#03adf0] text-white px-4 py-2 rounded hover:bg-[#0299d6] transition text-sm font-medium"
@@ -272,6 +682,11 @@ export function QualificationForm({ reservationData, printMode = false }: Qualif
             <Printer className="w-4 h-4" />
             Drukuj
           </button>
+          {saveMessage && (
+            <span className={`text-sm ${saveStatus === 'ok' ? 'text-green-600' : saveStatus === 'error' ? 'text-red-600' : ''}`}>
+              {saveMessage}
+            </span>
+          )}
         </div>
       )}
 
@@ -321,58 +736,247 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               <div className="readonly-field">{formData.childName}</div>
             </div>
 
-            <div className="field-group">
+            <div id="child-dob-field" className="field-group">
               <label>2) Data urodzenia uczestnika/dziecka</label>
-              <div className="readonly-field">{formData.childDOB}</div>
+              {(() => {
+                const dobRaw = formData.childDOB || '';
+                const yearMatch = dobRaw.match(/^(\d{4})/);
+                const birthYear = yearMatch ? parseInt(yearMatch[1], 10) : null;
+                const minYear = birthYear != null && !isNaN(birthYear) ? birthYear - 1 : null;
+                const maxYear = birthYear != null && !isNaN(birthYear) ? birthYear : null;
+                const dobValue =
+                  /^\d{4}-\d{2}-\d{2}$/.test(dobRaw) ? dobRaw
+                  : /^\d{4}$/.test(dobRaw) ? `${dobRaw}-01-01`
+                  : '';
+                const minDate = minYear != null ? `${minYear}-01-01` : undefined;
+                const maxDate = maxYear != null ? `${maxYear}-12-31` : undefined;
+                return (
+                  <>
+                    <input
+                      type="date"
+                      value={dobValue}
+                      onChange={(e) => {
+                        handleChange('childDOB', e.target.value);
+                        setChildDOBError(null);
+                      }}
+                      min={minDate}
+                      max={maxDate}
+                      readOnly={printMode}
+                      className={`input-line ${isEditable ? 'editable-field' : ''} ${childDOBError ? 'border-red-500' : ''}`}
+                      aria-invalid={!!childDOBError}
+                    />
+                    {childDOBError && (
+                      <p className="text-red-600 text-sm mt-1 font-semibold" role="alert">{childDOBError}</p>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
-            <div className="field-group">
+            <div className={`field-group ${childPeselError ? 'border-2 border-red-500 rounded p-2 bg-red-50' : ''}`} data-pesel-field>
               <label>3) PESEL uczestnika/dziecka</label>
-              <input
-                type="text"
-                value={formData.childPesel}
-                onChange={(e) => handleChange('childPesel', e.target.value)}
-                className={`input-line ${!isSigned ? 'editable-field' : ''}`}
-                placeholder="12312312322"
-              />
-            </div>
-
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={formData.vaccination.measles}
-                onChange={(e) => handleVaccinationChange('measles', e.target.checked)}
-              />
-              Dziecko nie posiada numeru PESEL
-              {formData.vaccination.measles && !formData.vaccination.calendar && (
+              <div className={formData.vaccination.measles ? 'pesel-input-crossed' : ''}>
                 <input
                   type="text"
-                  value={formData.vaccination.measlesYear}
-                  onChange={(e) => handleVaccinationChange('measlesYear', e.target.value)}
-                  className={`input-inline ${!isSigned ? 'editable-field' : ''}`}
-                  placeholder="rok"
+                  inputMode="numeric"
+                  maxLength={11}
+                  value={formData.vaccination.measles ? 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' : formData.childPesel}
+                  readOnly={printMode || formData.vaccination.measles}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, '');
+                    handleChange('childPesel', v);
+                    if (childPeselError) setChildPeselError(null);
+                  }}
+                  onBlur={() => {
+                    const v = formData.childPesel.trim();
+                    if (v.length === 0) {
+                      setChildPeselError(null);
+                      return;
+                    }
+                    setChildPeselError(isValidPesel(v) ? null : 'Nieprawidłowy numer PESEL');
+                  }}
+                  className={`input-line ${isEditable ? 'editable-field' : ''} ${childPeselError ? 'border-red-500' : ''}`}
+                  placeholder="12312312322"
+                  aria-invalid={!!childPeselError}
+                  aria-describedby={childPeselError ? 'childPesel-error' : undefined}
                 />
+              </div>
+              {childPeselError && (
+                <p id="childPesel-error" className="text-red-600 text-sm mt-1 font-semibold" role="alert">
+                  {childPeselError}
+                </p>
               )}
-            </label>
+            </div>
+
+            <div id="child-no-pesel-section">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.vaccination.measles}
+                  onChange={(e) => {
+                    handleVaccinationChange('measles', e.target.checked);
+                    setNoPeselYearError(null);
+                  }}
+                  disabled={printMode}
+                />
+                Dziecko nie posiada numeru PESEL
+                {formData.vaccination.measles && !formData.vaccination.calendar && (
+                  <input
+                    type="text"
+                    value={formData.vaccination.measlesYear}
+                    onChange={(e) => {
+                      handleVaccinationChange('measlesYear', e.target.value);
+                      if (noPeselYearError) setNoPeselYearError(null);
+                    }}
+                    readOnly={printMode}
+                    className={`input-inline ${isEditable ? 'editable-field' : ''} ${noPeselYearError ? 'border-red-500' : ''}`}
+                    placeholder="rok"
+                    aria-invalid={!!noPeselYearError}
+                  />
+                )}
+              </label>
+              {noPeselYearError && (
+                <p className="text-red-600 text-sm mt-1 font-semibold" role="alert">
+                  {noPeselYearError}
+                </p>
+              )}
+            </div>
             
             <div className="field-group">
               <label>4) Adres zamieszkania uczestnika/dziecka</label>
               <div className="readonly-field">{formData.childAddress}</div>
             </div>
 
-            <div className="field-group">
-              <label>5) Imiona i nazwiska rodziców/opiekunów prawnych</label>
-              <div className="readonly-field">{formData.parentNames}</div>
-            </div>
+            <div id="parents-section" className="space-y-2">
+              <div className="field-group">
+                <label>5) Imiona i nazwiska rodziców/opiekunów prawnych</label>
+                {(reservationData?.parentCount ?? 0) >= 2 ? (
+                  <div className="readonly-field">{formData.parentNames}</div>
+                ) : (reservationData?.parentCount ?? 0) === 1 ? (
+                  <>
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <div className="readonly-field flex-1 min-w-0">
+                        {formData.parentNames}
+                        {noSecondParent ? ', Brak drugiego rodzica/opiekuna prawnego' : secondParentName.trim() ? `, ${secondParentName.trim()}` : ''}
+                      </div>
+                      {!noSecondParent && (
+                        <>
+                          <input
+                            type="text"
+                            value={secondParentName}
+                            onChange={(e) => {
+                              setSecondParentName(e.target.value);
+                              setSecondParentNameError(false);
+                            }}
+                            placeholder="Imię i nazwisko drugiego opiekuna"
+                            readOnly={printMode}
+                            className={`input-line flex-1 min-w-[200px] ${isEditable ? 'editable-field' : ''} ${secondParentNameError ? 'border-red-500' : ''}`}
+                            aria-invalid={secondParentNameError}
+                          />
+                          {secondParentNameError && (
+                            <p className="text-red-600 text-sm mt-1 w-full font-semibold" role="alert">To pole jest obowiązkowe</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="readonly-field">{formData.parentNames}</div>
+                )}
+              </div>
 
-            <div className="field-group">
-              <label>6) Adresy zamieszkania rodziców/opiekunów prawnych</label>
-              <div className="readonly-field">{formData.parentAddress}</div>
-            </div>
+              {(reservationData?.parentCount ?? 0) === 1 && (
+                <div id="no-second-parent-section">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={noSecondParent}
+                      onChange={(e) => {
+                        setNoSecondParent(e.target.checked);
+                        setSecondParentNameError(false);
+                        setSecondParentAddressError(false);
+                        setSecondParentPhoneError(false);
+                      }}
+                      disabled={printMode}
+                    />
+                    Brak drugiego rodzica/opiekuna prawnego
+                  </label>
+                </div>
+              )}
 
-            <div className="field-group">
-              <label>7) Telefony do rodziców/ opiekunów prawnych</label>
-              <div className="readonly-field">{formData.parentPhone}</div>
+              <div className="field-group">
+                <label>6) Adresy zamieszkania rodziców/opiekunów prawnych</label>
+                {(reservationData?.parentCount ?? 0) >= 2 ? (
+                  <div className="readonly-field">{formData.parentAddress}</div>
+                ) : (reservationData?.parentCount ?? 0) === 1 ? (
+                  <>
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <div className="readonly-field flex-1 min-w-0">
+                        {formData.parentAddress}
+                        {noSecondParent ? ', Brak drugiego rodzica/opiekuna prawnego' : secondParentAddress.trim() ? `, ${secondParentAddress.trim()}` : ''}
+                      </div>
+                      {!noSecondParent && (
+                        <>
+                          <input
+                            type="text"
+                            value={secondParentAddress}
+                            onChange={(e) => {
+                              setSecondParentAddress(e.target.value);
+                              setSecondParentAddressError(false);
+                            }}
+                            placeholder="Adres drugiego opiekuna"
+                            readOnly={printMode}
+                            className={`input-line flex-1 min-w-[200px] ${isEditable ? 'editable-field' : ''} ${secondParentAddressError ? 'border-red-500' : ''}`}
+                            aria-invalid={secondParentAddressError}
+                          />
+                          {secondParentAddressError && (
+                            <p className="text-red-600 text-sm mt-1 w-full font-semibold" role="alert">To pole jest obowiązkowe</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="readonly-field">{formData.parentAddress}</div>
+                )}
+              </div>
+
+              <div className="field-group">
+                <label>7) Telefony do rodziców/ opiekunów prawnych</label>
+                {(reservationData?.parentCount ?? 0) >= 2 ? (
+                  <div className="readonly-field">{formData.parentPhone}</div>
+                ) : (reservationData?.parentCount ?? 0) === 1 ? (
+                  <>
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <div className="readonly-field flex-1 min-w-0">
+                        {formData.parentPhone}
+                        {noSecondParent ? ', Brak drugiego rodzica/opiekuna prawnego' : secondParentPhone.trim() ? `, ${secondParentPhone.trim()}` : ''}
+                      </div>
+                      {!noSecondParent && (
+                        <>
+                          <input
+                            type="text"
+                            value={secondParentPhone}
+                            onChange={(e) => {
+                              setSecondParentPhone(e.target.value);
+                              setSecondParentPhoneError(false);
+                            }}
+                            placeholder="Telefon drugiego opiekuna"
+                            readOnly={printMode}
+                            className={`input-line flex-1 min-w-[160px] ${isEditable ? 'editable-field' : ''} ${secondParentPhoneError ? 'border-red-500' : ''}`}
+                            aria-invalid={secondParentPhoneError}
+                          />
+                          {secondParentPhoneError && (
+                            <p className="text-red-600 text-sm mt-1 w-full font-semibold" role="alert">To pole jest obowiązkowe</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="readonly-field">{formData.parentPhone}</div>
+                )}
+              </div>
             </div>
           </section>
 
@@ -382,114 +986,56 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <div className="info-text">
               Np. na co dziecko jest uczulone, czy przyjmuje stałe leki i w jakich dawkach, czy może przyjmować je samodzielnie, czy może uprawiać sport,
               czy choruje przewlekle (np. alergie, cukrzyca, AZS itp.), czy posiada jakieś dysfunkcje (np. ADHD, upośledzenie w stopniu lekkim, itd), czy dziecko leczy się lub leczyło się
-              psychiatrycznie/psychologicznie, czy ma problemy ze wzrokiem (np. okulary, soczewki), słuchem, czy ma problemy z moczeniem się (tak zwanym zapaleniem układu moczowego). 
+              psychiatrycznie/psychologicznie, czy ma problemy ze wzrokiem (np. okulary, soczewki), słuchem, czy ma problemy z moczeniem się (tak zwanym zapaleniem układu moczowego).
               Informujemy, że leki podaje kadra na obozie lub uczestnik samodzielnie za zgodą opiekuna prawnego/rodzica. Informujemy, że z uwagi na brak możliwości zapewnienia pełnej opieki osobom z zaburzeniami rozwoju
               (Autyzm, Zespół Aspergera, Zespół Retta, Zespół Hellera, Zespół Tourett&apos;a oraz choroba autoimmunologiczna - celiakia), nie przyjmujemy uczestników z tym dysfunkcjami. Zatajenie informacji może
               skutkować usunięciem dziecka/uczestnika z obozu/kolonii i skierowaniem sprawy do sądu.
             </div>
-            <textarea
-              value={formData.healthInfo}
-              onChange={(e) => handleChange('healthInfo', e.target.value)}
-              className={`textarea-field ${!isSigned ? 'editable-field' : ''}`}
-              rows={3}
-              placeholder="Dane z procesu rezerwacji z możliwością edycji/dopisania tutaj"
-            />
-          </section>
-
-          {/* Informacja o szczepieniach */}
-          <section className="section">
-            <h2 className="section-title">Informacja o szczepieniach ochronnych (zaznaczenie oraz podanie roku):</h2>
-            
-            <div className="checkbox-group">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={formData.vaccination.calendar}
-                  onChange={(e) => handleVaccinationChange('calendar', e.target.checked)}
-                />
-                Zgodnie z kalendarzem szczepień
-              </label>
-              
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={formData.vaccination.tetanus}
-                  onChange={(e) => handleVaccinationChange('tetanus', e.target.checked)}
-                />
-                Tężec
-                {formData.vaccination.tetanus && !formData.vaccination.calendar && (
-                  <input
-                    type="text"
-                    value={formData.vaccination.tetanusYear}
-                    onChange={(e) => handleVaccinationChange('tetanusYear', e.target.value)}
-                    className={`input-inline ${!isSigned ? 'editable-field' : ''}`}
-                    placeholder="rok"
-                  />
+            <div className="space-y-3">
+              <div className="field-group">
+                <label>1) Choroby przewlekłe</label>
+                {isEditable && !printMode ? (
+                  <div className="health-tag-field">
+                    <div className="readonly-field">{healthChronicTags.length ? healthChronicTags.join(', ') : '—'}</div>
+                    <button type="button" onClick={() => setHealthTagModal('chronic')} className="health-tag-edit-btn">Edytuj</button>
+                  </div>
+                ) : (
+                  <div className="readonly-field">{healthChronicTags.length ? healthChronicTags.join(', ') : '—'}</div>
                 )}
-              </label>
-              
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={formData.vaccination.measles}
-                  onChange={(e) => handleVaccinationChange('measles', e.target.checked)}
-                />
-                Błonica
-                {formData.vaccination.measles && !formData.vaccination.calendar && (
-                  <input
-                    type="text"
-                    value={formData.vaccination.measlesYear}
-                    onChange={(e) => handleVaccinationChange('measlesYear', e.target.value)}
-                    className={`input-inline ${!isSigned ? 'editable-field' : ''}`}
-                    placeholder="rok"
-                  />
+              </div>
+              <div className="field-group">
+                <label>2) Dysfunkcje</label>
+                {isEditable && !printMode ? (
+                  <div className="health-tag-field">
+                    <div className="readonly-field">{healthDysfunctionsTags.length ? healthDysfunctionsTags.join(', ') : '—'}</div>
+                    <button type="button" onClick={() => setHealthTagModal('dysfunctions')} className="health-tag-edit-btn">Edytuj</button>
+                  </div>
+                ) : (
+                  <div className="readonly-field">{healthDysfunctionsTags.length ? healthDysfunctionsTags.join(', ') : '—'}</div>
                 )}
-              </label>
-              
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={formData.vaccination.diphtheria}
-                  onChange={(e) => handleVaccinationChange('diphtheria', e.target.checked)}
-                />
-                Dur
-                {formData.vaccination.diphtheria && !formData.vaccination.calendar && (
-                  <input
-                    type="text"
-                    value={formData.vaccination.diphtheriaYear}
-                    onChange={(e) => handleVaccinationChange('diphtheriaYear', e.target.value)}
-                    className={`input-inline ${!isSigned ? 'editable-field' : ''}`}
-                    placeholder="rok"
-                  />
+              </div>
+              <div className="field-group">
+                <label>3) Problemy psychiatryczne/psychologiczne</label>
+                {isEditable && !printMode ? (
+                  <div className="health-tag-field">
+                    <div className="readonly-field">{healthPsychiatricTags.length ? healthPsychiatricTags.join(', ') : '—'}</div>
+                    <button type="button" onClick={() => setHealthTagModal('psychiatric')} className="health-tag-edit-btn">Edytuj</button>
+                  </div>
+                ) : (
+                  <div className="readonly-field">{healthPsychiatricTags.length ? healthPsychiatricTags.join(', ') : '—'}</div>
                 )}
-              </label>
-              
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={formData.vaccination.other}
-                  onChange={(e) => handleVaccinationChange('other', e.target.checked)}
+              </div>
+              <div className="field-group">
+                <label>4) Dodatkowe informacje zdrowotne</label>
+                <textarea
+                  value={healthAdditionalNotes}
+                  onChange={(e) => setHealthAdditionalNotes(e.target.value)}
+                  readOnly={printMode}
+                  className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
+                  rows={2}
+                  placeholder="Pozostałe informacje (np. po przecinku)"
                 />
-                Inne
-                {formData.vaccination.other && !formData.vaccination.calendar && (
-                  <>
-                    <input
-                      type="text"
-                      value={formData.vaccination.otherDetails}
-                      onChange={(e) => handleVaccinationChange('otherDetails', e.target.value)}
-                      className={`input-inline ${!isSigned ? 'editable-field' : ''}`}
-                      placeholder="podać jakie"
-                    />
-                    <input
-                      type="text"
-                      value={formData.vaccination.otherYear}
-                      onChange={(e) => handleVaccinationChange('otherYear', e.target.value)}
-                      className={`input-inline ${!isSigned ? 'editable-field' : ''}`}
-                      placeholder="rok"
-                    />
-                  </>
-                )}
-              </label>
+              </div>
             </div>
           </section>
 
@@ -523,6 +1069,113 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <Image src="/logo.png" alt="RADSAS fun" width={60} height={32} className="logo-small" />
           </div>
 
+          {/* Informacja o szczepieniach – od następnej kartki (Strona 2) */}
+          <section className="section">
+            <h2 className="section-title">Informacja o szczepieniach ochronnych (zaznaczenie oraz podanie roku):</h2>
+            
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.vaccination.calendar}
+                  onChange={(e) => handleVaccinationChange('calendar', e.target.checked)}
+                  disabled={printMode}
+                />
+                Zgodnie z kalendarzem szczepień
+              </label>
+              
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.vaccination.tetanus}
+                  onChange={(e) => handleVaccinationChange('tetanus', e.target.checked)}
+                  disabled={printMode}
+                />
+                Tężec
+                {formData.vaccination.tetanus && !formData.vaccination.calendar && (
+                  <input
+                    type="text"
+                    value={formData.vaccination.tetanusYear}
+                    onChange={(e) => handleVaccinationChange('tetanusYear', e.target.value)}
+                    readOnly={printMode}
+                    className={`input-inline ${isEditable ? 'editable-field' : ''}`}
+                    placeholder="rok"
+                  />
+                )}
+              </label>
+              
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.vaccination.measles}
+                  onChange={(e) => handleVaccinationChange('measles', e.target.checked)}
+                  disabled={printMode}
+                />
+                Błonica
+                {formData.vaccination.measles && !formData.vaccination.calendar && (
+                  <input
+                    type="text"
+                    value={formData.vaccination.measlesYear}
+                    onChange={(e) => handleVaccinationChange('measlesYear', e.target.value)}
+                    readOnly={printMode}
+                    className={`input-inline ${isEditable ? 'editable-field' : ''}`}
+                    placeholder="rok"
+                  />
+                )}
+              </label>
+              
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.vaccination.diphtheria}
+                  onChange={(e) => handleVaccinationChange('diphtheria', e.target.checked)}
+                  disabled={printMode}
+                />
+                Dur
+                {formData.vaccination.diphtheria && !formData.vaccination.calendar && (
+                  <input
+                    type="text"
+                    value={formData.vaccination.diphtheriaYear}
+                    onChange={(e) => handleVaccinationChange('diphtheriaYear', e.target.value)}
+                    readOnly={printMode}
+                    className={`input-inline ${isEditable ? 'editable-field' : ''}`}
+                    placeholder="rok"
+                  />
+                )}
+              </label>
+              
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.vaccination.other}
+                  onChange={(e) => handleVaccinationChange('other', e.target.checked)}
+                  disabled={printMode}
+                />
+                Inne
+                {formData.vaccination.other && !formData.vaccination.calendar && (
+                  <>
+                    <input
+                      type="text"
+                      value={formData.vaccination.otherDetails}
+                      onChange={(e) => handleVaccinationChange('otherDetails', e.target.value)}
+                      readOnly={printMode}
+                      className={`input-inline ${isEditable ? 'editable-field' : ''}`}
+                      placeholder="podać jakie"
+                    />
+                    <input
+                      type="text"
+                      value={formData.vaccination.otherYear}
+                      onChange={(e) => handleVaccinationChange('otherYear', e.target.value)}
+                      readOnly={printMode}
+                      className={`input-inline ${isEditable ? 'editable-field' : ''}`}
+                      placeholder="rok"
+                    />
+                  </>
+                )}
+              </label>
+            </div>
+          </section>
+
           {/* Sekcja III - Informacje dodatkowe przeniesiona ze strony 1 */}
           <section className="section">
             <h2 className="section-title">III INFORMACJE DODATKOWE</h2>
@@ -532,7 +1185,8 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <textarea
               value={formData.additionalInfo}
               onChange={(e) => handleChange('additionalInfo', e.target.value)}
-              className={`textarea-field ${!isSigned ? 'editable-field' : ''}`}
+              readOnly={printMode}
+              className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
               rows={2}
             />
           </section>
@@ -547,7 +1201,8 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <textarea
               value={formData.vaccineInfo}
               onChange={(e) => handleChange('vaccineInfo', e.target.value)}
-              className={`textarea-field ${!isSigned ? 'editable-field' : ''}`}
+              readOnly={printMode}
+              className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
               rows={2}
             />
           </section>
@@ -571,14 +1226,13 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       setShowRegulationError(false);
                     }
                   }}
+                  disabled={printMode}
                 />
                 Potwierdzam zapoznanie się z regulaminem
               </label>
             </div>
             {showRegulationError && (
-              <div className="error-message">
-                ⚠️ Musisz potwierdzić zapoznanie się z regulaminem przed podpisaniem dokumentu.
-              </div>
+              <p className="text-red-600 text-sm mt-1 font-semibold" role="alert">To pole jest obowiązkowe</p>
             )}
           </section>
 
@@ -591,11 +1245,11 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             </div>
 
             {authorizations.map((auth, index) => (
-              <div key={index} className="authorization-card">
+              <div key={index} className={`authorization-card ${showAuthorizationError ? 'border-2 border-red-500 rounded p-2 bg-red-50' : ''}`}>
                 {/* Nagłówek karty z przyciskiem usuwania */}
                 <div className="auth-header">
                   <span className="auth-title">Osoba upoważniona #{index + 1}</span>
-                  {index > 0 && (
+                  {!printMode && index > 0 && (
                     <button
                       onClick={() => removeAuthorization(index)}
                       className="remove-button no-print"
@@ -613,7 +1267,8 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     type="text"
                     value={auth.fullName}
                     onChange={(e) => handleAuthorizationChange(index, 'fullName', e.target.value)}
-                    className={`input-inline-full ${!isSigned ? 'editable-field' : ''}`}
+                    readOnly={printMode}
+                    className={`input-inline-full ${isEditable ? 'editable-field' : ''}`}
                     placeholder="Jan Kowalski"
                   />
                 </div>
@@ -625,7 +1280,8 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     <select
                       value={auth.documentType}
                       onChange={(e) => handleAuthorizationChange(index, 'documentType', e.target.value)}
-                      className={`select-field ${!isSigned ? 'editable-field' : ''}`}
+                      disabled={printMode}
+                      className={`select-field ${isEditable ? 'editable-field' : ''}`}
                     >
                       <option value="dowód osobisty">Dowód osobisty</option>
                       <option value="paszport">Paszport</option>
@@ -637,7 +1293,8 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       type="text"
                       value={auth.documentNumber}
                       onChange={(e) => handleAuthorizationChange(index, 'documentNumber', e.target.value)}
-                      className={`input-line ${!isSigned ? 'editable-field' : ''}`}
+                      readOnly={printMode}
+                      className={`input-line ${isEditable ? 'editable-field' : ''}`}
                       placeholder="ABC123456"
                     />
                   </div>
@@ -653,6 +1310,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         type="checkbox"
                         checked={auth.canPickup}
                         onChange={(e) => handleAuthorizationChange(index, 'canPickup', e.target.checked)}
+                        disabled={printMode}
                       />
                       Do odbioru dziecka z obozu: ośrodka i/lub miejsca zbiórki transportu zbiorowego
                     </label>
@@ -662,6 +1320,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         type="checkbox"
                         checked={auth.canTemporaryPickup}
                         onChange={(e) => handleAuthorizationChange(index, 'canTemporaryPickup', e.target.checked)}
+                        disabled={printMode}
                       />
                       Odwiedzin dziecka i/lub zabrania go poza teren ośrodka na określony czas, w trakcie trwania obozu
                     </label>
@@ -681,6 +1340,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       e.target.checked = false; // Reset checkbox
                     }
                   }}
+                  disabled={printMode}
                 />
                 <span className="simple-action-text">Upoważniam kolejną osobę</span>
               </label>
@@ -693,6 +1353,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.independentReturn}
                   onChange={(e) => handleChange('independentReturn', e.target.checked)}
+                  disabled={printMode}
                 />
                 <span className="consent-text">Wyrażam zgodę na samodzielny powrót dziecka do domu z miejsca zbiórki transportu zbiorowego</span>
               </label>
@@ -700,9 +1361,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
 
             {/* Błąd upoważnień */}
             {showAuthorizationError && (
-              <div className="error-message">
-                ⚠️ Jeśli wypełniłeś imię i nazwisko osoby upoważnionej, musisz uzupełnić numer dokumentu oraz zaznaczyć przynajmniej jedno upoważnienie w Sekcji VI.
-              </div>
+              <p className="text-red-600 text-sm mt-1 font-semibold" role="alert">To pole jest obowiązkowe</p>
             )}
           </section>
 
@@ -710,18 +1369,22 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
           <section className="section">
 
             <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-              {isSigned ? (
+              {printMode ? null : isSigned ? (
                 <div className="signed-confirmation">
                   <div className="signed-header">Dokument podpisany przez:</div>
                   <div className="signed-role">{formData.parentNames || 'Opiekun prawny'}</div>
                   <div className="signed-timestamp">{getCurrentDateTime()}</div>
                 </div>
+              ) : latestCardStatus === 'in_verification' ? (
+                <p className="text-amber-700 font-medium no-print">Dokument w trakcie weryfikacji. Ponowne podpisanie nie jest możliwe.</p>
+              ) : latestCardStatus === 'accepted' ? (
+                <p className="text-green-700 font-medium no-print">Karta kwalifikacyjna została zaakceptowana.</p>
               ) : (
-                <button 
-                  onClick={handleSignDocument} 
+                <button
+                  onClick={handleSignDocument}
                   className="sign-button no-print"
                 >
-                  PODPISZ DOKUMENT
+                  {latestCardStatus === 'rejected' ? 'PODPISZ PONOWNIE' : 'PODPISZ DOKUMENT'}
                 </button>
               )}
             </div>
@@ -835,6 +1498,47 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
         </div>
       )}
 
+      {/* Modal edycji tagów zdrowia (1–3) – bez zmiany treści pól */}
+      {healthTagModal && (
+        <div className="modal-overlay no-print" onClick={() => setHealthTagModal(null)}>
+          <div className="modal-content modal-content-tags" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title modal-title-tags">
+              {healthTagModal === 'chronic' && '1) Choroby przewlekłe'}
+              {healthTagModal === 'dysfunctions' && '2) Dysfunkcje'}
+              {healthTagModal === 'psychiatric' && '3) Problemy psychiatryczne/psychologiczne'}
+            </h3>
+            <div className="modal-body-tags">
+              {healthTagModal === 'chronic' && (
+                <HealthTagInput
+                  tags={healthChronicTags}
+                  onTagsChange={setHealthChronicTags}
+                  placeholder="Wpisz i naciśnij Enter"
+                />
+              )}
+              {healthTagModal === 'dysfunctions' && (
+                <HealthTagInput
+                  tags={healthDysfunctionsTags}
+                  onTagsChange={setHealthDysfunctionsTags}
+                  placeholder="Wpisz i naciśnij Enter"
+                />
+              )}
+              {healthTagModal === 'psychiatric' && (
+                <HealthTagInput
+                  tags={healthPsychiatricTags}
+                  onTagsChange={setHealthPsychiatricTags}
+                  placeholder="Wpisz i naciśnij Enter"
+                />
+              )}
+            </div>
+            <div className="modal-buttons">
+              <button type="button" onClick={() => setHealthTagModal(null)} className="modal-button modal-button-confirm">
+                Zamknij
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @media print {
           .no-print {
@@ -891,6 +1595,7 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           line-height: 1.25;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
           color: #1a1a1a;
+          overflow-x: hidden;
         }
 
         .header {
@@ -994,6 +1699,8 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           margin: 0.35rem 0;
           background: white;
           padding: 0.2rem 0;
+          max-width: 100%;
+          min-width: 0;
         }
 
         .section-title {
@@ -1018,6 +1725,11 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           font-weight: 500;
         }
 
+        .pesel-input-crossed {
+          display: block;
+          width: 100%;
+        }
+
         .input-field,
         .input-line {
           width: 100%;
@@ -1039,6 +1751,16 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
 
         .input-line {
           border-bottom: 1px solid #b0b0b0;
+        }
+
+        /* Błąd walidacji – wyraźna czerwona ramka i tło */
+        .input-line.border-red-500,
+        .input-inline.border-red-500,
+        input[type="date"].border-red-500,
+        .select-field.border-red-500 {
+          border: 2px solid #dc2626 !important;
+          border-radius: 4px;
+          background: #fef2f2 !important;
         }
 
         .textarea-field {
@@ -1096,15 +1818,20 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           padding: 0.3rem;
           background: #f9f9f9;
           border-radius: 2px;
+          max-width: 100%;
+          min-width: 0;
         }
 
         .checkbox-label {
           display: flex;
           align-items: center;
+          flex-wrap: wrap;
           gap: 0.25rem;
           font-size: 7.5pt;
           cursor: pointer;
           transition: color 0.2s;
+          max-width: 100%;
+          min-width: 0;
         }
 
         .checkbox-label:hover {
@@ -1228,6 +1955,8 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           border-bottom: 1px solid #b0b0b0;
           font-size: 7.5pt;
           width: 130px;
+          max-width: 100%;
+          box-sizing: border-box;
         }
 
         .input-inline:focus {
@@ -1586,6 +2315,47 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
 
         .modal-button-confirm:disabled:hover {
           transform: none;
+        }
+
+        .health-tag-field {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .health-tag-field .readonly-field {
+          flex: 1;
+          min-width: 0;
+        }
+        .health-tag-edit-btn {
+          flex-shrink: 0;
+          padding: 0.35rem 0.75rem;
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: #0066cc;
+          background: #f0f8ff;
+          border: 1px solid #0066cc;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background 0.2s, color 0.2s;
+        }
+        .health-tag-edit-btn:hover {
+          background: #0066cc;
+          color: white;
+        }
+        .modal-content-tags {
+          width: 480px;
+          max-width: 92vw;
+          text-align: left;
+        }
+        .modal-title-tags {
+          justify-content: flex-start;
+        }
+        .modal-title-tags::before {
+          content: none;
+        }
+        .modal-body-tags {
+          margin-bottom: 1.25rem;
         }
 
         .signed-confirmation {

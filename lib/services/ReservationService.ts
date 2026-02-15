@@ -169,6 +169,7 @@ export interface ReservationResponse {
   source_name: string | null;
   selected_promotion?: string | null;
   promotion_name?: string | null;
+  promotion_price?: number | null;
   selected_addons?: string[] | null;
   selected_protection?: string[] | null;
   contract_status?: string | null;

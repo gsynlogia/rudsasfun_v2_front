@@ -95,72 +95,54 @@ export default function QualificationCardModal({
       setIsLoading(true);
       setError(null);
 
-      const data = await qualificationCardService.getQualificationCardData(reservation.id);
-
-      console.log('Loaded qualification card data:', data);
-      console.log('Reservation parents_data:', reservation.parents_data);
-      console.log('Has second parent:', hasSecondParent);
-
-      // Format date for input type="date" (YYYY-MM-DD)
-      let formattedBirthDate = null;
-      if (data.participant_birth_date) {
-        try {
-          const date = new Date(data.participant_birth_date);
-          if (!isNaN(date.getTime())) {
-            formattedBirthDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
-          }
-        } catch (e) {
-          console.error('Error parsing birth date:', e);
+      // Dane wyłącznie z rezerwacji – nie wczytujemy z qualification_card_data
+      let formattedBirthDate: string | null = null;
+      const age = reservation.participant_age;
+      if (age != null && age !== '') {
+        const ageNum = typeof age === 'string' ? parseInt(age, 10) : age;
+        if (!isNaN(ageNum)) {
+          const birthYear = new Date().getFullYear() - ageNum;
+          formattedBirthDate = `${birthYear}-01-01`;
         }
       }
 
-      // Pre-fill form with existing data or reservation data
-      // Priority: saved data > reservation data
       const formDataToSet = {
-        participant_birth_date: formattedBirthDate || null,
-        participant_birth_place: data.participant_birth_place || null,
-        participant_pesel: data.participant_pesel || null,
-        participant_street: data.participant_street || reservation.parents_data?.[0]?.street || null,
-        participant_postal_code: data.participant_postal_code || reservation.parents_data?.[0]?.postalCode || null,
-        participant_city_address: data.participant_city_address || reservation.participant_city || null,
-        parent1_first_name: data.parent1_first_name || reservation.parents_data?.[0]?.firstName || null,
-        parent1_last_name: data.parent1_last_name || reservation.parents_data?.[0]?.lastName || null,
-        parent1_street: data.parent1_street || reservation.parents_data?.[0]?.street || null,
-        parent1_postal_code: data.parent1_postal_code || reservation.parents_data?.[0]?.postalCode || null,
-        parent1_city: data.parent1_city || reservation.parents_data?.[0]?.city || null,
+        participant_birth_date: formattedBirthDate,
+        participant_birth_place: null,
+        participant_pesel: null,
+        participant_street: reservation.parents_data?.[0]?.street ?? null,
+        participant_postal_code: reservation.parents_data?.[0]?.postalCode ?? null,
+        participant_city_address: reservation.participant_city ?? null,
+        parent1_first_name: reservation.parents_data?.[0]?.firstName ?? null,
+        parent1_last_name: reservation.parents_data?.[0]?.lastName ?? null,
+        parent1_street: reservation.parents_data?.[0]?.street ?? null,
+        parent1_postal_code: reservation.parents_data?.[0]?.postalCode ?? null,
+        parent1_city: reservation.parents_data?.[0]?.city ?? null,
         parent1_phone: (() => {
-          // Priority: saved data > phoneNumber from reservation > phone from reservation
-          const phone = data.parent1_phone || reservation.parents_data?.[0]?.phoneNumber || reservation.parents_data?.[0]?.phone || null;
-          // Extract phone parts (code and number)
+          const phone = (reservation.parents_data?.[0]?.phoneNumber || reservation.parents_data?.[0]?.phone) ?? null;
           const phoneParts = extractPhoneParts(phone);
           setParent1PhoneCode(phoneParts.code);
           return phoneParts.number;
         })(),
-        parent1_email: data.parent1_email || reservation.parents_data?.[0]?.email || null,
-        parent2_first_name: data.parent2_first_name || (hasSecondParent ? reservation.parents_data?.[1]?.firstName : null) || null,
-        parent2_last_name: data.parent2_last_name || (hasSecondParent ? reservation.parents_data?.[1]?.lastName : null) || null,
-        parent2_street: data.parent2_street || (hasSecondParent ? reservation.parents_data?.[1]?.street : null) || null,
-        parent2_postal_code: data.parent2_postal_code || (hasSecondParent ? reservation.parents_data?.[1]?.postalCode : null) || null,
-        parent2_city: data.parent2_city || (hasSecondParent ? reservation.parents_data?.[1]?.city : null) || null,
+        parent1_email: reservation.parents_data?.[0]?.email ?? null,
+        parent2_first_name: hasSecondParent ? reservation.parents_data?.[1]?.firstName ?? null : null,
+        parent2_last_name: hasSecondParent ? reservation.parents_data?.[1]?.lastName ?? null : null,
+        parent2_street: hasSecondParent ? reservation.parents_data?.[1]?.street ?? null : null,
+        parent2_postal_code: hasSecondParent ? reservation.parents_data?.[1]?.postalCode ?? null : null,
+        parent2_city: hasSecondParent ? reservation.parents_data?.[1]?.city ?? null : null,
         parent2_phone: (() => {
           if (!hasSecondParent) return null;
-          // Priority: saved data > phoneNumber from reservation > phone from reservation
-          const phone = data.parent2_phone || reservation.parents_data?.[1]?.phoneNumber || reservation.parents_data?.[1]?.phone || null;
-          // Extract phone parts (code and number)
+          const phone = (reservation.parents_data?.[1]?.phoneNumber || reservation.parents_data?.[1]?.phone) ?? null;
           const phoneParts = extractPhoneParts(phone);
           setParent2PhoneCode(phoneParts.code);
           return phoneParts.number;
         })(),
-        parent2_email: data.parent2_email || (hasSecondParent ? reservation.parents_data?.[1]?.email : null) || null,
+        parent2_email: hasSecondParent ? reservation.parents_data?.[1]?.email ?? null : null,
       };
 
-      console.log('Setting form data:', formDataToSet);
       setFormData(formDataToSet);
-
-      // Load health and additional info from reservation
       setAccommodationRequest(reservation.accommodation_request || '');
 
-      // Load health questions
       if (reservation.health_questions && typeof reservation.health_questions === 'object') {
         setHealthQuestions({
           chronicDiseases: reservation.health_questions.chronicDiseases || 'Nie',
@@ -168,8 +150,6 @@ export default function QualificationCardModal({
           psychiatric: reservation.health_questions.psychiatric || 'Nie',
         });
       }
-
-      // Load health details
       if (reservation.health_details && typeof reservation.health_details === 'object') {
         setHealthDetails({
           chronicDiseases: reservation.health_details.chronicDiseases || '',
@@ -177,18 +157,15 @@ export default function QualificationCardModal({
           psychiatric: reservation.health_details.psychiatric || '',
         });
       }
-
       setAdditionalNotes(reservation.additional_notes || '');
       setParticipantAdditionalInfo(reservation.participant_additional_info || '');
 
-      // Check if can generate
       const canGen = await qualificationCardService.canGenerateQualificationCard(reservation.id);
       setCanGenerate(canGen.can_generate);
     } catch (err) {
       console.error('Error loading qualification card data:', err);
       setError(err instanceof Error ? err.message : 'Błąd podczas ładowania danych');
 
-      // Even if loading fails, pre-fill with reservation data
       const fallbackFormData = {
         participant_birth_date: null,
         participant_birth_place: null,
@@ -202,9 +179,7 @@ export default function QualificationCardModal({
         parent1_postal_code: reservation.parents_data?.[0]?.postalCode || null,
         parent1_city: reservation.parents_data?.[0]?.city || null,
         parent1_phone: (() => {
-          // Priority: phoneNumber from reservation > phone from reservation
-          const phone = reservation.parents_data?.[0]?.phoneNumber || reservation.parents_data?.[0]?.phone || null;
-          // Extract phone parts (code and number)
+          const phone = (reservation.parents_data?.[0]?.phoneNumber || reservation.parents_data?.[0]?.phone) ?? null;
           const phoneParts = extractPhoneParts(phone);
           setParent1PhoneCode(phoneParts.code);
           return phoneParts.number;
@@ -217,9 +192,7 @@ export default function QualificationCardModal({
         parent2_city: hasSecondParent ? reservation.parents_data?.[1]?.city : null,
         parent2_phone: (() => {
           if (!hasSecondParent) return null;
-          // Priority: phoneNumber from reservation > phone from reservation
-          const phone = reservation.parents_data?.[1]?.phoneNumber || reservation.parents_data?.[1]?.phone || null;
-          // Remove +48 prefix if present for display
+          const phone = (reservation.parents_data?.[1]?.phoneNumber || reservation.parents_data?.[1]?.phone) ?? null;
           if (phone && typeof phone === 'string' && phone.startsWith('+48')) {
             return phone.replace(/^\+48\s*/, '').trim();
           }

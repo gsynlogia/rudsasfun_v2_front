@@ -1,10 +1,11 @@
 'use client';
 
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Bell, X, CreditCard, Calendar, AlertCircle, CheckCircle } from 'lucide-react';
 
 import AdminSidebar from './AdminSidebar';
 import { useSidebar } from '@/context/SidebarContext';
+import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -70,26 +71,28 @@ const getNotificationIcon = (type: string) => {
 };
 
 /**
- * Inner layout component that uses sidebar context
+ * Inner layout component that uses sidebar context and right panel context
  */
 function AdminLayoutInner({ children }: AdminLayoutProps) {
-  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const unreadCount = sampleNotifications.filter(n => !n.read).length;
   const { sidebarWidth, isLoading } = useSidebar();
-  
-  // Use default width during loading to prevent layout shift
+  const { panelMode, documentTitle, documentContent, openNotifications, close } = useAdminRightPanel();
+
+  const isPanelOpen = panelMode !== 'closed';
+  const isDocumentMode = panelMode === 'document';
   const effectiveWidth = isLoading ? '256px' : sidebarWidth;
+  const panelLeftPx = effectiveWidth === '72px' ? 72 : 256;
 
   // Close panel on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isNotificationPanelOpen) {
-        setIsNotificationPanelOpen(false);
+      if (e.key === 'Escape' && isPanelOpen) {
+        close();
       }
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isNotificationPanelOpen]);
+  }, [isPanelOpen, close]);
 
   return (
     <div className="h-screen w-full bg-white flex">
@@ -105,7 +108,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
         <button 
           className="fixed top-11 right-3 z-50 w-10 h-10 bg-slate-800 hover:bg-slate-700 text-white rounded-full flex items-center justify-center shadow-lg transition-colors cursor-pointer"
           title="Powiadomienia"
-          onClick={() => setIsNotificationPanelOpen(true)}
+          onClick={openNotifications}
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
@@ -122,72 +125,93 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
       </div>
 
       {/* Overlay when panel is open */}
-      {isNotificationPanelOpen && (
+      {isPanelOpen && (
         <div 
           className="fixed inset-0 bg-black/20 z-50 transition-opacity"
-          onClick={() => setIsNotificationPanelOpen(false)}
+          onClick={close}
+          aria-hidden="true"
         />
       )}
 
-      {/* Notification Panel - slides from right */}
+      {/* Right Panel - notifications (w-96) or document (od lewego sidebara do prawej krawędzi) */}
       <div 
-        className={`fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
-          isNotificationPanelOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed top-0 h-full bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
+          isPanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
+        style={{
+          ...(isDocumentMode ? { left: panelLeftPx, right: 0 } : { right: 0, width: '24rem' }),
+        }}
       >
-        {/* Panel Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-[#03adf0]" />
-            <h2 className="text-lg font-semibold text-gray-800">Powiadomienia</h2>
-            {unreadCount > 0 && (
-              <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
-                {unreadCount} nowe
-              </span>
-            )}
-          </div>
-          <button
-            onClick={() => setIsNotificationPanelOpen(false)}
-            className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-            title="Zamknij"
-          >
-            <X className="w-5 h-5 text-gray-600" />
-          </button>
-        </div>
-
-        {/* Notifications List */}
-        <div className="overflow-y-auto h-[calc(100%-64px)]">
-          {sampleNotifications.map((notification) => (
-            <div
-              key={notification.id}
-              className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
-                !notification.read ? 'bg-blue-50/50' : ''
-              }`}
-            >
-              <div className="flex gap-3">
-                <div className="flex-shrink-0 mt-1">
-                  {getNotificationIcon(notification.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className={`text-sm font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}>
-                      {notification.title}
-                    </p>
-                    {!notification.read && (
-                      <span className="w-2 h-2 bg-[#03adf0] rounded-full flex-shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600 mt-0.5 line-clamp-2">
-                    {notification.message}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {notification.time}
-                  </p>
-                </div>
-              </div>
+        {isDocumentMode ? (
+          <>
+            <div className="flex items-center justify-between flex-shrink-0 p-4 border-b border-gray-200 bg-white z-10">
+              <h2 className="text-lg font-semibold text-gray-900">{documentTitle}</h2>
+              <button
+                onClick={close}
+                className="p-2 rounded-none text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors cursor-pointer"
+                title="Zamknij"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          ))}
-        </div>
+            <div className="flex-1 min-h-0 overflow-auto p-4">
+              {typeof documentContent === 'function' ? documentContent() : documentContent}
+            </div>
+          </>
+        ) : panelMode === 'notifications' ? (
+          <>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-[#03adf0]" />
+                <h2 className="text-lg font-semibold text-gray-800">Powiadomienia</h2>
+                {unreadCount > 0 && (
+                  <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                    {unreadCount} nowe
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={close}
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                title="Zamknij"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            <div className="overflow-y-auto h-[calc(100%-64px)]">
+              {sampleNotifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
+                    !notification.read ? 'bg-blue-50/50' : ''
+                  }`}
+                >
+                  <div className="flex gap-3">
+                    <div className="flex-shrink-0 mt-1">
+                      {getNotificationIcon(notification.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}>
+                          {notification.title}
+                        </p>
+                        {!notification.read && (
+                          <span className="w-2 h-2 bg-[#03adf0] rounded-full flex-shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mt-0.5 line-clamp-2">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {notification.time}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -196,8 +220,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
 /**
  * Admin Layout Component
  * Provides consistent layout for admin panel with sidebar
- * No top navbar - more space for content
- * Notification icon in top-right corner with slide-out panel
+ * Right panel: powiadomienia (w-96) lub dokument (od lewego sidebara do prawej krawędzi)
  * Note: SidebarProvider is in admin-panel/layout.tsx to persist state during SPA navigation
  */
 export default function AdminLayout({ children }: AdminLayoutProps) {

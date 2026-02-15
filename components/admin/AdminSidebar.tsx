@@ -34,7 +34,7 @@ export default function AdminSidebar() {
   const router = useRouter();
   const [accessibleSections, setAccessibleSections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isUserZero, setIsUserZero] = useState(false);
+  const [canAccessSuperFunctions, setCanAccessSuperFunctions] = useState(false);
   const { isCollapsed, setIsCollapsed, sidebarWidth, isLoading: sidebarLoading } = useSidebar();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
@@ -45,18 +45,22 @@ export default function AdminSidebar() {
         if (user.accessible_sections) {
           setAccessibleSections(user.accessible_sections);
         }
-        if (user.id === 0) {
-          setIsUserZero(true);
-        }
+        setCanAccessSuperFunctions(
+          user.id === 0 ||
+          user.user_type === 'admin' ||
+          !!(user.groups && user.groups.includes('admin'))
+        );
       } else {
         const storedUser = authService.getCurrentUser();
         if (storedUser) {
           if (storedUser.accessible_sections) {
             setAccessibleSections(storedUser.accessible_sections);
           }
-          if (storedUser.id === 0) {
-            setIsUserZero(true);
-          }
+          setCanAccessSuperFunctions(
+            storedUser.id === 0 ||
+            storedUser.user_type === 'admin' ||
+            !!(storedUser.groups && storedUser.groups.includes('admin'))
+          );
         }
       }
       setLoading(false);
@@ -82,7 +86,7 @@ export default function AdminSidebar() {
   ];
 
   const menuItemsWithSuperFunctions = [...allMenuItems];
-  if (!loading && isUserZero) {
+  if (!loading && canAccessSuperFunctions) {
     menuItemsWithSuperFunctions.push({
       href: '/admin-panel/settings/super-functions',
       icon: Sparkles,
@@ -102,7 +106,7 @@ export default function AdminSidebar() {
     : menuItemsWithSuperFunctions.filter(item => accessibleSections.includes(item.section));
 
   const menuItems = baseMenuItems.filter(item => {
-    if (item.key === 'super-functions') return isUserZero;
+    if (item.key === 'super-functions') return canAccessSuperFunctions;
     return true;
   });
 

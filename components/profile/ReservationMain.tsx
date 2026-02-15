@@ -693,7 +693,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             </h4>
             <div className="space-y-3 sm:space-y-4">
               {reservation.parents_data.map((parent, index) => (
-                <div key={parent.id || index} className="bg-gray-50 rounded-lg p-2 sm:p-3">
+                <div key={`parent-${index}`} className="bg-gray-50 rounded-lg p-2 sm:p-3">
                   <div className="text-xs sm:text-sm font-medium text-gray-900 mb-1 sm:mb-2">
                     {parent.firstName} {parent.lastName}
                   </div>
@@ -784,7 +784,12 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             </div>
             <div>
               <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Promocja</h5>
-              <div className="text-xs sm:text-sm text-gray-700">{promotion}</div>
+              <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-gray-700">
+                <span>{promotion}</span>
+                {reservation.promotion_price != null && reservation.promotion_price !== undefined && (
+                  <span>{reservation.promotion_price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł</span>
+                )}
+              </div>
               {hasPromotion && (
                 <div className="mt-2">
                   {hasJustificationData(reservation.promotion_justification) ? (

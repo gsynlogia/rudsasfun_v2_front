@@ -1,6 +1,7 @@
 'use client';
 
 import { Search, ChevronUp, ChevronDown, Check, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, FileSpreadsheet, XCircle, RotateCcw, RefreshCw, Trash2, Columns, GripVertical, Filter, X as XIcon, Info, Calendar } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useState, useMemo, useEffect, Fragment, useCallback, useRef } from 'react';
 
@@ -1122,7 +1123,20 @@ export default function PaymentsManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  
+  const [rowContextMenu, setRowContextMenu] = useState<{ x: number; y: number; url: string } | null>(null);
+  const rowContextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!rowContextMenu) return;
+    const close = (e: MouseEvent) => {
+      if (rowContextMenuRef.current && !rowContextMenuRef.current.contains(e.target as Node)) {
+        setRowContextMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [rowContextMenu]);
+
   // Initialize filters from URL params
   const getInitialFilters = useCallback((): SearchFilters => ({
     search: searchParams?.get('search') || '',
@@ -4134,22 +4148,31 @@ export default function PaymentsManagement() {
                   const hasPartiallyPaid = activeItemsForReservation.some(item => item.status === 'partially_paid');
                   const hasRemaining = reservation.paymentDetails.remainingAmount > 0;
                   const hasCanceledItems = reservation.paymentDetails.items.some(item => item.status === 'canceled');
+                  const paymentsUrl = currentPage > 1
+                    ? `/admin-panel/rezerwacja/${reservation.reservationName}/payments?fromPage=${currentPage}`
+                    : `/admin-panel/rezerwacja/${reservation.reservationName}/payments`;
 
                   return (
                     <Fragment key={reservation.id}>
                       <tr
                         className={`hover:bg-gray-50 transition-all duration-200 ${isExpanded ? 'bg-blue-50' : ''}`}
                         onClick={(e) => {
-                          // If clicking on expandable row content, don't navigate
                           const target = e.target as HTMLElement;
-                          if (target.closest('button, a, input, select')) {
-                            return;
-                          }
-                          // Navigate to payments detail page with fromPage param
-                          const paymentsUrl = currentPage > 1
-                            ? `/admin-panel/rezerwacja/${reservation.reservationName}/payments?fromPage=${currentPage}`
-                            : `/admin-panel/rezerwacja/${reservation.reservationName}/payments`;
+                          if (target.closest('button, a, input, select')) return;
                           router.push(paymentsUrl);
+                        }}
+                        onAuxClick={(e) => {
+                          if (e.button !== 1) return;
+                          const target = e.target as HTMLElement;
+                          if (target.closest('button, a, input, select')) return;
+                          e.preventDefault();
+                          window.open(paymentsUrl, '_blank', 'noopener,noreferrer');
+                        }}
+                        onContextMenu={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.closest('button, a, input, select')) return;
+                          e.preventDefault();
+                          setRowContextMenu({ x: e.clientX, y: e.clientY, url: paymentsUrl });
                         }}
                         style={{ cursor: 'pointer' }}
                       >
@@ -4158,7 +4181,11 @@ export default function PaymentsManagement() {
                           if (columnKey === 'reservationName') {
                             return (
                               <td key={columnKey} className="px-4 py-2">
-                                <div className="flex flex-col">
+                                <Link
+                                  href={paymentsUrl}
+                                  className="flex flex-col text-inherit no-underline hover:underline focus:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <span className="text-sm font-medium text-gray-900">
                                     {reservation.reservationName}
                                   </span>
@@ -4177,7 +4204,7 @@ export default function PaymentsManagement() {
                                       )}
                                     </div>
                                   )}
-                                </div>
+                                </Link>
                               </td>
                             );
                           } else if (columnKey === 'createdAt') {
@@ -5502,6 +5529,24 @@ export default function PaymentsManagement() {
           background-color: #a1a1a1;
         }
       `}</style>
+      {rowContextMenu && (
+        <div
+          ref={rowContextMenuRef}
+          className="fixed z-[100] min-w-[180px] py-1 bg-white border border-gray-200 rounded shadow-lg"
+          style={{ left: rowContextMenu.x, top: rowContextMenu.y }}
+        >
+          <button
+            type="button"
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            onClick={() => {
+              window.open(rowContextMenu.url, '_blank', 'noopener,noreferrer');
+              setRowContextMenu(null);
+            }}
+          >
+            Otwórz w nowej karcie
+          </button>
+        </div>
+      )}
     </div>
   );
 }

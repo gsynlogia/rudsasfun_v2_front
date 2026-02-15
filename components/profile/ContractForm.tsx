@@ -3,10 +3,15 @@
 import { useState, useEffect } from 'react';
 import { Printer } from 'lucide-react';
 import Image from 'next/image';
+import { authService } from '@/lib/services/AuthService';
 
 interface ContractFormProps {
+  /** Id rezerwacji (number) – do zapisu w signed_documents */
+  reservationId?: number;
   reservationData?: {
     reservationNumber?: string;
+    /** Data dokonania rezerwacji (DD.MM.YYYY) do „ZAWARTA W DNIU” */
+    contractDate?: string;
     tournamentName?: string;
     tournamentDates?: string;
     parentName?: string;
@@ -39,14 +44,63 @@ interface ContractFormProps {
     invoice?: string;
     promotions?: string;
   };
+  /** Payload z signed_documents (umowa). Gdy podany – dane formularza z payloadu; gdy brak – z rezerwacji (obecne zachowanie). */
+  signedPayload?: Record<string, unknown> | null;
   printMode?: boolean;
 }
 
-export function ContractForm({ reservationData, printMode = false }: ContractFormProps) {
+type PrintErrorKey = 'reservationNumber' | 'contractDate' | 'parentName' | 'childName' | 'tournamentName' | 'tournamentDates';
+
+/** Mapuje payload umowy (signed_documents) na overlay pól formularza. */
+function contractPayloadToFormOverlay(p: Record<string, unknown>): Partial<ContractFormProps['reservationData']> {
+  const daneKlienta = p.daneKlienta as Record<string, string> | undefined;
+  const daneUczestnika = p.daneUczestnika as Record<string, string> | undefined;
+  const szczegoly = p.szczegolyKoloniiObozu as Record<string, string> | undefined;
+  const platnosci = p.platnosci as Record<string, string> | undefined;
+  const temat = (p.tematKoloniiObozu as string) || '';
+  const bracket = temat.indexOf(' (');
+  const tournamentName = bracket > 0 ? temat.slice(0, bracket).trim() : temat;
+  const tournamentDates = bracket > 0 ? temat.slice(bracket + 2, temat.endsWith(')') ? temat.length - 1 : temat.length).trim() : '';
+  return {
+    parentName: daneKlienta?.imieNazwisko,
+    parentEmail: daneKlienta?.email,
+    parentPhone: daneKlienta?.kontakt,
+    parentCity: daneKlienta?.miasto,
+    childName: daneUczestnika?.imieNazwisko,
+    childYear: daneUczestnika?.rocznik,
+    childCity: daneUczestnika?.miasto,
+    childGender: daneUczestnika?.plec,
+    tournamentName: tournamentName || undefined,
+    tournamentDates: tournamentDates || undefined,
+    locationName: szczegoly?.tematOśrodekData,
+    facilityName: szczegoly?.nazwaIAdresOśrodka,
+    locationAddress: szczegoly?.adresOśrodka,
+    baseCost: platnosci?.kosztPodstawowy,
+    diet: platnosci?.dieta,
+    attractions: platnosci?.atrakcjeDodatkowe,
+    insurance1: platnosci?.ochronaRezygnacjiPrzed,
+    insurance2: platnosci?.ochronaRezygnacjiWTrakcie,
+    transport: platnosci?.cenaZaTransport,
+    totalCost: platnosci?.kosztCalkowity,
+    deposit: platnosci?.zaliczka,
+    remainingPayment: platnosci?.pozostalaKwotaTermin,
+    invoice: platnosci?.faktura,
+    promotions: platnosci?.promocje,
+    meals: p.wyzywienie as string | undefined,
+    transportInfo: p.specyfikacjaTransportu as string | undefined,
+    departurePlace: p.miejsceWyjazdu as string | undefined,
+    returnPlace: p.miejscePowrotu as string | undefined,
+  };
+}
+
+export function ContractForm({ reservationId, reservationData, signedPayload, printMode = false }: ContractFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
+  const [currentDocumentId, setCurrentDocumentId] = useState<number | null>(null);
+  const [printErrors, setPrintErrors] = useState<Partial<Record<PrintErrorKey, boolean>>>({});
+  const [latestContractStatus, setLatestContractStatus] = useState<'in_verification' | 'accepted' | 'rejected' | null>(null);
 
   // Automatyczny druk w trybie printMode
   useEffect(() => {
@@ -57,6 +111,27 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
       return () => clearTimeout(timer);
     }
   }, [printMode]);
+
+  // Pobierz status najnowszego podpisanego dokumentu (umowa) – czy można podpisać ponownie (tylko gdy odrzucona)
+  useEffect(() => {
+    if (printMode || reservationId == null) return;
+    const token = authService.getToken();
+    if (!token) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    fetch(`${apiUrl}/api/signed-documents/reservation/${reservationId}?document_type=contract`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((docs: Array<{ status: string }>) => {
+        const latest = docs[0];
+        if (latest && (latest.status === 'in_verification' || latest.status === 'accepted' || latest.status === 'rejected')) {
+          setLatestContractStatus(latest.status as 'in_verification' | 'accepted' | 'rejected');
+        } else {
+          setLatestContractStatus(null);
+        }
+      })
+      .catch(() => setLatestContractStatus(null));
+  }, [reservationId, printMode]);
 
   // Aktualna data i godzina
   const getCurrentDateTime = () => {
@@ -71,9 +146,11 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
     return now.toLocaleDateString('pl-PL');
   };
 
-  // Dane z rezerwacji - tylko do odczytu (używamy nullish coalescing żeby pusty string nie był zastąpiony)
-  const formData = {
+  // Gdy brak payloadu (dokument nie zapisany) – dane z rezerwacji. Gdy jest signedPayload – overlay z zapisanego dokumentu.
+  const overlay = signedPayload && typeof signedPayload === 'object' ? contractPayloadToFormOverlay(signedPayload) : {};
+  const base = {
     reservationNumber: reservationData?.reservationNumber ?? '',
+    contractDate: reservationData?.contractDate ?? '',
     tournamentName: reservationData?.tournamentName ?? '',
     tournamentDates: reservationData?.tournamentDates ?? '',
     parentName: reservationData?.parentName ?? 'Brak danych',
@@ -106,31 +183,205 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
     invoice: reservationData?.invoice ?? '',
     promotions: reservationData?.promotions ?? ''
   };
+  const formData: typeof base = { ...base };
+  if (overlay) {
+    if (overlay.reservationNumber != null) formData.reservationNumber = String(overlay.reservationNumber);
+    if (overlay.contractDate != null) formData.contractDate = String(overlay.contractDate);
+    if (overlay.tournamentName != null) formData.tournamentName = String(overlay.tournamentName);
+    if (overlay.tournamentDates != null) formData.tournamentDates = String(overlay.tournamentDates);
+    if (overlay.parentName != null) formData.parentName = String(overlay.parentName);
+    if (overlay.parentEmail != null) formData.parentEmail = String(overlay.parentEmail);
+    if (overlay.parentPhone != null) formData.parentPhone = String(overlay.parentPhone);
+    if (overlay.parentCity != null) formData.parentCity = String(overlay.parentCity);
+    if (overlay.childName != null) formData.childName = String(overlay.childName);
+    if (overlay.childCity != null) formData.childCity = String(overlay.childCity);
+    if (overlay.childYear != null) formData.childYear = String(overlay.childYear);
+    if (overlay.childGender != null) formData.childGender = String(overlay.childGender);
+    if (overlay.locationName != null) formData.locationName = String(overlay.locationName);
+    if (overlay.locationAddress != null) formData.locationAddress = String(overlay.locationAddress);
+    if (overlay.facilityName != null) formData.facilityName = String(overlay.facilityName);
+    if (overlay.transportTo != null) formData.transportTo = String(overlay.transportTo);
+    if (overlay.transportFrom != null) formData.transportFrom = String(overlay.transportFrom);
+    if (overlay.baseCost != null) formData.baseCost = String(overlay.baseCost);
+    if (overlay.diet != null) formData.diet = String(overlay.diet);
+    if (overlay.attractions != null) formData.attractions = String(overlay.attractions);
+    if (overlay.insurance1 != null) formData.insurance1 = String(overlay.insurance1);
+    if (overlay.insurance2 != null) formData.insurance2 = String(overlay.insurance2);
+    if (overlay.transport != null) formData.transport = String(overlay.transport);
+    if (overlay.totalCost != null) formData.totalCost = String(overlay.totalCost);
+    if (overlay.deposit != null) formData.deposit = String(overlay.deposit);
+    if (overlay.remainingPayment != null) formData.remainingPayment = String(overlay.remainingPayment);
+    if (overlay.accommodation != null) formData.accommodation = String(overlay.accommodation);
+    if (overlay.meals != null) formData.meals = String(overlay.meals);
+    if (overlay.transportInfo != null) formData.transportInfo = String(overlay.transportInfo);
+    if (overlay.departurePlace != null) formData.departurePlace = String(overlay.departurePlace);
+    if (overlay.returnPlace != null) formData.returnPlace = String(overlay.returnPlace);
+    if (overlay.invoice != null) formData.invoice = String(overlay.invoice);
+    if (overlay.promotions != null) formData.promotions = String(overlay.promotions);
+  }
 
   const handlePrint = () => {
     if (printMode) {
       window.print();
-    } else {
-      // Otwórz stronę druku w nowym oknie
-      const reservationId = reservationData?.reservationNumber || '';
-      window.open(`/druk/umowa/${reservationId}`, '_blank');
+      return;
+    }
+    const reservationNumber = (formData.reservationNumber ?? '').trim();
+    const contractDate = (formData.contractDate ?? '').trim();
+    const parentName = (formData.parentName ?? '').trim();
+    const childName = (formData.childName ?? '').trim();
+    const tournamentName = (formData.tournamentName ?? '').trim();
+    const tournamentDates = (formData.tournamentDates ?? '').trim();
+    const errors: Partial<Record<PrintErrorKey, boolean>> = {};
+    if (!reservationNumber) errors.reservationNumber = true;
+    if (!contractDate) errors.contractDate = true;
+    if (!parentName || parentName === 'Brak danych') errors.parentName = true;
+    if (!childName || childName === 'Brak danych') errors.childName = true;
+    if (!tournamentName) errors.tournamentName = true;
+    if (!tournamentDates) errors.tournamentDates = true;
+    if (Object.keys(errors).length > 0) {
+      setPrintErrors(errors);
+      const firstId = (errors.reservationNumber || errors.contractDate) ? 'contract-print-error-reservationNumber'
+        : errors.parentName ? 'contract-print-error-parentName'
+        : errors.childName ? 'contract-print-error-childName'
+        : (errors.tournamentName || errors.tournamentDates) ? 'contract-print-error-tournamentName'
+        : null;
+      if (firstId) {
+        document.getElementById(firstId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+    setPrintErrors({});
+    window.open(`/druk/umowa/${reservationNumber}`, '_blank');
+  };
+
+  const getContractPayload = () => {
+    const fd = formData;
+    const transportDisplay = fd.transportTo === 'Własny transport' && fd.transportFrom === 'Własny transport'
+      ? 'Transport własny'
+      : fd.transport;
+    return {
+      signedAt: new Date().toISOString(),
+      tytul: `UMOWA O ŚWIADCZENIE USŁUG/IMPREZY TURYSTYCZNEJ DOT. ${fd.reservationNumber} ZAWARTA W DNIU ${fd.contractDate || getCurrentDate()}`,
+      tematKoloniiObozu: `${fd.tournamentName} (${fd.tournamentDates})`,
+      daneOrganizatora: { nazwa: 'RADSAS FUN sp. z o.o.', adres: 'ul. Chłopska 7/6, 80-362 Gdańsk', nip: '5842861490', krs: '0001143093' },
+      daneKlienta: { imieNazwisko: fd.parentName, email: fd.parentEmail, kontakt: fd.parentPhone, miasto: fd.parentCity },
+      daneUczestnika: { imieNazwisko: fd.childName, rocznik: fd.childYear, miasto: fd.childCity, plec: fd.childGender },
+      przedmiotUmowy: 'Przedmiotem umowy pomiędzy Organizatorem i Klientem jest organizacja kolonii/obozu dla Uczestnika zgodnie z danymi w niniejszej umowie, w Panelu Klienta i regulaminie.',
+      szczegolyKoloniiObozu: { tematOśrodekData: fd.locationName, nazwaIAdresOśrodka: fd.facilityName, adresOśrodka: fd.locationAddress },
+      wyzywienie: fd.meals,
+      platnosci: { kosztPodstawowy: fd.baseCost, dieta: fd.diet, atrakcjeDodatkowe: fd.attractions, ochronaRezygnacjiPrzed: fd.insurance1, ochronaRezygnacjiWTrakcie: fd.insurance2, cenaZaTransport: transportDisplay, faktura: fd.invoice, promocje: fd.promotions, kosztCalkowity: fd.totalCost, zaliczka: fd.deposit, pozostalaKwotaTermin: fd.remainingPayment },
+      daneDoWplat: { odbiorca: 'RADSAS FUN sp. z o.o. ul. Chłopska 7/6, 80-362 Gdańsk', numerRachunku: '81 1160 2202 0000 0006 4343 3035 (Bank Millenium)', tytulWplaty: 'nazwisko i imię uczestnika, numer rezerwacji, temat obozu, ośrodek, termin' },
+      specyfikacjaTransportu: fd.transportInfo,
+      miejsceWyjazdu: fd.departurePlace,
+      miejscePowrotu: fd.returnPlace,
+      obowiazkiOrganizatora: [
+        'Organizator zapewnia zakwaterowanie, wyżywienie, realizację programu dostępnego na stronie wybranej kolonii/obozu oraz możliwość transportu.',
+        'Organizator zapewnia opiekę pedagogiczną, instruktorską oraz dostęp do opieki medycznej',
+        'Program kolonii/obozu dostępny jest na www.radsas-fun.pl w zakładce danej kolonii/obozu. Zmiany w realizacji programu zależą od czynników niezależnych od Organizatora. W przypadku złych warunków atmosferycznych, Organizator zastrzega sobie prawo do wprowadzenia zmian w programie lub zmiany atrakcji na równorzędne.',
+        'Organizator nie ponosi odpowiedzialności za rzeczy wartościowe uczestnika (pieniądze, telefony, tablety, biżuteria itp.).',
+      ],
+      obowiazkiKlienta: [
+        'Klient zobowiązuje się do wniesienia płatności w terminach określonych w umowie i regulaminie.',
+        'Klient zobowiązuje się do podpisania w Panelu Klienta wszystkich wymaganych dokumentów (karta kwalifikacyjna, zgody, upoważnienia) przed rozpoczęciem kolonii/obozu.',
+        'Klient zobowiązuje się do przekazania organizatorowi wszystkich istotnych informacji o stanie zdrowia uczestnika, przyjmowanych lekach, alergiach itp.',
+        'Klient zobowiązuje się do przekazania i odbioru Uczestnika opiekunowi w wyznaczonym przez Organizatora miejscu i czasie.',
+        'Klient ponosi pełną odpowiedzialność za szkody wyrządzone przez uczestnika w mieniu Organizatora lub osób trzecich.',
+      ],
+      odstapienieOdUmowy: [
+        'Klient może odstąpić od umowy w każdym czasie przed rozpoczęciem kolonii/obozu, zgodnie z zasadami określonymi w Regulaminie.',
+        'W przypadku odstąpienia, Organizator pobiera opłaty zgodnie z tabelą dostępną w Regulaminie i Panelu Klienta.',
+        'Organizator może odstąpić od umowy w przypadku nie uiszczenia płatności w terminie, niewykonania innych zobowiązań przez Klienta, sytuacji niezależnych od Organizatora oraz jego autonomicznych decyzji.',
+        'W przypadku odwołania terminu/tematu danej kolonii/obozu, Organizator proponuje inny termin/temat/miejsce kolonii/obozu lub zwraca 100% wpłaty - po konsultacji z Klientem.',
+      ],
+      reklamacje: 'Wszelkiego rodzaju reklamacje należy zgłosić za pośrednictwem poczty elektronicznej na adres: lato@radsas-fun.pl Przedmiotem reklamacji nie mogą być okoliczności i zdarzenia, za które Organizator nie ponosi odpowiedzialności i przy zachowaniu należytej staranności nie mógł ich przewidzieć. Reklamacje rozpatrywane są w ciągu 30 dni roboczych.',
+      postanowieniaKoncowe: [
+        'Sprawy nieuregulowane umową rozstrzygane będą w drodze dialogu, a następnie przepisami Kodeksu Cywilnego oraz ustawy z dnia 29.08.1997 r. o usługach turystycznych (Dz.U nr. 133/97 poz. 884 z póź. zmianami).',
+        'Ewentualne spory wynikające z umowy rozstrzygane będą polubownie, a w razie braku porozumienia przez sąd właściwy dla siedziby Organizatora.',
+        'Umowa sporządzona została w dwóch jednobrzmiących egzemplarzach, po jednym dla każdej ze stron.',
+        'Klient ma możliwość wglądu w umowę przed jej podpisaniem i dokonaniem wpłaty.',
+        'Wszelkiego rodzaju zmiany w Panelu Klienta (np: dokupienie atrakcji dodatkowych, poprawienie danych) stanowią aneks do niniejszej umowy i nie wymagają dodatkowego podpisu.',
+      ],
+      dodatkowePostanowienia: [
+        'Organizator zobowiązuje się do przeprowadzenia imprezy turystycznej i dołoży wszelkich starań, aby została wykonana zgodnie z umową.',
+        'Klient wyraża zgodę na przetwarzanie jego danych w Panelu Administratora, Panelu Klienta, Bazie Danych Radsas Fun oraz przez współpracujące z firmami (np. ośrodek, ubezpieczyciel) w zakresie niezbędnym do realizacji kolonii/obozu.',
+        'Cena obozu może ulec zmianie z powodu wzrostu inflacji, kosztów wyżywienia i zakwaterowania oraz opłat przewoźników.',
+        'Załącznik: Szczegółowy Regulamin Imprez Turystycznych RADSAS FUN.',
+        'Rodzic/opiekun prawny zapoznał się z umową i regulaminem oraz akceptuje ich treść.',
+      ],
+    };
+  };
+
+  const handleSignDocument = async () => {
+    if (reservationId == null) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const token = authService.getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${apiUrl}/api/signed-documents/request-sms-code`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservation_id: reservationId, document_type: 'contract', payload: getContractPayload() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Nie udało się wysłać kodu SMS');
+      }
+      const data = await res.json();
+      setCurrentDocumentId(data.document_id);
+      setShowSignatureModal(true);
+      setResendTimer(60);
+      setSignatureCode('');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Nie udało się wysłać kodu SMS.');
     }
   };
 
-  const handleSignDocument = () => {
-    setShowSignatureModal(true);
+  const handleResendCode = async () => {
+    if (resendTimer > 0 || reservationId == null) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const token = authService.getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${apiUrl}/api/signed-documents/request-sms-code`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservation_id: reservationId, document_type: 'contract' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Nie udało się wysłać kodu ponownie');
+      }
+      setResendTimer(60);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Nie udało się wysłać kodu ponownie.');
+    }
   };
 
-  const handleResendCode = () => {
-    alert('Kod został wysłany ponownie');
-    setResendTimer(60);
-  };
-
-  const handleConfirmSignature = () => {
-    if (signatureCode.length === 4) {
+  const handleConfirmSignature = async () => {
+    if (signatureCode.length !== 4 || currentDocumentId == null) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const token = authService.getToken();
+    if (!token) {
+      setShowSignatureModal(false);
+      setSignatureCode('');
+      return;
+    }
+    try {
+      const res = await fetch(`${apiUrl}/api/signed-documents/verify-sms-code`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_id: currentDocumentId, code: signatureCode }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Nieprawidłowy kod');
+      }
       setIsSigned(true);
       setShowSignatureModal(false);
       setSignatureCode('');
+      setCurrentDocumentId(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Nieprawidłowy kod lub błąd weryfikacji.');
     }
   };
 
@@ -170,9 +421,11 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
             <Image src="/logo.png" alt="RADSAS fun" width={75} height={40} className="logo" />
           </div>
 
-          <h1 className="main-title">UMOWA O ŚWIADCZENIE USŁUG/IMPREZY TURYSTYCZNEJ (zwanej dalej &quot;kolonia/obóz&quot;) DOT. {formData.reservationNumber}  <br />ZAWARTA W DNIU {getCurrentDate()}</h1>
+          <h1 className={`main-title ${(printErrors.reservationNumber || printErrors.contractDate) ? 'border-2 border-red-500 rounded p-2 bg-red-50' : ''}`} id="contract-print-error-reservationNumber">UMOWA O ŚWIADCZENIE USŁUG/IMPREZY TURYSTYCZNEJ (zwanej dalej &quot;kolonia/obóz&quot;) DOT. {formData.reservationNumber}  <br />ZAWARTA W DNIU {formData.contractDate || getCurrentDate()}</h1>
+          {(printErrors.reservationNumber || printErrors.contractDate) && <p className="text-red-600 text-sm mt-1 font-semibold" role="alert">To pole jest obowiązkowe</p>}
 
-          <div className="tournament-name">{formData.tournamentName} ({formData.tournamentDates})</div>
+          <div className={`tournament-name ${(printErrors.tournamentName || printErrors.tournamentDates) ? 'border-2 border-red-500 rounded p-2 bg-red-50' : ''}`} id="contract-print-error-tournamentName">{formData.tournamentName} ({formData.tournamentDates})</div>
+          {(printErrors.tournamentName || printErrors.tournamentDates) && <p className="text-red-600 text-sm mt-1 font-semibold" role="alert">To pole jest obowiązkowe</p>}
 
           {/* Dane organizatora */}
           <section className="section">
@@ -188,9 +441,10 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
           <section className="section">
             <h2 className="section-title">DANE RODZICA/OPIEKUNA PRAWNEGO rezerwującego kolonię/obóz (zwany dalej &quot;Klientem&quot;):</h2>
             <div className="field-grid">
-              <div className="field-group">
+              <div className="field-group" id="contract-print-error-parentName">
                 <label>Imię i nazwisko:</label>
-                <div className="field-value">{formData.parentName}</div>
+                <div className={`field-value ${printErrors.parentName ? 'border-2 border-red-500 rounded bg-red-50' : ''}`}>{formData.parentName}</div>
+                {printErrors.parentName && <p className="text-red-600 text-sm mt-1 font-semibold" role="alert">To pole jest obowiązkowe</p>}
               </div>
               <div className="field-group">
                 <label>E-mail:</label>
@@ -213,9 +467,10 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
           <section className="section">
             <h2 className="section-title">DANE UCZESTNIKA (zwany dalej &quot;Uczestnikiem&quot;):</h2>
             <div className="field-grid">
-              <div className="field-group">
+              <div className="field-group" id="contract-print-error-childName">
                 <label>Imię i nazwisko:</label>
-                <div className="field-value">{formData.childName}</div>
+                <div className={`field-value ${printErrors.childName ? 'border-2 border-red-500 rounded bg-red-50' : ''}`}>{formData.childName}</div>
+                {printErrors.childName && <p className="text-red-600 text-sm mt-1 font-semibold" role="alert">To pole jest obowiązkowe</p>}
               </div>
               <div className="field-group">
                 <label>Rocznik:</label>
@@ -327,8 +582,12 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
 
               <div className="payment-item">
                 <label>Cena za transport:</label>
-                <div className="field-value">{formData.transport}</div>
-                <span>zł</span>
+                <div className="field-value">
+                  {formData.transportTo === 'Własny transport' && formData.transportFrom === 'Własny transport'
+                    ? '— — — — — — — — — — — — — — — — — — — —'
+                    : formData.transport}
+                </div>
+                {!(formData.transportTo === 'Własny transport' && formData.transportFrom === 'Własny transport') && <span>zł</span>}
               </div>
 
                <div className="payment-item promocja">
@@ -353,13 +612,31 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
           {/* Warunki płatności */}
           <section className="section">
             <h2 className="section-title">Warunki płatności:</h2>
-            <p className="info-text">
-              <strong>Zaliczka w kwocie {formData.deposit} zł</strong> (zaliczka 500 zł + ewentualne ochrony) płatna w ciągu 2 dni roboczych od daty
-              rezerwacji.
-            </p>
-            <p className="info-text">
-              Pozostała kwota płatna najpóźniej na {formData.remainingPayment}.
-            </p>
+            {(() => {
+              const promLower = (formData.promotions ?? '').toLowerCase();
+              const isFirstMinute =
+                promLower.includes('first minute') ||
+                promLower.includes('firstminute') ||
+                promLower.includes('wczesna rezerwacja');
+              if (isFirstMinute) {
+                return (
+                  <p className="info-text">
+                    <strong>Pełna wpłata ({formData.totalCost} zł) płatna w ciągu 2 dni roboczych od daty rezerwacji.</strong>
+                  </p>
+                );
+              }
+              return (
+                <>
+                  <p className="info-text">
+                    <strong>Zaliczka w kwocie {formData.deposit} zł</strong> (zaliczka 500 zł + ewentualne ochrony) płatna w ciągu 2 dni roboczych od daty
+                    rezerwacji.
+                  </p>
+                  <p className="info-text">
+                    Pozostała kwota płatna najpóźniej na {formData.remainingPayment}.
+                  </p>
+                </>
+              );
+            })()}
           </section>
 
           {/* Dane do wpłat */}
@@ -484,20 +761,24 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
                 </div>
               </div>
 
-              {/* Przycisk podpisz dokument */}
-              {!isSigned ? (
-                <button 
-                  onClick={handleSignDocument} 
-                  className="sign-button no-print"
-                >
-                  PODPISZ DOKUMENT
-                </button>
-              ) : (
+              {/* Przycisk podpisz dokument – tylko gdy brak podpisu lub najnowszy status = odrzucona */}
+              {isSigned ? (
                 <div className="signed-confirmation">
                   <div className="signed-header">Dokument podpisany przez:</div>
                   <div className="signed-role">Opiekun prawny</div>
                   <div className="signed-timestamp">{getCurrentDateTime()}</div>
                 </div>
+              ) : latestContractStatus === 'in_verification' ? (
+                <p className="text-amber-700 font-medium no-print">Dokument w trakcie weryfikacji. Ponowne podpisanie nie jest możliwe.</p>
+              ) : latestContractStatus === 'accepted' ? (
+                <p className="text-green-700 font-medium no-print">Umowa została zaakceptowana.</p>
+              ) : (
+                <button
+                  onClick={handleSignDocument}
+                  className="sign-button no-print"
+                >
+                  {latestContractStatus === 'rejected' ? 'PODPISZ PONOWNIE' : 'PODPISZ DOKUMENT'}
+                </button>
               )}
             </div>
           </section>
@@ -559,22 +840,76 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
             display: none !important;
           }
           
-          body {
-            margin: 0;
-            padding: 0;
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+            background-image: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
+          .print-layout {
+            background: #fff !important;
+            min-height: auto !important;
           }
           
           .form-container {
-            width: 100%;
+            width: 210mm !important;
+            max-width: 210mm !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            background: #fff !important;
+            box-shadow: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           
           .page {
+            width: 210mm !important;
+            min-height: 297mm !important;
+            max-height: 297mm !important;
+            margin: 0 !important;
+            padding: 12mm !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
             page-break-after: always;
             page-break-inside: avoid;
+            background: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           
           .page:last-child {
             page-break-after: auto;
+          }
+          
+          .form-container *,
+          .form-container *::before,
+          .form-container *::after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
+          .field-grid {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 1.2rem !important;
+          }
+          
+          .header,
+          .header-simple {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+          }
+          
+          .signature-row-single {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
           }
         }
 
@@ -997,7 +1332,8 @@ export function ContractForm({ reservationData, printMode = false }: ContractFor
           color: #0066cc;
         }
 
-        @media (max-width: 768px) {
+        /* Tylko ekran – przy druku (@media print) nie stosować; układ ma być jak na podglądzie (grid 2 kolumny, header w rzędzie). */
+        @media screen and (max-width: 768px) {
           .page {
             width: 100%;
             min-height: auto;
