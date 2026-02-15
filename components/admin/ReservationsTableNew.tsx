@@ -11,7 +11,7 @@ import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/Manu
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
-import { formatDecimalForExcel, getExportSheetName } from '@/lib/exportExcelUtils';
+import { getExportSheetName } from '@/lib/exportExcelUtils';
 import * as XLSX from 'xlsx';
 
 /**
@@ -1454,6 +1454,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         }
         if (typeof settings?.excel_decimal_dot !== 'undefined') {
           localStorage.setItem('admin_excel_decimal_dot', settings.excel_decimal_dot ? '1' : '0');
+        } else {
+          localStorage.setItem('admin_excel_decimal_dot', '0');
         }
       } catch (err) {
         console.error('Failed to load user settings:', err);
@@ -2739,15 +2741,15 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         };
       });
 
-      const useDot = localStorage.getItem('admin_excel_decimal_dot') !== '0';
-      const formatNum = (n: number): string => formatDecimalForExcel(useDot, n);
+      const useDot = localStorage.getItem('admin_excel_decimal_dot') === '1';
+      const amountColumnKeys = ['totalAmount', 'paidAmount', 'remainingAmount', 'payment1Amount', 'payment2Amount', 'payment3Amount', 'depositAmount'];
 
       const headers = visibleCols.map(col => COLUMN_DEFINITIONS[col.key] || col.key);
       
       const rows: (string | number)[][] = exportData.map(reservation => {
         return visibleCols.map(col => {
           const key = col.key;
-          let value: string = '';
+          let value: string | number = '';
           
           switch (key) {
             case 'reservationName':
@@ -2757,28 +2759,28 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               value = reservation.participantName;
               break;
             case 'totalAmount':
-              value = formatNum(reservation.totalAmount);
+              value = reservation.totalAmount;
               break;
             case 'paidAmount':
-              value = formatNum(reservation.paidAmount);
+              value = reservation.paidAmount;
               break;
             case 'remainingAmount':
-              value = formatNum(reservation.remainingAmount);
+              value = reservation.remainingAmount;
               break;
             case 'payment1Amount':
-              value = reservation.payment1?.amount != null ? formatNum(reservation.payment1.amount) : '';
+              value = reservation.payment1?.amount ?? '';
               break;
             case 'payment1Date':
               value = reservation.payment1?.date || '';
               break;
             case 'payment2Amount':
-              value = reservation.payment2?.amount != null ? formatNum(reservation.payment2.amount) : '';
+              value = reservation.payment2?.amount ?? '';
               break;
             case 'payment2Date':
               value = reservation.payment2?.date || '';
               break;
             case 'payment3Amount':
-              value = reservation.payment3?.amount != null ? formatNum(reservation.payment3.amount) : '';
+              value = reservation.payment3?.amount ?? '';
               break;
             case 'payment3Date':
               value = reservation.payment3?.date || '';
@@ -2859,7 +2861,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               value = statusMapExport[reservation.paymentStatus] || reservation.paymentStatus;
               break;
             case 'depositAmount':
-              value = reservation.depositAmount != null ? formatNum(reservation.depositAmount) : '';
+              value = reservation.depositAmount ?? '';
               break;
             default:
               value = '';
@@ -2872,6 +2874,21 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       const sheetName = getExportSheetName(tableModule);
       const aoa: (string | number)[][] = [headers, ...rows];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      const numberFormat = useDot ? '0.00' : '0,00';
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      for (let c = 0; c <= range.e.c; c++) {
+        const colKey = visibleCols[c]?.key;
+        if (colKey && amountColumnKeys.includes(colKey)) {
+          for (let r = 1; r <= range.e.r; r++) {
+            const cellRef = XLSX.utils.encode_cell({ r, c });
+            const cell = ws[cellRef];
+            if (cell && typeof cell.v === 'number') {
+              cell.z = numberFormat;
+            }
+          }
+        }
+      }
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
       const fileName = `${tableModule === 'payments' ? 'platnosci' : 'rezerwacje'}_${new Date().toISOString().split('T')[0]}.xlsx`;
