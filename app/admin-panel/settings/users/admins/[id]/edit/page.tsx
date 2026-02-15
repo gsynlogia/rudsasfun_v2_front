@@ -28,6 +28,7 @@ interface AdminUserSettings {
   items_per_page: number;
   payments_columns_config: string | null;
   reservations_columns_config: string | null;
+  excel_decimal_dot?: boolean;
 }
 
 // LocalStorage keys for column configurations (must match keys in PaymentsManagement.tsx and ReservationsTable.tsx)
@@ -65,6 +66,7 @@ export default function EditAdminUserPage() {
     items_per_page: 10,
     payments_columns_config: null,
     reservations_columns_config: null,
+    excel_decimal_dot: true,
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
@@ -162,6 +164,7 @@ export default function EditAdminUserPage() {
         items_per_page: userSettings.items_per_page,
         payments_columns_config: paymentsConfig,
         reservations_columns_config: reservationsConfig,
+        excel_decimal_dot: userSettings.excel_decimal_dot !== false,
       };
 
       await authenticatedApiCall(
@@ -214,6 +217,9 @@ export default function EditAdminUserPage() {
       if (settings.items_per_page) {
         localStorage.setItem('admin_items_per_page', settings.items_per_page.toString());
       }
+      if (typeof (settings as { excel_decimal_dot?: boolean }).excel_decimal_dot !== 'undefined') {
+        localStorage.setItem('admin_excel_decimal_dot', (settings as { excel_decimal_dot?: boolean }).excel_decimal_dot ? '1' : '0');
+      }
       
       setUserSettings(settings);
       setSyncStatus('success');
@@ -265,12 +271,14 @@ export default function EditAdminUserPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             items_per_page: userSettings.items_per_page,
+            excel_decimal_dot: userSettings.excel_decimal_dot !== false,
           }),
         }
       );
 
-      // Also save items_per_page to localStorage for immediate use in other components
+      // Also save to localStorage for immediate use in other components
       localStorage.setItem('admin_items_per_page', userSettings.items_per_page.toString());
+      localStorage.setItem('admin_excel_decimal_dot', userSettings.excel_decimal_dot !== false ? '1' : '0');
 
       showSuccess(`Użytkownik ${login} został zaktualizowany`);
       router.push('/admin-panel/settings/users/admins');
@@ -494,6 +502,24 @@ export default function EditAdminUserPage() {
                     </select>
                     <p className="mt-1 text-xs text-gray-500">
                       Domyślna ilość wyników na stronę w tabelach Rezerwacji i Płatności
+                    </p>
+                  </div>
+
+                  {/* Excel export: decimal separator */}
+                  <div className="mb-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={userSettings.excel_decimal_dot !== false}
+                        onChange={(e) => setUserSettings({ ...userSettings, excel_decimal_dot: e.target.checked })}
+                        className="w-5 h-5 text-[#03adf0] border-gray-300 focus:ring-[#03adf0]"
+                        style={{ cursor: loading ? 'not-allowed' : 'pointer' }}
+                        disabled={loading}
+                      />
+                      <span className="text-sm font-medium text-gray-900">W eksporcie Excel używaj kropek zamiast przecinków</span>
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500 ml-8">
+                      Np. 1.50 zamiast 1,50 — umożliwia auto-sumowanie i obliczenia w Excelu
                     </p>
                   </div>
 
