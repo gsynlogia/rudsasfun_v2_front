@@ -1751,6 +1751,42 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const headerFilterThRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
   const [headerFilterPopoverRect, setHeaderFilterPopoverRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const headerFilterPopoverInputRef = useRef<HTMLInputElement>(null);
+  const tableScrollContainerRef = useRef<HTMLDivElement>(null);
+  const horizontalScrollBarRef = useRef<HTMLDivElement>(null);
+  const isScrollingFromBarRef = useRef(false);
+  const [tableScrollWidth, setTableScrollWidth] = useState(0);
+
+  // Pomiar szerokości tabeli do paska przewijania poziomego (po renderze)
+  useEffect(() => {
+    const el = tableScrollContainerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.scrollWidth;
+      setTableScrollWidth(w);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [reservations.length, columnConfig.length]);
+
+  const syncTableScrollToBar = useCallback(() => {
+    if (isScrollingFromBarRef.current) return;
+    const table = tableScrollContainerRef.current;
+    const bar = horizontalScrollBarRef.current;
+    if (table && bar && table.scrollLeft !== bar.scrollLeft) {
+      bar.scrollLeft = table.scrollLeft;
+    }
+  }, []);
+
+  const syncBarScrollToTable = useCallback(() => {
+    const table = tableScrollContainerRef.current;
+    const bar = horizontalScrollBarRef.current;
+    if (!table || !bar) return;
+    isScrollingFromBarRef.current = true;
+    table.scrollLeft = bar.scrollLeft;
+    requestAnimationFrame(() => { isScrollingFromBarRef.current = false; });
+  }, []);
 
   // Normalize phone for filter API: digits only (e.g. +48 735 048 660 -> 48735048660)
   const normalizePhoneForFilter = (raw: string): string => {
@@ -4931,8 +4967,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         })()}
       </div>
 
-      {/* Obszar przewijalny: alert + tabela (dolny pasek paginacji jest poza nim, zawsze widoczny) */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      {/* Obszar przewijalny tylko w pionie; przewijanie poziome tabeli przez pasek u dołu */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
       {/* Alert o zmianach w płatnościach */}
       {paymentChangesAlert.isVisible && (
         <div className="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4 flex items-center justify-between shadow-sm">
@@ -4969,7 +5005,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
       {/* Payments Table */}
       <div className="bg-white shadow mt-2">
-        <div className="overflow-x-auto payments-table-scroll">
+        <div
+          ref={tableScrollContainerRef}
+          className="overflow-x-auto table-scroll-no-bar payments-table-scroll"
+          onScroll={syncTableScrollToBar}
+        >
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-20">
               <tr>
@@ -6101,6 +6141,16 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       </div>
       </div>
 
+      {/* Pasek przewijania poziomego tabeli – zawsze widoczny u dołu (nie trzeba zjeżdżać na dół tabeli) */}
+      <div
+        ref={horizontalScrollBarRef}
+        className="flex-shrink-0 overflow-x-auto border-t border-gray-200 bg-gray-50 payments-table-scroll"
+        onScroll={syncBarScrollToTable}
+        style={{ maxHeight: 14 }}
+      >
+        <div style={{ width: tableScrollWidth, height: 1 }} aria-hidden />
+      </div>
+
       {/* Dolny pasek paginacji – reużywalny komponent, zawsze widoczny u dołu (nie przewija się z tabelą) */}
       <TablePaginationBar
         itemLabel="płatności"
@@ -6365,7 +6415,16 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           overflow: hidden;
         }
 
-        /* Always visible horizontal scrollbar for payments table */
+        /* Ukrycie scrollbara na kontenerze tabeli – przewijanie tylko przez pasek u dołu */
+        .table-scroll-no-bar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .table-scroll-no-bar::-webkit-scrollbar {
+          display: none;
+        }
+
+        /* Pasek przewijania poziomego (tabela + pasek u dołu) */
         .payments-table-scroll {
           overflow-x: scroll !important;
         }
