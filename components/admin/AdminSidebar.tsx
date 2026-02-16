@@ -7,6 +7,7 @@ import {
   Truck,
   UtensilsCrossed,
   FileText,
+  MessageSquare,
   Settings,
   LogOut,
   Tag,
@@ -82,6 +83,7 @@ export default function AdminSidebar() {
     { href: '/admin-panel/promotions', icon: Tag, label: 'Promocje', key: 'promotions', section: 'promotions' },
     { href: '/admin-panel/protections', icon: Shield, label: 'Ochrony', key: 'protections', section: 'protections' },
     { href: '/admin-panel/cms', icon: FileText, label: 'CMS', key: 'cms', section: 'cms' },
+    { href: '/admin-panel/wiadomosci', icon: MessageSquare, label: 'Wiadomości', key: 'wiadomosci', section: 'cms' },
     { href: '/admin-panel/settings', icon: Settings, label: 'Ustawienia', key: 'settings', section: 'settings' },
   ];
 
