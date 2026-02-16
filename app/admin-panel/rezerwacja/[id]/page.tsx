@@ -20,8 +20,8 @@ import SectionGuard from '@/components/admin/SectionGuard';
 import { useToast } from '@/components/ToastContainer';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
-import { ContractForm } from '@/components/profile/ContractForm';
-import { QualificationForm } from '@/components/profile/QualificationForm';
+import { ContractTemplateNew } from '@/components/admin/ContractTemplateNew';
+import { QualificationTemplateNew } from '@/components/admin/QualificationTemplateNew';
 import type { ReservationData } from '@/lib/contractReservationMapping';
 import { mapReservationToContractForm } from '@/lib/contractReservationMapping';
 import { mapReservationToQualificationForm } from '@/lib/qualificationReservationMapping';
@@ -263,11 +263,6 @@ export default function ReservationDetailPage() {
   const [cardHtmlExists, setCardHtmlExists] = useState(false);
   const [contractFiles, setContractFiles] = useState<any[]>([]);
   const [cardFiles, setCardFiles] = useState<any[]>([]);
-  const [showContractHtmlModal, setShowContractHtmlModal] = useState(false);
-  const [contractHtmlDraft, setContractHtmlDraft] = useState('');
-  const [loadingContractHtml, setLoadingContractHtml] = useState(false);
-  const [savingContractHtml, setSavingContractHtml] = useState(false);
-  const [contractHtmlError, setContractHtmlError] = useState<string | null>(null);
   const [_rejectingContract, _setRejectingContract] = useState(false);
   const [_rejectingCard, _setRejectingCard] = useState(false);
   const [latestSignedContract, setLatestSignedContract] = useState<{ id: number; status: string; client_message: string | null } | null>(null);
@@ -338,8 +333,6 @@ export default function ReservationDetailPage() {
   
   const contractUploadInputRef = useRef<HTMLInputElement>(null);
   const cardUploadInputRef = useRef<HTMLInputElement>(null);
-  const contractEditIframeRef = useRef<HTMLIFrameElement>(null);
-
   useEffect(() => {
     if (reservation) {
       setParticipantAdditionalInfo(reservation.participant_additional_info ?? '');
@@ -1152,65 +1145,6 @@ export default function ReservationDetailPage() {
     }
   };
 
-  const openContractHtmlPreview = async () => {
-    if (!reservation) return;
-    const previewWindow = window.open('', '_blank');
-    if (!previewWindow) {
-      alert('Nie udało się otworzyć podglądu umowy');
-      return;
-    }
-    previewWindow.document.open();
-    previewWindow.document.write('<p style="font-family: Arial, sans-serif; padding: 24px;">Ładowanie umowy...</p>');
-    previewWindow.document.close();
-    try {
-      const html = await contractService.getContractHtml(reservation.id);
-      previewWindow.document.open();
-      previewWindow.document.write(html);
-      previewWindow.document.close();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Nie udało się otworzyć podglądu umowy');
-    }
-  };
-
-  const openContractHtmlEditor = async () => {
-    if (!reservation) return;
-    setShowContractHtmlModal(true);
-    setLoadingContractHtml(true);
-    setContractHtmlError(null);
-    try {
-      const html = await contractService.getContractHtmlEditable(reservation.id);
-      setContractHtmlDraft(html);
-    } catch (err) {
-      setContractHtmlError(err instanceof Error ? err.message : 'Nie udało się wczytać treści umowy');
-    } finally {
-      setLoadingContractHtml(false);
-    }
-  };
-
-  const handleSaveContractHtml = async () => {
-    if (!reservation) return;
-    const doc = contractEditIframeRef.current?.contentDocument;
-    const rawHtml = doc ? doc.documentElement.outerHTML : contractHtmlDraft;
-    const htmlToSave = rawHtml.replace(/\s*contenteditable="true"/gi, '');
-    if (!htmlToSave.trim()) {
-      setContractHtmlError('Treść umowy jest wymagana');
-      return;
-    }
-    try {
-      setSavingContractHtml(true);
-      setContractHtmlError(null);
-      await contractService.updateContractHtml(reservation.id, htmlToSave);
-      setContractHtmlExists(true);
-      setShowContractHtmlModal(false);
-      showSuccess('Zmiany w umowie zostały zapisane. Klient musi ponownie podpisać kartę kwalifikacyjną.');
-      await loadDocuments();
-    } catch (err) {
-      setContractHtmlError(err instanceof Error ? err.message : 'Nie udało się zapisać umowy');
-    } finally {
-      setSavingContractHtml(false);
-    }
-  };
-
   // Oblicz kwotę transportu (dokładnie jak w TransportSection.tsx - krok 3)
   // Logika: bierze wyższą kwotę z departure_price i return_price
   let departurePrice: number | null = null;
@@ -1640,20 +1574,40 @@ export default function ReservationDetailPage() {
                     <div className="flex gap-2 flex-wrap">
                       <button
                         type="button"
-                        onClick={openContractHtmlPreview}
-                        disabled={!contractHtmlExists}
-                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
-                        title={contractHtmlExists ? 'Podgląd umowy (HTML)' : 'Dostępne tylko dla umowy w formacie HTML'}
+                        onClick={() => {
+                          if (!reservation) return;
+                          openDocument(
+                            <ContractTemplateNew
+                              reservationId={reservation.id}
+                              reservationData={mapReservationToContractForm(reservation as unknown as ReservationData)}
+                              signedPayload={contractSignedPayload ?? undefined}
+                              readOnly
+                            />,
+                            'Podgląd umowy'
+                          );
+                        }}
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
+                        title="Podgląd umowy (nowy szablon)"
                       >
                         <FileText className="w-4 h-4 flex-shrink-0" />
                         Podgląd umowy
                       </button>
                       <button
                         type="button"
-                        onClick={openContractHtmlEditor}
-                        disabled={!contractHtmlExists}
-                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
-                        title={contractHtmlExists ? 'Edytuj umowę' : 'Dostępne tylko dla umowy w formacie HTML'}
+                        onClick={() => {
+                          if (!reservation) return;
+                          openDocument(
+                            <ContractTemplateNew
+                              reservationId={reservation.id}
+                              reservationData={mapReservationToContractForm(reservation as unknown as ReservationData)}
+                              signedPayload={contractSignedPayload ?? undefined}
+                              readOnly={false}
+                            />,
+                            'Edytuj umowę'
+                          );
+                        }}
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
+                        title="Edytuj umowę (pola z żółtym tłem)"
                       >
                         <SquarePen className="w-4 h-4 flex-shrink-0" />
                         Edytuj umowę
@@ -1795,7 +1749,7 @@ export default function ReservationDetailPage() {
                           onClick={() => {
                           if (!reservation) return;
                           openDocument(
-                            <QualificationForm
+                            <QualificationTemplateNew
                               reservationId={reservation.id}
                               reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
                               signedPayload={qualificationCardSignedPayload ?? undefined}
@@ -2964,56 +2918,6 @@ export default function ReservationDetailPage() {
                     style={{ borderRadius: 0 }}
                   >
                     Rozumiem
-                  </button>
-                </div>
-              </div>
-            </UniversalModal>
-
-            <UniversalModal
-              isOpen={showContractHtmlModal}
-              onClose={() => {
-                setShowContractHtmlModal(false);
-                setContractHtmlError(null);
-              }}
-              title="Edytuj umowę"
-              maxWidth="screen"
-            >
-              <div className="p-4 space-y-3">
-                <p className="text-sm text-gray-600">
-                  Ten sam układ co podgląd — możesz edytować treść w miejscu. Zapisz zmiany, aby zapisać w bazie i wysłać e-mail do opiekuna.
-                </p>
-                {contractHtmlError && (
-                  <div className="text-sm text-red-600">{contractHtmlError}</div>
-                )}
-                {loadingContractHtml ? (
-                  <div className="text-sm text-gray-700">Ładowanie treści umowy...</div>
-                ) : (
-                  <iframe
-                    ref={contractEditIframeRef}
-                    srcDoc={contractHtmlDraft}
-                    title="Edycja umowy"
-                    className="w-full min-h-[70vh] border border-gray-300 rounded"
-                    sandbox="allow-same-origin"
-                  />
-                )}
-                <div className="flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowContractHtmlModal(false);
-                      setContractHtmlError(null);
-                    }}
-                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 cursor-pointer"
-                  >
-                    Anuluj
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveContractHtml}
-                    disabled={savingContractHtml || loadingContractHtml}
-                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    {savingContractHtml ? 'Zapisywanie...' : 'Zapisz zmiany'}
                   </button>
                 </div>
               </div>
