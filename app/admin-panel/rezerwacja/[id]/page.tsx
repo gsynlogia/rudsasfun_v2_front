@@ -301,8 +301,8 @@ export default function ReservationDetailPage() {
   const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
 
   const [activePanel, setActivePanel] = useState<PanelId>('platnosci');
-  /** Krok edycji umowy z hash (1 lub 2) – używany do otwarcia panelu po odświeżeniu. */
-  const [contractEditStepFromHash, setContractEditStepFromHash] = useState<1 | 2 | null>(null);
+  /** Sygnał do otwarcia panelu edycji umowy, gdy w hash jest #dokumenty/umowa-edycja. */
+  const [contractEditStepFromHash, setContractEditStepFromHash] = useState<1 | null>(null);
   /** Zapobiega podwójnemu otwarciu panelu (przycisk vs. efekt po hash). */
   const openedContractEditFromHashRef = useRef(false);
 
@@ -315,7 +315,7 @@ export default function ReservationDetailPage() {
     if (isPanelValid) {
       setActivePanel(panelId);
       if (panelId === 'dokumenty' && parts[1] === 'umowa-edycja') {
-        setContractEditStepFromHash(parts[2] === '2' ? 2 : 1);
+        setContractEditStepFromHash(1);
       } else {
         setContractEditStepFromHash(null);
         openedContractEditFromHashRef.current = false;
@@ -347,21 +347,15 @@ export default function ReservationDetailPage() {
     setReservation(data);
   }, [reservationNumber]);
 
-  /** Otwarcie panelu „Edytuj umowę” po odświeżeniu, gdy w adresie jest #dokumenty/umowa-edycja/1 lub /2 */
+  /** Otwarcie panelu „Edytuj umowę” po odświeżeniu, gdy w adresie jest #dokumenty/umowa-edycja */
   useEffect(() => {
     if (!reservation || contractEditStepFromHash === null || openedContractEditFromHashRef.current) return;
-    const step = contractEditStepFromHash;
     openedContractEditFromHashRef.current = true;
     setContractEditStepFromHash(null);
+    if (typeof window !== 'undefined') window.history.replaceState(null, '', `${window.location.pathname}#dokumenty/umowa-edycja`);
     openDocument(
       <ContractEditPanel
         reservation={reservation}
-        initialStep={step}
-        onStepChange={(s) => {
-          if (typeof window !== 'undefined') {
-            window.location.hash = `dokumenty/umowa-edycja/${s}`;
-          }
-        }}
         onSaveSuccess={async () => {
           await refetchReservation();
           if (reservation?.id) {
@@ -1687,18 +1681,12 @@ export default function ReservationDetailPage() {
                         onClick={() => {
                           if (!reservation) return;
                           if (typeof window !== 'undefined') {
-                            window.location.hash = 'dokumenty/umowa-edycja/1';
+                            window.location.hash = 'dokumenty/umowa-edycja';
                           }
                           openedContractEditFromHashRef.current = true;
                           openDocument(
                             <ContractEditPanel
                               reservation={reservation}
-                              initialStep={1}
-                              onStepChange={(s) => {
-                                if (typeof window !== 'undefined') {
-                                  window.location.hash = `dokumenty/umowa-edycja/${s}`;
-                                }
-                              }}
                               onSaveSuccess={async () => {
                                 await refetchReservation();
                                 if (reservation?.id) {
@@ -1717,7 +1705,7 @@ export default function ReservationDetailPage() {
                           );
                         }}
                         className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
-                        title="Edytuj umowę (krok 1 i 2, zapis z archiwum)"
+                        title="Edytuj umowę (zapis z archiwum)"
                       >
                         <SquarePen className="w-4 h-4 flex-shrink-0" />
                         Edytuj umowę

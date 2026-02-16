@@ -42,8 +42,10 @@ interface ReservationDetails {
   promotion_justification?: any;
   departure_type?: string | null;
   departure_city?: string | null;
+  departure_transport_city_id?: number | null;
   return_type?: string | null;
   return_city?: string | null;
+  return_transport_city_id?: number | null;
   transport_different_cities?: boolean;
   selected_source?: string | null;
   source_inne_text?: string | null;
@@ -55,10 +57,6 @@ interface ContractEditPanelProps {
   reservation: ReservationDetails;
   onSaveSuccess: () => void;
   onClose?: () => void;
-  /** Krok formularza (1 lub 2) – używany przy otwarciu z adresu (odświeżenie). */
-  initialStep?: 1 | 2;
-  /** Wywołane przy przełączeniu kroku – strona aktualizuje hash w pasku adresu. */
-  onStepChange?: (step: 1 | 2) => void;
 }
 
 function mapReservationToStep1(r: ReservationDetails) {
@@ -97,23 +95,20 @@ function mapReservationToStep2(r: ReservationDetails) {
     promotion_justification: r.promotion_justification ?? {},
     departure_type: r.departure_type ?? 'zbiorowy',
     departure_city: r.departure_city ?? '',
+    departure_transport_city_id: r.departure_transport_city_id ?? null,
     return_type: r.return_type ?? 'zbiorowy',
     return_city: r.return_city ?? '',
+    return_transport_city_id: r.return_transport_city_id ?? null,
     transport_different_cities: r.transport_different_cities ?? false,
     selected_source: r.selected_source ?? '',
     source_inne_text: r.source_inne_text ?? '',
   };
 }
 
-export function ContractEditPanel({ reservation, onSaveSuccess, onClose, initialStep = 1, onStepChange }: ContractEditPanelProps) {
+export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: ContractEditPanelProps) {
   const { showSuccess, showError: showErrorToast } = useToast();
   const [formData, setFormData] = useState<{ step1: any; step2: any }>({ step1: null, step2: null });
-  const [currentStep, setCurrentStep] = useState<1 | 2>(initialStep);
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    setCurrentStep(initialStep);
-  }, [initialStep]);
 
   useEffect(() => {
     setFormData({
@@ -160,8 +155,10 @@ export function ContractEditPanel({ reservation, onSaveSuccess, onClose, initial
           transportData: {
             departureType: formData.step2.departure_type || 'zbiorowy',
             departureCity: formData.step2.departure_city || '',
+            departureTransportCityId: formData.step2.departure_transport_city_id ?? undefined,
             returnType: formData.step2.return_type || 'zbiorowy',
             returnCity: formData.step2.return_city || '',
+            returnTransportCityId: formData.step2.return_transport_city_id ?? undefined,
             differentCities: formData.step2.transport_different_cities || false,
           },
           selectedSource: formData.step2.selected_source || '',
@@ -204,48 +201,32 @@ export function ContractEditPanel({ reservation, onSaveSuccess, onClose, initial
           {isSaving ? 'Zapisywanie...' : 'Zapisz'}
         </button>
       </div>
-      <div className="flex gap-2 mb-3">
-        <button
-          type="button"
-          onClick={() => {
-            setCurrentStep(1);
-            onStepChange?.(1);
-          }}
-          className={`px-3 py-2 text-sm font-medium rounded-none ${currentStep === 1 ? 'bg-[#03adf0] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-        >
-          Krok 1
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setCurrentStep(2);
-            onStepChange?.(2);
-          }}
-          className={`px-3 py-2 text-sm font-medium rounded-none ${currentStep === 2 ? 'bg-[#03adf0] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-        >
-          Krok 2
-        </button>
-      </div>
       <div className="flex-1 overflow-auto min-h-0">
-        {currentStep === 1 && formData.step1 && (
-          <EditReservationStep1
-            data={formData.step1}
-            camp_id={campId}
-            property_id={propertyId}
-            onChange={handleStep1Change}
-          />
-        )}
-        {currentStep === 2 && formData.step2 && (
-          <EditReservationStep2
-            data={formData.step2}
-            camp_id={campId}
-            property_id={propertyId}
-            property_city={propertyCity}
-            onChange={handleStep2Change}
-            promotion_name={reservation.promotion_name}
-            promotion_price={reservation.promotion_price}
-          />
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4">
+          <div className="min-w-0">
+            {formData.step1 && (
+              <EditReservationStep1
+                data={formData.step1}
+                camp_id={campId}
+                property_id={propertyId}
+                onChange={handleStep1Change}
+              />
+            )}
+          </div>
+          <div className="min-w-0">
+            {formData.step2 && (
+              <EditReservationStep2
+                data={formData.step2}
+                camp_id={campId}
+                property_id={propertyId}
+                property_city={propertyCity}
+                onChange={handleStep2Change}
+                promotion_name={reservation.promotion_name}
+                promotion_price={reservation.promotion_price}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
