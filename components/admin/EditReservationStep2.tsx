@@ -122,12 +122,16 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
       try {
         setLoading(true);
 
-        // Fetch addons (use property_city from props instead of fetching property)
+        // Fetch addons (prefer property_id, fallback property_city)
         const selectedAddonIds = normalizeSelectedAddons(data.selected_addons);
+        const addonsUrl = property_id != null
+          ? `${API_BASE_URL}/api/addons/public?property_id=${property_id}`
+          : property_city
+            ? `${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(property_city)}`
+            : null;
 
-        if (property_city) {
-          // First, fetch addons available for this city
-          const addonsRes = await fetch(`${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(property_city)}`);
+        if (addonsUrl) {
+          const addonsRes = await fetch(addonsUrl);
           if (addonsRes.ok) {
             const addonsData = await addonsRes.json();
             const fetchedAddons = (addonsData.addons || []).map((a: any) => ({ id: String(a.id), name: a.name, price: a.price }));
@@ -177,7 +181,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
             setAddons(Array.from(addonsMap.values()));
           }
         } else {
-          // If no property_city, fetch selected addons individually
+          // Brak property_id i city – pobierz tylko wybrane addony po ID
           const addonsMap = new Map<string, Addon>();
           for (const addonIdStr of selectedAddonIds) {
             try {

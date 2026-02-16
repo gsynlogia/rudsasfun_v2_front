@@ -213,6 +213,7 @@ useEffect(() => {
         const shouldUpdate = !currentCamp ||
           currentCamp.id !== campData.camp.id ||
           currentCamp.name !== campData.camp.name ||
+          currentCamp.properties.property_id !== campData.property.id ||
           currentCamp.properties.period !== campData.property.period ||
           currentCamp.properties.city !== campData.property.city ||
           currentCamp.properties.start_date !== campData.property.start_date ||
@@ -225,6 +226,7 @@ useEffect(() => {
           id: campData.camp.id,
           name: campData.camp.name,
           properties: {
+            property_id: campData.property.id,
             period: campData.property.period,
             city: campData.property.city,
             start_date: campData.property.start_date,

@@ -597,12 +597,15 @@ export default function ReservationDetailPage() {
           }
         }
 
-        // Pobierz dostępne dodatki dla miasta ośrodka
-        if (reservationData.property_city) {
+        // Pobierz dostępne dodatki dla turnusu (prefer property_id, fallback city)
+        const addonsUrl = reservationData.property_id != null
+          ? `/api/addons/public?property_id=${reservationData.property_id}`
+          : reservationData.property_city
+            ? `/api/addons/public?city=${encodeURIComponent(reservationData.property_city)}`
+            : null;
+        if (addonsUrl) {
           try {
-            const addonsResponse = await authenticatedApiCall<{ addons: Addon[]; total: number }>(
-              `/api/addons/public?city=${encodeURIComponent(reservationData.property_city)}`,
-            );
+            const addonsResponse = await authenticatedApiCall<{ addons: Addon[]; total: number }>(addonsUrl);
             setAvailableAddons(addonsResponse.addons || []);
           } catch (err) {
             console.warn('Could not fetch available addons:', err);

@@ -1,4 +1,5 @@
 export interface ReservationCampProperties {
+  property_id?: number;
   period: string;
   city: string;
   start_date: string;

@@ -70,24 +70,24 @@ export default function AddonsSection() {
     fetchDescription();
   }, []);
 
-  // Fetch addons from API
+  // Fetch addons from API (prefer property_id – single source of truth from DB)
   useEffect(() => {
     const fetchAddons = async () => {
       try {
         setLoadingAddons(true);
-        // Get the selected city from reservation context
+        const propertyId = reservation.camp?.properties?.property_id;
         const selectedCity = reservation.camp?.properties?.city;
 
-        // Always require city to be present - if not, don't fetch addons
-        if (!selectedCity) {
-          console.warn('[AddonsSection] No city found in reservation context, not fetching addons');
+        if (propertyId == null && !selectedCity) {
+          console.warn('[AddonsSection] Brak property_id ani city w kontekście rezerwacji – nie pobieram dodatków');
           setAddons([]);
           setLoadingAddons(false);
           return;
         }
 
-        // Build URL with city filter (always required)
-        const url = `${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(selectedCity)}`;
+        const url = propertyId != null
+          ? `${API_BASE_URL}/api/addons/public?property_id=${propertyId}`
+          : `${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(selectedCity!)}`;
 
         const response = await fetch(url);
         if (!response.ok) {
@@ -158,7 +158,7 @@ export default function AddonsSection() {
       }
     };
     fetchAddons();
-  }, [reservation.camp?.properties?.city]);
+  }, [reservation.camp?.properties?.property_id, reservation.camp?.properties?.city]);
 
   // Keep ref in sync with state
   useEffect(() => {
