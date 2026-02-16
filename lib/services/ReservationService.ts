@@ -60,8 +60,10 @@ export interface CreateReservationRequest {
     transportData: {
       departureType: 'zbiorowy' | 'wlasny';
       departureCity?: string;
+      departureTransportCityId?: number;
       returnType: 'zbiorowy' | 'wlasny';
       returnCity?: string;
+      returnTransportCityId?: number;
     };
     selectedSource: string;
     inneText?: string;
@@ -527,8 +529,10 @@ class ReservationService {
         transportData: {
           departureType: step2Data.transportData.departureType as 'zbiorowy' | 'wlasny',
           departureCity: step2Data.transportData.departureCity,
+          departureTransportCityId: step2Data.transportData.departureTransportCityId,
           returnType: step2Data.transportData.returnType as 'zbiorowy' | 'wlasny',
           returnCity: step2Data.transportData.returnCity,
+          returnTransportCityId: step2Data.transportData.returnTransportCityId,
         },
         selectedSource: step2Data.selectedSource,
         inneText: step2Data.inneText,

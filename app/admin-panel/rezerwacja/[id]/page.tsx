@@ -301,16 +301,30 @@ export default function ReservationDetailPage() {
   const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
 
   const [activePanel, setActivePanel] = useState<PanelId>('platnosci');
+  /** Krok edycji umowy z hash (1 lub 2) – używany do otwarcia panelu po odświeżeniu. */
+  const [contractEditStepFromHash, setContractEditStepFromHash] = useState<1 | 2 | null>(null);
+  /** Zapobiega podwójnemu otwarciu panelu (przycisk vs. efekt po hash). */
+  const openedContractEditFromHashRef = useRef(false);
 
   const setPanelFromHash = useCallback(() => {
     if (typeof window === 'undefined') return;
     const hash = window.location.hash.slice(1);
-    const valid = RESERVATION_PANELS.some((p) => p.id === hash);
-    if (valid) {
-      setActivePanel(hash as PanelId);
+    const parts = hash.split('/');
+    const panelId = (parts[0] || '') as PanelId;
+    const isPanelValid = RESERVATION_PANELS.some((p) => p.id === panelId);
+    if (isPanelValid) {
+      setActivePanel(panelId);
+      if (panelId === 'dokumenty' && parts[1] === 'umowa-edycja') {
+        setContractEditStepFromHash(parts[2] === '2' ? 2 : 1);
+      } else {
+        setContractEditStepFromHash(null);
+        openedContractEditFromHashRef.current = false;
+      }
     } else {
       setActivePanel('platnosci');
       if (!hash) window.history.replaceState(null, '', `${window.location.pathname}#platnosci`);
+      setContractEditStepFromHash(null);
+      openedContractEditFromHashRef.current = false;
     }
   }, []);
 
@@ -332,6 +346,39 @@ export default function ReservationDetailPage() {
     const data = await authenticatedApiCall<ReservationDetails>(`/api/reservations/by-number/${reservationNumber}`);
     setReservation(data);
   }, [reservationNumber]);
+
+  /** Otwarcie panelu „Edytuj umowę” po odświeżeniu, gdy w adresie jest #dokumenty/umowa-edycja/1 lub /2 */
+  useEffect(() => {
+    if (!reservation || contractEditStepFromHash === null || openedContractEditFromHashRef.current) return;
+    const step = contractEditStepFromHash;
+    openedContractEditFromHashRef.current = true;
+    setContractEditStepFromHash(null);
+    openDocument(
+      <ContractEditPanel
+        reservation={reservation}
+        initialStep={step}
+        onStepChange={(s) => {
+          if (typeof window !== 'undefined') {
+            window.location.hash = `dokumenty/umowa-edycja/${s}`;
+          }
+        }}
+        onSaveSuccess={async () => {
+          await refetchReservation();
+          if (reservation?.id) {
+            const list = await contractArchiveService.list(reservation.id);
+            setContractArchiveVersions(list);
+          }
+          closeRightPanel();
+        }}
+        onClose={() => {
+          if (typeof window !== 'undefined') window.location.hash = 'dokumenty';
+          openedContractEditFromHashRef.current = false;
+          closeRightPanel();
+        }}
+      />,
+      'Edytuj umowę',
+    );
+  }, [reservation, contractEditStepFromHash, openDocument, closeRightPanel, refetchReservation]);
 
   useEffect(() => {
     if (!reservation?.id) return;
@@ -978,6 +1025,32 @@ export default function ReservationDetailPage() {
     );
   };
 
+  const formatJustificationForDisplay = (just: any): string => {
+    if (!just || typeof just !== 'object') return '';
+    const parts: string[] = [];
+    if (just.card_number) parts.push(`Numer karty dużej rodziny: ${just.card_number}`);
+    if (just.sibling_first_name || just.sibling_last_name) {
+      const siblingName = [just.sibling_first_name, just.sibling_last_name].filter(Boolean).join(' ');
+      if (siblingName) parts.push(`Rodzeństwo: ${siblingName}`);
+    }
+    if (just.first_camp_date) parts.push(`Data pierwszego obozu: ${just.first_camp_date}`);
+    if (just.first_camp_name) parts.push(`Nazwa pierwszego obozu: ${just.first_camp_name}`);
+    if (just.reason) parts.push(`Powód wyboru promocji: ${just.reason}`);
+    if (just.years) {
+      const yearsStr = Array.isArray(just.years) ? just.years.join(', ') : String(just.years);
+      if (yearsStr) parts.push(`Lata uczestnictwa: ${yearsStr}`);
+    }
+    const knownFields = ['card_number', 'sibling_first_name', 'sibling_last_name', 'first_camp_date', 'first_camp_name', 'reason', 'years'];
+    const otherFields = Object.keys(just).filter((key) => !knownFields.includes(key));
+    otherFields.forEach((key) => {
+      const value = just[key];
+      if (value !== null && value !== undefined && value !== '') {
+        parts.push(`${key}: ${String(value)}`);
+      }
+    });
+    return parts.join('\n');
+  };
+
   const validateJustificationDraft = (): boolean => {
     setJustificationError(null);
     if (!reservation) return false;
@@ -1613,9 +1686,19 @@ export default function ReservationDetailPage() {
                         type="button"
                         onClick={() => {
                           if (!reservation) return;
+                          if (typeof window !== 'undefined') {
+                            window.location.hash = 'dokumenty/umowa-edycja/1';
+                          }
+                          openedContractEditFromHashRef.current = true;
                           openDocument(
                             <ContractEditPanel
                               reservation={reservation}
+                              initialStep={1}
+                              onStepChange={(s) => {
+                                if (typeof window !== 'undefined') {
+                                  window.location.hash = `dokumenty/umowa-edycja/${s}`;
+                                }
+                              }}
                               onSaveSuccess={async () => {
                                 await refetchReservation();
                                 if (reservation?.id) {
@@ -1624,7 +1707,11 @@ export default function ReservationDetailPage() {
                                 }
                                 closeRightPanel();
                               }}
-                              onClose={closeRightPanel}
+                              onClose={() => {
+                                if (typeof window !== 'undefined') window.location.hash = 'dokumenty';
+                                openedContractEditFromHashRef.current = false;
+                                closeRightPanel();
+                              }}
                             />,
                             'Edytuj umowę'
                           );
@@ -2067,6 +2154,31 @@ export default function ReservationDetailPage() {
                     </p>
                   );
                 })()}
+
+                {/* Gdy wybrano "Brak promocji", ale rezerwacja miała promocję – pokaż dane historyczne i uzasadnienie */}
+                {currentPromotionId === null && (reservation.promotion_name || reservation.selected_promotion) && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-900 font-medium">
+                      {reservation.promotion_name || `Promocja #${reservation.selected_promotion}`}
+                    </p>
+                    {reservation.promotion_price != null && reservation.promotion_price !== undefined && (
+                      <p className="text-sm text-gray-600">
+                        Cena: {formatCurrency(reservation.promotion_price)}
+                      </p>
+                    )}
+                    <p className="text-sm text-gray-500 italic">
+                      (promocja nieaktywna - dane historyczne)
+                    </p>
+                    {hasJustificationData(reservation.promotion_justification) && (
+                      <div className="mt-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Uzasadnienie:</label>
+                        <pre className="text-sm text-gray-900 bg-gray-50 p-3 rounded mt-1 whitespace-pre-wrap border border-gray-100">
+                          {formatJustificationForDisplay(reservation.promotion_justification)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {currentPromotionId !== null && (
                   <div>

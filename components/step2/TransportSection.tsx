@@ -13,6 +13,7 @@ import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
 interface TransportCity {
+  id?: number;
   city: string;
   departure_price: number | null;
   return_price: number | null;
@@ -38,7 +39,15 @@ export default function TransportSection() {
     ? parseInt(pathParts[campIdIndex + 3], 10)
     : null;
 
-  const [transportData, setTransportData] = useState({
+  const [transportData, setTransportData] = useState<{
+    departureType: string;
+    departureCity: string;
+    departureTransportCityId?: number;
+    returnType: string;
+    returnCity: string;
+    returnTransportCityId?: number;
+    differentCities: boolean;
+  }>({
     departureType: '',
     departureCity: '',
     returnType: '',
@@ -202,11 +211,12 @@ export default function TransportSection() {
     if (isFakeDataEnabled() && transportData.departureType === 'zbiorowy' && transportData.departureCity && cities.length > 0) {
       const cityExists = cities.some(c => c.city === transportData.departureCity);
       if (!cityExists && cities[0]) {
-        // City from fake data doesn't exist, use first available city
         setTransportData(prev => ({
           ...prev,
           departureCity: cities[0].city,
+          departureTransportCityId: cities[0].id,
           returnCity: prev.returnCity || cities[0].city,
+          returnTransportCityId: prev.returnCity ? prev.returnTransportCityId : cities[0].id,
         }));
       }
     }
@@ -371,14 +381,45 @@ export default function TransportSection() {
     };
   }, [validateTransport]);
 
-  const updateField = (field: keyof typeof transportData, value: string) => {
+  const updateField = (field: keyof typeof transportData, value: string | number | boolean) => {
     setTransportData((prev) => ({ ...prev, [field]: value }));
-    // Clear error for this field when user starts typing
-    if (transportErrors[field]) {
+    if (transportErrors[field as string]) {
       setTransportErrors((prev) => {
         const newErrors = { ...prev };
-        delete newErrors[field];
+        delete newErrors[field as string];
         return newErrors;
+      });
+    }
+  };
+
+  const setDepartureCity = (cityName: string) => {
+    const city = cities.find((c) => c.city === cityName);
+    setTransportData((prev) => ({
+      ...prev,
+      departureCity: cityName,
+      departureTransportCityId: city?.id,
+    }));
+    if (transportErrors.departureCity) {
+      setTransportErrors((prev) => {
+        const next = { ...prev };
+        delete next.departureCity;
+        return next;
+      });
+    }
+  };
+
+  const setReturnCity = (cityName: string) => {
+    const city = cities.find((c) => c.city === cityName);
+    setTransportData((prev) => ({
+      ...prev,
+      returnCity: cityName,
+      returnTransportCityId: city?.id,
+    }));
+    if (transportErrors.returnCity) {
+      setTransportErrors((prev) => {
+        const next = { ...prev };
+        delete next.returnCity;
+        return next;
       });
     }
   };
@@ -501,7 +542,7 @@ export default function TransportSection() {
                     onChange={(e) => {
                       updateField('departureType', e.target.value);
                       if (e.target.value !== 'zbiorowy') {
-                        updateField('departureCity', '');
+                        setTransportData((prev) => ({ ...prev, departureCity: '', departureTransportCityId: undefined }));
                       }
                     }}
                     className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 ${
@@ -527,7 +568,7 @@ export default function TransportSection() {
                   <div className="relative">
                     <select
                       value={transportData.departureCity}
-                      onChange={(e) => updateField('departureCity', e.target.value)}
+                      onChange={(e) => setDepartureCity(e.target.value)}
                       disabled={loadingCities}
                       className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed ${
                         transportErrors.departureCity ? 'border-red-500' : 'border-gray-400'
@@ -558,7 +599,7 @@ export default function TransportSection() {
                     onChange={(e) => {
                       updateField('returnType', e.target.value);
                       if (e.target.value !== 'zbiorowy') {
-                        updateField('returnCity', '');
+                        setTransportData((prev) => ({ ...prev, returnCity: '', returnTransportCityId: undefined }));
                       }
                     }}
                     className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 ${
@@ -584,7 +625,7 @@ export default function TransportSection() {
                   <div className="relative">
                     <select
                       value={transportData.returnCity}
-                      onChange={(e) => updateField('returnCity', e.target.value)}
+                      onChange={(e) => setReturnCity(e.target.value)}
                       disabled={loadingCities}
                       className={`w-full px-3 sm:px-4 py-2 pl-8 sm:pl-10 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] pr-8 sm:pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed ${
                         transportErrors.returnCity ? 'border-red-500' : 'border-gray-400'

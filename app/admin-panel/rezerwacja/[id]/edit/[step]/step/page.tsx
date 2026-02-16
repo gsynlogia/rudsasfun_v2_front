@@ -44,10 +44,14 @@ interface ReservationDetails {
   selected_protection?: string[] | null;
   selected_promotion?: string | null;
   promotion_justification?: any;
+  promotion_name?: string | null;
+  promotion_price?: number | null;
   departure_type: string;
   departure_city?: string | null;
+  departure_transport_city_id?: number | null;
   return_type: string;
   return_city?: string | null;
+  return_transport_city_id?: number | null;
   transport_different_cities?: boolean;
   selected_source?: string | null;
   source_inne_text?: string | null;
@@ -225,8 +229,10 @@ export default function EditReservationPage() {
           transportData: {
             departureType: formData.step2.departure_type || 'zbiorowy',
             departureCity: formData.step2.departure_city || '',
+            departureTransportCityId: formData.step2.departure_transport_city_id ?? undefined,
             returnType: formData.step2.return_type || 'zbiorowy',
             returnCity: formData.step2.return_city || '',
+            returnTransportCityId: formData.step2.return_transport_city_id ?? undefined,
             differentCities: formData.step2.transport_different_cities || false,
           },
           selectedSource: formData.step2.selected_source || '',
@@ -426,8 +432,10 @@ export default function EditReservationPage() {
                   promotion_justification: reservation.promotion_justification,
                   departure_type: reservation.departure_type,
                   departure_city: reservation.departure_city,
+                  departure_transport_city_id: reservation.departure_transport_city_id,
                   return_type: reservation.return_type,
                   return_city: reservation.return_city,
+                  return_transport_city_id: reservation.return_transport_city_id,
                   transport_different_cities: reservation.transport_different_cities,
                   selected_source: reservation.selected_source,
                   source_inne_text: reservation.source_inne_text,
@@ -436,6 +444,8 @@ export default function EditReservationPage() {
                 property_id={reservation.property_id}
                 property_city={reservation.property_city}
                 onChange={handleStep2Change}
+                promotion_name={reservation.promotion_name}
+                promotion_price={reservation.promotion_price}
               />
             )}
             {currentStep === 3 && reservation && (

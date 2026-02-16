@@ -186,8 +186,10 @@ export interface Step2FormData {
   transportData: {
     departureType: string;
     departureCity: string;
+    departureTransportCityId?: number;
     returnType: string;
     returnCity: string;
+    returnTransportCityId?: number;
     differentCities?: boolean;
   };
   transportModalConfirmed?: boolean; // Whether the different cities modal has been confirmed

@@ -47,12 +47,18 @@ interface ReservationDetails {
   transport_different_cities?: boolean;
   selected_source?: string | null;
   source_inne_text?: string | null;
+  promotion_name?: string | null;
+  promotion_price?: number | null;
 }
 
 interface ContractEditPanelProps {
   reservation: ReservationDetails;
   onSaveSuccess: () => void;
   onClose?: () => void;
+  /** Krok formularza (1 lub 2) – używany przy otwarciu z adresu (odświeżenie). */
+  initialStep?: 1 | 2;
+  /** Wywołane przy przełączeniu kroku – strona aktualizuje hash w pasku adresu. */
+  onStepChange?: (step: 1 | 2) => void;
 }
 
 function mapReservationToStep1(r: ReservationDetails) {
@@ -99,11 +105,15 @@ function mapReservationToStep2(r: ReservationDetails) {
   };
 }
 
-export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: ContractEditPanelProps) {
+export function ContractEditPanel({ reservation, onSaveSuccess, onClose, initialStep = 1, onStepChange }: ContractEditPanelProps) {
   const { showSuccess, showError: showErrorToast } = useToast();
   const [formData, setFormData] = useState<{ step1: any; step2: any }>({ step1: null, step2: null });
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2>(initialStep);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setCurrentStep(initialStep);
+  }, [initialStep]);
 
   useEffect(() => {
     setFormData({
@@ -178,36 +188,39 @@ export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: Contr
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between border-b border-gray-200 pb-3 mb-3">
-        <h3 className="text-lg font-semibold text-gray-900">Edycja umowy</h3>
-        <div className="flex gap-2">
-          {onClose && (
-            <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-none">
-              Zamknij
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 rounded-none text-sm font-medium"
-          >
-            <Save className="w-4 h-4" />
-            {isSaving ? 'Zapisywanie...' : 'Zapisz'}
+      <div className="flex items-center justify-end gap-2 border-b border-gray-200 pb-3 mb-3">
+        {onClose && (
+          <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-none">
+            Zamknij
           </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 rounded-none text-sm font-medium"
+        >
+          <Save className="w-4 h-4" />
+          {isSaving ? 'Zapisywanie...' : 'Zapisz'}
+        </button>
       </div>
       <div className="flex gap-2 mb-3">
         <button
           type="button"
-          onClick={() => setCurrentStep(1)}
+          onClick={() => {
+            setCurrentStep(1);
+            onStepChange?.(1);
+          }}
           className={`px-3 py-2 text-sm font-medium rounded-none ${currentStep === 1 ? 'bg-[#03adf0] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
         >
           Krok 1
         </button>
         <button
           type="button"
-          onClick={() => setCurrentStep(2)}
+          onClick={() => {
+            setCurrentStep(2);
+            onStepChange?.(2);
+          }}
           className={`px-3 py-2 text-sm font-medium rounded-none ${currentStep === 2 ? 'bg-[#03adf0] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
         >
           Krok 2
@@ -229,6 +242,8 @@ export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: Contr
             property_id={propertyId}
             property_city={propertyCity}
             onChange={handleStep2Change}
+            promotion_name={reservation.promotion_name}
+            promotion_price={reservation.promotion_price}
           />
         )}
       </div>
