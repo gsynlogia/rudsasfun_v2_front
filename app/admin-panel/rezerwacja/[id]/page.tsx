@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User, Tent, Users, Utensils, Shield, Gift, Bus, FileCheck, Receipt, Heart, MessageSquare, CheckCircle2, RotateCcw, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User, Tent, Users, Utensils, Shield, Gift, Bus, FileCheck, Receipt, Heart, MessageSquare, CheckCircle2, RotateCcw, CheckCircle, XCircle, SquarePen } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
@@ -338,6 +338,7 @@ export default function ReservationDetailPage() {
   
   const contractUploadInputRef = useRef<HTMLInputElement>(null);
   const cardUploadInputRef = useRef<HTMLInputElement>(null);
+  const contractEditIframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (reservation) {
@@ -1177,7 +1178,7 @@ export default function ReservationDetailPage() {
     setLoadingContractHtml(true);
     setContractHtmlError(null);
     try {
-      const html = await contractService.getContractHtml(reservation.id);
+      const html = await contractService.getContractHtmlEditable(reservation.id);
       setContractHtmlDraft(html);
     } catch (err) {
       setContractHtmlError(err instanceof Error ? err.message : 'Nie udało się wczytać treści umowy');
@@ -1188,14 +1189,17 @@ export default function ReservationDetailPage() {
 
   const handleSaveContractHtml = async () => {
     if (!reservation) return;
-    if (!contractHtmlDraft.trim()) {
+    const doc = contractEditIframeRef.current?.contentDocument;
+    const rawHtml = doc ? doc.documentElement.outerHTML : contractHtmlDraft;
+    const htmlToSave = rawHtml.replace(/\s*contenteditable="true"/gi, '');
+    if (!htmlToSave.trim()) {
       setContractHtmlError('Treść umowy jest wymagana');
       return;
     }
     try {
       setSavingContractHtml(true);
       setContractHtmlError(null);
-      await contractService.updateContractHtml(reservation.id, contractHtmlDraft);
+      await contractService.updateContractHtml(reservation.id, htmlToSave);
       setContractHtmlExists(true);
       setShowContractHtmlModal(false);
       showSuccess('Zmiany w umowie zostały zapisane. Klient musi ponownie podpisać kartę kwalifikacyjną.');
@@ -1633,54 +1637,71 @@ export default function ReservationDetailPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex gap-2 flex-wrap">
                       <button
+                        type="button"
                         onClick={openContractHtmlPreview}
-                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 text-sm font-medium hover:bg-gray-200 cursor-pointer"
-                        title="Podgląd umowy"
+                        disabled={!contractHtmlExists}
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
+                        title={contractHtmlExists ? 'Podgląd umowy (HTML)' : 'Dostępne tylko dla umowy w formacie HTML'}
                       >
-                        Podgląd
+                        <FileText className="w-4 h-4 flex-shrink-0" />
+                        Podgląd umowy
                       </button>
                       <button
+                        type="button"
                         onClick={openContractHtmlEditor}
-                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 text-sm font-medium hover:bg-gray-200 cursor-pointer"
-                        title="Edytuj umowę"
+                        disabled={!contractHtmlExists}
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
+                        title={contractHtmlExists ? 'Edytuj umowę' : 'Dostępne tylko dla umowy w formacie HTML'}
                       >
-                        Edytuj
+                        <SquarePen className="w-4 h-4 flex-shrink-0" />
+                        Edytuj umowę
                       </button>
-                      <input
-                        ref={contractUploadInputRef}
-                        type="file"
-                        accept=".pdf"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file || !reservation) return;
-                          try {
-                            setUploadingContract(true);
-                            await contractService.uploadContract(reservation.id, file);
-                            alert('Umowa została przesłana pomyślnie');
-                            const contractFilesData = await contractService.getContractFiles(reservation.id);
-                            setContractFiles(contractFilesData.filter(f => f.source === 'user'));
-                            if (contractUploadInputRef.current) {
-                              contractUploadInputRef.current.value = '';
-                            }
-                          } catch (err) {
-                            alert(err instanceof Error ? err.message : 'Nie udało się przesłać umowy');
-                          } finally {
-                            setUploadingContract(false);
-                          }
-                        }}
-                        className="hidden"
-                      />
-                      <button
-                        onClick={() => contractUploadInputRef.current?.click()}
-                        disabled={uploadingContract}
-                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-[#03adf0] text-white text-sm font-medium hover:bg-[#0288c7] disabled:opacity-50 cursor-pointer"
-                        title="Wgraj umowę"
-                      >
-                        <Upload className="w-4 h-4 flex-shrink-0" />
-                        {uploadingContract ? '...' : 'Wgraj'}
-                      </button>
+                      {latestSignedContract && (
+                        <>
+                          <button
+                            onClick={async () => {
+                              try {
+                                await authenticatedApiCall(`/api/signed-documents/${latestSignedContract.id}`, {
+                                  method: 'PATCH',
+                                  body: JSON.stringify({ status: 'accepted' }),
+                                });
+                                window.location.reload();
+                              } catch (e) {
+                                alert(e instanceof Error ? e.message : 'Błąd akceptacji');
+                              }
+                            }}
+                            disabled={latestSignedContract.status === 'accepted'}
+                            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                          >
+                            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                            Zaakceptuj umowę
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!latestSignedContract) return;
+                              openDocument(
+                                <RejectDocumentPanelContent
+                                  documentId={latestSignedContract.id}
+                                  onSuccess={() => {
+                                    closeRightPanel();
+                                    showSuccess('Umowa została odrzucona.');
+                                    window.location.reload();
+                                  }}
+                                  onCancel={closeRightPanel}
+                                />,
+                                'Odrzuć umowę'
+                              );
+                            }}
+                            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors cursor-pointer"
+                          >
+                            <XCircle className="w-4 h-4 flex-shrink-0" />
+                            Odrzuć umowę
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between bg-gray-50 p-3 rounded-none border border-gray-200 flex-wrap gap-3">
@@ -1689,68 +1710,6 @@ export default function ReservationDetailPage() {
                         ? `Podpisany dokument: ${latestSignedContract.status === 'accepted' ? 'Zaakceptowana' : latestSignedContract.status === 'rejected' ? `Odrzucona${latestSignedContract.client_message ? ` – ${latestSignedContract.client_message}` : ''}` : 'W trakcie weryfikacji'}`
                         : 'Podpisany dokument: Brak podpisanego dokumentu do weryfikacji (po podpisie przez klienta pojawią się przyciski).'}
                     </span>
-                    {latestSignedContract && (
-                      <div className="flex gap-2 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                          if (!reservation) return;
-                          openDocument(
-                            <ContractForm
-                              reservationId={reservation.id}
-                              reservationData={mapReservationToContractForm(reservation as unknown as ReservationData)}
-                              signedPayload={contractSignedPayload ?? undefined}
-                            />,
-                            'Podgląd umowy'
-                          );
-                        }}
-                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
-                        >
-                          <FileText className="w-4 h-4 flex-shrink-0" />
-                          Podgląd umowy
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await authenticatedApiCall(`/api/signed-documents/${latestSignedContract.id}`, {
-                                method: 'PATCH',
-                                body: JSON.stringify({ status: 'accepted' }),
-                              });
-                              window.location.reload();
-                            } catch (e) {
-                              alert(e instanceof Error ? e.message : 'Błąd akceptacji');
-                            }
-                          }}
-                          disabled={latestSignedContract.status === 'accepted'}
-                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                        >
-                          <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                          Zaakceptuj umowę
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!latestSignedContract) return;
-                            openDocument(
-                              <RejectDocumentPanelContent
-                                documentId={latestSignedContract.id}
-                                onSuccess={() => {
-                                  closeRightPanel();
-                                  showSuccess('Umowa została odrzucona.');
-                                  window.location.reload();
-                                }}
-                                onCancel={closeRightPanel}
-                              />,
-                              'Odrzuć umowę'
-                            );
-                          }}
-                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors cursor-pointer"
-                        >
-                          <XCircle className="w-4 h-4 flex-shrink-0" />
-                          Odrzuć umowę
-                        </button>
-                      </div>
-                    )}
                   </div>
                   {contractFiles.length > 0 && (
                     <div className="space-y-1">
@@ -3016,12 +2975,12 @@ export default function ReservationDetailPage() {
                 setShowContractHtmlModal(false);
                 setContractHtmlError(null);
               }}
-              title="Edycja umowy (HTML)"
-              maxWidth="2xl"
+              title="Edytuj umowę"
+              maxWidth="screen"
             >
               <div className="p-4 space-y-3">
                 <p className="text-sm text-gray-600">
-                  Edytujesz treść umowy w formacie HTML.
+                  Ten sam układ co podgląd — możesz edytować treść w miejscu. Zapisz zmiany, aby zapisać w bazie i wysłać e-mail do opiekuna.
                 </p>
                 {contractHtmlError && (
                   <div className="text-sm text-red-600">{contractHtmlError}</div>
@@ -3029,10 +2988,12 @@ export default function ReservationDetailPage() {
                 {loadingContractHtml ? (
                   <div className="text-sm text-gray-700">Ładowanie treści umowy...</div>
                 ) : (
-                  <textarea
-                    value={contractHtmlDraft}
-                    onChange={(e) => setContractHtmlDraft(e.target.value)}
-                    className="w-full h-96 p-2 border border-gray-300 rounded font-mono text-xs"
+                  <iframe
+                    ref={contractEditIframeRef}
+                    srcDoc={contractHtmlDraft}
+                    title="Edycja umowy"
+                    className="w-full min-h-[70vh] border border-gray-300 rounded"
+                    sandbox="allow-same-origin"
                   />
                 )}
                 <div className="flex justify-end gap-3">
@@ -3052,7 +3013,7 @@ export default function ReservationDetailPage() {
                     disabled={savingContractHtml || loadingContractHtml}
                     className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    {savingContractHtml ? 'Zapisywanie...' : 'Zapisz'}
+                    {savingContractHtml ? 'Zapisywanie...' : 'Zapisz zmiany'}
                   </button>
                 </div>
               </div>

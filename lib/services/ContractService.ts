@@ -81,6 +81,25 @@ class ContractService {
     return await response.text();
   }
 
+  /** Ten sam układ co podgląd, z możliwością edycji (contenteditable). Tylko admin. */
+  async getContractHtmlEditable(reservationId: number): Promise<string> {
+    const { authService } = await import('@/lib/services/AuthService');
+    const token = authService.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    const response = await fetch(`${this.API_URL}/${reservationId}/html/editable`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || `HTTP error! status: ${response.status}`);
+    }
+    return await response.text();
+  }
+
   async updateContractHtml(reservationId: number, htmlContent: string): Promise<{ status: string; reservation_id: number }> {
     const { authService } = await import('@/lib/services/AuthService');
     const token = authService.getToken();
