@@ -20,6 +20,7 @@ import SectionGuard from '@/components/admin/SectionGuard';
 import { useToast } from '@/components/ToastContainer';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
+import { ContractForm } from '@/components/profile/ContractForm';
 import { ContractTemplateNew } from '@/components/admin/ContractTemplateNew';
 import { QualificationTemplateNew } from '@/components/admin/QualificationTemplateNew';
 import type { ReservationData } from '@/lib/contractReservationMapping';
@@ -1577,17 +1578,16 @@ export default function ReservationDetailPage() {
                         onClick={() => {
                           if (!reservation) return;
                           openDocument(
-                            <ContractTemplateNew
+                            <ContractForm
                               reservationId={reservation.id}
                               reservationData={mapReservationToContractForm(reservation as unknown as ReservationData)}
                               signedPayload={contractSignedPayload ?? undefined}
-                              readOnly
                             />,
                             'Podgląd umowy'
                           );
                         }}
                         className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
-                        title="Podgląd umowy (nowy szablon)"
+                        title="Podgląd umowy (ten sam widok co w profilu)"
                       >
                         <FileText className="w-4 h-4 flex-shrink-0" />
                         Podgląd umowy

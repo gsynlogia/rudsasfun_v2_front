@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
+import { Printer } from 'lucide-react';
 
 export interface ContractTemplateNewProps {
   reservationId?: number;
@@ -193,9 +194,25 @@ export function ContractTemplateNew({ reservationData, signedPayload, readOnly =
 
   const update = (key: keyof typeof formData, value: string) => setFormData((prev) => ({ ...prev, [key]: value }));
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <>
-      <div className="form-container contract-template-new">
+      {/* Przycisk druku – jak w profilu (zrzut z przyciskiem Drukuj jest prawidłowy) */}
+      <div className="no-print max-w-[210mm] mx-auto px-4 pt-4 flex justify-end">
+        <button
+          type="button"
+          onClick={handlePrint}
+          className="flex items-center gap-2 bg-[#03adf0] text-white px-4 py-2 rounded hover:bg-[#0299d6] transition text-sm font-medium"
+        >
+          <Printer className="w-4 h-4" />
+          Drukuj
+        </button>
+      </div>
+
+      <div className="form-container">
         <div className="page">
           <div className="header">
             <div className="date">{getCurrentDateTime()}</div>
@@ -278,8 +295,26 @@ export function ContractTemplateNew({ reservationData, signedPayload, readOnly =
             <div className="field-group">
               <label>Nazwa i adres ośrodka (zakwaterowanie):</label>
               <div className="field-value-multiline">
-                <EditableField value={formData.facilityName} onChange={(v) => update('facilityName', v)} readOnly={readOnly} />
-                <EditableField value={formData.locationAddress} onChange={(v) => update('locationAddress', v)} readOnly={readOnly} />
+                {readOnly ? (
+                  <>
+                    <div className="facility-name">{formData.facilityName}</div>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.locationAddress)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="location-link"
+                    >
+                      {formData.locationAddress}
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <div className="facility-name">
+                      <EditableField value={formData.facilityName} onChange={(v) => update('facilityName', v)} readOnly={false} className="block" />
+                    </div>
+                    <EditableField value={formData.locationAddress} onChange={(v) => update('locationAddress', v)} readOnly={false} />
+                  </>
+                )}
               </div>
             </div>
           </section>
@@ -313,7 +348,7 @@ export function ContractTemplateNew({ reservationData, signedPayload, readOnly =
               </div>
               <div className="payment-item">
                 <label>Atrakcje dodatkowe:</label>
-                <EditableField value={formData.attractions} onChange={(v) => update('attractions', v)} readOnly={readOnly} />
+                <EditableField value={formData.attractions} onChange={(v) => update('attractions', v)} readOnly={readOnly} multiline />
                 <span>zł</span>
               </div>
               <div className="payment-item">
@@ -328,8 +363,21 @@ export function ContractTemplateNew({ reservationData, signedPayload, readOnly =
               </div>
               <div className="payment-item">
                 <label>Cena za transport:</label>
-                <EditableField value={formData.transportTo === 'Własny transport' && formData.transportFrom === 'Własny transport' ? 'Transport własny' : formData.transport} onChange={(v) => update('transport', v)} readOnly={readOnly} />
-                <span>zł</span>
+                {readOnly ? (
+                  <>
+                    <div className="field-value">
+                      {formData.transportTo === 'Własny transport' && formData.transportFrom === 'Własny transport'
+                        ? '— — — — — — — — — — — — — — — — — — — —'
+                        : formData.transport}
+                    </div>
+                    {!(formData.transportTo === 'Własny transport' && formData.transportFrom === 'Własny transport') && <span>zł</span>}
+                  </>
+                ) : (
+                  <>
+                    <EditableField value={formData.transport} onChange={(v) => update('transport', v)} readOnly={false} />
+                    {!(formData.transportTo === 'Własny transport' && formData.transportFrom === 'Własny transport') && <span>zł</span>}
+                  </>
+                )}
               </div>
               <div className="payment-item promocja">
                 <label>Faktura:</label>
@@ -348,12 +396,30 @@ export function ContractTemplateNew({ reservationData, signedPayload, readOnly =
           </section>
           <section className="section">
             <h2 className="section-title">Warunki płatności:</h2>
-            <p className="info-text">
-              <strong>Zaliczka w kwocie <EditableField value={formData.deposit} onChange={(v) => update('deposit', v)} readOnly={readOnly} /> zł</strong> (zaliczka 500 zł + ewentualne ochrony) płatna w ciągu 2 dni roboczych od daty rezerwacji.
-            </p>
-            <p className="info-text">
-              Pozostała kwota płatna najpóźniej na <EditableField value={formData.remainingPayment} onChange={(v) => update('remainingPayment', v)} readOnly={readOnly} />.
-            </p>
+            {(() => {
+              const promLower = (formData.promotions ?? '').toLowerCase();
+              const isFirstMinute =
+                promLower.includes('first minute') ||
+                promLower.includes('firstminute') ||
+                promLower.includes('wczesna rezerwacja');
+              if (isFirstMinute) {
+                return (
+                  <p className="info-text">
+                    <strong>Pełna wpłata (<EditableField value={formData.totalCost} onChange={(v) => update('totalCost', v)} readOnly={readOnly} /> zł) płatna w ciągu 2 dni roboczych od daty rezerwacji.</strong>
+                  </p>
+                );
+              }
+              return (
+                <>
+                  <p className="info-text">
+                    <strong>Zaliczka w kwocie <EditableField value={formData.deposit} onChange={(v) => update('deposit', v)} readOnly={readOnly} /> zł</strong> (zaliczka 500 zł + ewentualne ochrony) płatna w ciągu 2 dni roboczych od daty rezerwacji.
+                  </p>
+                  <p className="info-text">
+                    Pozostała kwota płatna najpóźniej na <EditableField value={formData.remainingPayment} onChange={(v) => update('remainingPayment', v)} readOnly={readOnly} />.
+                  </p>
+                </>
+              );
+            })()}
           </section>
           <section className="section">
             <h2 className="section-title">Dane do wpłat:</h2>
@@ -364,7 +430,8 @@ export function ContractTemplateNew({ reservationData, signedPayload, readOnly =
             </div>
           </section>
           <section className="section">
-            <h2 className="section-title">TRANSPORT / Specyfikacja transportu:</h2>
+            <h2 className="section-title">TRANSPORT:</h2>
+            <h2 className="section-title">Specyfikacja transportu:</h2>
             <EditableField value={formData.transportInfo} onChange={(v) => update('transportInfo', v)} readOnly={readOnly} multiline />
           </section>
           <section className="section">
@@ -448,34 +515,418 @@ export function ContractTemplateNew({ reservationData, signedPayload, readOnly =
       </div>
 
       <style>{`
-        .contract-template-new .admin-editable-field {
-          background: #fef9c3 !important;
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+            background-image: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          .print-layout {
+            background: #fff !important;
+            min-height: auto !important;
+          }
+
+          .form-container {
+            width: 210mm !important;
+            max-width: 210mm !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            background: #fff !important;
+            box-shadow: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          .page {
+            width: 210mm !important;
+            min-height: 297mm !important;
+            max-height: 297mm !important;
+            margin: 0 !important;
+            padding: 12mm !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            page-break-after: always;
+            page-break-inside: avoid;
+            background: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          .page:last-child {
+            page-break-after: auto;
+          }
+
+          .form-container *,
+          .form-container *::before,
+          .form-container *::after {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          .field-grid {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 1.2rem !important;
+          }
+
+          .header,
+          .header-simple {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+          }
+
+          .signature-row-single {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+          }
         }
-        .contract-template-new .form-container { max-width: 210mm; margin: 2rem auto; background: #f5f5f5; }
-        .contract-template-new .page { width: 210mm; min-height: 297mm; padding: 12mm; box-sizing: border-box; font-size: 9pt; line-height: 1.3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1a1a1a; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 2rem; border-radius: 4px; position: relative; }
-        .contract-template-new .header, .contract-template-new .header-simple { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; padding-bottom: 0.5rem; border-bottom: 2px solid #0066cc; gap: 0.8rem; }
-        .contract-template-new .date { font-size: 7.5pt; color: #666; }
-        .contract-template-new .title-center { text-align: center; font-size: 9pt; flex: 1; font-weight: 600; color: #0066cc; }
-        .contract-template-new .main-title { text-align: center; font-size: 11pt; font-weight: 700; margin: 1rem 0; padding: 0.8rem; background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; border-radius: 3px; }
-        .contract-template-new .tournament-name { text-align: center; font-size: 9.5pt; font-weight: 600; margin: 1rem 0; padding: 0.6rem; background: #f0f7ff; border-left: 3px solid #0066cc; color: #0066cc; }
-        .contract-template-new .section { margin: 0.8rem 0; }
-        .contract-template-new .section-title { font-size: 8.5pt; font-weight: 700; margin: 0.6rem 0; color: #0066cc; padding-bottom: 0.3rem; border-bottom: 1px solid #e0e0e0; }
-        .contract-template-new .organizer-box { background: #f8faff; padding: 0.7rem 0.8rem; border-left: 3px solid #0066cc; margin: 0.5rem 0; }
-        .contract-template-new .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin: 0.5rem 0; }
-        .contract-template-new .field-group label { font-size: 8pt; display: block; margin-bottom: 0.25rem; color: #333; font-weight: 600; }
-        .contract-template-new .field-value, .contract-template-new .field-value-multiline { padding: 0.4rem 0.5rem; border-bottom: 1px solid #b0b0b0; font-size: 8.5pt; min-height: 1.3em; }
-        .contract-template-new .field-value-multiline { min-height: 45px; white-space: pre-wrap; }
-        .contract-template-new input.field-value, .contract-template-new textarea.field-value-multiline { width: 100%; border: 1px solid #d0d0d0; border-radius: 2px; }
-        .contract-template-new .info-text { font-size: 8pt; line-height: 1.4; margin: 0.5rem 0; text-align: justify; color: #333; }
-        .contract-template-new .info-text-small { font-size: 7.5pt; line-height: 1.3; margin: 0.3rem 0; color: #555; font-style: italic; }
-        .contract-template-new .payment-grid { display: grid; grid-template-columns: 1fr; gap: 0.5rem; margin: 0.5rem 0; }
-        .contract-template-new .payment-item { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; align-items: center; }
-        .contract-template-new .payment-item label { font-size: 8pt; font-weight: 600; color: #333; }
-        .contract-template-new .total-cost { font-size: 10pt; font-weight: 700; color: #0066cc; text-align: right; margin: 0.8rem 0; padding: 0.6rem; background: #f0f7ff; border-radius: 3px; border-left: 3px solid #0066cc; }
-        .contract-template-new .bank-info { background: #f8faff; padding: 0.6rem 0.8rem; border-left: 3px solid #0066cc; margin: 0.5rem 0; }
-        .contract-template-new .bullet-list { list-style-type: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
-        .contract-template-new .bullet-list li { font-size: 8pt; line-height: 1.4; margin: 0.35rem 0; text-align: justify; color: #333; }
-        .contract-template-new .page-number { position: absolute; bottom: 10mm; right: 15mm; font-size: 8pt; font-weight: 600; color: #333; padding: 0.15rem 0.4rem; background: #f0f0f0; border-radius: 2px; }
+
+        @media screen {
+          .form-container {
+            max-width: 210mm;
+            margin: 2rem auto;
+            background: #f5f5f5;
+          }
+
+          .page {
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin-bottom: 2rem;
+            border-radius: 4px;
+          }
+        }
+
+        .page {
+          width: 210mm;
+          min-height: 297mm;
+          max-height: 297mm;
+          padding: 12mm 12mm;
+          box-sizing: border-box;
+          position: relative;
+          font-size: 9pt;
+          line-height: 1.3;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          color: #1a1a1a;
+        }
+
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+          padding-bottom: 0.6rem;
+          border-bottom: 2px solid #0066cc;
+          gap: 1rem;
+        }
+
+        .header-simple {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.8rem;
+          padding-bottom: 0.5rem;
+          border-bottom: 2px solid #0066cc;
+          gap: 0.8rem;
+        }
+
+        .date {
+          font-size: 7.5pt;
+          flex-shrink: 0;
+          color: #666;
+        }
+
+        .title-center {
+          text-align: center;
+          font-size: 9pt;
+          flex: 1;
+          font-weight: 600;
+          color: #0066cc;
+        }
+
+        .contract-date {
+          font-size: 9pt;
+          font-weight: 600;
+          padding: 0.3rem 0.6rem;
+          border: 2px solid #0066cc;
+          color: #0066cc;
+          flex-shrink: 0;
+        }
+
+        .logo {
+          width: 75px;
+          height: auto;
+          flex-shrink: 0;
+        }
+
+        .logo-small {
+          width: 60px;
+          height: auto;
+          flex-shrink: 0;
+        }
+
+        .main-title {
+          text-align: center;
+          font-size: 11pt;
+          font-weight: 700;
+          margin: 1rem 0 1.2rem 0;
+          padding: 0.8rem;
+          background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
+          color: white;
+          border-radius: 3px;
+          letter-spacing: 0.3px;
+          line-height: 1.4;
+        }
+
+        .tournament-name {
+          text-align: center;
+          font-size: 9.5pt;
+          font-weight: 600;
+          margin: 1rem 0 1.2rem 0;
+          padding: 0.6rem;
+          background: #f0f7ff;
+          border-left: 3px solid #0066cc;
+          color: #0066cc;
+        }
+
+        .section {
+          margin: 0.8rem 0;
+          background: white;
+        }
+
+        .page:nth-child(2) .section {
+          margin: 0.5rem 0;
+        }
+
+        .section-title {
+          font-size: 8.5pt;
+          font-weight: 700;
+          margin: 0.6rem 0 0.5rem 0;
+          color: #0066cc;
+          padding-bottom: 0.3rem;
+          border-bottom: 1px solid #e0e0e0;
+          line-height: 1.2;
+        }
+
+        .page:nth-child(2) .section-title {
+          margin: 0.4rem 0 0.3rem 0;
+        }
+
+        .organizer-box {
+          background: #f8faff;
+          padding: 0.7rem 0.8rem;
+          border-left: 3px solid #0066cc;
+          margin: 0.5rem 0;
+        }
+
+        .organizer-box p {
+          margin: 0.3rem 0;
+          font-size: 8.5pt;
+          line-height: 1.4;
+        }
+
+        .organizer-box strong {
+          color: #0066cc;
+        }
+
+        .field-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.2rem;
+          margin: 0.5rem 0;
+        }
+
+        .field-group {
+          margin: 0.5rem 0;
+        }
+
+        .field-group label {
+          font-size: 8pt;
+          display: block;
+          margin-bottom: 0.25rem;
+          color: #333;
+          font-weight: 600;
+        }
+
+        .field-value {
+          padding: 0.4rem 0.5rem;
+          border-bottom: 1px solid #b0b0b0;
+          font-size: 8.5pt;
+          font-family: inherit;
+          color: #1a1a1a;
+          min-height: 1.3em;
+        }
+
+        .field-value-multiline {
+          padding: 0.5rem 0.6rem;
+          border: 1px solid #d0d0d0;
+          font-size: 8pt;
+          font-family: inherit;
+          border-radius: 2px;
+          line-height: 1.4;
+          white-space: pre-wrap;
+          color: #1a1a1a;
+          min-height: 45px;
+        }
+
+        .info-text {
+          font-size: 8pt;
+          line-height: 1.4;
+          margin: 0.5rem 0;
+          text-align: justify;
+          color: #333;
+        }
+
+        .info-text strong {
+          color: #0066cc;
+          font-weight: 600;
+        }
+
+        .info-text-small {
+          font-size: 7.5pt;
+          line-height: 1.3;
+          margin: 0.3rem 0;
+          text-align: justify;
+          color: #555;
+          font-style: italic;
+        }
+
+        .payment-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.5rem;
+          margin: 0.5rem 0;
+        }
+
+        .payment-item {
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          gap: 0.5rem;
+          align-items: center;
+          padding: 0.2rem 0;
+        }
+
+        .payment-item label {
+          font-size: 8pt;
+          font-weight: 600;
+          color: #333;
+          white-space: nowrap;
+        }
+
+        .payment-item span {
+          font-size: 8pt;
+          color: #333;
+        }
+
+        .total-cost {
+          font-size: 10pt;
+          font-weight: 700;
+          color: #0066cc;
+          text-align: right;
+          margin: 0.8rem 0;
+          padding: 0.6rem;
+          background: #f0f7ff;
+          border-radius: 3px;
+          border-left: 3px solid #0066cc;
+        }
+
+        .bank-info {
+          background: #f8faff;
+          padding: 0.6rem 0.8rem;
+          border-left: 3px solid #0066cc;
+          margin: 0.5rem 0;
+        }
+
+        .bank-info p {
+          margin: 0.3rem 0;
+          font-size: 8pt;
+          line-height: 1.4;
+        }
+
+        .bank-info strong {
+          color: #0066cc;
+        }
+
+        .bullet-list {
+          list-style-type: disc;
+          padding-left: 1.5rem;
+          margin: 0.5rem 0;
+        }
+
+        .bullet-list li {
+          font-size: 8pt;
+          line-height: 1.4;
+          margin: 0.35rem 0;
+          text-align: justify;
+          color: #333;
+        }
+
+        .signature-section {
+          margin-top: 2.5rem;
+          padding-top: 1.5rem;
+          border-top: 2px solid #e0e0e0;
+        }
+
+        .signature-row-single {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin: 1.5rem 0;
+        }
+
+        .signature-field-organizer {
+          text-align: left;
+        }
+
+        .signature-field-organizer label {
+          display: block;
+          font-size: 8pt;
+          margin-bottom: 0.6rem;
+          color: #333;
+          font-weight: 600;
+        }
+
+        .page-number {
+          position: absolute;
+          bottom: 10mm;
+          right: 15mm;
+          font-size: 8pt;
+          font-weight: 600;
+          color: #333;
+          padding: 0.15rem 0.4rem;
+          background: #f0f0f0;
+          border-radius: 2px;
+        }
+
+        .location-link {
+          color: #0066cc;
+          text-decoration: none;
+          font-weight: 600;
+        }
+
+        .location-link:hover {
+          text-decoration: underline;
+        }
+
+        .facility-name {
+          font-weight: 600;
+          color: #0052a3;
+          margin-bottom: 0.3rem;
+          font-size: 8.5pt;
+        }
+
+        .admin-editable-field { background: #fef9c3 !important; }
       `}</style>
     </>
   );
