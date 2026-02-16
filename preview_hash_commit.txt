@@ -1,3 +1,7 @@
-a1fec3a
-# Punkt przywracania PRZED zadaniem: formularz edycji umowy + archiwum (tylko lokalny)
-# Testy wyłącznie REZ-2026-442. Do cofnięcia: git checkout a1fec3a .
+# Addony po property_id (frontend) – punkt przywracania
+# PRZED realizacją zadania (hash commita przed zmianami):
+9b0f5fb05d8492499f8326dacc6946fa05f267e0
+# PO realizacji (lokalny commit – punkt przywracania):
+76788f86ee95729de19bb548890fb93702acccba
+# Do cofnięcia do stanu PRZED: git checkout 9b0f5fb05d8492499f8326dacc6946fa05f267e0 .
+# Do cofnięcia do stanu PO (przywrócenie): git checkout 76788f86ee95729de19bb548890fb93702acccba .
