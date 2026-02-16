@@ -21,8 +21,10 @@ import { useToast } from '@/components/ToastContainer';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
 import { ContractForm } from '@/components/profile/ContractForm';
+import { ContractEditPanel } from '@/components/admin/ContractEditPanel';
 import { ContractTemplateNew } from '@/components/admin/ContractTemplateNew';
 import { QualificationTemplateNew } from '@/components/admin/QualificationTemplateNew';
+import { contractArchiveService, type ContractArchiveVersionItem } from '@/lib/services/ContractArchiveService';
 import type { ReservationData } from '@/lib/contractReservationMapping';
 import { mapReservationToContractForm } from '@/lib/contractReservationMapping';
 import { mapReservationToQualificationForm } from '@/lib/qualificationReservationMapping';
@@ -270,6 +272,7 @@ export default function ReservationDetailPage() {
   const [latestSignedCard, setLatestSignedCard] = useState<{ id: number; status: string; client_message: string | null } | null>(null);
   const [qualificationCardSignedPayload, setQualificationCardSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [contractSignedPayload, setContractSignedPayload] = useState<Record<string, unknown> | null>(null);
+  const [contractArchiveVersions, setContractArchiveVersions] = useState<ContractArchiveVersionItem[]>([]);
   const [signedDocumentsList, setSignedDocumentsList] = useState<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null }>>([]);
   const [uploadingContract, setUploadingContract] = useState(false);
   const [uploadingCard, setUploadingCard] = useState(false);
@@ -323,6 +326,17 @@ export default function ReservationDetailPage() {
     }
     setActivePanel(id);
   }, []);
+
+  const refetchReservation = useCallback(async () => {
+    if (!reservationNumber) return;
+    const data = await authenticatedApiCall<ReservationDetails>(`/api/reservations/by-number/${reservationNumber}`);
+    setReservation(data);
+  }, [reservationNumber]);
+
+  useEffect(() => {
+    if (!reservation?.id) return;
+    contractArchiveService.list(reservation.id).then(setContractArchiveVersions).catch(() => setContractArchiveVersions([]));
+  }, [reservation?.id]);
 
   // Informacje dodatkowe dotyczące uczestnika (sekcja z kroku 1 – edycja tylko tego pola)
   const [participantAdditionalInfo, setParticipantAdditionalInfo] = useState('');
@@ -1597,17 +1611,23 @@ export default function ReservationDetailPage() {
                         onClick={() => {
                           if (!reservation) return;
                           openDocument(
-                            <ContractTemplateNew
-                              reservationId={reservation.id}
-                              reservationData={mapReservationToContractForm(reservation as unknown as ReservationData)}
-                              signedPayload={contractSignedPayload ?? undefined}
-                              readOnly={false}
+                            <ContractEditPanel
+                              reservation={reservation}
+                              onSaveSuccess={async () => {
+                                await refetchReservation();
+                                if (reservation?.id) {
+                                  const list = await contractArchiveService.list(reservation.id);
+                                  setContractArchiveVersions(list);
+                                }
+                                closeRightPanel();
+                              }}
+                              onClose={closeRightPanel}
                             />,
                             'Edytuj umowę'
                           );
                         }}
                         className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
-                        title="Edytuj umowę (pola z żółtym tłem)"
+                        title="Edytuj umowę (krok 1 i 2, zapis z archiwum)"
                       >
                         <SquarePen className="w-4 h-4 flex-shrink-0" />
                         Edytuj umowę
@@ -1677,6 +1697,40 @@ export default function ReservationDetailPage() {
                       ))}
                     </div>
                   )}
+                  <div className="mt-3 space-y-2">
+                    <span className="text-xs font-medium text-gray-700">Wersje umowy (archiwum)</span>
+                    {contractArchiveVersions.length === 0 ? (
+                      <p className="text-sm text-gray-500">Brak zapisanych wersji.</p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {contractArchiveVersions.map((v) => (
+                          <li key={v.id}>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const version = await contractArchiveService.get(v.id);
+                                  const snapshot = version.snapshot as unknown as ReservationData;
+                                  openDocument(
+                                    <ContractForm
+                                      reservationId={reservation.id}
+                                      reservationData={mapReservationToContractForm(snapshot)}
+                                    />,
+                                    `Wersja umowy ${v.created_at ? new Date(v.created_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : v.id}`
+                                  );
+                                } catch {
+                                  showError('Nie udało się wczytać wersji.');
+                                }
+                              }}
+                              className="text-sm text-[#03adf0] hover:underline cursor-pointer"
+                            >
+                              Wersja z {v.created_at ? new Date(v.created_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : `#${v.id}`}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
 
                 <div className="border-t border-gray-200"></div>

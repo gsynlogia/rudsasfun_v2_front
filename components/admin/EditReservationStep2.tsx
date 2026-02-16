@@ -51,6 +51,13 @@ interface Source {
   name: string;
 }
 
+interface TurnusDiet {
+  id: number;
+  name: string;
+  price: number;
+  relation_id?: number;
+}
+
 export default function EditReservationStep2({ data, camp_id, property_id, property_city, onChange }: EditReservationStep2Props) {
   // Normalize data - ensure arrays are properly formatted
   const normalizeArray = (arr: any): any[] => {
@@ -80,6 +87,15 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
     setSelectedAddons(normalized);
     console.log('[EditReservationStep2] Updated selected addons from data:', normalized);
   }, [data.selected_addons]);
+  const normalizeSelectedDiets = (arr: any): number[] => {
+    const normalized = normalizeArray(arr);
+    return normalized.map((x) => (typeof x === 'number' ? x : parseInt(String(x), 10))).filter((n) => !Number.isNaN(n));
+  };
+  const [selectedDiets, setSelectedDiets] = useState<number[]>(normalizeSelectedDiets(data.selected_diets));
+  useEffect(() => {
+    const normalized = normalizeSelectedDiets(data.selected_diets);
+    setSelectedDiets((prev) => (JSON.stringify([...prev].sort()) === JSON.stringify([...normalized].sort()) ? prev : normalized));
+  }, [data.selected_diets]);
   const [selectedProtection, setSelectedProtection] = useState<string[]>(normalizeArray(data.selected_protection));
   const [selectedPromotion, setSelectedPromotion] = useState<string>(data.selected_promotion ? String(data.selected_promotion) : '');
   const [promotionJustification, setPromotionJustification] = useState<any>(data.promotion_justification || {});
@@ -94,6 +110,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
   const [inneText, setInneText] = useState<string>(data.source_inne_text || '');
 
   const [addons, setAddons] = useState<Addon[]>([]);
+  const [turnusDiets, setTurnusDiets] = useState<TurnusDiet[]>([]);
   const [protections, setProtections] = useState<Protection[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
@@ -176,6 +193,14 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
           setAddons(Array.from(addonsMap.values()));
         }
 
+        // Fetch turnus diets (dodatkowe diety z turnusu)
+        const dietsRes = await fetch(`${API_BASE_URL}/api/camps/${camp_id}/properties/${property_id}/diets`);
+        if (dietsRes.ok) {
+          const dietsData = await dietsRes.json();
+          const list = Array.isArray(dietsData) ? dietsData : [];
+          setTurnusDiets(list.map((d: any) => ({ id: d.id ?? d.relation_id ?? 0, name: d.name || '', price: typeof d.price === 'number' ? d.price : 0, relation_id: d.relation_id })));
+        }
+
         // Fetch protections
         const protectionsRes = await fetch(`${API_BASE_URL}/api/camps/${camp_id}/properties/${property_id}/protections`);
         if (protectionsRes.ok) {
@@ -211,7 +236,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
 
   useEffect(() => {
     const newData = {
-      selected_diets: data.selected_diets || [], // Keep original selected_diets from data
+      selected_diets: selectedDiets,
       selected_addons: selectedAddons,
       selected_protection: selectedProtection,
       selected_promotion: selectedPromotion,
@@ -230,7 +255,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
       prevDataRef.current = newData;
       onChange(newData);
     }
-  }, [data.selected_diets, selectedAddons, selectedProtection, selectedPromotion, promotionJustification, transportData, selectedSource, inneText, onChange]);
+  }, [selectedDiets, selectedAddons, selectedProtection, selectedPromotion, promotionJustification, transportData, selectedSource, inneText, onChange]);
 
   if (loading) {
     return <div className="text-center py-8">Ładowanie danych...</div>;
@@ -239,6 +264,40 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-gray-900">Krok 2: Szczegóły rezerwacji</h2>
+
+      {/* Diety (dodatkowe diety z turnusu) */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Diety (dostępne w turnusie)</h3>
+        <div className="space-y-2">
+          {turnusDiets.length > 0 ? (
+            turnusDiets.map((diet) => {
+              const dietId = diet.relation_id ?? diet.id;
+              const isSelected = selectedDiets.includes(dietId);
+              return (
+                <label key={diet.id} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedDiets([...selectedDiets, dietId]);
+                      } else {
+                        setSelectedDiets(selectedDiets.filter((id) => id !== dietId));
+                      }
+                    }}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-900">
+                    {diet.name} {diet.price > 0 ? `(+${diet.price.toFixed(2)} PLN)` : ''}
+                  </span>
+                </label>
+              );
+            })
+          ) : (
+            <p className="text-sm text-gray-500">Brak dodatkowych diet dla tego turnusu</p>
+          )}
+        </div>
+      </div>
 
       {/* Dodatki */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

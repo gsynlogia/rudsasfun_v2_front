@@ -1,4 +1,3 @@
-e47d48e
-# RWD: Mobile-first implementacja procesu rezerwacji
-# Poprzedni hash: 083ad02 (RWD profilu klienta)
-# Do cofnięcia: git checkout [hash] .
+a1fec3a
+# Punkt przywracania PRZED zadaniem: formularz edycji umowy + archiwum (tylko lokalny)
+# Testy wyłącznie REZ-2026-442. Do cofnięcia: git checkout a1fec3a .
