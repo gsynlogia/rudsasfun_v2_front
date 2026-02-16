@@ -1,6 +1,7 @@
 'use client';
 
 import { Info } from 'lucide-react';
+import { useParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
@@ -23,7 +24,12 @@ interface Addon {
  * Displays addon description from database, addon selection tiles, and info block from database
  */
 export default function AddonsSection() {
+  const params = useParams();
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
+  const editionIdFromUrl = params?.editionId as string | undefined;
+  const propertyIdFromUrl = editionIdFromUrl != null && editionIdFromUrl !== '' && !Number.isNaN(Number(editionIdFromUrl))
+    ? Number(editionIdFromUrl)
+    : undefined;
 
   // Initialize with data from sessionStorage if available
   const getInitialSelectedAddons = (): Set<string> => {
@@ -71,15 +77,17 @@ export default function AddonsSection() {
   }, []);
 
   // Fetch addons from API (prefer property_id – single source of truth from DB)
+  // Fallback: property_id z kontekstu → property_id z URL (editionId) → city z kontekstu
   useEffect(() => {
     const fetchAddons = async () => {
       try {
         setLoadingAddons(true);
-        const propertyId = reservation.camp?.properties?.property_id;
+        const propertyIdFromContext = reservation.camp?.properties?.property_id;
         const selectedCity = reservation.camp?.properties?.city;
+        const propertyId = propertyIdFromContext ?? propertyIdFromUrl;
 
         if (propertyId == null && !selectedCity) {
-          console.warn('[AddonsSection] Brak property_id ani city w kontekście rezerwacji – nie pobieram dodatków');
+          console.warn('[AddonsSection] Brak property_id (kontekst i URL) ani city – nie pobieram dodatków');
           setAddons([]);
           setLoadingAddons(false);
           return;
@@ -158,7 +166,7 @@ export default function AddonsSection() {
       }
     };
     fetchAddons();
-  }, [reservation.camp?.properties?.property_id, reservation.camp?.properties?.city]);
+  }, [reservation.camp?.properties?.property_id, reservation.camp?.properties?.city, propertyIdFromUrl]);
 
   // Keep ref in sync with state
   useEffect(() => {
