@@ -1,7 +1,8 @@
 # Addony po property_id (frontend) – punkt przywracania
-# PRZED realizacją zadania (hash commita przed zmianami):
-9b0f5fb05d8492499f8326dacc6946fa05f267e0
-# PO realizacji (lokalny commit – punkt przywracania):
-76788f86ee95729de19bb548890fb93702acccba
-# Do cofnięcia do stanu PRZED: git checkout 9b0f5fb05d8492499f8326dacc6946fa05f267e0 .
-# Do cofnięcia do stanu PO (przywrócenie): git checkout 76788f86ee95729de19bb548890fb93702acccba .
+# Run 2026-02-13 (kontynuacja – fallback property_id z URL w AddonsSection)
+# PRZED (punkt przywracania – commit przed zmianami):
+4d12c5cc7ab8ced2907818cfee6e8b6623080aad
+# PO (po dodaniu fallback property_id z editionId w AddonsSection):
+9de23a1f476ecd8043eda407c9f7badb89f5d373
+# Do cofnięcia do stanu PRZED: git checkout 4d12c5cc7ab8ced2907818cfee6e8b6623080aad .
+# Do przywrócenia stanu PO: git checkout 9de23a1f476ecd8043eda407c9f7badb89f5d373 .
