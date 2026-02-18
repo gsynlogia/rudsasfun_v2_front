@@ -50,19 +50,33 @@ interface Diet {
   price: number;
 }
 
+const MAX_PARENTS = 2;
+
 export default function EditReservationStep1({ data, camp_id, property_id, onChange }: EditReservationStep1Props) {
-  // Normalize parents_data - ensure it's an array
+  // Normalize parents_data - ensure it's an array, max MAX_PARENTS
   const normalizeParents = (parentsData: any): ParentData[] => {
     if (!parentsData) return [];
     if (typeof parentsData === 'string') {
       try {
-        return JSON.parse(parentsData);
+        const parsed = JSON.parse(parentsData);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.slice(0, MAX_PARENTS).map((p: any, idx: number) => ({
+          id: p.id || String(idx + 1),
+          firstName: p.firstName || '',
+          lastName: p.lastName || '',
+          email: p.email || '',
+          phone: p.phone || p.phoneNumber || '',
+          phoneNumber: p.phoneNumber || p.phone || '',
+          street: p.street || '',
+          postalCode: p.postalCode || '',
+          city: p.city || '',
+        }));
       } catch {
         return [];
       }
     }
     if (Array.isArray(parentsData)) {
-      return parentsData.map((p, idx) => ({
+      return parentsData.slice(0, MAX_PARENTS).map((p, idx) => ({
         id: p.id || String(idx + 1),
         firstName: p.firstName || '',
         lastName: p.lastName || '',
@@ -173,6 +187,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
   }, [parents, participantData, selectedDietId, accommodationRequest, healthQuestions, healthDetails, additionalNotes, participantAdditionalInfo, onChange]);
 
   const addParent = () => {
+    if (parents.length >= MAX_PARENTS) return;
     const newParent: ParentData = {
       id: Date.now().toString(),
       firstName: '',
@@ -204,12 +219,14 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
       {/* Opiekunowie */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Opiekunowie</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Opiekunowie <span className="text-sm font-normal text-gray-500">(maks. {MAX_PARENTS})</span></h3>
           <button
             type="button"
             onClick={addParent}
-            className="px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-colors"
+            disabled={parents.length >= MAX_PARENTS}
+            className="px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             style={{ borderRadius: 0 }}
+            title={parents.length >= MAX_PARENTS ? `Maksymalnie ${MAX_PARENTS} opiekunów` : 'Dodaj opiekuna'}
           >
             + Dodaj opiekuna
           </button>

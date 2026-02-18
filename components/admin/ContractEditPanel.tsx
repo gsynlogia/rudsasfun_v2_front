@@ -13,6 +13,12 @@ interface ReservationDetails {
   camp_id?: number;
   property_id?: number;
   property_city?: string | null;
+  camp_name?: string | null;
+  property_name?: string | null;
+  property_period?: string | null;
+  property_start_date?: string | null;
+  property_end_date?: string | null;
+  property_tag?: string | null;
   parents_data?: Array<{
     id?: string;
     firstName?: string;
@@ -183,23 +189,49 @@ export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: Contr
   const propertyId = reservation.property_id ?? 0;
   const propertyCity = reservation.property_city ?? undefined;
 
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return null;
+    try {
+      return new Date(dateString).toLocaleDateString('pl-PL');
+    } catch {
+      return null;
+    }
+  };
+  const startFormatted = formatDate(reservation.property_start_date);
+  const endFormatted = formatDate(reservation.property_end_date);
+  const datesText = startFormatted && endFormatted ? `${startFormatted} – ${endFormatted}` : startFormatted || endFormatted || null;
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-end gap-2 border-b border-gray-200 pb-3 mb-3">
-        {onClose && (
-          <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-none">
-            Zamknij
+      <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-3 mb-3">
+        <div className="min-w-0 text-sm text-gray-700">
+          {reservation.camp_name && <span>Obóz: {reservation.camp_name}</span>}
+          {reservation.property_name && (
+            <span>{reservation.camp_name ? '. Turnus: ' : 'Turnus: '}{reservation.property_name}</span>
+          )}
+          {datesText && <span>{reservation.camp_name || reservation.property_name ? '. Daty: ' : 'Daty: '}{datesText}</span>}
+          {reservation.property_tag && (
+            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#1d283d]/10 text-[#1d283d]">
+              {reservation.property_tag}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {onClose && (
+            <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-none">
+              Zamknij
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 rounded-none text-sm font-medium"
+          >
+            <Save className="w-4 h-4" />
+            {isSaving ? 'Zapisywanie...' : 'Zapisz'}
           </button>
-        )}
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isSaving}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 rounded-none text-sm font-medium"
-        >
-          <Save className="w-4 h-4" />
-          {isSaving ? 'Zapisywanie...' : 'Zapisz'}
-        </button>
+        </div>
       </div>
       <div className="flex-1 overflow-auto min-h-0">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4">

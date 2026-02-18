@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User, Tent, Users, Utensils, Shield, Gift, Bus, FileCheck, Receipt, Heart, MessageSquare, CheckCircle2, RotateCcw, CheckCircle, XCircle, SquarePen } from 'lucide-react';
+import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User, Tent, Users, Utensils, Shield, Gift, Bus, FileCheck, Receipt, Heart, MessageSquare, CheckCircle2, RotateCcw, CheckCircle, XCircle, SquarePen, Mic } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
@@ -33,6 +33,22 @@ import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/Manu
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
 import { authenticatedApiCall } from '@/utils/api-auth';
+
+interface SpeechRecognitionResultEventLike {
+  results: { [i: number]: { isFinal: boolean; 0: { transcript: string }; length: number } };
+  resultIndex: number;
+}
+interface SpeechRecognitionLike {
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: (e: SpeechRecognitionResultEventLike) => void;
+  onend: () => void;
+  onerror: (e: { error: string }) => void;
+}
 
 interface ReservationDetails {
   id: number;
@@ -296,6 +312,8 @@ export default function ReservationDetailPage() {
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+  const [noteSpeechListening, setNoteSpeechListening] = useState(false);
+  const noteSpeechRecognitionRef = useRef<{ start: () => void; stop: () => void; abort: () => void } | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState('');
   const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
@@ -808,6 +826,9 @@ export default function ReservationDetailPage() {
   const handleCreateNote = async () => {
     if (!reservation || !newNoteContent.trim()) return;
 
+    noteSpeechRecognitionRef.current?.stop();
+    setNoteSpeechListening(false);
+
     try {
       setSavingNote(true);
       const newNote = await authenticatedApiCall<ReservationNote>(
@@ -880,6 +901,62 @@ export default function ReservationDetailPage() {
     setEditingNoteId(null);
     setEditingNoteContent('');
   };
+
+  const toggleNoteSpeech = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const Win = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+    const SpeechRecognitionAPI = Win.SpeechRecognition || Win.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      showError('Twoja przeglądarka nie obsługuje rozpoznawania mowy.');
+      return;
+    }
+    if (noteSpeechListening) {
+      noteSpeechRecognitionRef.current?.stop();
+      return;
+    }
+    const rec = new SpeechRecognitionAPI();
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.lang = 'pl-PL';
+    rec.onresult = (event: SpeechRecognitionResultEventLike) => {
+      const result = event.results[event.resultIndex];
+      const transcript = result[0].transcript;
+      if (result.isFinal) {
+        setNewNoteContent((prev) => (prev ? prev + ' ' + transcript : transcript));
+      }
+    };
+    rec.onend = () => setNoteSpeechListening(false);
+    rec.onerror = (event: { error: string }) => {
+      setNoteSpeechListening(false);
+      if (event.error === 'aborted') return;
+      if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+        showError('Aby dyktować, zezwól na dostęp do mikrofonu w przeglądarce (ikonka kłódki w pasku adresu).');
+        return;
+      }
+      if (event.error === 'no-speech') {
+        showError('Nie wykryto mowy. Kliknij mikrofon ponownie i mów po zatwierdzeniu zgody.');
+        return;
+      }
+      if (event.error === 'network') {
+        showError('Błąd sieci przy rozpoznawaniu mowy. Sprawdź połączenie.');
+        return;
+      }
+      showError('Błąd rozpoznawania mowy. Sprawdź mikrofon i uprawnienia.');
+    };
+    noteSpeechRecognitionRef.current = rec;
+    setNoteSpeechListening(true);
+    try {
+      rec.start();
+    } catch (err) {
+      setNoteSpeechListening(false);
+      noteSpeechRecognitionRef.current = null;
+      showError('Nie udało się uruchomić mikrofonu. Zezwól na dostęp do mikrofonu w ustawieniach przeglądarki.');
+    }
+  }, [noteSpeechListening, showError]);
+
+  useEffect(() => () => {
+    noteSpeechRecognitionRef.current?.abort();
+  }, []);
 
   // Synchronizuj justificationDraft z reservation (tylko gdy modal nie jest otwarty)
   useEffect(() => {
@@ -2825,7 +2902,7 @@ export default function ReservationDetailPage() {
           <aside
             role="complementary"
             aria-label="Notatki i wydarzenia rezerwacji"
-            className="flex-shrink-0 w-full lg:w-[320px] xl:w-[360px] flex flex-col border-t lg:border-t-0 lg:border-l border-[#1d283d] rounded-none bg-[#1d283d] overflow-hidden min-h-[280px] lg:h-[calc(100vh-11rem)] lg:min-h-0 z-20"
+            className="flex-shrink-0 w-full lg:w-[320px] xl:w-[360px] flex flex-col border-t lg:border-t-0 lg:border-l border-[#1d283d] rounded-none bg-[#1d283d] overflow-hidden min-h-[280px] lg:h-[calc(100vh-11rem)] lg:min-h-0 z-20 pr-4"
           >
                 <div className="p-3 min-h-[6rem] flex items-center border-b border-white/20 flex-shrink-0">
                   <div className="flex items-center gap-2">
@@ -2846,7 +2923,19 @@ export default function ReservationDetailPage() {
                       className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d283d] bg-white resize-none text-gray-900"
                       rows={2}
                     />
-                    <div className="flex justify-end mt-1">
+                    <div className="flex justify-end items-center gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={toggleNoteSpeech}
+                        title={noteSpeechListening ? 'Zatrzymaj dyktowanie' : 'Podyktuj notatkę (mikrofon)'}
+                        className={`inline-flex items-center justify-center w-10 h-10 rounded-none border text-sm font-medium cursor-pointer transition-colors ${
+                          noteSpeechListening
+                            ? 'bg-red-500 border-red-600 text-white hover:bg-red-600'
+                            : 'bg-white border-gray-300 text-[#1d283d] hover:bg-gray-50'
+                        }`}
+                      >
+                        <Mic className="w-4 h-4" aria-hidden />
+                      </button>
                       <button
                         type="button"
                         onClick={handleCreateNote}
