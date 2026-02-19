@@ -25,6 +25,8 @@ interface ReservationDetails {
   participant_last_name?: string | null;
   total_price?: number;
   deposit_amount?: number | null;
+  special_price?: number | null;
+  standard_price_calculated?: number | null;
   base_price?: number | null;
   diet?: number | null;
   diet_name?: string | null;
@@ -86,6 +88,8 @@ export default function ReservationPaymentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [specialPriceDraft, setSpecialPriceDraft] = useState<string>('');
+  const [savingSpecialPrice, setSavingSpecialPrice] = useState(false);
 
   // Search states
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
@@ -102,6 +106,7 @@ export default function ReservationPaymentsPage() {
           `/api/reservations/by-number/${reservationNumber}`,
         );
         setReservation(reservationData);
+        setSpecialPriceDraft(reservationData.special_price != null && reservationData.special_price !== undefined ? String(reservationData.special_price) : '');
 
         // Fetch all payments (Tpay)
         const allPayments = await paymentService.listPayments(0, 1000);
@@ -567,6 +572,76 @@ export default function ReservationPaymentsPage() {
                     )}
                   </div>
                 )}
+                <div className="pt-3 mt-3 border-t border-gray-100">
+                  <div className="text-gray-700 font-medium mb-2">Cena Specjalna (PLN)</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder={reservation.special_price != null ? String(reservation.special_price) : '—'}
+                      value={specialPriceDraft}
+                      onChange={(e) => setSpecialPriceDraft(e.target.value)}
+                      className="w-28 px-2 py-1.5 border border-gray-300 text-sm"
+                      style={{ borderRadius: 0 }}
+                    />
+                    <button
+                      type="button"
+                      disabled={savingSpecialPrice}
+                      onClick={async () => {
+                        const num = specialPriceDraft.trim() === '' ? null : parseFloat(specialPriceDraft.replace(',', '.'));
+                        if (num !== null && (isNaN(num) || num < 0)) return;
+                        setSavingSpecialPrice(true);
+                        try {
+                          setError(null);
+                          const updated = await authenticatedApiCall<ReservationDetails>(
+                            `/api/reservations/by-number/${reservationNumber}/admin/special-price`,
+                            { method: 'PATCH', body: JSON.stringify({ special_price: num }) },
+                          );
+                          setReservation(updated);
+                          setSpecialPriceDraft(updated.special_price != null ? String(updated.special_price) : '');
+                        } catch {
+                          setError('Nie udało się zapisać ceny specjalnej.');
+                        } finally {
+                          setSavingSpecialPrice(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-[#03adf0] text-white text-sm hover:bg-[#0288c7] disabled:opacity-50"
+                      style={{ borderRadius: 0 }}
+                    >
+                      {savingSpecialPrice ? 'Zapisywanie…' : 'Zapisz'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingSpecialPrice || reservation.special_price == null}
+                      onClick={async () => {
+                        setSavingSpecialPrice(true);
+                        try {
+                          setError(null);
+                          const updated = await authenticatedApiCall<ReservationDetails>(
+                            `/api/reservations/by-number/${reservationNumber}/admin/special-price`,
+                            { method: 'PATCH', body: JSON.stringify({ special_price: null }) },
+                          );
+                          setReservation(updated);
+                          setSpecialPriceDraft('');
+                        } catch {
+                          setError('Nie udało się usunąć ceny specjalnej.');
+                        } finally {
+                          setSavingSpecialPrice(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ borderRadius: 0 }}
+                    >
+                      Usuń / Resetuj
+                    </button>
+                  </div>
+                  {reservation.special_price != null && reservation.standard_price_calculated != null && (
+                    <p className="text-xs text-gray-500 mt-1.5">
+                      Standardowa cena wyliczona przez system: {Number(reservation.standard_price_calculated).toFixed(2)} PLN
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 

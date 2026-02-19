@@ -1212,6 +1212,20 @@ export default function ReservationDetailPage() {
         const amount = Number(payload.new_total_price).toFixed(2).replace('.', ',');
         return `System zaktualizował cenę całkowitą rezerwacji w wyniku modyfikacji usług. Nowa cena: ${amount} PLN.`;
       }
+      if (ev.action === 'special_price_set' && payload && typeof payload.special_price === 'number' && typeof payload.standard_price === 'number') {
+        const sp = Number(payload.special_price).toFixed(2).replace('.', ',');
+        const std = Number(payload.standard_price).toFixed(2).replace('.', ',');
+        return `Pracownik ustawił Cenę Specjalną: ${sp} PLN. (Standardowa cena wynosiła: ${std} PLN).`;
+      }
+      if (ev.action === 'special_price_updated' && payload && typeof payload.old_special_price === 'number' && typeof payload.new_special_price === 'number') {
+        const oldA = Number(payload.old_special_price).toFixed(2).replace('.', ',');
+        const newA = Number(payload.new_special_price).toFixed(2).replace('.', ',');
+        return `Pracownik zmienił Cenę Specjalną z ${oldA} PLN na ${newA} PLN.`;
+      }
+      if (ev.action === 'special_price_cleared' && payload && typeof payload.restored_standard_price === 'number') {
+        const std = Number(payload.restored_standard_price).toFixed(2).replace('.', ',');
+        return `Pracownik usunął Cenę Specjalną. System przywrócił standardową cenę rezerwacji: ${std} PLN.`;
+      }
     } catch {
       /* ignore */
     }
@@ -1225,6 +1239,9 @@ export default function ReservationDetailPage() {
       protection_updated: 'Pracownik zaktualizował pakiety ochrony.',
       diet_updated: 'Pracownik zaktualizował dietę.',
       total_price_recalculated: 'System zaktualizował cenę całkowitą rezerwacji.',
+      special_price_set: 'Pracownik ustawił cenę specjalną.',
+      special_price_updated: 'Pracownik zmienił cenę specjalną.',
+      special_price_cleared: 'Pracownik usunął cenę specjalną.',
     };
     return labels[ev.action] ?? ev.action;
   };
