@@ -1226,6 +1226,16 @@ export default function ReservationDetailPage() {
         const std = Number(payload.restored_standard_price).toFixed(2).replace('.', ',');
         return `Pracownik usunął Cenę Specjalną. System przywrócił standardową cenę rezerwacji: ${std} PLN.`;
       }
+      if (ev.action === 'camp_merged' && payload && typeof payload.source_name === 'string' && typeof payload.target_name === 'string') {
+        const turnus = typeof payload.turnus_count === 'number' ? payload.turnus_count : 0;
+        const res = typeof payload.reservation_count === 'number' ? payload.reservation_count : 0;
+        const arch = typeof payload.archive_count === 'number' ? payload.archive_count : 0;
+        const parts = [`Scalono obóz „${payload.source_name}” z obozem „${payload.target_name}”.`];
+        if (turnus > 0 || res > 0 || arch > 0) {
+          parts.push(`Przeniesiono: ${turnus} turnusów, ${res} rezerwacji, ${arch} wpisów archiwalnych.`);
+        }
+        return parts.join(' ');
+      }
     } catch {
       /* ignore */
     }
@@ -1242,6 +1252,7 @@ export default function ReservationDetailPage() {
       special_price_set: 'Pracownik ustawił cenę specjalną.',
       special_price_updated: 'Pracownik zmienił cenę specjalną.',
       special_price_cleared: 'Pracownik usunął cenę specjalną.',
+      camp_merged: 'Scalono obozy (merge).',
     };
     return labels[ev.action] ?? ev.action;
   };
