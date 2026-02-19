@@ -1166,8 +1166,19 @@ export default function ReservationDetailPage() {
   /** Mapowanie action (+ opcjonalnie payload) na zdanie po polsku w „Zdarzenia klienta”. */
   const formatEventAction = (ev: ReservationEventItem): string => {
     try {
-      const payload = ev.payload ? (typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload) as { description?: string; sections?: string[] } | null : null;
+      const payload = ev.payload ? (typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload) as Record<string, unknown> | null : null;
       if (payload?.description && typeof payload.description === 'string') return payload.description;
+      if (ev.action === 'protection_updated' && payload?.new_data && typeof payload.new_data === 'object') {
+        const newData = payload.new_data as { added_names?: string[]; removed_names?: string[] };
+        const parts: string[] = [];
+        if (Array.isArray(newData.added_names) && newData.added_names.length > 0) {
+          parts.push(`Pracownik dodał pakiet ochrony: [${newData.added_names.join(', ')}].`);
+        }
+        if (Array.isArray(newData.removed_names) && newData.removed_names.length > 0) {
+          parts.push(`Pracownik usunął pakiet ochrony: [${newData.removed_names.join(', ')}].`);
+        }
+        if (parts.length > 0) return parts.join(' ');
+      }
     } catch {
       /* ignore */
     }
@@ -1178,6 +1189,7 @@ export default function ReservationDetailPage() {
       qualification_card_accepted: 'Pracownik zaakceptował kartę kwalifikacyjną.',
       qualification_card_rejected: 'Pracownik odrzucił kartę kwalifikacyjną.',
       qualification_card_updated_after_approval: 'Klient zmodyfikował kartę po zaakceptowaniu – wymagana ponowna weryfikacja.',
+      protection_updated: 'Pracownik zaktualizował pakiety ochrony.',
     };
     return labels[ev.action] ?? ev.action;
   };

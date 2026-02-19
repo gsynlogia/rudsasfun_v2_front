@@ -327,12 +327,16 @@ export default function AdditionalServicesTiles({
     }
   };
 
-  // Extract numeric IDs from selectedProtection (format: "protection-{id}")
+  // Extract numeric IDs from selectedProtection (backend returns e.g. ["1","2"] or ["protection-1"]; accept both)
   const selectedProtectionNumericIds = new Set(
     (selectedProtection || [])
-      .map((id: string) => {
-        const match = id.match(/^protection-(\d+)$/);
-        return match ? parseInt(match[1], 10) : null;
+      .map((id: string | number) => {
+        if (typeof id === 'number' && !Number.isNaN(id)) return id;
+        const s = String(id).trim();
+        const match = s.match(/^protection-(\d+)$/);
+        if (match) return parseInt(match[1], 10);
+        const n = parseInt(s, 10);
+        return Number.isNaN(n) ? null : n;
       })
       .filter((id): id is number => id !== null),
   );
