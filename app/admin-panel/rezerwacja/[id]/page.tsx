@@ -1208,6 +1208,10 @@ export default function ReservationDetailPage() {
         if (newName) return `Pracownik ustawił dietę: „${newName}”.`;
         if (oldName) return `Pracownik usunął dietę: „${oldName}”.`;
       }
+      if (ev.action === 'total_price_recalculated' && payload && typeof payload.new_total_price === 'number') {
+        const amount = Number(payload.new_total_price).toFixed(2).replace('.', ',');
+        return `System zaktualizował cenę całkowitą rezerwacji w wyniku modyfikacji usług. Nowa cena: ${amount} PLN.`;
+      }
     } catch {
       /* ignore */
     }
@@ -1220,6 +1224,7 @@ export default function ReservationDetailPage() {
       qualification_card_updated_after_approval: 'Klient zmodyfikował kartę po zaakceptowaniu – wymagana ponowna weryfikacja.',
       protection_updated: 'Pracownik zaktualizował pakiety ochrony.',
       diet_updated: 'Pracownik zaktualizował dietę.',
+      total_price_recalculated: 'System zaktualizował cenę całkowitą rezerwacji.',
     };
     return labels[ev.action] ?? ev.action;
   };
