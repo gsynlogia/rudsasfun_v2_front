@@ -28,6 +28,17 @@ export default function ContactPage() {
       return;
     }
 
+    if (!email.trim()) {
+      showError('Adres e-mail jest wymagany.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      showError('Proszę podać prawidłowy adres e-mail.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -40,7 +51,7 @@ export default function ContactPage() {
         body: JSON.stringify({
           subject: subject.trim(),
           message: message.trim(),
-          email: email.trim() || undefined,
+          email: email.trim(),
         }),
       });
 
@@ -117,13 +128,14 @@ export default function ContactPage() {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email (opcjonalnie - otrzymasz potwierdzenie)
+                Adres e-mail <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
                 className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent outline-none text-sm sm:text-base"
                 placeholder="twoj@email.pl"
               />

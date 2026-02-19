@@ -48,6 +48,8 @@ interface ContractFormProps {
   /** Payload z signed_documents (umowa). Gdy podany – dane formularza z payloadu; gdy brak – z rezerwacji (obecne zachowanie). */
   signedPayload?: Record<string, unknown> | null;
   printMode?: boolean;
+  /** Tylko podgląd (np. krok 4 rezerwacji) – bez przycisku Drukuj i sekcji podpisu. */
+  previewOnly?: boolean;
 }
 
 type PrintErrorKey = 'reservationNumber' | 'contractDate' | 'parentName' | 'childName' | 'tournamentName' | 'tournamentDates';
@@ -94,7 +96,7 @@ function contractPayloadToFormOverlay(p: Record<string, unknown>): Partial<Contr
   };
 }
 
-export function ContractForm({ reservationId, reservationData, signedPayload, printMode = false }: ContractFormProps) {
+export function ContractForm({ reservationId, reservationData, signedPayload, printMode = false, previewOnly = false }: ContractFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
@@ -398,8 +400,8 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
 
   return (
     <>
-      {/* Przycisk druku - ukryty przy druku i w printMode */}
-      {!printMode && (
+      {/* Przycisk druku - ukryty przy druku, printMode i podglądzie (krok 4) */}
+      {!printMode && !previewOnly && (
         <div className="no-print max-w-[210mm] mx-auto px-4 pt-4 flex justify-end">
           <button
             onClick={handlePrint}
@@ -751,7 +753,8 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
             </ul>
           </section>
 
-          {/* Podpisy */}
+          {/* Podpisy – ukryte w trybie podglądu (krok 4 rezerwacji) */}
+          {!previewOnly && (
           <section className="section signature-section">
             <div className="signature-row-single">
               <div className="signature-field-organizer">
@@ -785,6 +788,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
               )}
             </div>
           </section>
+          )}
 
           <div className="page-number">3/3</div>
         </div>

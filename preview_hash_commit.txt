@@ -1,3 +1,3 @@
 # Podgląd umowy na kroku 4 rezerwacji (tasks/zadanie.md)
 # PRZED (punkt przywracania – commit przed zmianami):
-23f940b2e26722d4b29e5457dda0c35734ecba46
+bd74d4ec49224ae202552c43ca4b85aeca521af7

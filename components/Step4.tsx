@@ -3,10 +3,11 @@
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
-
+import { ContractForm } from '@/components/profile/ContractForm';
 import type { StepComponentProps } from '@/types/reservation';
+import { buildContractFormDataFromSteps } from '@/lib/buildContractPreviewFromSteps';
 import { API_BASE_URL } from '@/utils/api-config';
-import { saveStep4FormData, loadStep4FormData, type Step4FormData } from '@/utils/sessionStorage';
+import { saveStep4FormData, loadStep4FormData, loadStep1FormData, loadStep2FormData, loadStep3FormData, loadReservationState, type Step4FormData } from '@/utils/sessionStorage';
 
 import DashedLine from './DashedLine';
 
@@ -503,6 +504,27 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
                   Brak dokumentów do pobrania
                 </p>
               )}
+            </div>
+          </div>
+
+          {/* Podgląd umowy – dane z kroków 1–3 (bez zapisu do bazy) */}
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+              Podgląd umowy
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-600 mb-3">
+              Poniżej widzisz treść umowy na podstawie danych z poprzednich kroków. Numer rezerwacji zostanie nadany po kliknięciu „Potwierdzam i zamawiam”.
+            </p>
+            <div className="max-h-[70vh] overflow-y-auto border border-gray-200 rounded-lg bg-gray-50 p-4">
+              <ContractForm
+                reservationData={buildContractFormDataFromSteps(
+                  loadStep1FormData(),
+                  loadStep2FormData(),
+                  loadStep3FormData(),
+                  loadReservationState(),
+                )}
+                previewOnly
+              />
             </div>
           </div>
         </section>
