@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import { QualificationForm } from '@/components/profile/QualificationForm';
 import type { ReservationData } from '@/lib/contractReservationMapping';
@@ -21,6 +21,7 @@ export default function QualificationCardPage() {
 
   const [reservationData, setReservationData] = useState<ReservationData | null>(null);
   const [qualificationCardSignedPayload, setQualificationCardSignedPayload] = useState<Record<string, unknown> | null>(null);
+  const [formSnapshotFromDb, setFormSnapshotFromDb] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +86,32 @@ export default function QualificationCardPage() {
       .catch(() => setQualificationCardSignedPayload(null));
   }, [reservationData?.id]);
 
+  const refetchFormSnapshot = useCallback(() => {
+    if (!reservationData?.id) return;
+    const token = authService.getToken();
+    if (!token) return;
+    fetch(`${API_URL}/api/qualification-cards/${reservationData.id}/data`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { form_snapshot?: string | null } | null) => {
+        if (data?.form_snapshot && typeof data.form_snapshot === 'string') {
+          try {
+            setFormSnapshotFromDb(JSON.parse(data.form_snapshot) as Record<string, unknown>);
+          } catch {
+            setFormSnapshotFromDb(null);
+          }
+        } else {
+          setFormSnapshotFromDb(null);
+        }
+      })
+      .catch(() => setFormSnapshotFromDb(null));
+  }, [reservationData?.id]);
+
+  useEffect(() => {
+    refetchFormSnapshot();
+  }, [refetchFormSnapshot]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -117,6 +144,8 @@ export default function QualificationCardPage() {
         reservationId={reservationData?.id}
         reservationData={qualificationData}
         signedPayload={qualificationCardSignedPayload ?? undefined}
+        formSnapshotFromDb={formSnapshotFromDb ?? undefined}
+        onSaveSuccess={() => refetchFormSnapshot()}
       />
     </div>
   );

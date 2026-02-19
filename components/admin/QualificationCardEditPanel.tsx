@@ -111,6 +111,8 @@ export function QualificationCardEditPanel({
 
   const [childPesel, setChildPesel] = useState('');
   const [childDOB, setChildDOB] = useState('');
+  const [noPesel, setNoPesel] = useState(false);
+  const [noPeselYear, setNoPeselYear] = useState('');
   const [noSecondParent, setNoSecondParent] = useState(false);
   const [secondParentName, setSecondParentName] = useState('');
   const [secondParentAddress, setSecondParentAddress] = useState('');
@@ -163,22 +165,37 @@ export function QualificationCardEditPanel({
   }, [formSnapshotFromDb, signedPayload, reservationData?.childDOB]);
 
   useEffect(() => {
-    setChildPesel(reservationData?.childPesel ?? '');
-    if (overlay?.childPesel !== undefined && overlay.childPesel !== '') setChildPesel(overlay.childPesel);
-    if (overlay?.secondParent) {
-      setSecondParentName(overlay.secondParent.name);
-      setSecondParentAddress(overlay.secondParent.address);
-      setSecondParentPhone(overlay.secondParent.phone);
-      setNoSecondParent(false);
-    } else if ((reservationData?.secondParentName !== null && reservationData?.secondParentName !== undefined) || (reservationData?.secondParentAddress !== null && reservationData?.secondParentAddress !== undefined)) {
-      setSecondParentName(reservationData.secondParentName ?? '');
-      setSecondParentAddress(reservationData.secondParentAddress ?? '');
-      setSecondParentPhone(reservationData.secondParentPhone ?? '');
+    const data = mapReservationToQualificationForm(reservation as unknown as ReservationData);
+    let ov: ReturnType<typeof signedPayloadOverlayOnly> = null;
+    if (formSnapshotFromDb?.trim()) {
+      try {
+        ov = signedPayloadOverlayOnly(JSON.parse(formSnapshotFromDb) as SignedQualificationPayload);
+      } catch {
+        ov = signedPayloadOverlayOnly(signedPayload ?? undefined);
+      }
+    } else {
+      ov = signedPayloadOverlayOnly(signedPayload ?? undefined);
     }
-    if (overlay?.vaccination) setVaccination(overlay.vaccination);
-    if (overlay?.regulationConfirm !== undefined) setRegulationConfirm(overlay.regulationConfirm);
-    if (overlay?.authorizations?.length) setAuthorizations(overlay.authorizations);
-  }, [overlay, reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone]);
+    setChildPesel(ov?.childPesel !== undefined && ov.childPesel !== '' ? ov.childPesel : (data?.childPesel ?? ''));
+    if (ov?.noPesel !== undefined) setNoPesel(ov.noPesel);
+    if (ov?.noPeselYear !== undefined) setNoPeselYear(ov.noPeselYear);
+    if (ov?.secondParent) {
+      setSecondParentName(ov.secondParent.name);
+      setSecondParentAddress(ov.secondParent.address);
+      setSecondParentPhone(ov.secondParent.phone);
+      setNoSecondParent(false);
+    } else {
+      if (ov != null && data?.parentCount === 1) setNoSecondParent(true);
+      if (data?.secondParentName != null || data?.secondParentAddress != null) {
+        setSecondParentName(data?.secondParentName ?? '');
+        setSecondParentAddress(data?.secondParentAddress ?? '');
+        setSecondParentPhone(data?.secondParentPhone ?? '');
+      }
+    }
+    if (ov?.vaccination) setVaccination(ov.vaccination);
+    if (ov?.regulationConfirm !== undefined) setRegulationConfirm(ov.regulationConfirm);
+    if (ov?.authorizations?.length) setAuthorizations(ov.authorizations);
+  }, [formSnapshotFromDb, signedPayload, reservation]);
 
   const buildPayload = useCallback(() => {
     const childName = reservationData?.childName ?? '';
@@ -203,7 +220,9 @@ export function QualificationCardEditPanel({
         uczestnik: {
           imieNazwisko: childName,
           dataUrodzenia: childDOB.trim() || (reservationData?.childDOB ?? ''),
-          pesel: vaccination.measles ? '' : childPesel.trim(),
+          pesel: noPesel ? '' : childPesel.trim(),
+          brakPesel: noPesel,
+          rokUrodzeniaGdyBrakPesel: noPeselYear || undefined,
           adres: childAddress,
         },
         opiekunowie: { imionaNazwiska: parentNames, adres: parentAddress, telefon: parentPhone },
@@ -256,6 +275,8 @@ export function QualificationCardEditPanel({
     secondParentAddress,
     secondParentPhone,
     childPesel,
+    noPesel,
+    noPeselYear,
     healthChronicTags,
     healthDysfunctionsTags,
     healthPsychiatricTags,
@@ -291,9 +312,10 @@ export function QualificationCardEditPanel({
       const parent2_first_name = parts[0] ?? '';
       const parent2_last_name = parts.slice(1).join(' ') ?? '';
       const payload = buildPayload();
+      const participantBirthDate = toDateInputValue(childDOB) || null;
       const card_data: Record<string, unknown> = {
-        participant_pesel: vaccination.measles ? null : (childPesel.trim() || null),
-        participant_birth_date: childDOB.trim() || null,
+        participant_pesel: noPesel ? null : (childPesel.trim() || null),
+        participant_birth_date: participantBirthDate,
         parent2_first_name: secondParentName.trim() ? parent2_first_name : null,
         parent2_last_name: secondParentName.trim() ? parent2_last_name : null,
         parent2_street: secondParentAddress.trim() || null,
@@ -304,7 +326,8 @@ export function QualificationCardEditPanel({
       showSuccess('Karta kwalifikacyjna zaktualizowana. Wymagany ponowny podpis klienta.');
       onClose?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Błąd zapisu';
+      const msg =
+        err instanceof Error ? err.message : typeof err === 'string' ? err : 'Błąd zapisu';
       showErrorToast(msg);
     } finally {
       setIsSaving(false);
@@ -407,31 +430,31 @@ export function QualificationCardEditPanel({
                 type="text"
                 inputMode="numeric"
                 maxLength={11}
-                value={vaccination.measles ? '' : childPesel}
-                readOnly={vaccination.measles}
+                value={noPesel ? '' : childPesel}
+                readOnly={noPesel}
                 onChange={(e) => {
                   const v = e.target.value.replace(/\D/g, '');
                   setChildPesel(v);
                 }}
-                className={`w-full border border-gray-300 rounded-none px-3 py-2 text-sm bg-white ${vaccination.measles ? 'bg-amber-50 text-gray-500' : ''}`}
-                placeholder={vaccination.measles ? 'xxxxxxxxxxx' : 'np. 12345678901'}
+                className={`w-full border border-gray-300 rounded-none px-3 py-2 text-sm bg-white ${noPesel ? 'bg-amber-50 text-gray-500' : ''}`}
+                placeholder={noPesel ? 'xxxxxxxxxxx' : 'np. 12345678901'}
               />
             </div>
             <div className="sm:col-span-2 flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={vaccination.measles}
-                  onChange={(e) => setVaccination((v) => ({ ...v, measles: e.target.checked }))}
+                  checked={noPesel}
+                  onChange={(e) => setNoPesel(e.target.checked)}
                   className="rounded border-gray-300"
                 />
                 <span className="text-sm text-gray-800">Dziecko nie posiada numeru PESEL</span>
               </label>
-              {vaccination.measles && (
+              {noPesel && (
                 <input
                   type="text"
-                  value={vaccination.measlesYear}
-                  onChange={(e) => setVaccination((v) => ({ ...v, measlesYear: e.target.value }))}
+                  value={noPeselYear}
+                  onChange={(e) => setNoPeselYear(e.target.value)}
                   placeholder="rok"
                   className="w-20 border border-gray-300 rounded-none px-2 py-1.5 text-sm bg-amber-50"
                   aria-label="Rok urodzenia (gdy brak PESEL)"
@@ -635,7 +658,7 @@ export function QualificationCardEditPanel({
                 </label>
                 <label className="flex items-center gap-2 flex-wrap">
                   <input type="checkbox" checked={vaccination.measles} onChange={(e) => setVaccination((v) => ({ ...v, measles: e.target.checked }))} className="rounded border-gray-300" />
-                  <span className="text-sm">Odra</span>
+                  <span className="text-sm">Dur</span>
                   {vaccination.measles && !vaccination.calendar && (
                     <input type="text" value={vaccination.measlesYear} onChange={(e) => setVaccination((v) => ({ ...v, measlesYear: e.target.value }))} placeholder="Rok" className="w-20 border border-gray-300 rounded-none px-2 py-1 text-sm ml-2" />
                   )}

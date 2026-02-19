@@ -88,14 +88,16 @@ interface QualificationFormProps {
     secondParentAddress?: string;
     secondParentPhone?: string;
   };
-  /** Payload z signed_documents – overlay (szczepienia, upoważnienia, potwierdzenia). Baza = tylko rezerwacja (qualification_card_data nie jest wczytywane). */
+  /** Payload z signed_documents – overlay (szczepienia, upoważnienia, potwierdzenia). */
   signedPayload?: SignedQualificationPayload | null;
+  /** Zapisany draft z qualification_card_data.form_snapshot – przywraca zaznaczenia po F5. */
+  formSnapshotFromDb?: SignedQualificationPayload | Record<string, unknown> | null;
   printMode?: boolean;
   /** Po udanym „Zapisz zmiany” – np. do pokazania toastu z informacją o źródle danych */
   onSaveSuccess?: (message: string) => void;
 }
 
-export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, printMode = false, onSaveSuccess }: QualificationFormProps) {
+export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, formSnapshotFromDb, printMode = false, onSaveSuccess }: QualificationFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
@@ -148,20 +150,27 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     if (reservationData.secondParentPhone !== null && reservationData.secondParentPhone !== undefined) setSecondParentPhone(reservationData.secondParentPhone);
   }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone]);
 
-  /** Overlay z signed_documents.payload: PESEL, drugi opiekun (gdy podpisano kartę), szczepienia, upoważnienia, potwierdzenia. Źródła: reservations + signed_documents. */
+  /** Overlay z qualification_card_data.form_snapshot (draft) – przywraca zapisane zaznaczenia po F5. Pomijany, gdy jest signedPayload (podpisany dokument ma pierwszeństwo). */
   useEffect(() => {
-    const overlay = signedPayloadOverlayOnly(signedPayload ?? undefined);
+    if (signedPayload) return;
+    const overlay = signedPayloadOverlayOnly((formSnapshotFromDb as SignedQualificationPayload) ?? undefined);
     if (!overlay) return;
     setAuthorizations(overlay.authorizations);
     if (overlay.secondParent) {
       setSecondParentName(overlay.secondParent.name);
       setSecondParentAddress(overlay.secondParent.address);
       setSecondParentPhone(overlay.secondParent.phone);
+      setNoSecondParent(false);
+    } else if (reservationData?.parentCount === 1) {
+      setNoSecondParent(true);
     }
     setFormData((prev) => ({
       ...prev,
       childPesel: overlay.childPesel !== undefined && overlay.childPesel !== '' ? overlay.childPesel : prev.childPesel,
+      noPesel: overlay.noPesel ?? prev.noPesel,
+      noPeselYear: overlay.noPeselYear ?? prev.noPeselYear,
       vaccination: overlay.vaccination,
+      vaccineInfo: overlay.vaccineInfo ?? prev.vaccineInfo,
       regulationConfirm: overlay.regulationConfirm,
       pickupInfo: overlay.pickupInfo,
       independentReturn: overlay.independentReturn,
@@ -171,7 +180,38 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       directorSignature: overlay.directorSignature,
       organizerSignature: overlay.organizerSignature,
     }));
-  }, [signedPayload]);
+  }, [formSnapshotFromDb, signedPayload, reservationData?.parentCount]);
+
+  /** Overlay z signed_documents.payload: PESEL, noPesel/noPeselYear, drugi opiekun, szczepienia, upoważnienia, potwierdzenia (nadpisuje draft). */
+  useEffect(() => {
+    const overlay = signedPayloadOverlayOnly(signedPayload ?? undefined);
+    if (!overlay) return;
+    setAuthorizations(overlay.authorizations);
+    if (overlay.secondParent) {
+      setSecondParentName(overlay.secondParent.name);
+      setSecondParentAddress(overlay.secondParent.address);
+      setSecondParentPhone(overlay.secondParent.phone);
+      setNoSecondParent(false);
+    } else if (reservationData?.parentCount === 1) {
+      setNoSecondParent(true);
+    }
+    setFormData((prev) => ({
+      ...prev,
+      childPesel: overlay.childPesel !== undefined && overlay.childPesel !== '' ? overlay.childPesel : prev.childPesel,
+      noPesel: overlay.noPesel ?? prev.noPesel,
+      noPeselYear: overlay.noPeselYear ?? prev.noPeselYear,
+      vaccination: overlay.vaccination,
+      vaccineInfo: overlay.vaccineInfo ?? prev.vaccineInfo,
+      regulationConfirm: overlay.regulationConfirm,
+      pickupInfo: overlay.pickupInfo,
+      independentReturn: overlay.independentReturn,
+      parentDeclaration: overlay.parentDeclaration,
+      directorConfirmation: overlay.directorConfirmation,
+      directorDate: overlay.directorDate,
+      directorSignature: overlay.directorSignature,
+      organizerSignature: overlay.organizerSignature,
+    }));
+  }, [signedPayload, reservationData?.parentCount]);
 
   /** Na wydruku pola tylko do oglądania. Gdy karta odrzucona – formularz edytowalny i można podpisać ponownie. */
   const isEditable = !printMode && (!isSigned || latestCardStatus === 'rejected');
@@ -242,7 +282,11 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     // Sekcja II - Informacja o stanie zdrowia (z profilu: health_questions, health_details, additional_notes)
     healthInfo: reservationData?.healthInfo ?? '',
 
-    // Informacja o szczepieniach
+    // "Dziecko nie posiada numeru PESEL" + rok – odseparowane od sekcji Szczepienia (odra)
+    noPesel: false,
+    noPeselYear: '',
+
+    // Informacja o szczepieniach (Odra = vaccination.measles/measlesYear – nie mylić z noPesel)
     vaccination: {
       calendar: false,
       tetanus: false,
@@ -368,7 +412,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       if (!firstErrorSection) firstErrorSection = document.getElementById('child-dob-field');
     }
 
-    if (!formData.vaccination.measles) {
+    if (!formData.noPesel) {
       const peselTrim = formData.childPesel.trim();
       if (!peselTrim || !isValidPesel(peselTrim)) {
         setChildPeselError('To pole jest obowiązkowe');
@@ -377,7 +421,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       }
     } else {
       if (!formData.vaccination.calendar) {
-        const yearTrim = (formData.vaccination.measlesYear || '').trim();
+        const yearTrim = (formData.noPeselYear || '').trim();
         if (!yearTrim) {
           setNoPeselYearError('To pole jest obowiązkowe');
           hasAnyError = true;
@@ -444,7 +488,14 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
         nazwaTurnusu: fd.turnName,
         miejsceKoloniiObozu: fd.campLocation,
         termin: fd.campDates,
-        uczestnik: { imieNazwisko: fd.childName, dataUrodzenia: fd.childDOB, pesel: fd.childPesel, adres: fd.childAddress },
+        uczestnik: {
+          imieNazwisko: fd.childName,
+          dataUrodzenia: fd.childDOB,
+          pesel: fd.childPesel,
+          adres: fd.childAddress,
+          brakPesel: fd.noPesel,
+          rokUrodzeniaGdyBrakPesel: fd.noPeselYear || undefined,
+        },
         opiekunowie: { imionaNazwiska: fd.parentNames, adres: fd.parentAddress, telefon: fd.parentPhone },
         drugiOpiekun: reservationData?.parentCount === 1 && !noSecondParent
           ? { imieNazwisko: secondParentName, adres: secondParentAddress, telefon: secondParentPhone }
@@ -629,7 +680,14 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       const parts = secondParentName.trim().split(/\s+/);
       const parent2_first_name = parts[0] ?? '';
       const parent2_last_name = parts.slice(1).join(' ') ?? '';
-      const cardBody: Record<string, string | null> = {};
+      const cardBody: Record<string, unknown> = {
+        form_snapshot: getQualificationPayload(),
+      };
+      const dobStr = (formData.childDOB || '').trim();
+      const dobMatch = dobStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (dobMatch) {
+        cardBody.participant_birth_date = `${dobMatch[3]}-${dobMatch[2].padStart(2, '0')}-${dobMatch[1].padStart(2, '0')}`;
+      }
       if (formData.childPesel) cardBody.participant_pesel = formData.childPesel;
       if (secondParentName.trim()) {
         cardBody.parent2_first_name = parent2_first_name;
@@ -637,19 +695,18 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       }
       if (secondParentAddress.trim()) cardBody.parent2_street = secondParentAddress.trim();
       if (secondParentPhone.trim()) cardBody.parent2_phone = secondParentPhone.trim();
-      if (Object.keys(cardBody).length > 0) {
-        const resCard = await fetch(`${apiUrl}/api/qualification-cards/by-number/${reservationId}/data/partial`, {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(cardBody),
-        });
-        if (!resCard.ok) {
-          const err = await resCard.json().catch(() => ({}));
-          throw new Error(err.detail || 'Błąd zapisu danych karty');
-        }
+
+      const resCard = await fetch(`${apiUrl}/api/qualification-cards/by-number/${reservationId}/data/partial`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cardBody),
+      });
+      if (!resCard.ok) {
+        const err = await resCard.json().catch(() => ({}));
+        throw new Error(err.detail || 'Błąd zapisu danych karty');
       }
       setSaveStatus('ok');
       const sourceMsg = signedPayload
@@ -776,13 +833,13 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
 
             <div className={`field-group ${childPeselError ? 'border-2 border-red-500 rounded p-2 bg-red-50' : ''}`} data-pesel-field>
               <label>3) PESEL uczestnika/dziecka</label>
-              <div className={formData.vaccination.measles ? 'pesel-input-crossed' : ''}>
+              <div className={formData.noPesel ? 'pesel-input-crossed' : ''}>
                 <input
                   type="text"
                   inputMode="numeric"
                   maxLength={11}
-                  value={formData.vaccination.measles ? 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' : formData.childPesel}
-                  readOnly={printMode || formData.vaccination.measles}
+                  value={formData.noPesel ? 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' : formData.childPesel}
+                  readOnly={printMode || formData.noPesel}
                   onChange={(e) => {
                     const v = e.target.value.replace(/\D/g, '');
                     handleChange('childPesel', v);
@@ -813,20 +870,20 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               <label className="checkbox-label">
                 <input
                   type="checkbox"
-                  checked={formData.vaccination.measles}
+                  checked={formData.noPesel}
                   onChange={(e) => {
-                    handleVaccinationChange('measles', e.target.checked);
+                    handleChange('noPesel', e.target.checked);
                     setNoPeselYearError(null);
                   }}
                   disabled={printMode}
                 />
                 Dziecko nie posiada numeru PESEL
-                {formData.vaccination.measles && !formData.vaccination.calendar && (
+                {formData.noPesel && !formData.vaccination.calendar && (
                   <input
                     type="text"
-                    value={formData.vaccination.measlesYear}
+                    value={formData.noPeselYear}
                     onChange={(e) => {
-                      handleVaccinationChange('measlesYear', e.target.value);
+                      handleChange('noPeselYear', e.target.value);
                       if (noPeselYearError) setNoPeselYearError(null);
                     }}
                     readOnly={printMode}
@@ -1112,7 +1169,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   onChange={(e) => handleVaccinationChange('measles', e.target.checked)}
                   disabled={printMode}
                 />
-                Błonica
+                Dur
                 {formData.vaccination.measles && !formData.vaccination.calendar && (
                   <input
                     type="text"
@@ -1132,7 +1189,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   onChange={(e) => handleVaccinationChange('diphtheria', e.target.checked)}
                   disabled={printMode}
                 />
-                Dur
+                Błonica
                 {formData.vaccination.diphtheria && !formData.vaccination.calendar && (
                   <input
                     type="text"

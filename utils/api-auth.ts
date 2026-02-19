@@ -56,6 +56,22 @@ export async function authenticatedFetch(
   }
 }
 
+/** Formatuje detail z odpowiedzi API (422: tablica błędów walidacji) na czytelny tekst. */
+function formatApiErrorDetail(statusCode: number, error: { detail?: unknown }): string {
+  const d = error.detail;
+  if (d == null) return `Błąd HTTP ${statusCode}`;
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d)) {
+    const parts = d.map((e: { loc?: unknown[]; msg?: string }) => {
+      const loc = Array.isArray(e.loc) ? e.loc.slice(1).join('.') : '';
+      const msg = e.msg ?? '';
+      return loc ? `${loc}: ${msg}` : msg;
+    });
+    return parts.length ? parts.join('; ') : `Błąd walidacji (${statusCode})`;
+  }
+  return `Błąd HTTP ${statusCode}`;
+}
+
 /**
  * Make authenticated API call and return JSON
  */
@@ -87,7 +103,8 @@ export async function authenticatedApiCall<T>(
       }
 
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      const msg = formatApiErrorDetail(response.status, error);
+      throw new Error(msg);
     }
 
     // For DELETE requests with 204 No Content, response has no body

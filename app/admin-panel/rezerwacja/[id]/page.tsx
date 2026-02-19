@@ -1163,6 +1163,25 @@ export default function ReservationDetailPage() {
     }
   };
 
+  /** Mapowanie action (+ opcjonalnie payload) na zdanie po polsku w „Zdarzenia klienta”. */
+  const formatEventAction = (ev: ReservationEventItem): string => {
+    try {
+      const payload = ev.payload ? (typeof ev.payload === 'string' ? JSON.parse(ev.payload) : ev.payload) as { description?: string; sections?: string[] } | null : null;
+      if (payload?.description && typeof payload.description === 'string') return payload.description;
+    } catch {
+      /* ignore */
+    }
+    const labels: Record<string, string> = {
+      qualification_card_draft_saved: 'Klient zaktualizował robocze dane w Karcie Kwalifikacyjnej.',
+      qualification_card_edited_by_admin: 'Pracownik zaktualizował dane Karty Kwalifikacyjnej.',
+      qualification_card_signed: 'Klient podpisał kartę kwalifikacyjną (SMS).',
+      qualification_card_accepted: 'Pracownik zaakceptował kartę kwalifikacyjną.',
+      qualification_card_rejected: 'Pracownik odrzucił kartę kwalifikacyjną.',
+      qualification_card_updated_after_approval: 'Klient zmodyfikował kartę po zaakceptowaniu – wymagana ponowna weryfikacja.',
+    };
+    return labels[ev.action] ?? ev.action;
+  };
+
   const formatCurrency = (amount: number | null | undefined) => {
     if (amount === null || amount === undefined) return '0.00 PLN';
     return `${amount.toFixed(2)} PLN`;
@@ -1653,7 +1672,7 @@ export default function ReservationDetailPage() {
         <div className="space-y-2 text-sm text-white/90">
           {reservationEvents.map((ev) => (
             <div key={ev.id} className="flex flex-col gap-0.5 py-1.5 border-b border-white/20 last:border-b-0">
-              <span className="text-white/90">{ev.action}</span>
+              <span className="text-white/90">{formatEventAction(ev)}</span>
               <span className="text-white/70 whitespace-nowrap text-xs">{ev.created_at ? formatDateTime(ev.created_at) : '–'}</span>
               <span className="text-white/60 text-xs">{ev.author_role === 'System' ? '(System)' : `${ev.author_display} (${ev.author_role})`}</span>
             </div>

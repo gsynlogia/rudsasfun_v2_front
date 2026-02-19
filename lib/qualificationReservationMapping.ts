@@ -53,6 +53,8 @@ export function signedPayloadOverlayOnly(payload: SignedQualificationPayload | n
   const u = payload.upowaznienia;
   return {
     childPesel: s1?.uczestnik?.pesel ?? '',
+    noPesel: s1?.uczestnik?.brakPesel ?? false,
+    noPeselYear: s1?.uczestnik?.rokUrodzeniaGdyBrakPesel ?? '',
     secondParent: drugi
       ? { name: drugi.imieNazwisko ?? '', address: drugi.adres ?? '', phone: drugi.telefon ?? '' }
       : null,
@@ -78,6 +80,7 @@ export function signedPayloadOverlayOnly(payload: SignedQualificationPayload | n
             canTemporaryPickup: a.odbiorTymczasowy ?? false,
           }))
         : [{ fullName: '', documentType: 'dowód osobisty' as const, documentNumber: '', canPickup: false, canTemporaryPickup: false }],
+    vaccineInfo: s4?.wniosekOZakwaterowanie ?? '',
     regulationConfirm: s4?.potwierdzenieRegulaminu ?? false,
     pickupInfo: s4?.odbiorDziecka ?? '',
     independentReturn: s4?.zgodaNaSamodzielnyPowrot ?? false,
@@ -99,7 +102,7 @@ export interface SignedQualificationPayload {
     nazwaTurnusu?: string;
     miejsceKoloniiObozu?: string;
     termin?: string;
-    uczestnik?: { imieNazwisko?: string; dataUrodzenia?: string; pesel?: string; adres?: string };
+    uczestnik?: { imieNazwisko?: string; dataUrodzenia?: string; pesel?: string; adres?: string; brakPesel?: boolean; rokUrodzeniaGdyBrakPesel?: string };
     opiekunowie?: { imionaNazwiska?: string; adres?: string; telefon?: string };
     drugiOpiekun?: { imieNazwisko?: string; adres?: string; telefon?: string } | null;
   };
