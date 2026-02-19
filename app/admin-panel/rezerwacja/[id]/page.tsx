@@ -78,7 +78,7 @@ export default function ReservationDetailPage() {
   // Dostępne opcje dla turnusu (do wyświetlania nawet gdy rezerwacja nie ma wybranych)
   const [availableProtections, setAvailableProtections] = useState<Protection[]>([]);
   const [availableAddons, setAvailableAddons] = useState<Addon[]>([]);
-  const [turnusDietsList, setTurnusDietsList] = useState<Array<{ id: number; relation_id?: number; name: string; price?: number }>>([]);
+  const [turnusDietsList, setTurnusDietsList] = useState<Array<{ id: number; relation_id?: number; general_diet_id?: number; name: string; price?: number }>>([]);
   const [sourcesList, setSourcesList] = useState<Array<{ id: number; name: string }>>([]);
   const [savingAddons, setSavingAddons] = useState(false);
   /** Lokalny stan wybranych dodatków (tylko UI). Zapis do API wyłącznie po kliku „Zapisz”. */
@@ -91,6 +91,7 @@ export default function ReservationDetailPage() {
   const [savingDiet, setSavingDiet] = useState(false);
   /** Lokalny stan diety (tylko UI). Zapis do API wyłącznie po kliku „Zapisz”. */
   const [dietDraft, setDietDraft] = useState<number | null>(null);
+  const [dietDraftDirty, setDietDraftDirty] = useState(false);
   const [savingSource, setSavingSource] = useState(false);
   /** Lokalny stan źródła (tylko UI). Zapis do API wyłącznie po kliku „Zapisz”. */
   const [sourceDraft, setSourceDraft] = useState<{ selected_source: string; source_inne_text: string | null }>({ selected_source: '', source_inne_text: null });
@@ -729,7 +730,7 @@ export default function ReservationDetailPage() {
 
         if (reservationData.camp_id !== null && reservationData.property_id !== null) {
           try {
-            const dietsRes = await authenticatedApiCall<Array<{ id: number; relation_id?: number; name: string; price?: number }>>(
+            const dietsRes = await authenticatedApiCall<Array<{ id: number; relation_id?: number; general_diet_id?: number; name: string; price?: number }>>(
               `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/diets`,
             );
             setTurnusDietsList(Array.isArray(dietsRes) ? dietsRes : []);
@@ -823,11 +824,32 @@ export default function ReservationDetailPage() {
     setProtectionDraft(ids);
   }, [reservation?.id, reservation?.selected_protection, protectionDraftDirty]);
 
-  // Sync diet draft from reservation (for initial load and after save)
+  // Sync diet draft from reservation (for initial load and after save). Normalize to option value (relation_id ?? id) when turnusDietsList available.
   useEffect(() => {
-    if (reservation === null || reservation === undefined) return;
-    setDietDraft(reservation.diet ?? null);
-  }, [reservation?.id, reservation?.diet]);
+    if (dietDraftDirty || reservation === null || reservation === undefined) return;
+    const raw = reservation.diet;
+    if (raw === null || raw === undefined) {
+      setDietDraft(null);
+      return;
+    }
+    const numId = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+    if (Number.isNaN(numId)) {
+      setDietDraft(null);
+      return;
+    }
+    if (turnusDietsList.length > 0) {
+      const match = turnusDietsList.find(
+        (d) =>
+          (d.relation_id ?? d.id) === numId ||
+          d.relation_id === numId ||
+          d.id === numId ||
+          d.general_diet_id === numId,
+      );
+      setDietDraft(match ? (match.relation_id ?? match.id) : numId);
+    } else {
+      setDietDraft(numId);
+    }
+  }, [reservation?.id, reservation?.diet, dietDraftDirty, turnusDietsList]);
 
   // Sync source draft from reservation (for initial load and after save)
   useEffect(() => {
@@ -1179,6 +1201,13 @@ export default function ReservationDetailPage() {
         }
         if (parts.length > 0) return parts.join(' ');
       }
+      if (ev.action === 'diet_updated' && payload) {
+        const oldName = payload.old_diet_name != null ? String(payload.old_diet_name) : null;
+        const newName = payload.new_diet_name != null ? String(payload.new_diet_name) : null;
+        if (oldName && newName) return `Pracownik zmienił dietę z „${oldName}” na „${newName}”.`;
+        if (newName) return `Pracownik ustawił dietę: „${newName}”.`;
+        if (oldName) return `Pracownik usunął dietę: „${oldName}”.`;
+      }
     } catch {
       /* ignore */
     }
@@ -1190,6 +1219,7 @@ export default function ReservationDetailPage() {
       qualification_card_rejected: 'Pracownik odrzucił kartę kwalifikacyjną.',
       qualification_card_updated_after_approval: 'Klient zmodyfikował kartę po zaakceptowaniu – wymagana ponowna weryfikacja.',
       protection_updated: 'Pracownik zaktualizował pakiety ochrony.',
+      diet_updated: 'Pracownik zaktualizował dietę.',
     };
     return labels[ev.action] ?? ev.action;
   };
@@ -3960,7 +3990,20 @@ export default function ReservationDetailPage() {
               <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-slate-700">Dieta</h2>
                 {turnusDietsList.length > 0 && (() => {
-                  const same = (dietDraft ?? null) === (reservation.diet ?? null);
+                  const d = dietDraft ?? null;
+                  const r = reservation.diet ?? null;
+                  const same = d === null && r === null
+                    ? true
+                    : d === null || r === null
+                      ? false
+                      : d === r
+                        ? true
+                        : (() => {
+                            const option = turnusDietsList.find((x) => (x.relation_id ?? x.id) === d);
+                            return Boolean(
+                              option && (option.relation_id === r || option.id === r || option.general_diet_id === r),
+                            );
+                          })();
                   return (
                     <button
                       type="button"
@@ -3975,6 +4018,7 @@ export default function ReservationDetailPage() {
                           );
                           setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
                           setDietDraft(updated.diet ?? null);
+                          setDietDraftDirty(false);
                           showSuccess('Dieta została zaktualizowana.');
                           if (reservation?.id) {
                             authenticatedApiCall<ReservationEventItem[]>(`/api/reservations/${reservation.id}/system-events`)
@@ -4005,6 +4049,7 @@ export default function ReservationDetailPage() {
                       const raw = e.target.value;
                       const diet = raw === '' || raw === 'none' ? null : parseInt(raw, 10);
                       if (diet !== null && isNaN(diet)) return;
+                      setDietDraftDirty(true);
                       setDietDraft(diet);
                     }}
                     className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
@@ -4021,7 +4066,13 @@ export default function ReservationDetailPage() {
                   </select>
                   {(dietDraft ?? reservation.diet) !== null && (dietDraft ?? reservation.diet) !== undefined && (() => {
                     const currentId = dietDraft ?? reservation.diet ?? null;
-                    const d = turnusDietsList.find((x) => (x.relation_id ?? x.id) === currentId);
+                    const d = turnusDietsList.find(
+                      (x) =>
+                        (x.relation_id ?? x.id) === currentId ||
+                        x.relation_id === currentId ||
+                        x.id === currentId ||
+                        x.general_diet_id === currentId,
+                    );
                     return d?.price !== null && d?.price !== undefined ? (
                       <p className="text-xs text-gray-500 mt-1">Cena: {formatCurrency(d.price)}</p>
                     ) : null;

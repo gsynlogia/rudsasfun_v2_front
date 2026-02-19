@@ -1,6 +1,7 @@
 'use client';
 
-import { ArrowLeft, Check, XCircle, Shield, Plus, RefreshCw, Search, Plus as PlusIcon } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, Check, XCircle, RefreshCw, Search, Plus as PlusIcon } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 
@@ -24,10 +25,19 @@ interface ReservationDetails {
   participant_last_name?: string | null;
   total_price?: number;
   deposit_amount?: number | null;
+  base_price?: number | null;
+  diet?: number | null;
+  diet_name?: string | null;
+  diet_price?: number | null;
+  departure_city?: string | null;
+  return_city?: string | null;
+  transport_price?: number | null;
+  promotion_does_not_reduce_price?: boolean | null;
   selected_addons?: (string | number)[] | null;
   selected_protection?: (string | number)[] | null;
   selected_promotion?: string | null;
   promotion_name?: string | null;
+  promotion_price?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
   user_id?: number;
@@ -49,6 +59,7 @@ interface Promotion {
   id: number;
   name: string;
   price: number;
+  does_not_reduce_price?: boolean;
 }
 
 export default function ReservationPaymentsPage() {
@@ -231,12 +242,13 @@ export default function ReservationPaymentsPage() {
               );
               if (foundPromotion && foundPromotion.general_promotion_id) {
                 try {
-                  const generalPromotion = await authenticatedApiCall<Promotion>(
+                  const generalPromotion = await authenticatedApiCall<Promotion & { does_not_reduce_price?: boolean }>(
                     `/api/general-promotions/${foundPromotion.general_promotion_id}`,
                   );
                   setPromotion({
                     ...generalPromotion,
-                    price: foundPromotion.price || generalPromotion.price,
+                    price: foundPromotion.price ?? generalPromotion.price,
+                    does_not_reduce_price: foundPromotion.does_not_reduce_price ?? generalPromotion.does_not_reduce_price,
                   });
                 } catch (err) {
                   console.warn('Could not fetch general promotion:', err);
@@ -428,12 +440,20 @@ export default function ReservationPaymentsPage() {
   const hasDeposit = depositAmount > 0;
   const pendingPayments = payments.filter(p => p.status === 'pending');
 
+  const dietPrice = reservation.diet_price ?? 0;
+  const transportPrice = reservation.transport_price ?? 0;
+  const promotionPrice = promotion && reservation.selected_promotion ? (promotion.does_not_reduce_price ? 0 : (promotion.price ?? 0)) : 0;
+  const basePriceDisplay =
+    reservation.base_price != null && reservation.base_price !== undefined
+      ? Number(reservation.base_price)
+      : Math.max(0, totalAmount - dietPrice - calculateTotalAddonsPrice() - calculateTotalProtectionsPrice() - promotionPrice - transportPrice);
+
   return (
     <SectionGuard section="payments">
       <AdminLayout>
-        <div className="h-full flex flex-col animate-fadeIn">
+        <div className="h-full flex flex-col animate-fadeIn pr-4">
           {/* Header */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => {
@@ -461,7 +481,14 @@ export default function ReservationPaymentsPage() {
                 </p>
               </div>
             </div>
-            {pendingPayments.length > 0 && (
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/admin-panel/rezerwacja/${reservationNumber}#dane`}
+                className="text-sm text-[#03adf0] hover:text-[#0288c7] hover:underline"
+              >
+                Zarządzaj rezerwacją
+              </Link>
+              {pendingPayments.length > 0 && (
               <button
                 onClick={handleSyncPayments}
                 disabled={isSyncing}
@@ -471,12 +498,80 @@ export default function ReservationPaymentsPage() {
                 <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
                 {isSyncing ? 'Synchronizacja...' : 'Synchronizuj płatności'}
               </button>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 overflow-auto">
-            {/* Koszt całkowity */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 lg:col-span-2">
+            {/* Podsumowanie kosztów – jedna lista, bez duplikatów */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <h2 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-100">Podsumowanie kosztów</h2>
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-gray-700">Cena podstawowa</span>
+                  <span className="font-medium tabular-nums text-gray-900">+{basePriceDisplay.toFixed(2)} zł</span>
+                </div>
+                {reservation.diet_name && (
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-gray-700">{reservation.diet_name}</span>
+                    <span className="font-medium tabular-nums text-gray-900">+{(reservation.diet_price ?? 0).toFixed(2)} zł</span>
+                  </div>
+                )}
+                {reservation.selected_addons && reservation.selected_addons.length > 0 && reservation.selected_addons.map((addonIdValue) => {
+                  const addonId = typeof addonIdValue === 'number' ? addonIdValue : parseInt(String(addonIdValue));
+                  const addon = addons.get(addonId);
+                  return addon ? (
+                    <div key={String(addonIdValue)} className="flex justify-between items-center py-1">
+                      <span className="text-gray-700">{addon.name}</span>
+                      <span className="font-medium tabular-nums text-gray-900">{addon.price > 0 ? `+${addon.price.toFixed(2)}` : addon.price.toFixed(2)} zł</span>
+                    </div>
+                  ) : null;
+                })}
+                {reservation.selected_protection && reservation.selected_protection.length > 0 && reservation.selected_protection.map((protectionIdValue) => {
+                  let generalProtectionId: number | null = null;
+                  if (typeof protectionIdValue === 'string' && protectionIdValue.startsWith('protection-')) {
+                    const n = parseInt(protectionIdValue.split('-')[1], 10);
+                    if (!isNaN(n)) generalProtectionId = n;
+                  } else {
+                    const p = typeof protectionIdValue === 'number' ? protectionIdValue : parseInt(String(protectionIdValue));
+                    if (!isNaN(p)) generalProtectionId = p;
+                  }
+                  const protection = generalProtectionId ? protections.get(generalProtectionId) : null;
+                  return protection ? (
+                    <div key={String(protectionIdValue)} className="flex justify-between items-center py-1">
+                      <span className="text-gray-700">Ochrona {protection.name}</span>
+                      <span className="font-medium tabular-nums text-gray-900">+{protection.price.toFixed(2)} zł</span>
+                    </div>
+                  ) : null;
+                })}
+                {reservation.selected_promotion && promotion && (
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-gray-700">
+                      {promotion.name}
+                      {promotion.does_not_reduce_price ? ' (nie obniża ceny)' : ''}
+                    </span>
+                    <span className="font-medium tabular-nums text-gray-900">+{(promotion.price ?? 0).toFixed(2)} zł</span>
+                  </div>
+                )}
+                {(reservation.departure_city || reservation.return_city || (reservation.transport_price != null && reservation.transport_price > 0)) && (
+                  <div className="pt-1">
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-gray-700">Transport</span>
+                      <span className="font-medium tabular-nums text-gray-900">+{(reservation.transport_price ?? 0).toFixed(2)} zł</span>
+                    </div>
+                    {(reservation.departure_city || reservation.return_city) && (
+                      <div className="text-xs text-gray-500 pl-0 space-y-0.5 mt-0.5">
+                        {reservation.departure_city && <div>WYJAZD: {reservation.departure_city}</div>}
+                        {reservation.return_city && <div>POWRÓT: {reservation.return_city}</div>}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Koszt całkowity – ostatni wiersz niezmieniony */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <h2 className="text-base font-semibold text-gray-900 mb-4">Koszt całkowity</h2>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
@@ -494,173 +589,30 @@ export default function ReservationPaymentsPage() {
               </div>
             </div>
 
-            {/* Płatność przelewem tradycyjnym */}
+            {/* Zaliczka (bez duplikowania listy ochron – jedna linia) */}
             {hasDeposit && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 lg:col-span-2">
-                <h2 className="text-base font-semibold text-gray-900 mb-4">Płatność przelewem tradycyjnym</h2>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Zaliczka do wpłaty:</h3>
-                  <div className="space-y-2">
+                <h2 className="text-base font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-100">Płatność przelewem tradycyjnym</h2>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-700">Zaliczka podstawowa</span>
+                    <span className="font-medium text-gray-900">500,00 zł</span>
+                  </div>
+                  {calculateTotalProtectionsPrice() > 0 && (
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-700">Zaliczka podstawowa:</span>
-                      <span className="text-sm font-medium text-gray-900">500.00 zł</span>
+                      <span className="text-gray-700">Ochrony (w cenie zaliczki)</span>
+                      <span className="font-medium text-gray-900">+{calculateTotalProtectionsPrice().toFixed(2)} zł</span>
                     </div>
-                    {reservation.selected_protection && reservation.selected_protection.length > 0 && (
-                      <>
-                        {reservation.selected_protection.map((protectionIdValue) => {
-                          let generalProtectionId: number | null = null;
-                          if (typeof protectionIdValue === 'string' && protectionIdValue.startsWith('protection-')) {
-                            const numericId = parseInt(protectionIdValue.split('-')[1], 10);
-                            if (!isNaN(numericId)) {
-                              generalProtectionId = numericId;
-                            }
-                          } else {
-                            const parsedId = typeof protectionIdValue === 'number' ? protectionIdValue : parseInt(String(protectionIdValue));
-                            if (!isNaN(parsedId)) {
-                              generalProtectionId = parsedId;
-                            }
-                          }
-
-                          if (!generalProtectionId) return null;
-                          const protection = protections.get(generalProtectionId);
-                          if (!protection) return null;
-                          return (
-                            <div key={String(protectionIdValue)} className="flex justify-between items-center">
-                              <span className="text-sm text-gray-700">Ochrona: {protection.name}</span>
-                              <span className="text-sm font-medium text-gray-900">+{protection.price.toFixed(2)} zł</span>
-                            </div>
-                          );
-                        })}
-                      </>
-                    )}
-                    <div className="pt-2 border-t border-gray-200 mt-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-semibold text-gray-900">Razem zaliczka:</span>
-                        <span className="text-sm font-bold text-[#03adf0]">{depositAmount.toFixed(2)} zł</span>
-                      </div>
-                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-100 font-semibold text-gray-900">
+                    <span>Razem zaliczka</span>
+                    <span className="text-[#03adf0]">{depositAmount.toFixed(2)} zł</span>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Dodatki, Ochrony, Promocje - w jednym wierszu */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:col-span-2">
-              {/* Dodatki */}
-              {reservation.selected_addons && reservation.selected_addons.length > 0 && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                  <h2 className="text-base font-semibold text-gray-900 mb-3">Dodatki</h2>
-                  <div className="space-y-2">
-                    {reservation.selected_addons.map((addonIdValue) => {
-                      const addonId = typeof addonIdValue === 'number' ? addonIdValue : parseInt(String(addonIdValue));
-                      const addon = addons.get(addonId);
-                      const isPaid = payments.some(p =>
-                        p.status === 'success' &&
-                        p.order_id?.startsWith(`ADDON-${reservation.id}-`) &&
-                        p.description?.includes(addon?.name || ''),
-                      );
-                      return (
-                        <div key={String(addonIdValue)} className="flex justify-between items-center border-b border-gray-200 pb-2">
-                          <div className="flex items-center gap-2">
-                            <Plus className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-900">
-                              {addon ? addon.name : `Dodatek ID: ${addonIdValue}`}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {addon && (
-                              <span className="text-sm text-gray-600">{formatCurrency(addon.price)}</span>
-                            )}
-                            {isPaid && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <Check className="w-3 h-3 mr-1" />
-                                Opłacone
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">Suma dodatków:</span>
-                      <span className="text-sm font-bold text-gray-900">{formatCurrency(calculateTotalAddonsPrice())}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Ochrony */}
-              {reservation.selected_protection && reservation.selected_protection.length > 0 && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                  <h2 className="text-base font-semibold text-gray-900 mb-3">Ochrony</h2>
-                  <div className="space-y-2">
-                    {reservation.selected_protection.map((protectionIdValue) => {
-                      let generalProtectionId: number | null = null;
-                      if (typeof protectionIdValue === 'string' && protectionIdValue.startsWith('protection-')) {
-                        const numericId = parseInt(protectionIdValue.split('-')[1], 10);
-                        if (!isNaN(numericId)) {
-                          generalProtectionId = numericId;
-                        }
-                      } else {
-                        const parsedId = typeof protectionIdValue === 'number' ? protectionIdValue : parseInt(String(protectionIdValue));
-                        if (!isNaN(parsedId)) {
-                          generalProtectionId = parsedId;
-                        }
-                      }
-
-                      if (!generalProtectionId) {
-                        return (
-                          <div key={String(protectionIdValue)} className="flex justify-between items-center border-b border-gray-200 pb-2">
-                            <div className="flex items-center gap-2">
-                              <Shield className="w-4 h-4 text-gray-400" />
-                              <span className="text-sm text-gray-900">Ochrona ID: {protectionIdValue}</span>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      const protection = protections.get(generalProtectionId);
-                      return (
-                        <div key={String(protectionIdValue)} className="flex justify-between items-center border-b border-gray-200 pb-2">
-                          <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-900">
-                              {protection ? protection.name : `Ochrona ID: ${protectionIdValue}`}
-                            </span>
-                          </div>
-                          {protection && (
-                            <span className="text-sm text-gray-600">{formatCurrency(protection.price)}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">Suma ochron:</span>
-                      <span className="text-sm font-bold text-gray-900">{formatCurrency(calculateTotalProtectionsPrice())}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Promocja */}
-              {reservation.selected_promotion && promotion && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                  <h2 className="text-base font-semibold text-gray-900 mb-3">Promocja</h2>
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{promotion.name}</p>
-                      <p className="text-sm text-gray-600 mt-1">Cena: {formatCurrency(promotion.price)}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Wpłaty - w drugim wierszu */}
+            {/* Wpłaty */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-semibold text-gray-900">Wpłaty</h2>
