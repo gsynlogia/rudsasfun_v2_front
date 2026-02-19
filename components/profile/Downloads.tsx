@@ -7,6 +7,19 @@ import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 import { API_BASE_URL } from '@/utils/api-config';
+import { authenticatedApiCall } from '@/utils/api-auth';
+
+interface AnnexItem {
+  id: number;
+  reservation_id: number;
+  change_type: string;
+  description: string;
+  status: string;
+  cancellation_reason: string | null;
+  batch_id: string | null;
+  created_at: string | null;
+  signed_at: string | null;
+}
 
 interface Document {
   id: string;
@@ -34,6 +47,14 @@ export default function Downloads() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+  const [annexesByReservation, setAnnexesByReservation] = useState<Map<number, AnnexItem[]>>(new Map());
+  const [batchSignDocId, setBatchSignDocId] = useState<number | null>(null);
+  const [batchSignCode, setBatchSignCode] = useState('');
+  const [batchSignLoading, setBatchSignLoading] = useState(false);
+  const [cancelAnnexId, setCancelAnnexId] = useState<number | null>(null);
+  const [cancelAnnexReason, setCancelAnnexReason] = useState('');
+  const [cancelAnnexLoading, setCancelAnnexLoading] = useState(false);
+  const [refreshAnnexes, setRefreshAnnexes] = useState(0);
 
   // Load user's contracts from backend
   useEffect(() => {
@@ -240,6 +261,20 @@ export default function Downloads() {
         // Combine all documents
         const documentsList: Document[] = [...allContractsList, ...allQualificationCardsList, ...cmsDocumentsList];
 
+        // Aneksy do umowy (per rezerwacja)
+        const annexMap = new Map<number, AnnexItem[]>();
+        for (const reservation of reservations) {
+          try {
+            const annexes = await authenticatedApiCall<AnnexItem[]>(`/api/annexes/reservation/${reservation.id}`);
+            if (Array.isArray(annexes) && annexes.length > 0) {
+              annexMap.set(reservation.id, annexes);
+            }
+          } catch {
+            // ignore
+          }
+        }
+        setAnnexesByReservation(annexMap);
+
         // Sort by reservation ID first, then by uploaded_at timestamp within each reservation (newest first)
         // We need to use the actual uploaded_at from the files, not the formatted date string
         // So we'll sort after grouping by reservation
@@ -255,7 +290,7 @@ export default function Downloads() {
     };
 
     loadDocuments();
-  }, []);
+  }, [refreshAnnexes]);
 
   const handleDownloadDocument = async (document: Document) => {
     if (document.type === 'contract') {
@@ -612,6 +647,49 @@ export default function Downloads() {
                   {isExpanded && (
                     <div className="border-t border-gray-200 bg-gray-50">
                       <div className="p-4 sm:p-6 space-y-4">
+                        {/* Aneksy do umowy – oczekujące na podpis */}
+                        {(() => {
+                          const annexes = annexesByReservation.get(reservationId) || [];
+                          const pendingAnnexes = annexes.filter((a) => a.status === 'pending_signing');
+                          if (pendingAnnexes.length === 0) return null;
+                          return (
+                            <div className="mb-4">
+                              <h4 className="text-sm font-semibold text-gray-800 mb-2">Aneksy do umowy – do podpisania</h4>
+                              <ul className="space-y-2 mb-3">
+                                {pendingAnnexes.map((a) => (
+                                  <li key={a.id} className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 rounded p-2 text-sm">
+                                    <span className="flex-1 text-gray-800">{a.description}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setCancelAnnexId(a.id); setCancelAnnexReason(''); }}
+                                      className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs font-medium"
+                                    >
+                                      Anuluj
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const res = await authenticatedApiCall<{ document_id: number }>(
+                                      '/api/annexes/request-batch-sign',
+                                      { method: 'POST', body: JSON.stringify({ reservation_id: reservationId, annex_ids: pendingAnnexes.map((a) => a.id) }) }
+                                    );
+                                    setBatchSignDocId(res.document_id);
+                                    setBatchSignCode('');
+                                  } catch (e) {
+                                    alert(e instanceof Error ? e.message : 'Błąd wysyłki kodu SMS');
+                                  }
+                                }}
+                                className="px-3 py-2 bg-[#03adf0] text-white text-sm rounded hover:bg-[#0288c7]"
+                              >
+                                Podpisz wszystkie dokumenty (1 SMS)
+                              </button>
+                            </div>
+                          );
+                        })()}
                         {reservationDocs.map((document) => (
                           <div key={document.id} className="bg-white rounded-lg p-4 border border-gray-200">
                             <div className="flex items-start justify-between">
@@ -699,6 +777,106 @@ export default function Downloads() {
           </div>
         ) : null}
       </div>
+
+      {/* Modal: kod SMS do podpisania aneksów */}
+      {batchSignDocId != null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-4">
+            <p className="text-sm text-gray-700 mb-3">Wprowadź 4-cyfrowy kod z SMS:</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              value={batchSignCode}
+              onChange={(e) => setBatchSignCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-center text-lg tracking-widest"
+              placeholder="0000"
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => { setBatchSignDocId(null); setBatchSignCode(''); }}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-700"
+              >
+                Anuluj
+              </button>
+              <button
+                type="button"
+                disabled={batchSignCode.length !== 4 || batchSignLoading}
+                onClick={async () => {
+                  if (batchSignCode.length !== 4) return;
+                  setBatchSignLoading(true);
+                  try {
+                    await authenticatedApiCall('/api/signed-documents/verify-sms-code', {
+                      method: 'POST',
+                      body: JSON.stringify({ document_id: batchSignDocId, code: batchSignCode }),
+                    });
+                    setBatchSignDocId(null);
+                    setBatchSignCode('');
+                    setRefreshAnnexes((n) => n + 1);
+                  } catch (e) {
+                    alert(e instanceof Error ? e.message : 'Nieprawidłowy kod');
+                  } finally {
+                    setBatchSignLoading(false);
+                  }
+                }}
+                className="flex-1 px-3 py-2 bg-[#03adf0] text-white rounded disabled:opacity-50"
+              >
+                {batchSignLoading ? 'Weryfikacja...' : 'Potwierdź'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: anulowanie aneksu – powód */}
+      {cancelAnnexId != null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-4">
+            <p className="text-sm text-gray-700 mb-2">Powód anulowania (min. 5 znaków):</p>
+            <textarea
+              value={cancelAnnexReason}
+              onChange={(e) => setCancelAnnexReason(e.target.value)}
+              rows={3}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              placeholder="np. Zmiana planów"
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => { setCancelAnnexId(null); setCancelAnnexReason(''); }}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-700"
+              >
+                Zamknij
+              </button>
+              <button
+                type="button"
+                disabled={cancelAnnexReason.trim().length < 5 || cancelAnnexLoading}
+                onClick={async () => {
+                  if (cancelAnnexReason.trim().length < 5) return;
+                  setCancelAnnexLoading(true);
+                  try {
+                    await authenticatedApiCall(`/api/annexes/${cancelAnnexId}/cancel`, {
+                      method: 'PATCH',
+                      body: JSON.stringify({ reason: cancelAnnexReason.trim() }),
+                    });
+                    setCancelAnnexId(null);
+                    setCancelAnnexReason('');
+                    setRefreshAnnexes((n) => n + 1);
+                  } catch (e) {
+                    alert(e instanceof Error ? e.message : 'Błąd anulowania');
+                  } finally {
+                    setCancelAnnexLoading(false);
+                  }
+                }}
+                className="flex-1 px-3 py-2 bg-red-600 text-white rounded disabled:opacity-50"
+              >
+                {cancelAnnexLoading ? 'Zapisywanie...' : 'Anuluj aneks'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

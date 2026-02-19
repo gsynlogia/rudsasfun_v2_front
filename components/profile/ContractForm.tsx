@@ -755,10 +755,12 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
             <div className="signature-row-single">
               <div className="signature-field-organizer">
                 <label>Data: {getCurrentDate()} i podpis Organizatora</label>
-                <div className="signed-indicator-contract">
-                  <div className="signed-name">RADSAS FUN sp. z o.o.</div>
-                  <div className="signed-date">{getCurrentDate()}</div>
-                </div>
+                {latestContractStatus === 'accepted' && (
+                  <div className="signed-indicator-contract">
+                    <div className="signed-name">RADSAS FUN sp. z o.o.</div>
+                    <div className="signed-date">{getCurrentDate()}</div>
+                  </div>
+                )}
               </div>
 
               {/* Przycisk podpisz dokument – tylko gdy brak podpisu lub najnowszy status = odrzucona */}

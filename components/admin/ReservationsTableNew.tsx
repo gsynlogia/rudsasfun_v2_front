@@ -4767,29 +4767,6 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white placeholder:text-slate-400 w-[120px]"
           />
           
-          {/* Payment status */}
-          <select
-            value={filters.paymentStatus}
-            onChange={(e) => handleFilterChange('paymentStatus', e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white min-w-[140px]"
-          >
-            <option value="">Status...</option>
-            <option value="paid">Opłacone</option>
-            <option value="partial">Częściowe</option>
-            <option value="unpaid">Nieopłacone</option>
-          </select>
-          
-          {/* Camp name */}
-          <input
-            type="text"
-            value={filters.campName}
-            onChange={(e) => handleFilterChange('campName', e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            placeholder="Obóz..."
-            className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white placeholder:text-slate-400 min-w-[100px] max-w-[150px]"
-          />
-          
           {/* Data rezerwacji: tryb jedna data / zakres */}
           <select
             value={dateFilterMode}

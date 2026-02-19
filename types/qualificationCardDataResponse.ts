@@ -1,6 +1,8 @@
 export interface QualificationCardDataResponse {
   id: number;
   reservation_id: number;
+  /** JSON string (formularz: szczepienia, upoważnienia, zgody) */
+  form_snapshot?: string | null;
   participant_birth_date: string | null;
   participant_birth_place: string | null;
   participant_pesel: string | null;

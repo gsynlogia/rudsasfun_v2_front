@@ -344,7 +344,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
             <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
               {(() => {
                 const status = reservation.contract_status;
-                if (status === 'approved') {
+                if (status === 'approved' || status === 'accepted') {
                   return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full" />;
                 } else if (status === 'rejected') {
                   return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full" />;

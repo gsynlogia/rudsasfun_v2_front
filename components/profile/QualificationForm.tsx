@@ -172,8 +172,8 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }));
   }, [signedPayload]);
 
-  /** Na wydruku (/druk/...) pola tylko do oglądania, bez żółtego tła i bez możliwości wypełniania. */
-  const isEditable = !printMode && !isSigned;
+  /** Na wydruku pola tylko do oglądania. Gdy karta odrzucona – formularz edytowalny i można podpisać ponownie. */
+  const isEditable = !printMode && (!isSigned || latestCardStatus === 'rejected');
 
   // Pobierz status najnowszego podpisanego dokumentu (karta) – czy można podpisać ponownie (tylko gdy odrzucona)
   useEffect(() => {

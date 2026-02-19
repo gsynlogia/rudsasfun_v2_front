@@ -3890,28 +3890,6 @@ export default function PaymentsManagement() {
             <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           </div>
           
-          {/* Payment status */}
-          <select
-            value={filters.paymentStatus}
-            onChange={(e) => handleFilterChange('paymentStatus', e.target.value)}
-            className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white min-w-[140px]"
-          >
-            <option value="">Status...</option>
-            <option value="paid">Opłacone</option>
-            <option value="partial">Częściowe</option>
-            <option value="unpaid">Nieopłacone</option>
-          </select>
-          
-          {/* Camp name */}
-          <input
-            type="text"
-            value={filters.campName}
-            onChange={(e) => handleFilterChange('campName', e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            placeholder="Obóz..."
-            className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white placeholder:text-slate-400 min-w-[100px] max-w-[150px]"
-          />
-          
           {/* Date from */}
           <div className="relative">
             <input

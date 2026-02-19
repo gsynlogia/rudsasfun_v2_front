@@ -96,11 +96,19 @@ interface QualificationFormProps {
   /** Payload z signed_documents – overlay (szczepienia, upoważnienia, potwierdzenia). Baza = tylko rezerwacja (qualification_card_data nie jest wczytywane). */
   signedPayload?: SignedQualificationPayload | null;
   printMode?: boolean;
+  /** Gdy true: tryb tylko do odczytu (jak printMode) ale bez wywołania window.print() – np. podgląd w panelu admina */
+  previewOnly?: boolean;
+  /** Tryb zapisu: client = zwykły zapis (rezerwacja + card partial), admin = pełny zapis przez endpoint admin-full */
+  saveMode?: 'client' | 'admin';
+  /** Wywołane gdy saveMode='admin' i użytkownik kliknie Zapisz – body do PATCH .../data/admin-full */
+  onSaveAdmin?: (body: { reservation_partial: Record<string, unknown>; card_data: Record<string, unknown>; sections_edited: string[] }) => Promise<void>;
+  /** JSON z bazy (form_snapshot) – używany jako overlay gdy brak signedPayload (edycja przez admina) */
+  formSnapshotFromDb?: string | null;
   /** Po udanym „Zapisz zmiany” – np. do pokazania toastu z informacją o źródle danych */
   onSaveSuccess?: (message: string) => void;
 }
 
-export function QualificationTemplateNew({ reservationId: reservationIdProp, reservationData, signedPayload, printMode = false, onSaveSuccess }: QualificationFormProps) {
+export function QualificationTemplateNew({ reservationId: reservationIdProp, reservationData, signedPayload, printMode = false, previewOnly = false, saveMode = 'client', onSaveAdmin, formSnapshotFromDb, onSaveSuccess }: QualificationFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
@@ -153,9 +161,19 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
     if (reservationData.secondParentPhone != null) setSecondParentPhone(reservationData.secondParentPhone);
   }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone]);
 
-  /** Overlay z signed_documents.payload: PESEL, drugi opiekun (gdy podpisano kartę), szczepienia, upoważnienia, potwierdzenia. Źródła: reservations + signed_documents. */
+  /** Overlay: form_snapshot (admin) lub signed_documents.payload. Źródła: reservations + form_snapshot lub signed_documents. */
   useEffect(() => {
-    const overlay = signedPayloadOverlayOnly(signedPayload ?? undefined);
+    let payload: SignedQualificationPayload | undefined;
+    if (formSnapshotFromDb?.trim()) {
+      try {
+        payload = JSON.parse(formSnapshotFromDb) as SignedQualificationPayload;
+      } catch {
+        payload = signedPayload ?? undefined;
+      }
+    } else {
+      payload = signedPayload ?? undefined;
+    }
+    const overlay = signedPayloadOverlayOnly(payload ?? undefined);
     if (!overlay) return;
     setAuthorizations(overlay.authorizations);
     if (overlay.secondParent) {
@@ -176,14 +194,15 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
       directorSignature: overlay.directorSignature,
       organizerSignature: overlay.organizerSignature,
     }));
-  }, [signedPayload]);
+  }, [signedPayload, formSnapshotFromDb]);
 
-  /** Na wydruku (/druk/...) pola tylko do oglądania, bez żółtego tła i bez możliwości wypełniania. */
-  const isEditable = !printMode && !isSigned;
+  /** Na wydruku lub w podglądzie (admin) – pola tylko do oglądania. */
+  const readOnlyView = printMode || previewOnly;
+  const isEditable = !readOnlyView && !isSigned;
 
   // Pobierz status najnowszego podpisanego dokumentu (karta) – czy można podpisać ponownie (tylko gdy odrzucona)
   useEffect(() => {
-    if (printMode || reservationIdProp == null) return;
+    if (readOnlyView || reservationIdProp == null) return;
     const token = authService.getToken();
     if (!token) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -200,17 +219,17 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
         }
       })
       .catch(() => setLatestCardStatus(null));
-  }, [reservationIdProp, printMode]);
+  }, [reservationIdProp, readOnlyView]);
 
-  // Automatyczny druk w trybie printMode
+  // Automatyczny druk w trybie printMode (tylko na stronie /druk/..., nie w podglądzie admina)
   useEffect(() => {
-    if (printMode) {
+    if (printMode && !previewOnly) {
       const timer = setTimeout(() => {
         window.print();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [printMode]);
+  }, [printMode, previewOnly]);
   
   // Tablica upoważnień
   const [authorizations, setAuthorizations] = useState([
@@ -431,7 +450,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
   };
 
   const handlePrint = () => {
-    if (printMode) {
+    if (printMode && !previewOnly) {
       window.print();
     } else {
       if (!runValidation()) return;
@@ -668,14 +687,65 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
     }
   };
 
+  const handleSaveAdmin = async () => {
+    if (!runValidation() || !onSaveAdmin || !reservationData?.reservationId) return;
+    setSaveStatus('loading');
+    setSaveMessage('');
+    try {
+      const health_questions = {
+        chronicDiseases: healthChronicTags.length ? 'Tak' : 'Nie',
+        dysfunctions: healthDysfunctionsTags.length ? 'Tak' : 'Nie',
+        psychiatric: healthPsychiatricTags.length ? 'Tak' : 'Nie',
+      };
+      const health_details = {
+        chronicDiseases: healthChronicTags.join(', '),
+        dysfunctions: healthDysfunctionsTags.join(', '),
+        psychiatric: healthPsychiatricTags.join(', '),
+      };
+      const reservation_partial = {
+        health_questions,
+        health_details,
+        additional_notes: healthAdditionalNotes.trim() || null,
+        accommodation_request: formData.vaccineInfo?.trim() || null,
+        participant_additional_info: formData.additionalInfo?.trim() || null,
+      };
+      const parts = secondParentName.trim().split(/\s+/);
+      const parent2_first_name = parts[0] ?? '';
+      const parent2_last_name = parts.slice(1).join(' ') ?? '';
+      const payload = getQualificationPayload();
+      const card_data: Record<string, unknown> = {
+        participant_pesel: formData.childPesel?.trim() || null,
+        participant_birth_date: formData.childDOB?.trim() || null,
+        parent2_first_name: secondParentName.trim() ? parent2_first_name : null,
+        parent2_last_name: secondParentName.trim() ? parent2_last_name : null,
+        parent2_street: secondParentAddress.trim() || null,
+        parent2_phone: secondParentPhone.trim() || null,
+        form_snapshot: payload,
+      };
+      await onSaveAdmin({
+        reservation_partial,
+        card_data,
+        sections_edited: ['Karta kwalifikacyjna'],
+      });
+      setSaveStatus('ok');
+      setSaveMessage('Zapisano. Wymagany ponowny podpis klienta.');
+      onSaveSuccess?.('Zapisano. Wymagany ponowny podpis klienta.');
+    } catch (e) {
+      setSaveStatus('error');
+      setSaveMessage(e instanceof Error ? e.message : 'Błąd zapisu');
+    }
+  };
+
+  const handleSave = saveMode === 'admin' ? handleSaveAdmin : handleSaveChanges;
+
   return (
     <>
-      {/* Przycisk druku - ukryty przy druku i w printMode */}
-      {!printMode && (
+      {/* Przycisk druku - ukryty przy druku i w podglądzie tylko do odczytu */}
+      {!readOnlyView && (
         <div className="no-print max-w-[210mm] mx-auto px-4 pt-4 flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
-            onClick={handleSaveChanges}
+            onClick={handleSave}
             disabled={saveStatus === 'loading'}
             className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition text-sm font-medium disabled:opacity-50"
           >
@@ -767,7 +837,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       }}
                       min={minDate}
                       max={maxDate}
-                      readOnly={printMode}
+                      readOnly={readOnlyView}
                       className={`input-line ${isEditable ? 'editable-field' : ''} ${childDOBError ? 'border-red-500' : ''}`}
                       aria-invalid={!!childDOBError}
                     />
@@ -787,7 +857,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   inputMode="numeric"
                   maxLength={11}
                   value={formData.vaccination.measles ? 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' : formData.childPesel}
-                  readOnly={printMode || formData.vaccination.measles}
+                  readOnly={readOnlyView || formData.vaccination.measles}
                   onChange={(e) => {
                     const v = e.target.value.replace(/\D/g, '');
                     handleChange('childPesel', v);
@@ -823,7 +893,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     handleVaccinationChange('measles', e.target.checked);
                     setNoPeselYearError(null);
                   }}
-                  disabled={printMode}
+                  disabled={readOnlyView}
                 />
                 Dziecko nie posiada numeru PESEL
                 {formData.vaccination.measles && !formData.vaccination.calendar && (
@@ -834,7 +904,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       handleVaccinationChange('measlesYear', e.target.value);
                       if (noPeselYearError) setNoPeselYearError(null);
                     }}
-                    readOnly={printMode}
+                    readOnly={readOnlyView}
                     className={`input-inline ${isEditable ? 'editable-field' : ''} ${noPeselYearError ? 'border-red-500' : ''}`}
                     placeholder="rok"
                     aria-invalid={!!noPeselYearError}
@@ -875,7 +945,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                               setSecondParentNameError(false);
                             }}
                             placeholder="Imię i nazwisko drugiego opiekuna"
-                            readOnly={printMode}
+                            readOnly={readOnlyView}
                             className={`input-line flex-1 min-w-[200px] ${isEditable ? 'editable-field' : ''} ${secondParentNameError ? 'border-red-500' : ''}`}
                             aria-invalid={secondParentNameError}
                           />
@@ -903,7 +973,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         setSecondParentAddressError(false);
                         setSecondParentPhoneError(false);
                       }}
-                      disabled={printMode}
+                      disabled={readOnlyView}
                     />
                     Brak drugiego rodzica/opiekuna prawnego
                   </label>
@@ -931,7 +1001,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                               setSecondParentAddressError(false);
                             }}
                             placeholder="Adres drugiego opiekuna"
-                            readOnly={printMode}
+                            readOnly={readOnlyView}
                             className={`input-line flex-1 min-w-[200px] ${isEditable ? 'editable-field' : ''} ${secondParentAddressError ? 'border-red-500' : ''}`}
                             aria-invalid={secondParentAddressError}
                           />
@@ -968,7 +1038,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                               setSecondParentPhoneError(false);
                             }}
                             placeholder="Telefon drugiego opiekuna"
-                            readOnly={printMode}
+                            readOnly={readOnlyView}
                             className={`input-line flex-1 min-w-[160px] ${isEditable ? 'editable-field' : ''} ${secondParentPhoneError ? 'border-red-500' : ''}`}
                             aria-invalid={secondParentPhoneError}
                           />
@@ -1000,7 +1070,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <div className="space-y-3">
               <div className="field-group">
                 <label>1) Choroby przewlekłe</label>
-                {isEditable && !printMode ? (
+                {isEditable ? (
                   <div className="health-tag-field">
                     <div className="readonly-field">{healthChronicTags.length ? healthChronicTags.join(', ') : '—'}</div>
                     <button type="button" onClick={() => setHealthTagModal('chronic')} className="health-tag-edit-btn">Edytuj</button>
@@ -1011,7 +1081,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               </div>
               <div className="field-group">
                 <label>2) Dysfunkcje</label>
-                {isEditable && !printMode ? (
+                {isEditable ? (
                   <div className="health-tag-field">
                     <div className="readonly-field">{healthDysfunctionsTags.length ? healthDysfunctionsTags.join(', ') : '—'}</div>
                     <button type="button" onClick={() => setHealthTagModal('dysfunctions')} className="health-tag-edit-btn">Edytuj</button>
@@ -1022,7 +1092,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               </div>
               <div className="field-group">
                 <label>3) Problemy psychiatryczne/psychologiczne</label>
-                {isEditable && !printMode ? (
+                {isEditable ? (
                   <div className="health-tag-field">
                     <div className="readonly-field">{healthPsychiatricTags.length ? healthPsychiatricTags.join(', ') : '—'}</div>
                     <button type="button" onClick={() => setHealthTagModal('psychiatric')} className="health-tag-edit-btn">Edytuj</button>
@@ -1036,7 +1106,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 <textarea
                   value={healthAdditionalNotes}
                   onChange={(e) => setHealthAdditionalNotes(e.target.value)}
-                  readOnly={printMode}
+                  readOnly={readOnlyView}
                   className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
                   rows={2}
                   placeholder="Pozostałe informacje (np. po przecinku)"
@@ -1085,7 +1155,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.calendar}
                   onChange={(e) => handleVaccinationChange('calendar', e.target.checked)}
-                  disabled={printMode}
+                  disabled={readOnlyView}
                 />
                 Zgodnie z kalendarzem szczepień
               </label>
@@ -1095,7 +1165,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.tetanus}
                   onChange={(e) => handleVaccinationChange('tetanus', e.target.checked)}
-                  disabled={printMode}
+                  disabled={readOnlyView}
                 />
                 Tężec
                 {formData.vaccination.tetanus && !formData.vaccination.calendar && (
@@ -1103,7 +1173,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     type="text"
                     value={formData.vaccination.tetanusYear}
                     onChange={(e) => handleVaccinationChange('tetanusYear', e.target.value)}
-                    readOnly={printMode}
+                    readOnly={readOnlyView}
                     className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                     placeholder="rok"
                   />
@@ -1115,7 +1185,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.measles}
                   onChange={(e) => handleVaccinationChange('measles', e.target.checked)}
-                  disabled={printMode}
+                  disabled={readOnlyView}
                 />
                 Błonica
                 {formData.vaccination.measles && !formData.vaccination.calendar && (
@@ -1123,7 +1193,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     type="text"
                     value={formData.vaccination.measlesYear}
                     onChange={(e) => handleVaccinationChange('measlesYear', e.target.value)}
-                    readOnly={printMode}
+                    readOnly={readOnlyView}
                     className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                     placeholder="rok"
                   />
@@ -1135,7 +1205,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.diphtheria}
                   onChange={(e) => handleVaccinationChange('diphtheria', e.target.checked)}
-                  disabled={printMode}
+                  disabled={readOnlyView}
                 />
                 Dur
                 {formData.vaccination.diphtheria && !formData.vaccination.calendar && (
@@ -1143,7 +1213,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     type="text"
                     value={formData.vaccination.diphtheriaYear}
                     onChange={(e) => handleVaccinationChange('diphtheriaYear', e.target.value)}
-                    readOnly={printMode}
+                    readOnly={readOnlyView}
                     className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                     placeholder="rok"
                   />
@@ -1155,7 +1225,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.other}
                   onChange={(e) => handleVaccinationChange('other', e.target.checked)}
-                  disabled={printMode}
+                  disabled={readOnlyView}
                 />
                 Inne
                 {formData.vaccination.other && !formData.vaccination.calendar && (
@@ -1164,7 +1234,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       type="text"
                       value={formData.vaccination.otherDetails}
                       onChange={(e) => handleVaccinationChange('otherDetails', e.target.value)}
-                      readOnly={printMode}
+                      readOnly={readOnlyView}
                       className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                       placeholder="podać jakie"
                     />
@@ -1172,7 +1242,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       type="text"
                       value={formData.vaccination.otherYear}
                       onChange={(e) => handleVaccinationChange('otherYear', e.target.value)}
-                      readOnly={printMode}
+                      readOnly={readOnlyView}
                       className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                       placeholder="rok"
                     />
@@ -1191,7 +1261,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <textarea
               value={formData.additionalInfo}
               onChange={(e) => handleChange('additionalInfo', e.target.value)}
-              readOnly={printMode}
+              readOnly={readOnlyView}
               className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
               rows={2}
             />
@@ -1207,7 +1277,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <textarea
               value={formData.vaccineInfo}
               onChange={(e) => handleChange('vaccineInfo', e.target.value)}
-              readOnly={printMode}
+              readOnly={readOnlyView}
               className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
               rows={2}
             />
@@ -1232,7 +1302,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       setShowRegulationError(false);
                     }
                   }}
-                  disabled={printMode}
+                  disabled={readOnlyView}
                 />
                 Potwierdzam zapoznanie się z regulaminem
               </label>
@@ -1255,7 +1325,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 {/* Nagłówek karty z przyciskiem usuwania */}
                 <div className="auth-header">
                   <span className="auth-title">Osoba upoważniona #{index + 1}</span>
-                  {!printMode && index > 0 && (
+                  {!readOnlyView && index > 0 && (
                     <button
                       onClick={() => removeAuthorization(index)}
                       className="remove-button no-print"
@@ -1273,7 +1343,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     type="text"
                     value={auth.fullName}
                     onChange={(e) => handleAuthorizationChange(index, 'fullName', e.target.value)}
-                    readOnly={printMode}
+                    readOnly={readOnlyView}
                     className={`input-inline-full ${isEditable ? 'editable-field' : ''}`}
                     placeholder="Jan Kowalski"
                   />
@@ -1286,7 +1356,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     <select
                       value={auth.documentType}
                       onChange={(e) => handleAuthorizationChange(index, 'documentType', e.target.value)}
-                      disabled={printMode}
+                      disabled={readOnlyView}
                       className={`select-field ${isEditable ? 'editable-field' : ''}`}
                     >
                       <option value="dowód osobisty">Dowód osobisty</option>
@@ -1299,7 +1369,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       type="text"
                       value={auth.documentNumber}
                       onChange={(e) => handleAuthorizationChange(index, 'documentNumber', e.target.value)}
-                      readOnly={printMode}
+                      readOnly={readOnlyView}
                       className={`input-line ${isEditable ? 'editable-field' : ''}`}
                       placeholder="ABC123456"
                     />
@@ -1316,7 +1386,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         type="checkbox"
                         checked={auth.canPickup}
                         onChange={(e) => handleAuthorizationChange(index, 'canPickup', e.target.checked)}
-                        disabled={printMode}
+                        disabled={readOnlyView}
                       />
                       Do odbioru dziecka z obozu: ośrodka i/lub miejsca zbiórki transportu zbiorowego
                     </label>
@@ -1326,7 +1396,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         type="checkbox"
                         checked={auth.canTemporaryPickup}
                         onChange={(e) => handleAuthorizationChange(index, 'canTemporaryPickup', e.target.checked)}
-                        disabled={printMode}
+                        disabled={readOnlyView}
                       />
                       Odwiedzin dziecka i/lub zabrania go poza teren ośrodka na określony czas, w trakcie trwania obozu
                     </label>
@@ -1346,7 +1416,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       e.target.checked = false; // Reset checkbox
                     }
                   }}
-                  disabled={printMode}
+                  disabled={readOnlyView}
                 />
                 <span className="simple-action-text">Upoważniam kolejną osobę</span>
               </label>
@@ -1359,7 +1429,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.independentReturn}
                   onChange={(e) => handleChange('independentReturn', e.target.checked)}
-                  disabled={printMode}
+                  disabled={readOnlyView}
                 />
                 <span className="consent-text">Wyrażam zgodę na samodzielny powrót dziecka do domu z miejsca zbiórki transportu zbiorowego</span>
               </label>
@@ -1371,11 +1441,11 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             )}
           </section>
 
-          {/* Podpis dokumentu */}
+          {/* Podpis dokumentu – ukryty w trybie edycji admina */}
           <section className="section">
 
             <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-              {printMode ? null : isSigned ? (
+              {readOnlyView || saveMode === 'admin' ? null : isSigned ? (
                 <div className="signed-confirmation">
                   <div className="signed-header">Dokument podpisany przez:</div>
                   <div className="signed-role">{formData.parentNames || 'Opiekun prawny'}</div>
