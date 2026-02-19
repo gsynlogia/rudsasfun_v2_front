@@ -1,11 +1,12 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
 import { Bell, X, CreditCard, Calendar, AlertCircle, CheckCircle } from 'lucide-react';
+import { ReactNode, useEffect } from 'react';
+
+import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
+import { useSidebar } from '@/context/SidebarContext';
 
 import AdminSidebar from './AdminSidebar';
-import { useSidebar } from '@/context/SidebarContext';
-import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -100,12 +101,12 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
       <AdminSidebar />
 
       {/* Main Content Area - scrollable, takes remaining space */}
-      <div 
+      <div
         className="flex-1 overflow-auto relative transition-all duration-300 pl-0.5"
         style={{ marginLeft: effectiveWidth }}
       >
         {/* Notification icon - fixed in top-right corner */}
-        <button 
+        <button
           className="fixed top-11 right-3 z-50 w-10 h-10 bg-slate-800 hover:bg-slate-700 text-white rounded-full flex items-center justify-center shadow-lg transition-colors cursor-pointer"
           title="Powiadomienia"
           onClick={openNotifications}
@@ -126,7 +127,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
 
       {/* Overlay when panel is open */}
       {isPanelOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/20 z-50 transition-opacity"
           onClick={close}
           aria-hidden="true"
@@ -134,7 +135,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
       )}
 
       {/* Right Panel - notifications (w-96) or document (od lewego sidebara do prawej krawędzi) */}
-      <div 
+      <div
         className={`fixed top-0 h-full bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
           isPanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}

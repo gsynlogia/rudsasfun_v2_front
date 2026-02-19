@@ -3,7 +3,7 @@
 import { Shield } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
 import { authService } from '@/lib/services/AuthService';
@@ -73,13 +73,17 @@ useEffect(() => {
 
 const lastLoggedStepRef = useRef<number | null>(null);
 
-useEffect(() => {
-  if (isAdmin) return;
-  if (lastLoggedStepRef.current === currentStep) return;
-  logStepEvent();
-  lastLoggedStepRef.current = currentStep;
+  const logStepEvent = useCallback(() => {
+    if (isAdmin) return;
+    logGtmEvent('reservation_step', buildStepEventData(currentStep, reservation));
+  }, [currentStep, isAdmin, reservation]);
 
-}, [currentStep, isAdmin, reservation]);
+  useEffect(() => {
+    if (isAdmin) return;
+    if (lastLoggedStepRef.current === currentStep) return;
+    logStepEvent();
+    lastLoggedStepRef.current = currentStep;
+  }, [currentStep, isAdmin, logStepEvent]);
 
   // Common validation function for current step
   const validateCurrentStep = (): boolean => {
@@ -106,11 +110,6 @@ useEffect(() => {
     }
 
     return isValid;
-  };
-
-  const logStepEvent = () => {
-    if (isAdmin) return;
-    logGtmEvent('reservation_step', buildStepEventData(currentStep, reservation));
   };
 
   // Navigate to specific step using URL
@@ -382,7 +381,7 @@ useEffect(() => {
                 </div>
               </aside>
             </div>
-            
+
             {/* Mobile Sticky Bottom Bar - Back, Price and Next Button */}
             <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40 px-4 py-3 safe-area-bottom">
               <div className="flex items-center justify-between gap-2 max-w-container mx-auto">
@@ -400,7 +399,7 @@ useEffect(() => {
                 ) : (
                   <div className="w-9"></div>
                 )}
-                
+
                 {/* Price display */}
                 <div className="flex flex-col items-center flex-1">
                   <span className="text-[10px] text-gray-500">Do zapłaty</span>
@@ -408,7 +407,7 @@ useEffect(() => {
                     {reservation.totalPrice?.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'} zł
                   </span>
                 </div>
-                
+
                 {/* Next/Pay button */}
                 {currentStep < TOTAL_STEPS ? (
                   <button

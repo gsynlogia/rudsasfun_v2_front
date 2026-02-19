@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, RefreshCw, FileText, CheckCircle, XCircle, Loader2, Search, ChevronLeft, ChevronRight, ChevronDown, FileQuestion, X, Calendar, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, RefreshCw, FileText, CheckCircle, Loader2, Search, ChevronLeft, ChevronRight, ChevronDown, FileQuestion, X, Calendar, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useEffect, useState, useCallback, useRef, Suspense } from 'react';
@@ -96,7 +96,7 @@ function SkeletonRow() {
 function ContractRegeneratorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Initialize filters from URL params
   const getInitialFilters = useCallback((): SearchFilters => ({
     search: searchParams?.get('search') || '',
@@ -106,7 +106,7 @@ function ContractRegeneratorContent() {
     dateFrom: searchParams?.get('date_from') || '',
     dateTo: searchParams?.get('date_to') || '',
   }), [searchParams]);
-  
+
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [contracts, setContracts] = useState<ContractItem[]>([]);
@@ -117,21 +117,21 @@ function ContractRegeneratorContent() {
   const [regeneratingAll, setRegeneratingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
-  
+
   // Filter state - local inputs
   const [filters, setFilters] = useState<SearchFilters>(getInitialFilters);
   // Applied filters (what's actually being searched)
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(getInitialFilters);
-  
+
   const [currentPage, setCurrentPage] = useState(() => {
     const pageParam = searchParams?.get('page');
     return pageParam ? parseInt(pageParam, 10) : 1;
   });
   const [pageSize] = useState(20);
-  
+
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialMount = useRef(true);
+  const _isInitialMount = useRef(true);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -165,7 +165,7 @@ function ContractRegeneratorContent() {
   // Update URL with current filters
   const updateURL = useCallback((newFilters: SearchFilters, page: number) => {
     const params = new URLSearchParams();
-    
+
     if (newFilters.search) params.set('search', newFilters.search);
     if (newFilters.reservationNumber) params.set('reservation_number', newFilters.reservationNumber);
     if (newFilters.contractStatus) params.set('status', newFilters.contractStatus);
@@ -173,12 +173,12 @@ function ContractRegeneratorContent() {
     if (newFilters.dateFrom) params.set('date_from', newFilters.dateFrom);
     if (newFilters.dateTo) params.set('date_to', newFilters.dateTo);
     if (page > 1) params.set('page', page.toString());
-    
+
     const queryString = params.toString();
-    const newUrl = queryString 
+    const newUrl = queryString
       ? `${window.location.pathname}?${queryString}`
       : window.location.pathname;
-    
+
     window.history.replaceState({}, '', newUrl);
   }, []);
 
@@ -186,19 +186,19 @@ function ContractRegeneratorContent() {
     try {
       setLoadingContracts(true);
       setError(null);
-      
+
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pageSize.toString(),
       });
-      
+
       if (searchFilters.search) params.append('search', searchFilters.search);
       if (searchFilters.reservationNumber) params.append('reservation_number', searchFilters.reservationNumber);
       if (searchFilters.contractStatus) params.append('contract_status', searchFilters.contractStatus);
       if (searchFilters.campName) params.append('camp_name', searchFilters.campName);
       if (searchFilters.dateFrom) params.append('date_from', searchFilters.dateFrom);
       if (searchFilters.dateTo) params.append('date_to', searchFilters.dateTo);
-      
+
       const data = await authenticatedApiCall<ApiResponse>(
         `${API_BASE_URL}/api/contracts/regenerator/list?${params.toString()}`,
       );
@@ -224,12 +224,12 @@ function ContractRegeneratorContent() {
   // Debounced filter change handler
   const handleFilterChange = useCallback((field: keyof SearchFilters, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
-    
+
     // Clear existing timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    
+
     // Show skeleton after 300ms
     debounceTimerRef.current = setTimeout(() => {
       setShowSkeleton(true);
@@ -271,7 +271,7 @@ function ContractRegeneratorContent() {
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
   };
-  
+
   const hasActiveFilters = Object.values(appliedFilters).some(v => v !== '');
 
   const handleRegenerate = async (reservationId: number) => {
@@ -447,7 +447,7 @@ function ContractRegeneratorContent() {
               />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
-            
+
             {/* Reservation number */}
             <div className="relative">
               <input
@@ -460,7 +460,7 @@ function ContractRegeneratorContent() {
               />
               <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
-            
+
             {/* Contract status */}
             <div>
               <select
@@ -474,7 +474,7 @@ function ContractRegeneratorContent() {
                 <option value="no_contract">Brak umowy</option>
               </select>
             </div>
-            
+
             {/* Camp name */}
             <div className="relative">
               <input
@@ -486,7 +486,7 @@ function ContractRegeneratorContent() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm"
               />
             </div>
-            
+
             {/* Date from */}
             <div className="relative">
               <input
@@ -497,7 +497,7 @@ function ContractRegeneratorContent() {
               />
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
-            
+
             {/* Date to */}
             <div className="relative">
               <input
@@ -509,7 +509,7 @@ function ContractRegeneratorContent() {
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
           </div>
-          
+
           {/* Action buttons */}
           <div className="flex items-center gap-3 mt-3">
             <button
@@ -708,7 +708,7 @@ function ContractRegeneratorContent() {
                               onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRegenerate(contract.reservation_id); }}
                               disabled={regenerating === contract.reservation_id}
                               className="text-green-600 hover:text-green-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                              title={contract.has_contract ? "Regeneruj umowę" : "Wygeneruj umowę"}
+                              title={contract.has_contract ? 'Regeneruj umowę' : 'Wygeneruj umowę'}
                             >
                               {regenerating === contract.reservation_id ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -737,7 +737,7 @@ function ContractRegeneratorContent() {
                                   </span>
                                 )}
                               </div>
-                              
+
                               {/* Camp and turnus info */}
                               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
@@ -752,14 +752,14 @@ function ContractRegeneratorContent() {
                                   <div>
                                     <span className="font-medium text-blue-800">Daty:</span>
                                     <span className="ml-2 text-blue-900">
-                                      {contract.property_start_date && contract.property_end_date 
+                                      {contract.property_start_date && contract.property_end_date
                                         ? `${contract.property_start_date} - ${contract.property_end_date}`
                                         : '-'}
                                     </span>
                                   </div>
                                 </div>
                               </div>
-                              
+
                               {!contract.has_contract ? (
                                 <div className="text-center py-6 text-gray-500">
                                   <FileQuestion className="w-12 h-12 mx-auto mb-2 text-orange-400" />
@@ -808,7 +808,7 @@ function ContractRegeneratorContent() {
                                       );
                                     });
                                   })()}
-                                  
+
                                   {/* Regenerate button */}
                                   {contract.mismatch_count > 0 && (
                                     <div className="flex justify-end pt-2">
@@ -860,7 +860,7 @@ function ContractRegeneratorContent() {
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              
+
               {/* Page numbers */}
               {Array.from({ length: Math.min(5, pagination.total_pages) }, (_, i) => {
                 let pageNum: number;
@@ -887,7 +887,7 @@ function ContractRegeneratorContent() {
                   </button>
                 );
               })}
-              
+
               <button
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={!pagination.has_next}

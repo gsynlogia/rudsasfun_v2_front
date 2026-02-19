@@ -215,7 +215,7 @@ export default function AddonsManagement() {
           const uploadResult = await handleIconUpload(iconFile);
           // uploadResult is { url, relative_path }
           finalIconRelativePath = uploadResult.relative_path;
-        } catch (uploadErr) {
+        } catch (_uploadErr) {
           // Error already set in handleIconUpload
           return; // Stop saving if upload fails
         }

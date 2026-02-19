@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from 'react';
 
 import type { StepComponentProps } from '@/types/reservation';
-import { saveStep2FormData, loadStep2FormData, type Step2FormData } from '@/utils/sessionStorage';
+import { loadStep2FormData } from '@/utils/sessionStorage';
 
 import DashedLine from './DashedLine';
 import AddonsSection from './step2/AddonsSection';
@@ -16,7 +16,7 @@ import TransportSection from './step2/TransportSection';
  * Step2 Component - Reservation Details
  * Contains: Addons, Protection, Promotions, Transport, Source information
  */
-export default function Step2({ onNext, onPrevious, disabled = false }: StepComponentProps) {
+export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabled: _disabled = false }: StepComponentProps) {
   // Combined validation function for Step2 (Transport + Source + Promotions)
   const validateStep2 = useCallback((): boolean => {
     // Validate transport section

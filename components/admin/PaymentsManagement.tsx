@@ -872,7 +872,7 @@ const mapReservationToPaymentFormat = async (
 
   // Get promotion name - prefer backend's promotion_name, fallback to cache
   let promotionName: string | null = reservation.promotion_name || null;
-  
+
   // If backend didn't provide promotion_name, try from cache
   if (!promotionName && reservation.selected_promotion && reservation.camp_id && reservation.property_id) {
     const cacheKey = `${reservation.camp_id}_${reservation.property_id}`;
@@ -972,28 +972,28 @@ const mapReservationToPaymentFormat = async (
   }
 
   // === NEW FIELDS MAPPING ===
-  
+
   // Guardian data from parents_data (camelCase from backend)
   const guardian = firstParent;
-  const guardianName = guardian 
-    ? `${guardian.firstName || ''} ${guardian.lastName || ''}`.trim() || null 
+  const guardianName = guardian
+    ? `${guardian.firstName || ''} ${guardian.lastName || ''}`.trim() || null
     : null;
   const guardianPhone = guardian?.phoneNumber || null;
   const guardianEmail = guardian?.email || null;
-  
+
   // Location (period - city)
   const location = reservation.property_period && reservation.property_city
     ? `${reservation.property_period} - ${reservation.property_city}`
     : reservation.property_city || reservation.property_period || null;
-  
+
   // Transport
-  const transportDeparture = reservation.departure_type === 'own' 
-    ? 'Własny' 
+  const transportDeparture = reservation.departure_type === 'own'
+    ? 'Własny'
     : reservation.departure_city || null;
-  const transportReturn = reservation.return_type === 'own' 
-    ? 'Własny' 
+  const transportReturn = reservation.return_type === 'own'
+    ? 'Własny'
     : reservation.return_city || null;
-  
+
   // Check addons for specific types (based on addon names)
   let hasOaza = false;
   let hasTarcza = false;
@@ -1001,19 +1001,19 @@ const mapReservationToPaymentFormat = async (
   let hasSkuter = false;
   let hasEnergylandia = false;
   let hasTermy = false;
-  
+
   // Check protections for Oaza and Tarcza
   if (protectionNames) {
     const protNamesLower = protectionNames.toLowerCase();
     hasOaza = protNamesLower.includes('oaza');
     hasTarcza = protNamesLower.includes('tarcza');
   }
-  
+
   // Check selected addons for other extras
   const allSelectedAddons = reservation.selected_addons
     ? (Array.isArray(reservation.selected_addons) ? reservation.selected_addons : [reservation.selected_addons])
     : [];
-  
+
   allSelectedAddons.forEach((addonId: string | number) => {
     const addonIdStr = String(addonId);
     const addonData = addonsMap.get(addonIdStr);
@@ -1025,7 +1025,7 @@ const mapReservationToPaymentFormat = async (
       if (addonNameLower.includes('termy')) hasTermy = true;
     }
   });
-  
+
   // Get individual payments (combine Tpay and manual payments, sorted by date)
   const tpayPayments = payments.filter(p => {
     const orderId = p.order_id || '';
@@ -1035,21 +1035,21 @@ const mapReservationToPaymentFormat = async (
     if (match && parseInt(match[1], 10) === reservation.id) return true;
     return false;
   }).filter(p => p.status === 'success' || (p.status === 'pending' && p.amount && p.amount > 0));
-  
+
   // Map Tpay payments to PaymentRecord format
   const tpayRecords: PaymentRecord[] = tpayPayments.map(p => ({
     amount: p.paid_amount || p.amount || 0,
     date: p.paid_at ? p.paid_at.split('T')[0] : (p.payment_date ? String(p.payment_date).split('T')[0] : (p.created_at ? String(p.created_at).split('T')[0] : null)),
     method: p.channel_id === 64 ? 'BLIK' : p.channel_id === 53 ? 'Karta' : 'Online',
   }));
-  
+
   // Map manual payments to PaymentRecord format
   const manualRecords: PaymentRecord[] = reservationManualPayments.map(mp => ({
     amount: mp.amount,
     date: mp.payment_date ? String(mp.payment_date).split('T')[0] : null,
     method: mp.payment_method || 'Ręczna',
   }));
-  
+
   // Combine and sort all payments by date (oldest first)
   const allPaymentRecords = [...tpayRecords, ...manualRecords].sort((a, b) => {
     if (!a.date && !b.date) return 0;
@@ -1057,7 +1057,7 @@ const mapReservationToPaymentFormat = async (
     if (!b.date) return -1;
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
-  
+
   // Assign to payment1, payment2, payment3
   const payment1 = allPaymentRecords[0] || null;
   const payment2 = allPaymentRecords[1] || null;
@@ -1150,10 +1150,10 @@ export default function PaymentsManagement() {
   const [filters, setFilters] = useState<SearchFilters>(getInitialFilters);
   // Applied filters (what's actually being searched)
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(getInitialFilters);
-  
+
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const [sortColumn, setSortColumn] = useState<string | null>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -1164,7 +1164,7 @@ export default function PaymentsManagement() {
   const [pageInputValue, setPageInputValue] = useState('');
   const [serverPagination, setServerPagination] = useState<PaginationInfo | null>(null);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
-  
+
   // Load user settings (items_per_page) on mount
   // First check localStorage for immediate value, then sync from API
   useEffect(() => {
@@ -1182,15 +1182,15 @@ export default function PaymentsManagement() {
         // Then fetch from API to ensure sync with database
         const token = localStorage.getItem('token');
         if (!token) return;
-        
+
         const payload = JSON.parse(atob(token.split('.')[1]));
         const adminUserId = payload.admin_user_id;
         if (!adminUserId) return;
-        
+
         const settings = await authenticatedApiCall<{ items_per_page: number }>(
-          `/api/admin-users/${adminUserId}/settings`
+          `/api/admin-users/${adminUserId}/settings`,
         );
-        
+
         if (settings?.items_per_page) {
           setItemsPerPage(settings.items_per_page);
           // Update localStorage to stay in sync
@@ -1201,10 +1201,10 @@ export default function PaymentsManagement() {
         // Keep localStorage value or default on error
       }
     };
-    
+
     loadUserSettings();
   }, []);
-  
+
   // Applied column filters - JSON string to trigger refetch only when filters actually change
   // This prevents modal from flickering when columnConfig updates
   const [appliedColumnFilters, setAppliedColumnFilters] = useState<string>('{}');
@@ -1221,31 +1221,31 @@ export default function PaymentsManagement() {
   // Update URL with current filters
   const updateURL = useCallback((newFilters: SearchFilters, page: number) => {
     const params = new URLSearchParams();
-    
+
     if (newFilters.search) params.set('search', newFilters.search);
     if (newFilters.paymentStatus) params.set('status', newFilters.paymentStatus);
     if (newFilters.campName) params.set('camp', newFilters.campName);
     if (newFilters.dateFrom) params.set('date_from', newFilters.dateFrom);
     if (newFilters.dateTo) params.set('date_to', newFilters.dateTo);
     if (page > 1) params.set('page', page.toString());
-    
+
     const queryString = params.toString();
-    const newUrl = queryString 
+    const newUrl = queryString
       ? `${window.location.pathname}?${queryString}`
       : window.location.pathname;
-    
+
     window.history.replaceState({}, '', newUrl);
   }, []);
 
   // Debounced filter change handler
   const handleFilterChange = useCallback((field: keyof SearchFilters, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
-    
+
     // Clear existing timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    
+
     // Apply filter after 300ms
     debounceTimerRef.current = setTimeout(() => {
       setCurrentPage(1);
@@ -1434,10 +1434,10 @@ export default function PaymentsManagement() {
 
   // Filter dropdown state: which column has filter dropdown open
   const [openFilterColumn, setOpenFilterColumn] = useState<string | null>(null);
-  
+
   // Frozen filter options - captured when modal opens to prevent "jumping"
   const [frozenFilterOptions, setFrozenFilterOptions] = useState<string[]>([]);
-  
+
   // Filter search state (for searching within filter modal)
   const [filterSearchQuery, setFilterSearchQuery] = useState<string>('');
   const [filterSearchResults, setFilterSearchResults] = useState<string[]>([]);
@@ -1445,12 +1445,12 @@ export default function PaymentsManagement() {
   const filterSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveToCloudTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [cloudSettingsLoaded, setCloudSettingsLoaded] = useState<boolean>(false);
-  
+
   // Check if column is an amount/money column
   const isAmountColumn = (columnKey: string): boolean => {
     return ['totalAmount', 'paidAmount', 'remainingAmount', 'payment1Amount', 'payment2Amount', 'payment3Amount', 'depositAmount'].includes(columnKey);
   };
-  
+
   // Parse amount input (handle comma and dot as decimal separator)
   const parseAmountInput = (input: string): number | null => {
     if (!input.trim()) return null;
@@ -1484,7 +1484,7 @@ export default function PaymentsManagement() {
         const cloudSettings = await authenticatedApiCall<{
           payments_columns_config?: string | null;
         }>('/api/admin-users/me/settings');
-        
+
         if (cloudSettings.payments_columns_config) {
           const parsed = JSON.parse(cloudSettings.payments_columns_config);
           if (Array.isArray(parsed)) {
@@ -1577,7 +1577,7 @@ export default function PaymentsManagement() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
       setColumnConfig([...config]);
-      
+
       // Debounced save to cloud (1 second delay)
       if (saveToCloudTimeoutRef.current) {
         clearTimeout(saveToCloudTimeoutRef.current);
@@ -1610,7 +1610,7 @@ export default function PaymentsManagement() {
         return filterOptions[backendKey];
       }
     }
-    
+
     // Fallback: calculate from current page data (for columns not in filter_options)
     const values = new Set<string>();
     reservations.forEach(reservation => {
@@ -1704,7 +1704,7 @@ export default function PaymentsManagement() {
           value = reservation.hasTermy ? 'Tak' : 'Nie';
           break;
         case 'qualificationCardStatus':
-          value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona' 
+          value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
             : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
             : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje'
             : '-';
@@ -1782,7 +1782,7 @@ export default function PaymentsManagement() {
       }
     });
     updateFiltersInUrl(filtersForUrl);
-    
+
     // Update applied column filters to trigger API refetch
     setAppliedColumnFilters(JSON.stringify(filtersForUrl));
 
@@ -1807,10 +1807,10 @@ export default function PaymentsManagement() {
       }
     });
     updateFiltersInUrl(filtersForUrl);
-    
+
     // Update applied column filters to trigger API refetch
     setAppliedColumnFilters(JSON.stringify(filtersForUrl));
-    
+
     updatePageInUrl(1);
   };
 
@@ -1820,24 +1820,24 @@ export default function PaymentsManagement() {
     if (filterSearchTimeoutRef.current) {
       clearTimeout(filterSearchTimeoutRef.current);
     }
-    
+
     setFilterSearchQuery(query);
-    
+
     // If query is empty, clear results
     if (!query.trim()) {
       setFilterSearchResults([]);
       setIsFilterSearching(false);
       return;
     }
-    
+
     // Set searching state
     setIsFilterSearching(true);
-    
+
     // Debounce: wait 500ms after user stops typing
     filterSearchTimeoutRef.current = setTimeout(async () => {
       try {
         const response = await authenticatedApiCall<{ results: string[]; total: number }>(
-          `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(query)}&limit=50`
+          `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(query)}&limit=50`,
         );
         setFilterSearchResults(response.results);
       } catch (err) {
@@ -1848,7 +1848,7 @@ export default function PaymentsManagement() {
       }
     }, 500);
   };
-  
+
   // Reset filter search when modal closes
   const handleCloseFilterModal = () => {
     setOpenFilterColumn(null);
@@ -1860,7 +1860,7 @@ export default function PaymentsManagement() {
       clearTimeout(filterSearchTimeoutRef.current);
     }
   };
-  
+
   // Open filter modal and freeze options to prevent jumping
   const handleOpenFilterModal = (columnKey: string) => {
     // Freeze current options to prevent modal from "jumping" during data reload
@@ -1868,12 +1868,12 @@ export default function PaymentsManagement() {
     setFrozenFilterOptions(currentOptions);
     setOpenFilterColumn(columnKey);
   };
-  
+
   // Get values to display in filter modal (search results or default from current page)
   const getFilterDisplayValues = (columnKey: string): string[] => {
     // Use frozen options to prevent modal from "jumping" during data reload
     const baseOptions = frozenFilterOptions.length > 0 ? frozenFilterOptions : getUniqueColumnValues(columnKey);
-    
+
     // For amount columns with search query, filter locally from frozen/base options
     if (isAmountColumn(columnKey) && filterSearchQuery.trim()) {
       const searchAmount = parseAmountInput(filterSearchQuery);
@@ -1882,13 +1882,13 @@ export default function PaymentsManagement() {
           if (value === '-') return false;
           const valueAmount = parseFloat(value);
           if (isNaN(valueAmount)) return false;
-          
+
           // Exact match (with small tolerance for floating point)
           return Math.abs(valueAmount - searchAmount) < 0.01;
         });
       }
     }
-    
+
     // If user is searching and has results, show search results
     if (filterSearchQuery.trim() && filterSearchResults.length > 0) {
       return filterSearchResults;
@@ -1920,7 +1920,7 @@ export default function PaymentsManagement() {
       }
     });
     updateFiltersInUrl(filtersForUrl);
-    
+
     // Update applied column filters to trigger API refetch
     setAppliedColumnFilters(JSON.stringify(filtersForUrl));
 
@@ -1950,17 +1950,17 @@ export default function PaymentsManagement() {
     const hasCampName = appliedFilters.campName.trim() !== '';
     const hasDateFrom = appliedFilters.dateFrom !== '';
     const hasDateTo = appliedFilters.dateTo !== '';
-    
+
     // Check column filters
     const hasColumnFilters = columnConfig.some(col => col.filters && col.filters.length > 0);
-    
+
     return hasSearch || hasPaymentStatus || hasCampName || hasDateFrom || hasDateTo || hasColumnFilters;
   }, [appliedFilters, columnConfig]);
 
   // Build active filters description for toast
   const getActiveFiltersDescription = (): string => {
     const parts: string[] = [];
-    
+
     if (appliedFilters.search.trim()) {
       parts.push(`wyszukiwanie: "${appliedFilters.search}"`);
     }
@@ -1976,13 +1976,13 @@ export default function PaymentsManagement() {
     if (appliedFilters.dateTo) {
       parts.push(`do: ${appliedFilters.dateTo}`);
     }
-    
+
     // Count column filters
     const columnFiltersCount = columnConfig.filter(col => col.filters && col.filters.length > 0).length;
     if (columnFiltersCount > 0) {
       parts.push(`filtry kolumn: ${columnFiltersCount}`);
     }
-    
+
     return parts.join(', ');
   };
 
@@ -1990,7 +1990,7 @@ export default function PaymentsManagement() {
   const handleExportToExcel = async () => {
     // Get visible columns in order
     const visibleCols = columnConfig.filter(col => col.visible);
-    
+
     if (visibleCols.length === 0) {
       showError('Brak widocznych kolumn do eksportu');
       return;
@@ -2001,7 +2001,7 @@ export default function PaymentsManagement() {
       const filtersDesc = getActiveFiltersDescription();
       showInfo(
         `Eksport zawiera tylko przefiltrowane dane (${filtersDesc})`,
-        { title: 'Export z filtrami', duration: 5000 }
+        { title: 'Export z filtrami', duration: 5000 },
       );
     }
 
@@ -2061,17 +2061,17 @@ export default function PaymentsManagement() {
         // Build reservation object for export
         const payments = item.payments || [];
         const manualPayments = item.manual_payments || [];
-        
+
         // Calculate payment details
         const allPayments: Array<{ status: string; paid_amount?: number | null; amount: number; created_at: string | null }> = [
           ...payments.map(p => ({ status: p.status, paid_amount: p.paid_amount, amount: p.amount, created_at: p.created_at })),
           ...manualPayments.map(mp => ({ status: 'paid', paid_amount: mp.amount, amount: mp.amount, created_at: mp.created_at })),
         ];
-        
+
         const totalPaid = allPayments
           .filter(p => p.status === 'paid' || p.status === 'completed')
           .reduce((sum, p) => sum + (p.paid_amount || p.amount || 0), 0);
-        
+
         const totalAmount = item.total_price || 0;
         const remainingAmount = Math.max(0, totalAmount - totalPaid);
 
@@ -2086,24 +2086,24 @@ export default function PaymentsManagement() {
           : item.property_city || item.property_period || '';
 
         // Calculate transport info
-        const transportDeparture = item.departure_type === 'own' 
-          ? 'Własny' 
+        const transportDeparture = item.departure_type === 'own'
+          ? 'Własny'
           : item.departure_city || '';
-        const transportReturn = item.return_type === 'own' 
-          ? 'Własny' 
+        const transportReturn = item.return_type === 'own'
+          ? 'Własny'
           : item.return_city || '';
 
         // Get guardian info from parents_data
         const firstParent = item.parents_data?.[0];
-        const guardianName = firstParent 
-          ? `${firstParent.firstName || ''} ${firstParent.lastName || ''}`.trim() 
+        const guardianName = firstParent
+          ? `${firstParent.firstName || ''} ${firstParent.lastName || ''}`.trim()
           : '';
         const guardianPhone = firstParent?.phoneNumber || '';
         const guardianEmail = item.invoice_email || '';
 
         // Check for addons (hasOaza, hasTarcza, etc.) based on selected_protection and selected_addons
         // Get protection names from protectionsMap for hasOaza/hasTarcza
-        const selectedProtections = item.selected_protection 
+        const selectedProtections = item.selected_protection
           ? (Array.isArray(item.selected_protection) ? item.selected_protection : [item.selected_protection])
           : [];
         const protectionNamesArr = selectedProtections
@@ -2115,7 +2115,7 @@ export default function PaymentsManagement() {
         const hasTarcza = protNamesLower.includes('tarcza');
 
         // Check addons for quad, skuter, energylandia, termy
-        const selectedAddons = item.selected_addons 
+        const selectedAddons = item.selected_addons
           ? (Array.isArray(item.selected_addons) ? item.selected_addons : [item.selected_addons])
           : [];
         const addonNamesArr = selectedAddons
@@ -2164,13 +2164,13 @@ export default function PaymentsManagement() {
 
       // Create CSV header
       const headers = visibleCols.map(col => COLUMN_DEFINITIONS[col.key] || col.key);
-      
+
       // Create CSV rows
       const rows = exportData.map(reservation => {
         return visibleCols.map(col => {
           const key = col.key;
           let value = '';
-          
+
           switch (key) {
             case 'reservationName':
               value = reservation.reservationName;
@@ -2260,7 +2260,7 @@ export default function PaymentsManagement() {
               value = reservation.hasTermy ? 'Tak' : 'Nie';
               break;
             case 'qualificationCardStatus':
-              value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona' 
+              value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
                 : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
                 : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje'
                 : '';
@@ -2290,20 +2290,20 @@ export default function PaymentsManagement() {
             default:
               value = '';
           }
-          
+
           // Escape quotes and wrap in quotes if contains comma, newline or quote
           if (value.includes(',') || value.includes('\n') || value.includes('"')) {
-            value = '"' + value.replace(/"/g, '""') + '"';
+            value = `"${value.replace(/"/g, '""')}"`;
           }
-          
+
           return value;
         }).join(';'); // Use semicolon for Polish Excel compatibility
       });
-      
+
       // Add BOM for UTF-8 Excel compatibility
       const BOM = '\uFEFF';
-      const csvContent = BOM + headers.join(';') + '\n' + rows.join('\n');
-      
+      const csvContent = `${BOM + headers.join(';')}\n${rows.join('\n')}`;
+
       // Create and download file
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -2482,7 +2482,7 @@ export default function PaymentsManagement() {
         const params = new URLSearchParams();
         params.set('page', currentPage.toString());
         params.set('limit', itemsPerPage.toString());
-        
+
         // Add search filters
         if (appliedFilters.search && appliedFilters.search.trim()) {
           params.set('search', appliedFilters.search.trim());
@@ -2508,10 +2508,10 @@ export default function PaymentsManagement() {
           'Nieopłacone': 'unpaid',
           'Zwrócone': 'returned',
         };
-        
+
         // Parse applied column filters from JSON string
         const parsedColumnFilters: Record<string, string[]> = JSON.parse(appliedColumnFilters || '{}');
-        
+
         Object.entries(parsedColumnFilters).forEach(([colKey, filters]) => {
           if (filters && filters.length > 0) {
             if (colKey === 'status') {
@@ -2531,7 +2531,7 @@ export default function PaymentsManagement() {
 
         console.log(`Fetched ${response.items.length} reservations (page ${response.pagination.page}/${response.pagination.total_pages})`);
         setServerPagination(response.pagination);
-        
+
         // Save filter options from backend (all unique values for each column)
         if (response.filter_options) {
           setFilterOptions(response.filter_options);
@@ -2654,8 +2654,8 @@ export default function PaymentsManagement() {
         setReservations(mappedReservations);
 
         // Sync Tpay in background for pending payments (non-blocking)
-        const allPendingPayments = response.items.flatMap(r => 
-          r.payments.filter(p => p.status === 'pending' && p.transaction_id)
+        const allPendingPayments = response.items.flatMap(r =>
+          r.payments.filter(p => p.status === 'pending' && p.transaction_id),
         );
         if (allPendingPayments.length > 0) {
           console.log(`🔄 Synchronizacja ${allPendingPayments.length} płatności z API Tpay w tle...`);
@@ -2831,7 +2831,7 @@ export default function PaymentsManagement() {
       case 'hasTermy':
         return reservation.hasTermy ? 'Tak' : 'Nie';
       case 'qualificationCardStatus':
-        return reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona' 
+        return reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
           : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
           : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje'
           : '-';
@@ -2860,7 +2860,7 @@ export default function PaymentsManagement() {
 
   // Client-side sorting only (filtering is now server-side)
   const filteredReservations = useMemo(() => {
-    let filtered = [...reservations];
+    const filtered = [...reservations];
 
     // NOTE: Column filters are now server-side (sent as filter_xxx params)
     // NOTE: Search is server-side (appliedFilters)
@@ -3397,7 +3397,7 @@ export default function PaymentsManagement() {
     const params = new URLSearchParams();
     params.set('page', currentPage.toString());
     params.set('limit', itemsPerPage.toString());
-    
+
     // Add search filters
     if (appliedFilters.search && appliedFilters.search.trim()) {
       params.set('search', appliedFilters.search.trim());
@@ -3710,29 +3710,29 @@ export default function PaymentsManagement() {
   // Format phone number with country code and return WhatsApp link
   const formatPhoneWithWhatsApp = (phone: string | null | undefined) => {
     if (!phone) return { display: '-', whatsappLink: null };
-    
+
     // Remove all non-digit characters
     let cleanPhone = phone.replace(/\D/g, '');
-    
+
     // If starts with 48, it already has country code
     // If 9 digits (Polish mobile), add 48
     if (cleanPhone.length === 9) {
-      cleanPhone = '48' + cleanPhone;
+      cleanPhone = `48${cleanPhone}`;
     } else if (cleanPhone.startsWith('0048')) {
       cleanPhone = cleanPhone.substring(2);
     } else if (!cleanPhone.startsWith('48') && cleanPhone.length === 11) {
       // Could be with leading 0, remove it
-      cleanPhone = '48' + cleanPhone.substring(1);
+      cleanPhone = `48${cleanPhone.substring(1)}`;
     }
-    
+
     // Format for display: +48 XXX XXX XXX
-    const displayPhone = cleanPhone.length >= 11 
+    const displayPhone = cleanPhone.length >= 11
       ? `+${cleanPhone.substring(0, 2)} ${cleanPhone.substring(2, 5)} ${cleanPhone.substring(5, 8)} ${cleanPhone.substring(8)}`
       : `+48 ${phone}`;
-    
+
     // WhatsApp link format: https://wa.me/48XXXXXXXXX
     const whatsappLink = `https://wa.me/${cleanPhone}`;
-    
+
     return { display: displayPhone, whatsappLink };
   };
 
@@ -3805,7 +3805,7 @@ export default function PaymentsManagement() {
             <div className="h-8 bg-gray-200 w-[70px]"></div>
             <div className="h-8 bg-gray-200 w-[70px]"></div>
             <div className="h-8 bg-gray-200 w-[80px]"></div>
-            
+
             {/* Results count skeleton - pushed to right */}
             <div className="ml-auto h-3 bg-gray-200 w-48"></div>
           </div>
@@ -3889,7 +3889,7 @@ export default function PaymentsManagement() {
             />
             <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           </div>
-          
+
           {/* Date from */}
           <div className="relative">
             <input
@@ -3901,7 +3901,7 @@ export default function PaymentsManagement() {
             />
             <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           </div>
-          
+
           {/* Date to */}
           <div className="relative">
             <input
@@ -3959,7 +3959,7 @@ export default function PaymentsManagement() {
             )}
             <span className="hidden xl:inline">{isExporting ? 'Eksport...' : 'Excel'}</span>
           </button>
-          
+
           <button
             onClick={handleOpenColumnModal}
             className="px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-500 transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
@@ -3968,7 +3968,7 @@ export default function PaymentsManagement() {
             <Columns className="w-3.5 h-3.5" />
             <span className="hidden xl:inline">Kolumny</span>
           </button>
-          
+
           <button
             onClick={handleManualSync}
             disabled={isSyncing}
@@ -3978,11 +3978,11 @@ export default function PaymentsManagement() {
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
             <span className="hidden xl:inline">{isSyncing ? 'Sync...' : 'Weryfikuj'}</span>
           </button>
-          
+
           {/* Results count - pushed to right */}
           <span className="ml-auto text-xs text-slate-300 whitespace-nowrap">Znaleziono: <strong className="text-white">{serverPagination?.total || 0}</strong> | Na stronie: <strong className="text-white">{itemsPerPage}</strong></span>
         </div>
-        
+
         {/* Active column filters - small orange buttons with X to remove */}
         {(() => {
           const activeFilters: { columnKey: string; columnName: string; value: string }[] = [];
@@ -3994,9 +3994,9 @@ export default function PaymentsManagement() {
               });
             }
           });
-          
+
           if (activeFilters.length === 0) return null;
-          
+
           return (
             <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-gray-200">
               <span className="text-xs text-gray-500 self-center mr-1">Aktywne filtry:</span>
@@ -4308,7 +4308,7 @@ export default function PaymentsManagement() {
                             return (
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
                                 {phoneData.whatsappLink ? (
-                                  <a 
+                                  <a
                                     href={phoneData.whatsappLink}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -5254,7 +5254,7 @@ export default function PaymentsManagement() {
                 </button>
               )}
             </div>
-            
+
             {/* Search input */}
             <div className="mb-3">
               <div className="relative">
@@ -5270,9 +5270,9 @@ export default function PaymentsManagement() {
                       handleFilterSearch(e.target.value, openFilterColumn);
                     }
                   }}
-                  placeholder={openFilterColumn && isAmountColumn(openFilterColumn) 
-                    ? "Wpisz kwotę (np. 100 lub 100,50)..." 
-                    : "Szukaj w bazie..."}
+                  placeholder={openFilterColumn && isAmountColumn(openFilterColumn)
+                    ? 'Wpisz kwotę (np. 100 lub 100,50)...'
+                    : 'Szukaj w bazie...'}
                   className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                   style={{ borderRadius: 0 }}
                 />
@@ -5291,14 +5291,14 @@ export default function PaymentsManagement() {
               </div>
               {filterSearchQuery && (
                 <p className="mt-1 text-xs text-gray-500">
-                  {openFilterColumn && isAmountColumn(openFilterColumn) 
+                  {openFilterColumn && isAmountColumn(openFilterColumn)
                     ? `Znaleziono: ${getFilterDisplayValues(openFilterColumn).length} wyników`
                     : (isFilterSearching ? 'Szukam...' : `Znaleziono: ${filterSearchResults.length} wyników`)
                   }
                 </p>
               )}
             </div>
-            
+
             {/* Values list - fixed height container */}
             <div className="border border-gray-200" style={{ borderRadius: 0 }}>
               <div className="h-[320px] overflow-y-auto">
@@ -5409,7 +5409,7 @@ export default function PaymentsManagement() {
               Resetuj
             </button>
           </div>
-          
+
           {/* Columns list - fixed height container */}
           <div className="border border-gray-200" style={{ borderRadius: 0 }}>
             <div className="h-[320px] overflow-y-auto">
@@ -5441,7 +5441,7 @@ export default function PaymentsManagement() {
               ))}
             </div>
           </div>
-          
+
           {/* Footer with buttons */}
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
             <button

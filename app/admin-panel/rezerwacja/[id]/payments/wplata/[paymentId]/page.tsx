@@ -37,7 +37,7 @@ export default function EditPaymentPage() {
   const [paymentMethod, setPaymentMethod] = useState<string>('przelew');
   const [paymentDate, setPaymentDate] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [_isUploading, setIsUploading] = useState(false);
   const [isDeletingAttachment, setIsDeletingAttachment] = useState(false);
   const [isDeletingPayment, setIsDeletingPayment] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

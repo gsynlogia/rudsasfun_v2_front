@@ -41,12 +41,12 @@ export function ToastProvider({ children }: ToastProviderProps) {
   const showToast = useCallback(
     (message: string, type: ToastType['type'], options?: ToastOptions | number) => {
       const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
+
       // Obsługa starego API (duration jako number) i nowego (options object)
-      const opts: ToastOptions = typeof options === 'number' 
-        ? { duration: options } 
+      const opts: ToastOptions = typeof options === 'number'
+        ? { duration: options }
         : options || {};
-      
+
       const newToast: ToastType = {
         id,
         title: opts.title,
@@ -84,8 +84,8 @@ export function ToastProvider({ children }: ToastProviderProps) {
   const showInfo = useCallback(
     (message: string, options?: ToastOptions | number) => {
       // Info (niebieski) - dłuższy czas dla filtrów/wyszukiwania (15 sekund)
-      const opts: ToastOptions = typeof options === 'number' 
-        ? { duration: options } 
+      const opts: ToastOptions = typeof options === 'number'
+        ? { duration: options }
         : options || {};
       if (!opts.duration) {
         opts.duration = 15000; // 15 sekund dla info

@@ -1,9 +1,8 @@
 'use client';
 
+import { Eye, EyeOff } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
-
-import { Eye, EyeOff } from 'lucide-react';
 
 import HeaderTop from '@/components/HeaderTop';
 import { authService } from '@/lib/services/AuthService';

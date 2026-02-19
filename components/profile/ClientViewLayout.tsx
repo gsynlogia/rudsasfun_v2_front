@@ -111,7 +111,7 @@ export default function ClientViewLayout({
             {/* System Update Alert */}
             <div className="mb-4 sm:mb-6 relative">
               {/* Main alert with clipped corners */}
-              <div 
+              <div
                 className="bg-red-600 p-4 sm:p-5"
                 style={{ clipPath: 'polygon(0 0, calc(100% - 35px) 0, 100% 35px, 100% 100%, 35px 100%, 0 calc(100% - 35px))' }}
               >

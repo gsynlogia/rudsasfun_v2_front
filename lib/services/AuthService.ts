@@ -166,7 +166,7 @@ class AuthService {
   /**
    * Get authorization header for API requests
    */
-  getAuthHeader(): { Authorization: string } | {} {
+  getAuthHeader(): { Authorization: string } | Record<string, never> {
     const token = this.getToken();
     if (!token) return {};
     return { Authorization: `Bearer ${token}` };

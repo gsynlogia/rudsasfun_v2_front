@@ -9,7 +9,6 @@ import { DEFAULT_CAMP, DEFAULT_CAMP_PROPERTY } from '@/types/defaults';
 import type { Camp, CampProperty } from '@/types/reservation';
 import { formatDateRange } from '@/utils/api';
 import { BackendUnavailableError } from '@/utils/api-auth';
-import { API_BASE_URL } from '@/utils/api-config';
 import { fetchWithDefaults } from '@/utils/api-fetch';
 
 interface CampWithProperties extends Camp {

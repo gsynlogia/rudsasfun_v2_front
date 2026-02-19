@@ -2,13 +2,14 @@
 
 import { Save } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { useToast } from '@/components/ToastContainer';
+import type { ReservationData } from '@/lib/contractReservationMapping';
 import {
   mapReservationToQualificationForm,
   signedPayloadOverlayOnly,
   type SignedQualificationPayload,
 } from '@/lib/qualificationReservationMapping';
-import type { ReservationData } from '@/lib/contractReservationMapping';
 
 function parseDetailToTags(detail: string | null | undefined): string[] {
   if (!detail || typeof detail !== 'string') return [];
@@ -169,7 +170,7 @@ export function QualificationCardEditPanel({
       setSecondParentAddress(overlay.secondParent.address);
       setSecondParentPhone(overlay.secondParent.phone);
       setNoSecondParent(false);
-    } else if (reservationData?.secondParentName != null || reservationData?.secondParentAddress != null) {
+    } else if ((reservationData?.secondParentName !== null && reservationData?.secondParentName !== undefined) || (reservationData?.secondParentAddress !== null && reservationData?.secondParentAddress !== undefined)) {
       setSecondParentName(reservationData.secondParentName ?? '');
       setSecondParentAddress(reservationData.secondParentAddress ?? '');
       setSecondParentPhone(reservationData.secondParentPhone ?? '');

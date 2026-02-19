@@ -12,7 +12,7 @@ function VerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Weryfikowanie magic link...');
+  const [_message, setMessage] = useState('Weryfikowanie magic link...');
 
   useEffect(() => {
     const verifyToken = async () => {

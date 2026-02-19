@@ -70,7 +70,7 @@ class InvoiceService {
         } else {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
-      } catch (parseError) {
+      } catch {
         errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas generowania faktury'}`;
       }
       throw new Error(errorMessage);
@@ -107,7 +107,7 @@ class InvoiceService {
               const error = await response.json();
               console.error('[InvoiceService] Error details:', error);
             }
-          } catch (parseError) {
+          } catch {
             // Ignore parsing errors for error responses
           }
           // Return empty list to allow UI to continue
@@ -124,7 +124,7 @@ class InvoiceService {
           } else {
             errorMessage = `HTTP ${response.status}: ${response.statusText}`;
           }
-        } catch (parseError) {
+        } catch {
           // If parsing fails, use status-based message
           errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktur'}`;
         }
@@ -175,7 +175,7 @@ class InvoiceService {
         } else {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
-      } catch (parseError) {
+      } catch {
         errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktury'}`;
       }
       throw new Error(errorMessage);
@@ -218,7 +218,7 @@ class InvoiceService {
         } else {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
-      } catch (parseError) {
+      } catch {
         errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktur'}`;
       }
       throw new Error(errorMessage);
@@ -253,7 +253,7 @@ class InvoiceService {
         } else {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
-      } catch (parseError) {
+      } catch {
         errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktur'}`;
       }
       throw new Error(errorMessage);
@@ -288,7 +288,7 @@ class InvoiceService {
         } else {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
-      } catch (parseError) {
+      } catch {
         errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas pobierania faktury'}`;
       }
       throw new Error(errorMessage);
@@ -323,7 +323,7 @@ class InvoiceService {
         } else {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
-      } catch (parseError) {
+      } catch {
         errorMessage = `HTTP ${response.status}: ${response.statusText || 'Błąd podczas anulowania faktury'}`;
       }
       throw new Error(errorMessage);

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Check, XCircle, Shield, Utensils, Plus, FileText, Download, RefreshCw, Search, Plus as PlusIcon } from 'lucide-react';
+import { ArrowLeft, Check, XCircle, Shield, Plus, RefreshCw, Search, Plus as PlusIcon } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 
@@ -190,7 +190,7 @@ export default function ReservationPaymentsPage() {
                         ...generalProtection,
                         price: turnusProtection.price || generalProtection.price,
                       });
-                    } catch (err) {
+                    } catch {
                       protectionsMap.set(generalProtectionId, {
                         id: turnusProtection.general_protection_id,
                         name: turnusProtection.name || `Ochrona ${generalProtectionId}`,
@@ -810,7 +810,7 @@ export default function ReservationPaymentsPage() {
                       </tr>
                     ) : (
                       filteredInvoices.map((invoice: any) => {
-                        const isManual = invoice.type === 'manual';
+                        const _isManual = invoice.type === 'manual';
                         return (
                           <tr
                             key={`${invoice.type}-${invoice.id}`}

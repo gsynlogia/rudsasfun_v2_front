@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Printer } from 'lucide-react';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
 
 interface AuthorizationFormProps {
   reservationData?: {
@@ -28,7 +28,7 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
       return () => clearTimeout(timer);
     }
   }, [printMode]);
-  
+
   // Aktualna data i godzina
   const getCurrentDateTime = () => {
     const now = new Date();
@@ -43,11 +43,11 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
       documentType: 'dowód osobisty' as const,
       documentNumber: '',
       canPickup: false,
-      canTemporaryPickup: false
+      canTemporaryPickup: false,
     }],
     independentReturn: false,
     acceptsResponsibility: false,
-    parentPhone: reservationData?.parentPhone || '+48 724680812'
+    parentPhone: reservationData?.parentPhone || '+48 724680812',
   });
 
   const handleChange = (field: string, value: any) => {
@@ -62,13 +62,13 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
         ...newAuthorizations[index],
         [parent]: {
           ...(newAuthorizations[index] as any)[parent],
-          [child]: value
-        }
+          [child]: value,
+        },
       };
     } else {
       newAuthorizations[index] = {
         ...newAuthorizations[index],
-        [field]: value
+        [field]: value,
       };
     }
     setFormData(prev => ({ ...prev, authorizations: newAuthorizations }));
@@ -84,9 +84,9 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
           documentType: 'dowód osobisty' as const,
           documentNumber: '',
           canPickup: false,
-          canTemporaryPickup: false
-        }
-      ]
+          canTemporaryPickup: false,
+        },
+      ],
     }));
   };
 
@@ -94,7 +94,7 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
     if (index === 0) return; // Nie można usunąć pierwszej osoby
     setFormData(prev => ({
       ...prev,
-      authorizations: prev.authorizations.filter((_, i) => i !== index)
+      authorizations: prev.authorizations.filter((_, i) => i !== index),
     }));
   };
 
@@ -119,7 +119,7 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
       }
       return;
     }
-    
+
     // Jeśli wszystko OK, otwórz modal
     setShowResponsibilityError(false);
     setShowSignatureModal(true);
@@ -191,7 +191,7 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
                     </button>
                   )}
                 </div>
-                
+
                 {/* Imię i nazwisko - w jednym rzędzie */}
                 <div className="field-row-inline">
                   <span className="label-inline">Upoważniam (imię i nazwisko)</span>
@@ -232,7 +232,7 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
                 {/* Do czego upoważniamy */}
                 <div className="field-group">
                   <label className="section-label">Do czego upoważniam:</label>
-                  
+
                   <div className="checkbox-container">
                     <label className="checkbox-label">
                       <input
@@ -242,7 +242,7 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
                       />
                       Do odbioru dziecka z obozu: ośrodka i/lub miejsca zbiórki transportu zbiorowego
                     </label>
-                    
+
                     <label className="checkbox-label">
                       <input
                         type="checkbox"
@@ -319,8 +319,8 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
                   <div className="signed-timestamp">{getCurrentDateTime()}</div>
                 </div>
               ) : (
-                <button 
-                  onClick={handleSignDocument} 
+                <button
+                  onClick={handleSignDocument}
                   className="sign-button no-print"
                 >
                   PODPISZ DOKUMENT
@@ -339,7 +339,7 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">Potwierdzenie</h3>
             <p className="modal-text">
-              Na podany w rezerwacji numer telefonu <strong>{formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod. 
+              Na podany w rezerwacji numer telefonu <strong>{formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod.
               Wpisanie kodu jest jednoznaczne z podpisaniem niniejszego dokumentu.
             </p>
             <div className="modal-input-group">
@@ -354,21 +354,21 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
               />
             </div>
             <div className="modal-buttons">
-              <button 
-                onClick={() => setShowSignatureModal(false)} 
+              <button
+                onClick={() => setShowSignatureModal(false)}
                 className="modal-button modal-button-cancel"
               >
                 Anuluj
               </button>
-              <button 
-                onClick={handleResendCode} 
+              <button
+                onClick={handleResendCode}
                 className="modal-button modal-button-resend"
                 disabled={resendTimer > 0}
               >
                 {resendTimer > 0 ? `Ponownie za ${resendTimer}s` : 'Wyślij ponownie kod'}
               </button>
-              <button 
-                onClick={handleConfirmSignature} 
+              <button
+                onClick={handleConfirmSignature}
                 className="modal-button modal-button-confirm"
                 disabled={signatureCode.length !== 4}
               >

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { MessageSquare, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { useState, useEffect, useCallback } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
@@ -79,7 +79,7 @@ export default function SmsLogiPage() {
     if (filterPhone.trim()) params.set('filter_phone', filterPhone.trim());
     if (filterGuardian && filterGuardian !== 'all') params.set('filter_guardian', filterGuardian);
     const res = await fetchWithAuth(
-      `${API_BASE_URL}/api/admin/sms/logs?${params.toString()}`
+      `${API_BASE_URL}/api/admin/sms/logs?${params.toString()}`,
     );
     if (res.ok) {
       const json: LogsResponse = await res.json();

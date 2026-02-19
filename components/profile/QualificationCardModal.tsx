@@ -98,7 +98,7 @@ export default function QualificationCardModal({
       // Dane wyłącznie z rezerwacji – nie wczytujemy z qualification_card_data
       let formattedBirthDate: string | null = null;
       const age = reservation.participant_age;
-      if (age != null && age !== '') {
+      if (age !== null && age !== undefined && age !== '') {
         const ageNum = typeof age === 'string' ? parseInt(age, 10) : age;
         if (!isNaN(ageNum)) {
           const birthYear = new Date().getFullYear() - ageNum;

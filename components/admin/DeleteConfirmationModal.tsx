@@ -32,7 +32,7 @@ export default function DeleteConfirmationModal({
   isOpen,
   itemType,
   itemName,
-  itemId,
+  itemId: _itemId,
   additionalInfo,
   onConfirm,
   onCancel,

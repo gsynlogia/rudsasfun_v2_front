@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 
-import { getGtmId, isGtmEnabled } from '@/utils/gtm-config';
-
-import './globals.css';
 import MaintenancePage from '@/components/MaintenancePage';
 import TestBanner from '@/components/TestBanner';
 import { ToastProvider } from '@/components/ToastContainer';
 import { ReservationProvider } from '@/context/ReservationContext';
+import { getGtmId, isGtmEnabled } from '@/utils/gtm-config';
+
+import './globals.css';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',

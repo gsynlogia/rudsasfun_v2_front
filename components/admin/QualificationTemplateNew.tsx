@@ -6,13 +6,14 @@
  * Używany w panelu admin (rezerwacja #dokumenty) zamiast starego szablonu HTML z backendu.
  */
 
-import { useState, useEffect, useCallback } from 'react';
 import { Printer } from 'lucide-react';
 import Image from 'next/image';
-import { isValidPesel } from '@/lib/utils/pesel';
-import { authService } from '@/lib/services/AuthService';
+import { useState, useEffect, useCallback } from 'react';
+
 import type { SignedQualificationPayload } from '@/lib/qualificationReservationMapping';
 import { signedPayloadOverlayOnly, signedPayloadToFormState } from '@/lib/qualificationReservationMapping';
+import { authService } from '@/lib/services/AuthService';
+import { isValidPesel } from '@/lib/utils/pesel';
 
 function HealthTagInput({
   tags,
@@ -156,9 +157,9 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
       ...prev,
       childPesel: reservationData.childPesel ?? prev.childPesel,
     }));
-    if (reservationData.secondParentName != null) setSecondParentName(reservationData.secondParentName);
-    if (reservationData.secondParentAddress != null) setSecondParentAddress(reservationData.secondParentAddress);
-    if (reservationData.secondParentPhone != null) setSecondParentPhone(reservationData.secondParentPhone);
+    if (reservationData.secondParentName !== null && reservationData.secondParentName !== undefined) setSecondParentName(reservationData.secondParentName);
+    if (reservationData.secondParentAddress !== null && reservationData.secondParentAddress !== undefined) setSecondParentAddress(reservationData.secondParentAddress);
+    if (reservationData.secondParentPhone !== null && reservationData.secondParentPhone !== undefined) setSecondParentPhone(reservationData.secondParentPhone);
   }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone]);
 
   /** Overlay: form_snapshot (admin) lub signed_documents.payload. Źródła: reservations + form_snapshot lub signed_documents. */
@@ -202,7 +203,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
 
   // Pobierz status najnowszego podpisanego dokumentu (karta) – czy można podpisać ponownie (tylko gdy odrzucona)
   useEffect(() => {
-    if (readOnlyView || reservationIdProp == null) return;
+    if (readOnlyView || reservationIdProp === null || reservationIdProp === undefined) return;
     const token = authService.getToken();
     if (!token) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -230,7 +231,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
       return () => clearTimeout(timer);
     }
   }, [printMode, previewOnly]);
-  
+
   // Tablica upoważnień
   const [authorizations, setAuthorizations] = useState([
     {
@@ -238,10 +239,10 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
       documentType: 'dowód osobisty',
       documentNumber: '',
       canPickup: false,
-      canTemporaryPickup: false
-    }
+      canTemporaryPickup: false,
+    },
   ]);
-  
+
   // Aktualna data i godzina
   const getCurrentDateTime = () => {
     const now = new Date();
@@ -262,10 +263,10 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
     parentNames: reservationData?.parentNames ?? '',
     parentAddress: reservationData?.parentAddress ?? '',
     parentPhone: reservationData?.parentPhone ?? '',
-    
+
     // Sekcja II - Informacja o stanie zdrowia (z profilu: health_questions, health_details, additional_notes)
     healthInfo: reservationData?.healthInfo ?? '',
-    
+
     // Informacja o szczepieniach
     vaccination: {
       calendar: false,
@@ -277,36 +278,36 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
       diphtheriaYear: '',
       other: false,
       otherYear: '',
-      otherDetails: ''
+      otherDetails: '',
     },
-    
+
     // Sekcja IV - Wniosek o zakwaterowanie (z profilu: accommodation_request)
     vaccineInfo: reservationData?.accommodationRequest ?? '',
-    
+
     // Sekcja III - Deklaracja
     parentDeclaration: '',
-    
+
     // Sekcja IV - Potwierdzenie zapoznania
     regulationConfirm: false,
-    
+
     // Sekcja VI - Zgoda na samodzielny powrót
     independentReturn: false,
-    
+
     // Sekcja III - Informacje dodatkowe (z profilu: participant_additional_info)
     additionalInfo: reservationData?.additionalInfo ?? '',
-    
+
     // Sekcja V - Odbiór dziecka
     pickupInfo: '',
-    
+
     // Sekcja VI - Potwierdzenie przez kierownika
     directorConfirmation: '',
     directorDate: '',
-    
+
     // Podpisy
     parentSignature: '',
     parentSignatureDate: '',
     directorSignature: '',
-    organizerSignature: ''
+    organizerSignature: '',
   });
 
   const handleChange = (field: string, value: any) => {
@@ -323,13 +324,13 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
           calendar: true,
           tetanus: true,
           measles: true,
-          diphtheria: true
-        }
+          diphtheria: true,
+        },
       }));
     } else {
       setFormData(prev => ({
         ...prev,
-        vaccination: { ...prev.vaccination, [field]: value }
+        vaccination: { ...prev.vaccination, [field]: value },
       }));
     }
   };
@@ -349,8 +350,8 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
         documentType: 'dowód osobisty',
         documentNumber: '',
         canPickup: false,
-        canTemporaryPickup: false
-      }
+        canTemporaryPickup: false,
+      },
     ]);
   };
 
@@ -515,7 +516,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
   };
 
   const handleSignDocument = async () => {
-    if (!runValidation() || reservationIdProp == null) return;
+    if (!runValidation() || reservationIdProp === null || reservationIdProp === undefined) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const token = authService.getToken();
     if (!token) return;
@@ -544,7 +545,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
   };
 
   const handleResendCode = async () => {
-    if (resendTimer > 0 || reservationIdProp == null) return;
+    if (resendTimer > 0 || reservationIdProp === null || reservationIdProp === undefined) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const token = authService.getToken();
     if (!token) return;
@@ -565,7 +566,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
   };
 
   const handleConfirmSignature = async () => {
-    if (signatureCode.length !== 4 || currentDocumentId == null) return;
+    if (signatureCode.length !== 4 || currentDocumentId === null || currentDocumentId === undefined) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const token = authService.getToken();
     if (!token) {
@@ -806,7 +807,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
           <section className="section">
             <h2 className="section-title">I WNIOSEK RODZICÓW (OPIEKUNÓW PRAWNYCH) O SKIEROWANIE UCZESTNIKA/DZIECKA NA
 PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z siedzibą w Gdańsku</h2>
-            
+
             <div className="field-group">
               <label>1) Imię i nazwisko uczestnika/dziecka</label>
               <div className="readonly-field">{formData.childName}</div>
@@ -818,14 +819,14 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 const dobRaw = formData.childDOB || '';
                 const yearMatch = dobRaw.match(/^(\d{4})/);
                 const birthYear = yearMatch ? parseInt(yearMatch[1], 10) : null;
-                const minYear = birthYear != null && !isNaN(birthYear) ? birthYear - 1 : null;
-                const maxYear = birthYear != null && !isNaN(birthYear) ? birthYear : null;
+                const minYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear - 1 : null;
+                const maxYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear : null;
                 const dobValue =
                   /^\d{4}-\d{2}-\d{2}$/.test(dobRaw) ? dobRaw
                   : /^\d{4}$/.test(dobRaw) ? `${dobRaw}-01-01`
                   : '';
-                const minDate = minYear != null ? `${minYear}-01-01` : undefined;
-                const maxDate = maxYear != null ? `${maxYear}-12-31` : undefined;
+                const minDate = minYear !== null && minYear !== undefined ? `${minYear}-01-01` : undefined;
+                const maxDate = maxYear !== null && maxYear !== undefined ? `${maxYear}-12-31` : undefined;
                 return (
                   <>
                     <input
@@ -917,7 +918,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 </p>
               )}
             </div>
-            
+
             <div className="field-group">
               <label>4) Adres zamieszkania uczestnika/dziecka</label>
               <div className="readonly-field">{formData.childAddress}</div>
@@ -1118,9 +1119,9 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
           {/* Deklaracja o zgodzie na leczenie - przeniesiona ze strony 2 */}
           <section className="section">
             <div className="info-text">
-              W razie zagrożenia zdrowia lub życia dziecka zgadzam się na jego leczenie, niezbędne zabiegi diagnostyczne i operacje. 
-              Wyrażam zgodę na transport mojego dziecka przez kierownika, wychowawcę lub opiekuna obozu/kolonii prywatnym samochodem osobowym do lekarza, 
-              przychodni, szpitala i/lub miejsca, gdzie zostanie mu zapewniona opieka medyczna. Wyrażam zgodę na podawanie potrzebnych leków przez kadrę Radsas Fun sp. z o.o. mojemu dziecku w razie potrzeby. 
+              W razie zagrożenia zdrowia lub życia dziecka zgadzam się na jego leczenie, niezbędne zabiegi diagnostyczne i operacje.
+              Wyrażam zgodę na transport mojego dziecka przez kierownika, wychowawcę lub opiekuna obozu/kolonii prywatnym samochodem osobowym do lekarza,
+              przychodni, szpitala i/lub miejsca, gdzie zostanie mu zapewniona opieka medyczna. Wyrażam zgodę na podawanie potrzebnych leków przez kadrę Radsas Fun sp. z o.o. mojemu dziecku w razie potrzeby.
             </div>
 
             <div className="declaration-box">
@@ -1148,7 +1149,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
           {/* Informacja o szczepieniach – od następnej kartki (Strona 2) */}
           <section className="section">
             <h2 className="section-title">Informacja o szczepieniach ochronnych (zaznaczenie oraz podanie roku):</h2>
-            
+
             <div className="checkbox-group">
               <label className="checkbox-label">
                 <input
@@ -1159,7 +1160,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 />
                 Zgodnie z kalendarzem szczepień
               </label>
-              
+
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -1179,7 +1180,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   />
                 )}
               </label>
-              
+
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -1199,7 +1200,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   />
                 )}
               </label>
-              
+
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -1219,7 +1220,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   />
                 )}
               </label>
-              
+
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -1287,9 +1288,9 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
           <section className="section">
             <h2 className="section-title">V POTWIERDZENIE ZAPOZNANIA SIĘ Z REGULAMINEM Radsas Fun sp. z o.o.</h2>
             <div className="info-text">
-              SZCZEGÓŁOWY REGULAMIN IMPREZ TURYSTYCZNYCH RADSAS FUN DOSTĘPNY JEST NA STRONIE INTERNETOWEJ ORGANIZATORA ORAZ W PANELU KLIENTA. 
-              KLIENT (RODZIC/OPIEKUN PRAWNY) JEST W OBOWIĄZKU ZAPOZNANIA SIE Z REGULAMINEM. 
-              ZAPISANIE DZIECKA/UCZESTNIKA NA OBÓZ/KOLONIĘ JEST JEDNOZNACZNE Z JEGO ZAAKCEPTOWANIEM. 
+              SZCZEGÓŁOWY REGULAMIN IMPREZ TURYSTYCZNYCH RADSAS FUN DOSTĘPNY JEST NA STRONIE INTERNETOWEJ ORGANIZATORA ORAZ W PANELU KLIENTA.
+              KLIENT (RODZIC/OPIEKUN PRAWNY) JEST W OBOWIĄZKU ZAPOZNANIA SIE Z REGULAMINEM.
+              ZAPISANIE DZIECKA/UCZESTNIKA NA OBÓZ/KOLONIĘ JEST JEDNOZNACZNE Z JEGO ZAAKCEPTOWANIEM.
             </div>
             <div className={`checkbox-single ${showRegulationError ? 'checkbox-error' : ''}`}>
               <label className="checkbox-label">
@@ -1315,7 +1316,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
           {/* Sekcja VI */}
           <section className="section">
             <h2 className="section-title">VI ODBIÓR DZIECKA Z OBOZU / ODWIEDZINY W TRAKCIE IMPREZY – UPOWAŻNIENIE</h2>
-            
+
             <div className="info-text">
               Biorę pełną odpowiedzialność za bezpieczeństwo dziecka podczas przebywania z osobą upoważnioną.
             </div>
@@ -1379,7 +1380,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 {/* Do czego upoważniamy */}
                 <div className="field-group">
                   <label className="section-label">Do czego upoważniam:</label>
-                  
+
                   <div className="checkbox-container">
                     <label className="checkbox-label">
                       <input
@@ -1390,7 +1391,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       />
                       Do odbioru dziecka z obozu: ośrodka i/lub miejsca zbiórki transportu zbiorowego
                     </label>
-                    
+
                     <label className="checkbox-label">
                       <input
                         type="checkbox"
@@ -1479,7 +1480,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <h2 className="section-title">VII POTWIERDZENIE PRZEZ KIEROWNIKA WYPOCZYNKU POBYTU UCZESTNIKA WYPOCZYNKU W/REJSCU WYPOCZYNKU (WYPEŁNIANIE PRZEZ
 KIEROWNIKA DO CELÓW WAMNET ŻYWIENIA WYRSTAWANIE SA NA PODSTAWE ODREDREGO WNICSKU RODZICAROPIEKUNA
 PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CHOROBY PRZEBYTE W TRAKCIE)</h2>
-            
+
             <div className="field-group">
               <label>Uczestnik przybywał (impreza wypoczynku)</label>
               <input
@@ -1534,7 +1535,7 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">Potwierdzenie</h3>
             <p className="modal-text">
-              Na podany w rezerwacji numer telefonu <strong>{formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod. 
+              Na podany w rezerwacji numer telefonu <strong>{formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod.
               Wpisanie kodu jest jednoznaczne z podpisaniem niniejszego dokumentu.
             </p>
             <div className="modal-input-group">
@@ -1549,21 +1550,21 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
               />
             </div>
             <div className="modal-buttons">
-              <button 
-                onClick={() => setShowSignatureModal(false)} 
+              <button
+                onClick={() => setShowSignatureModal(false)}
                 className="modal-button modal-button-cancel"
               >
                 Anuluj
               </button>
-              <button 
-                onClick={handleResendCode} 
+              <button
+                onClick={handleResendCode}
                 className="modal-button modal-button-resend"
                 disabled={resendTimer > 0}
               >
                 {resendTimer > 0 ? `Ponownie za ${resendTimer}s` : 'Wyślij ponownie kod'}
               </button>
-              <button 
-                onClick={handleConfirmSignature} 
+              <button
+                onClick={handleConfirmSignature}
                 className="modal-button modal-button-confirm"
                 disabled={signatureCode.length !== 4}
               >

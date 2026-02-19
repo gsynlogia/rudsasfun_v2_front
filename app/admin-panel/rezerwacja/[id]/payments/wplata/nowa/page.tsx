@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Save, Upload, X, FileText, Download } from 'lucide-react';
+import { ArrowLeft, Save, Upload, X, FileText } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 

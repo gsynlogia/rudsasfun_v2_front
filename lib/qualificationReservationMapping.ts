@@ -231,7 +231,7 @@ export function signedPayloadToFormState(payload: SignedQualificationPayload | n
           phone: drugi.telefon ?? '',
         }
       : null,
-    noSecondParent: drugi == null,
+    noSecondParent: drugi === null || drugi === undefined,
   };
 }
 
@@ -272,7 +272,7 @@ function buildHealthInfoString(data: ReservationData): string {
  * Mapuje odpowiedź API rezerwacji (by-number) na dane do karty kwalifikacyjnej.
  */
 export function mapReservationToQualificationForm(
-  data: ReservationData
+  data: ReservationData,
 ): QualificationFormReservationData {
   const parents = data.parents_data || [];
   const firstParent = parents[0] || {};

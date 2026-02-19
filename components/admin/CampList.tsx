@@ -27,9 +27,9 @@ export default function CampList({
   onSelectCamp,
   onEditCamp,
   onDeleteCamp,
-  onCreateProperty,
-  onEditProperty,
-  onDeleteProperty,
+  onCreateProperty: _onCreateProperty,
+  onEditProperty: _onEditProperty,
+  onDeleteProperty: _onDeleteProperty,
 }: CampListProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

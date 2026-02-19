@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react';
 import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
-import { API_BASE_URL } from '@/utils/api-config';
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { API_BASE_URL } from '@/utils/api-config';
 
 interface AnnexItem {
   id: number;
@@ -675,7 +675,7 @@ export default function Downloads() {
                                   try {
                                     const res = await authenticatedApiCall<{ document_id: number }>(
                                       '/api/annexes/request-batch-sign',
-                                      { method: 'POST', body: JSON.stringify({ reservation_id: reservationId, annex_ids: pendingAnnexes.map((a) => a.id) }) }
+                                      { method: 'POST', body: JSON.stringify({ reservation_id: reservationId, annex_ids: pendingAnnexes.map((a) => a.id) }) },
                                     );
                                     setBatchSignDocId(res.document_id);
                                     setBatchSignCode('');
@@ -779,7 +779,7 @@ export default function Downloads() {
       </div>
 
       {/* Modal: kod SMS do podpisania aneksów */}
-      {batchSignDocId != null && (
+      {batchSignDocId !== null && batchSignDocId !== undefined && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-4">
             <p className="text-sm text-gray-700 mb-3">Wprowadź 4-cyfrowy kod z SMS:</p>
@@ -830,7 +830,7 @@ export default function Downloads() {
       )}
 
       {/* Modal: anulowanie aneksu – powód */}
-      {cancelAnnexId != null && (
+      {cancelAnnexId !== null && cancelAnnexId !== undefined && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-4">
             <p className="text-sm text-gray-700 mb-2">Powód anulowania (min. 5 znaków):</p>

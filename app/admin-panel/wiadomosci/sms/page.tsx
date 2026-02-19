@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { MessageSquare, FileText, Search } from 'lucide-react';
+import Link from 'next/link';
+import { useState, useEffect, useCallback } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
@@ -45,7 +45,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
 export default function SmsPage() {
   const { showSuccess, showError } = useToast();
   const [sendMode, setSendMode] = useState<SendMode>('guardians_1');
-  const [guardianFilter, setGuardianFilter] = useState<'1' | '2' | 'both'>('1');
+  const [_guardianFilter, _setGuardianFilter] = useState<'1' | '2' | 'both'>('1');
   const [individualPhones, setIndividualPhones] = useState('');
   const [turnusId, setTurnusId] = useState<number | ''>('');
   const [turnusGuardianFilter, setTurnusGuardianFilter] = useState<'1' | '2' | 'both'>('1');
@@ -86,7 +86,7 @@ export default function SmsPage() {
     }
     const t = setTimeout(async () => {
       const res = await fetchWithAuth(
-        `${API_BASE_URL}/api/admin/sms/search-phones?q=${encodeURIComponent(searchQuery)}&limit=50`
+        `${API_BASE_URL}/api/admin/sms/search-phones?q=${encodeURIComponent(searchQuery)}&limit=50`,
       );
       if (res.ok) {
         const data = await res.json();
@@ -173,7 +173,7 @@ export default function SmsPage() {
         }
         showSuccess(`Wysłano: ${data.sent_count}, błędów: ${data.failed_count}.`);
       }
-    } catch (e) {
+    } catch {
       showError('Błąd połączenia z serwerem.');
     }
     setSending(false);

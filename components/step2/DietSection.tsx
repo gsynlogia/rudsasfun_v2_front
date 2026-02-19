@@ -1,6 +1,6 @@
 'use client';
 
-import { Info, UtensilsCrossed } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';

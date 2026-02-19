@@ -1,8 +1,3 @@
-# Addony po property_id (frontend) – punkt przywracania
-# Run 2026-02-13 (kontynuacja – fallback property_id z URL w AddonsSection)
+# Podgląd umowy na kroku 4 rezerwacji (tasks/zadanie.md)
 # PRZED (punkt przywracania – commit przed zmianami):
-4d12c5cc7ab8ced2907818cfee6e8b6623080aad
-# PO (po dodaniu fallback property_id z editionId w AddonsSection):
-9de23a1f476ecd8043eda407c9f7badb89f5d373
-# Do cofnięcia do stanu PRZED: git checkout 4d12c5cc7ab8ced2907818cfee6e8b6623080aad .
-# Do przywrócenia stanu PO: git checkout 9de23a1f476ecd8043eda407c9f7badb89f5d373 .
+23f940b2e26722d4b29e5457dda0c35734ecba46

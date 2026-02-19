@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, User, Mail, Phone, MapPin, FileText, Info, Download } from 'lucide-react';
+import { Building2, MapPin, FileText, Info, Download } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { loadStep3FormData, saveStep3FormData } from '@/utils/sessionStorage';
@@ -138,7 +138,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
   }, [invoiceType, privateData, companyData]);
 
   // Validate private person fields
-  const validatePrivate = useCallback((): boolean => {
+  const _validatePrivate = useCallback((): boolean => {
     const errors: Record<string, string> = {};
 
     if (!privateData.firstName || privateData.firstName.trim() === '') {
@@ -211,7 +211,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
     };
   }, [validateInvoiceData]);
 
-  const updatePrivateField = (field: keyof typeof privateData, value: string) => {
+  const _updatePrivateField = (field: keyof typeof privateData, value: string) => {
     setPrivateData((prev) => ({ ...prev, [field]: value }));
     // Clear error for this field when user starts typing
     if (privateErrors[field]) {

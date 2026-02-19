@@ -4,15 +4,16 @@ import { Search, ChevronUp, ChevronDown, Check, CreditCard, FileText, Building2,
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useState, useMemo, useEffect, Fragment, useCallback, useRef } from 'react';
+import * as XLSX from 'xlsx';
 
 import { useToast } from '@/components/ToastContainer';
+import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
+import { getExportSheetName } from '@/lib/exportExcelUtils';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
-import { getExportSheetName } from '@/lib/exportExcelUtils';
-import * as XLSX from 'xlsx';
 
 /**
  * Search filters interface for URL sync
@@ -145,9 +146,8 @@ interface PaginatedPaymentsResponse {
 
 import PaymentConfirmationModal from './PaymentConfirmationModal';
 import RefundConfirmationModal from './RefundConfirmationModal';
-import UniversalModal from './UniversalModal';
 import TablePaginationBar from './TablePaginationBar';
-import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
+import UniversalModal from './UniversalModal';
 
 
 /**
@@ -272,7 +272,7 @@ const fetchTurnusProtectionPrices = async (
   try {
     const { authenticatedApiCall } = await import('@/utils/api-auth');
     const turnusProtections = await authenticatedApiCall<any[]>(
-      `/api/camps/${campId}/properties/${propertyId}/protections`
+      `/api/camps/${campId}/properties/${propertyId}/protections`,
     );
 
     const protectionsMap = new Map<number, { name: string; price: number }>();
@@ -777,7 +777,7 @@ const generatePaymentDetails = async (
     payments_count: payments.length,
     manual_count: manualPayments.length,
   });
-  
+
   const items = await generatePaymentItems(reservation, payments, protectionsMap, addonsMap);
 
   // Find payments for this reservation (order_id format: "RES-{id}" or just "{id}" or "RES-{id}-{timestamp}")
@@ -842,11 +842,11 @@ const generatePaymentDetails = async (
   const _isPartialPayment = paidAmount > 0 && paidAmount < totalAmount;
 
   // Safely parse created_at for invoice generation
-  const invoiceYear = reservation.created_at 
-    ? new Date(reservation.created_at).getFullYear() 
+  const invoiceYear = reservation.created_at
+    ? new Date(reservation.created_at).getFullYear()
     : new Date().getFullYear();
-  const orderDateFormatted = reservation.created_at 
-    ? reservation.created_at.split('T')[0] 
+  const orderDateFormatted = reservation.created_at
+    ? reservation.created_at.split('T')[0]
     : new Date().toISOString().split('T')[0];
 
   return {
@@ -906,7 +906,7 @@ const mapReservationToPaymentFormat = async (
 
   // Get promotion name - prefer backend's promotion_name, fallback to cache
   let promotionName: string | null = reservation.promotion_name || null;
-  
+
   // If backend didn't provide promotion_name, try from cache
   if (!promotionName && reservation.selected_promotion && reservation.camp_id && reservation.property_id) {
     const cacheKey = `${reservation.camp_id}_${reservation.property_id}`;
@@ -1006,7 +1006,7 @@ const mapReservationToPaymentFormat = async (
   }
 
   // === NEW FIELDS MAPPING ===
-  
+
   // Guardian data from parents_data (camelCase or snake_case from backend)
   const guardian = firstParent;
   const guardianName = guardian
@@ -1014,20 +1014,20 @@ const mapReservationToPaymentFormat = async (
     : null;
   const guardianPhone = (guardian?.phoneNumber as string) || (guardian?.phone_number as string) || (guardian?.phone as string) || null;
   const guardianEmail = (guardian?.email as string) || (reservation.invoice_email as string) || null;
-  
+
   // Location (period - city)
   const location = reservation.property_period && reservation.property_city
     ? `${reservation.property_period} - ${reservation.property_city}`
     : reservation.property_city || reservation.property_period || null;
-  
+
   // Transport
-  const transportDeparture = reservation.departure_type === 'own' 
-    ? 'Własny' 
+  const transportDeparture = reservation.departure_type === 'own'
+    ? 'Własny'
     : reservation.departure_city || null;
-  const transportReturn = reservation.return_type === 'own' 
-    ? 'Własny' 
+  const transportReturn = reservation.return_type === 'own'
+    ? 'Własny'
     : reservation.return_city || null;
-  
+
   // Check addons for specific types (based on addon names)
   let hasOaza = false;
   let hasTarcza = false;
@@ -1035,19 +1035,19 @@ const mapReservationToPaymentFormat = async (
   let hasSkuter = false;
   let hasEnergylandia = false;
   let hasTermy = false;
-  
+
   // Check protections for Oaza and Tarcza
   if (protectionNames) {
     const protNamesLower = protectionNames.toLowerCase();
     hasOaza = protNamesLower.includes('oaza');
     hasTarcza = protNamesLower.includes('tarcza');
   }
-  
+
   // Check selected addons for other extras
   const allSelectedAddons = reservation.selected_addons
     ? (Array.isArray(reservation.selected_addons) ? reservation.selected_addons : [reservation.selected_addons])
     : [];
-  
+
   allSelectedAddons.forEach((addonId: string | number) => {
     const addonIdStr = String(addonId);
     const addonData = addonsMap.get(addonIdStr);
@@ -1059,7 +1059,7 @@ const mapReservationToPaymentFormat = async (
       if (addonNameLower.includes('termy')) hasTermy = true;
     }
   });
-  
+
   // Get individual payments (combine Tpay and manual payments, sorted by date)
   const tpayPayments = payments.filter(p => {
     const orderId = p.order_id || '';
@@ -1069,21 +1069,21 @@ const mapReservationToPaymentFormat = async (
     if (match && parseInt(match[1], 10) === reservation.id) return true;
     return false;
   }).filter(p => p.status === 'success' || (p.status === 'pending' && p.amount && p.amount > 0));
-  
+
   // Map Tpay payments to PaymentRecord format
   const tpayRecords: PaymentRecord[] = tpayPayments.map(p => ({
     amount: p.paid_amount || p.amount || 0,
     date: p.paid_at ? p.paid_at.split('T')[0] : (p.payment_date ? String(p.payment_date).split('T')[0] : (p.created_at ? String(p.created_at).split('T')[0] : null)),
     method: p.channel_id === 64 ? 'BLIK' : p.channel_id === 53 ? 'Karta' : 'Online',
   }));
-  
+
   // Map manual payments to PaymentRecord format
   const manualRecords: PaymentRecord[] = reservationManualPayments.map(mp => ({
     amount: mp.amount,
     date: mp.payment_date ? String(mp.payment_date).split('T')[0] : null,
     method: mp.payment_method || 'Ręczna',
   }));
-  
+
   // Combine and sort all payments by date (oldest first)
   const allPaymentRecords = [...tpayRecords, ...manualRecords].sort((a, b) => {
     if (!a.date && !b.date) return 0;
@@ -1091,7 +1091,7 @@ const mapReservationToPaymentFormat = async (
     if (!b.date) return -1;
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
-  
+
   // Assign to payment1, payment2, payment3
   const payment1 = allPaymentRecords[0] || null;
   const payment2 = allPaymentRecords[1] || null;
@@ -1100,13 +1100,13 @@ const mapReservationToPaymentFormat = async (
   // Safely parse created_at
   const createdAtDate = reservation.created_at ? new Date(reservation.created_at) : new Date();
   const createdAtYear = createdAtDate.getFullYear();
-  const createdAtFormatted = reservation.created_at 
-    ? reservation.created_at.split('T')[0] 
+  const createdAtFormatted = reservation.created_at
+    ? reservation.created_at.split('T')[0]
     : new Date().toISOString().split('T')[0];
 
   // Use reservation_number from API if available, otherwise generate from ID (fallback for old data)
   const baseNumber = reservation.reservation_number || `REZ-${createdAtYear}-${reservation.id}`;
-  const reservationNumber = reservation.is_archived 
+  const reservationNumber = reservation.is_archived
     ? `ARCH_${baseNumber}`
     : baseNumber;
 
@@ -1312,12 +1312,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [rowContextMenu]);
-  
+
   // Archive filter: 'active' = current reservations, 'archived' = archived, 'all' = both
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>(
-    (searchParams?.get('archive') as 'active' | 'archived' | 'all') || 'active'
+    (searchParams?.get('archive') as 'active' | 'archived' | 'all') || 'active',
   );
-  
+
   // Initialize filters from URL params
   const getInitialFilters = useCallback((): SearchFilters => ({
     search: searchParams?.get('search') || '',
@@ -1337,15 +1337,15 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const filtersRef = useRef<SearchFilters>(getInitialFilters());
   // Data rezerwacji: jedna data vs zakres
   const [dateFilterMode, setDateFilterMode] = useState<'single' | 'range'>('range');
-  
+
   // Track if initial URL sync has been done
   const initialSyncDoneRef = useRef(false);
-  
+
   // Sync all filters with URL params on initial load only (runs once when searchParams become available)
   useEffect(() => {
     // Skip if already synced
     if (initialSyncDoneRef.current) return;
-    
+
     // Check if searchParams has values
     const searchFromUrl = searchParams?.get('search') || '';
     const reservationFromUrl = searchParams?.get('reservation') || '';
@@ -1354,7 +1354,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const dateFromUrl = searchParams?.get('date_from') || '';
     const dateToUrl = searchParams?.get('date_to') || '';
     const archiveFromUrl = searchParams?.get('archive') as 'active' | 'archived' | 'all' | null;
-    
+
     // Parse column filters from URL (filter_columnKey=value1,value2)
     const columnFiltersFromUrl: Record<string, string[]> = {};
     searchParams?.forEach((value, key) => {
@@ -1364,10 +1364,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       }
     });
     const hasColumnFilters = Object.keys(columnFiltersFromUrl).length > 0;
-    
+
     const phoneFromUrl = searchParams?.get('phone') || '';
     const hasUrlFilters = searchFromUrl || phoneFromUrl || reservationFromUrl || statusFromUrl || campFromUrl || dateFromUrl || dateToUrl || archiveFromUrl || hasColumnFilters;
-    
+
     if (hasUrlFilters) {
       const urlFilters: SearchFilters = {
         search: searchFromUrl,
@@ -1386,12 +1386,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       } else if (dateFromUrl || dateToUrl) {
         setDateFilterMode('range');
       }
-      
+
       // Set archive filter from URL
       if (archiveFromUrl) {
         setArchiveFilter(archiveFromUrl);
       }
-      
+
       // Set column filters from URL
       if (hasColumnFilters) {
         setAppliedColumnFilters(JSON.stringify(columnFiltersFromUrl));
@@ -1403,14 +1403,14 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           return col;
         }));
       }
-      
+
       initialSyncDoneRef.current = true;
     }
   }, [searchParams]);
-  
+
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const [sortColumn, setSortColumn] = useState<string | null>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -1421,7 +1421,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const [pageInputValue, setPageInputValue] = useState('');
   const [serverPagination, setServerPagination] = useState<PaginationInfo | null>(null);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
-  
+
   // Load user settings (items_per_page) on mount
   // First check localStorage for immediate value, then sync from API
   useEffect(() => {
@@ -1439,15 +1439,15 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         // Then fetch from API to ensure sync with database
         const token = localStorage.getItem('token');
         if (!token) return;
-        
+
         const payload = JSON.parse(atob(token.split('.')[1]));
         const adminUserId = payload.admin_user_id;
         if (!adminUserId) return;
-        
+
         const settings = await authenticatedApiCall<{ items_per_page: number; excel_decimal_dot?: boolean }>(
-          `/api/admin-users/${adminUserId}/settings`
+          `/api/admin-users/${adminUserId}/settings`,
         );
-        
+
         if (settings?.items_per_page) {
           setItemsPerPage(settings.items_per_page);
           localStorage.setItem('admin_items_per_page', settings.items_per_page.toString());
@@ -1462,10 +1462,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         // Keep localStorage value or default on error
       }
     };
-    
+
     loadUserSettings();
   }, []);
-  
+
   // Applied column filters - JSON string to trigger refetch only when filters actually change
   // This prevents modal from flickering when columnConfig updates
   const [appliedColumnFilters, setAppliedColumnFilters] = useState<string>('{}');
@@ -1486,7 +1486,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     page: number,
     archive?: 'active' | 'archived' | 'all',
     columnFilters?: string,
-    columnFiltersExclude?: string
+    columnFiltersExclude?: string,
   ) => {
     const params = new URLSearchParams();
 
@@ -1741,7 +1741,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const [filterModalOffset, setFilterModalOffset] = useState<number>(0);
   const [isFilterLoadingMore, setIsFilterLoadingMore] = useState<boolean>(false);
   const filterModalScrollRef = useRef<HTMLDivElement>(null);
-  
+
   // Filter search state (for searching within filter modal)
   const [filterSearchQuery, setFilterSearchQuery] = useState<string>('');
   const [filterSearchResults, setFilterSearchResults] = useState<string[]>([]);
@@ -1803,7 +1803,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const isAmountColumn = (columnKey: string): boolean => {
     return ['totalAmount', 'paidAmount', 'remainingAmount', 'payment1Amount', 'payment2Amount', 'payment3Amount', 'depositAmount'].includes(columnKey);
   };
-  
+
   // Parse amount input (handle comma and dot as decimal separator)
   const parseAmountInput = (input: string): number | null => {
     if (!input.trim()) return null;
@@ -1946,7 +1946,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       const fullConfig = [...toPersist, ...appended];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toPersist));
       setColumnConfig([...fullConfig]);
-      
+
       // Debounced save to cloud (1 second delay)
       if (saveToCloudTimeoutRef.current) {
         clearTimeout(saveToCloudTimeoutRef.current);
@@ -1980,7 +1980,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         return filterOptions[backendKey];
       }
     }
-    
+
     // Fallback: calculate from current page data (for columns not in filter_options)
     const values = new Set<string>();
     reservations.forEach(reservation => {
@@ -2074,7 +2074,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           value = reservation.hasTermy ? 'Tak' : 'Nie';
           break;
         case 'qualificationCardStatus':
-          value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona' 
+          value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
             : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
             : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje'
             : '-';
@@ -2186,7 +2186,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     try {
       const q = columnKey === 'guardianPhone' ? normalizePhoneForFilter(query) : query.trim();
       const response = await authenticatedApiCall<{ results: string[]; total: number }>(
-        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(q)}&limit=50`
+        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(q)}&limit=50`,
       );
       setFilterSearchResults(response.results || []);
     } catch (err) {
@@ -2225,7 +2225,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       runModalFilterSearch(value, openFilterColumn);
     }
   };
-  
+
   // Reset filter search when modal closes
   const handleCloseFilterModal = () => {
     setOpenFilterColumn(null);
@@ -2237,7 +2237,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       clearTimeout(filterSearchTimeoutRef.current);
     }
   };
-  
+
   // Open filter modal: load first 10 unique values from DB
   const handleOpenFilterModal = async (columnKey: string) => {
     setOpenFilterColumn(columnKey);
@@ -2249,7 +2249,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     setIsFilterSearching(true);
     try {
       const response = await authenticatedApiCall<{ results: string[]; total: number; has_more: boolean }>(
-        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=&limit=10&offset=0`
+        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=&limit=10&offset=0`,
       );
       setFrozenFilterOptions(response.results || []);
       setFilterModalHasMore(response.has_more ?? false);
@@ -2269,7 +2269,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     try {
       const query = openFilterColumn === 'guardianPhone' ? normalizePhoneForFilter(filterSearchQuery) : filterSearchQuery.trim();
       const response = await authenticatedApiCall<{ results: string[]; has_more: boolean }>(
-        `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=10&offset=${filterModalOffset}`
+        `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=10&offset=${filterModalOffset}`,
       );
       const newResults = response.results || [];
       setFrozenFilterOptions(prev => [...prev, ...newResults]);
@@ -2294,7 +2294,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       const query = openFilterColumn === 'guardianPhone' ? normalizePhoneForFilter(filterSearchQuery) : filterSearchQuery.trim();
       while (hasMore) {
         const response = await authenticatedApiCall<{ results: string[]; has_more: boolean }>(
-          `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`
+          `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`,
         );
         const chunk = response.results || [];
         allResults.push(...chunk);
@@ -2331,12 +2331,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       setIsFilterSearching(false);
     }
   };
-  
+
   // Get values to display in filter modal (search results or default from current page)
   const getFilterDisplayValues = (columnKey: string): string[] => {
     // Use frozen options to prevent modal from "jumping" during data reload
     const baseOptions = frozenFilterOptions.length > 0 ? frozenFilterOptions : getUniqueColumnValues(columnKey);
-    
+
     // For amount columns with search query, filter locally from frozen/base options
     if (isAmountColumn(columnKey) && filterSearchQuery.trim()) {
       const searchAmount = parseAmountInput(filterSearchQuery);
@@ -2345,13 +2345,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           if (value === '-') return false;
           const valueAmount = parseFloat(value);
           if (isNaN(valueAmount)) return false;
-          
+
           // Exact match (with small tolerance for floating point)
           return Math.abs(valueAmount - searchAmount) < 0.01;
         });
       }
     }
-    
+
     // If user is searching and has results, show search results
     if (filterSearchQuery.trim() && filterSearchResults.length > 0) {
       return filterSearchResults;
@@ -2369,7 +2369,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     if (!value.trim()) {
       setColumnConfig(prev => {
         const updated = prev.map(col =>
-          col.key === columnKey ? { ...col, filters: [] } : col
+          col.key === columnKey ? { ...col, filters: [] } : col,
         );
         const filtersForApi: Record<string, string[]> = {};
         updated.forEach(col => {
@@ -2385,12 +2385,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     try {
       const query = columnKey === 'guardianPhone' ? normalizePhoneForFilter(value) : value.trim();
       const response = await authenticatedApiCall<{ results: string[]; total: number }>(
-        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(query)}&limit=20`
+        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(query)}&limit=20`,
       );
       const results = response.results || [];
       setColumnConfig(prev => {
         const updated = prev.map(col =>
-          col.key === columnKey ? { ...col, filters: results } : col
+          col.key === columnKey ? { ...col, filters: results } : col,
         );
         const filtersForApi: Record<string, string[]> = {};
         updated.forEach(col => {
@@ -2510,17 +2510,17 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const hasCampName = appliedFilters.campName.trim() !== '';
     const hasDateFrom = appliedFilters.dateFrom !== '';
     const hasDateTo = appliedFilters.dateTo !== '';
-    
+
     // Check column filters
     const hasColumnFilters = columnConfig.some(col => col.filters && col.filters.length > 0);
-    
+
     return hasSearch || hasPaymentStatus || hasCampName || hasDateFrom || hasDateTo || hasColumnFilters;
   }, [appliedFilters, columnConfig]);
 
   // Build active filters description for toast
   const getActiveFiltersDescription = (): string => {
     const parts: string[] = [];
-    
+
     if (appliedFilters.search.trim()) {
       parts.push(`wyszukiwanie: "${appliedFilters.search}"`);
     }
@@ -2536,13 +2536,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     if (appliedFilters.dateTo) {
       parts.push(`do: ${appliedFilters.dateTo}`);
     }
-    
+
     // Count column filters
     const columnFiltersCount = columnConfig.filter(col => col.filters && col.filters.length > 0).length;
     if (columnFiltersCount > 0) {
       parts.push(`filtry kolumn: ${columnFiltersCount}`);
     }
-    
+
     return parts.join(', ');
   };
 
@@ -2550,7 +2550,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const handleExportToExcel = async () => {
     // Get visible columns in order
     const visibleCols = columnConfig.filter(col => col.visible);
-    
+
     if (visibleCols.length === 0) {
       showError('Brak widocznych kolumn do eksportu');
       return;
@@ -2561,7 +2561,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       const filtersDesc = getActiveFiltersDescription();
       showInfo(
         `Eksport zawiera tylko przefiltrowane dane (${filtersDesc})`,
-        { title: 'Export z filtrami', duration: 5000 }
+        { title: 'Export z filtrami', duration: 5000 },
       );
     }
 
@@ -2595,7 +2595,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       if (appliedFilters.dateTo) {
         params.set('date_to', appliedFilters.dateTo);
       }
-      
+
       // Add archive filter
       params.set('archive_filter', archiveFilter);
 
@@ -2634,17 +2634,17 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         // Build reservation object for export
         const payments = item.payments || [];
         const manualPayments = item.manual_payments || [];
-        
+
         // Calculate payment details
         const allPayments: Array<{ status: string; paid_amount?: number | null; amount: number; created_at: string | null }> = [
           ...payments.map(p => ({ status: p.status, paid_amount: p.paid_amount, amount: p.amount, created_at: p.created_at })),
           ...manualPayments.map(mp => ({ status: 'paid', paid_amount: mp.amount, amount: mp.amount, created_at: mp.created_at })),
         ];
-        
+
         const totalPaid = allPayments
           .filter(p => p.status === 'paid' || p.status === 'completed')
           .reduce((sum, p) => sum + (p.paid_amount || p.amount || 0), 0);
-        
+
         const totalAmount = item.total_price || 0;
         const remainingAmount = Math.max(0, totalAmount - totalPaid);
 
@@ -2659,24 +2659,24 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           : item.property_city || item.property_period || '';
 
         // Calculate transport info
-        const transportDeparture = item.departure_type === 'own' 
-          ? 'Własny' 
+        const transportDeparture = item.departure_type === 'own'
+          ? 'Własny'
           : item.departure_city || '';
-        const transportReturn = item.return_type === 'own' 
-          ? 'Własny' 
+        const transportReturn = item.return_type === 'own'
+          ? 'Własny'
           : item.return_city || '';
 
         // Get guardian info from parents_data
         const firstParent = item.parents_data?.[0];
-        const guardianName = firstParent 
-          ? `${firstParent.firstName || ''} ${firstParent.lastName || ''}`.trim() 
+        const guardianName = firstParent
+          ? `${firstParent.firstName || ''} ${firstParent.lastName || ''}`.trim()
           : '';
         const guardianPhone = firstParent?.phoneNumber || '';
         const guardianEmail = item.invoice_email || '';
 
         // Check for addons (hasOaza, hasTarcza, etc.) based on selected_protection and selected_addons
         // Get protection names from protectionsMap for hasOaza/hasTarcza
-        const selectedProtections = item.selected_protection 
+        const selectedProtections = item.selected_protection
           ? (Array.isArray(item.selected_protection) ? item.selected_protection : [item.selected_protection])
           : [];
         const protectionNamesArr = selectedProtections
@@ -2688,7 +2688,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         const hasTarcza = protNamesLower.includes('tarcza');
 
         // Check addons for quad, skuter, energylandia, termy
-        const selectedAddons = item.selected_addons 
+        const selectedAddons = item.selected_addons
           ? (Array.isArray(item.selected_addons) ? item.selected_addons : [item.selected_addons])
           : [];
         const addonNamesArr = selectedAddons
@@ -2745,12 +2745,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       const amountColumnKeys = ['totalAmount', 'paidAmount', 'remainingAmount', 'payment1Amount', 'payment2Amount', 'payment3Amount', 'depositAmount'];
 
       const headers = visibleCols.map(col => COLUMN_DEFINITIONS[col.key] || col.key);
-      
+
       const rows: (string | number)[][] = exportData.map(reservation => {
         return visibleCols.map(col => {
           const key = col.key;
           let value: string | number = '';
-          
+
           switch (key) {
             case 'reservationName':
               value = reservation.reservationName;
@@ -2840,7 +2840,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               value = reservation.hasTermy ? 'Tak' : 'Nie';
               break;
             case 'qualificationCardStatus':
-              value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona' 
+              value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
                 : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
                 : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje'
                 : '';
@@ -2866,11 +2866,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             default:
               value = '';
           }
-          
+
           return value;
         });
       });
-      
+
       const sheetName = getExportSheetName(tableModule);
       const aoa: (string | number)[][] = [headers, ...rows];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -3121,7 +3121,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         const params = new URLSearchParams();
         params.set('page', currentPage.toString());
         params.set('limit', itemsPerPage.toString());
-        
+
         // Add search filters
         if (appliedFilters.search && appliedFilters.search.trim()) {
           params.set('search', appliedFilters.search.trim());
@@ -3144,7 +3144,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         if (appliedFilters.dateTo) {
           params.set('date_to', appliedFilters.dateTo);
         }
-        
+
         // Add archive filter
         params.set('archive_filter', archiveFilter);
 
@@ -3156,11 +3156,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           'Nieopłacone': 'unpaid',
           'Zwrócone': 'returned',
         };
-        
+
         // Parse applied column filters (include) and exclude from JSON
         const parsedColumnFilters: Record<string, string[]> = JSON.parse(appliedColumnFilters || '{}');
         const parsedColumnFiltersExclude: Record<string, string[]> = JSON.parse(appliedColumnFiltersExclude || '{}');
-        
+
         Object.entries(parsedColumnFilters).forEach(([colKey, filters]) => {
           if (filters && filters.length > 0) {
             if (colKey === 'status') {
@@ -3184,7 +3184,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
         console.log(`Fetched ${response.items.length} reservations (page ${response.pagination.page}/${response.pagination.total_pages})`);
         setServerPagination(response.pagination);
-        
+
         // Save filter options from backend (all unique values for each column)
         if (response.filter_options) {
           setFilterOptions(response.filter_options);
@@ -3251,23 +3251,23 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           // Calculate paid amount from payments
           const payments = reservation.payments || [];
           const manualPayments = reservation.manual_payments || [];
-          
+
           const tpayPaid = payments
             .filter(p => p.status === 'success' || (p.status === 'pending' && p.amount > 0))
             .reduce((sum, p) => sum + (p.paid_amount || p.amount || 0), 0);
           const manualPaid = manualPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
           const totalPaid = tpayPaid + manualPaid;
-          
+
           const totalPrice = reservation.total_price || 0;
           const remainingAmount = Math.max(0, totalPrice - totalPaid);
-          
+
           // Parse created_at safely
           const createdAtDate = reservation.created_at ? new Date(reservation.created_at) : new Date();
           const createdAtYear = createdAtDate.getFullYear();
-          const createdAtFormatted = reservation.created_at 
-            ? reservation.created_at.split('T')[0] 
+          const createdAtFormatted = reservation.created_at
+            ? reservation.created_at.split('T')[0]
             : new Date().toISOString().split('T')[0];
-          
+
           // Get guardian from parents_data (parse if string JSON; support camelCase and snake_case)
           let parents: Array<Record<string, unknown>> = [];
           const rawParents = reservation.parents_data as unknown;
@@ -3287,7 +3287,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             : null;
           const guardianPhone = (firstParent?.phoneNumber as string) || (firstParent?.phone_number as string) || (firstParent?.phone as string) || null;
           const guardianEmail = (firstParent?.email as string) || (reservation.invoice_email as string) || null;
-          
+
           // Map payment records
           const allPaymentRecords = [
             ...payments
@@ -3308,18 +3308,18 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             if (!b.date) return -1;
             return new Date(a.date).getTime() - new Date(b.date).getTime();
           });
-          
+
           // Map status
           let status = reservation.status || 'pending';
           if (status === 'pending') status = 'aktywna';
           if (status === 'cancelled') status = 'anulowana';
           if (status === 'completed') status = 'zakończona';
-          
+
           // Location
           const location = reservation.property_period && reservation.property_city
             ? `${reservation.property_period} - ${reservation.property_city}`
             : reservation.property_city || reservation.property_period || null;
-          
+
           // Transport
           const transportDeparture = reservation.departure_type === 'wlasny'
             ? 'Własny'
@@ -3454,8 +3454,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         setReservations(mappedReservations);
 
         // Sync Tpay in background for pending payments (non-blocking)
-        const allPendingPayments = response.items.flatMap(r => 
-          r.payments.filter(p => p.status === 'pending' && p.transaction_id)
+        const allPendingPayments = response.items.flatMap(r =>
+          r.payments.filter(p => p.status === 'pending' && p.transaction_id),
         );
         if (allPendingPayments.length > 0) {
           console.log(`🔄 Synchronizacja ${allPendingPayments.length} płatności z API Tpay w tle...`);
@@ -3631,7 +3631,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       case 'hasTermy':
         return reservation.hasTermy ? 'Tak' : 'Nie';
       case 'qualificationCardStatus':
-        return reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona' 
+        return reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
           : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
           : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje'
           : '-';
@@ -3658,7 +3658,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
   // Client-side sorting only (filtering is now server-side)
   const filteredReservations = useMemo(() => {
-    let filtered = [...reservations];
+    const filtered = [...reservations];
 
     // NOTE: Column filters are now server-side (sent as filter_xxx params)
     // NOTE: Search is server-side (appliedFilters)
@@ -4195,7 +4195,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const params = new URLSearchParams();
     params.set('page', currentPage.toString());
     params.set('limit', itemsPerPage.toString());
-    
+
     // Add search filters
     if (appliedFilters.search && appliedFilters.search.trim()) {
       params.set('search', appliedFilters.search.trim());
@@ -4218,7 +4218,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     if (appliedFilters.dateTo) {
       params.set('date_to', appliedFilters.dateTo);
     }
-    
+
     // Add archive filter
     params.set('archive_filter', archiveFilter);
 
@@ -4517,29 +4517,29 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   // Format phone number with country code and return WhatsApp link
   const formatPhoneWithWhatsApp = (phone: string | null | undefined) => {
     if (!phone) return { display: '-', whatsappLink: null };
-    
+
     // Remove all non-digit characters
     let cleanPhone = phone.replace(/\D/g, '');
-    
+
     // If starts with 48, it already has country code
     // If 9 digits (Polish mobile), add 48
     if (cleanPhone.length === 9) {
-      cleanPhone = '48' + cleanPhone;
+      cleanPhone = `48${cleanPhone}`;
     } else if (cleanPhone.startsWith('0048')) {
       cleanPhone = cleanPhone.substring(2);
     } else if (!cleanPhone.startsWith('48') && cleanPhone.length === 11) {
       // Could be with leading 0, remove it
-      cleanPhone = '48' + cleanPhone.substring(1);
+      cleanPhone = `48${cleanPhone.substring(1)}`;
     }
-    
+
     // Format for display: +48 XXX XXX XXX
-    const displayPhone = cleanPhone.length >= 11 
+    const displayPhone = cleanPhone.length >= 11
       ? `+${cleanPhone.substring(0, 2)} ${cleanPhone.substring(2, 5)} ${cleanPhone.substring(5, 8)} ${cleanPhone.substring(8)}`
       : `+48 ${phone}`;
-    
+
     // WhatsApp link format: https://wa.me/48XXXXXXXXX
     const whatsappLink = `https://wa.me/${cleanPhone}`;
-    
+
     return { display: displayPhone, whatsappLink };
   };
 
@@ -4612,7 +4612,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             <div className="h-8 bg-gray-200 w-[70px]"></div>
             <div className="h-8 bg-gray-200 w-[70px]"></div>
             <div className="h-8 bg-gray-200 w-[80px]"></div>
-            
+
             {/* Results count skeleton - pushed to right */}
             <div className="ml-auto h-3 bg-gray-200 w-48"></div>
           </div>
@@ -4684,7 +4684,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         <div className="flex flex-wrap items-center gap-2">
           {/* Title */}
           <h1 className="text-lg font-bold text-white whitespace-nowrap">{tableModule === 'payments' ? 'Płatności' : 'Rezerwacje'}</h1>
-          
+
           {/* Archive filter radio buttons */}
           <div className="flex items-center gap-3 bg-slate-700 px-3 py-1 rounded">
             <label className="flex items-center gap-1.5 cursor-pointer text-sm text-white">
@@ -4730,10 +4730,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               <span>Wszystkie</span>
             </label>
           </div>
-          
+
           {/* Divider */}
           <div className="h-6 w-px bg-slate-500 mx-1 hidden sm:block" />
-          
+
           {/* General search (participant name, email, camp) */}
           <div className="relative flex-1 min-w-[150px] max-w-[200px]">
             <input
@@ -4756,7 +4756,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             placeholder="Telefon..."
             className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white placeholder:text-slate-400 w-[120px]"
           />
-          
+
           {/* Reservation number search */}
           <input
             type="text"
@@ -4766,7 +4766,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             placeholder="Nr rez. (np. 441)"
             className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white placeholder:text-slate-400 w-[120px]"
           />
-          
+
           {/* Data rezerwacji: tryb jedna data / zakres */}
           <select
             value={dateFilterMode}
@@ -4862,7 +4862,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             )}
             <span className="hidden xl:inline">{isExporting ? 'Eksport...' : 'Excel'}</span>
           </button>
-          
+
           <button
             onClick={handleOpenColumnModal}
             className="px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-500 transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
@@ -4879,11 +4879,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             <RotateCcw className="w-3.5 h-3.5" />
             <span className="hidden xl:inline">Resetuj do domyślnych ustawień</span>
           </button>
-          
+
           {/* Results count - pushed to right */}
           <span className="ml-auto text-xs text-slate-300 whitespace-nowrap">Znaleziono: <strong className="text-white">{serverPagination?.total || 0}</strong> | Na stronie: <strong className="text-white">{itemsPerPage}</strong></span>
         </div>
-        
+
         {/* Active column filters - small orange buttons with X to remove */}
         {(() => {
           const activeFilters: { columnKey: string; columnName: string; value: string; isExclude?: boolean }[] = [];
@@ -5249,7 +5249,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                             return (
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
                                 {phoneData.whatsappLink ? (
-                                  <a 
+                                  <a
                                     href={phoneData.whatsappLink}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -6182,7 +6182,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                 )}
               </div>
             </div>
-            
+
             {/* Search input */}
             <div className="mb-3">
               <div className="relative">
@@ -6199,9 +6199,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                     }
                   }}
                   onKeyDown={handleModalFilterSearchKeyDown}
-                  placeholder={openFilterColumn && isAmountColumn(openFilterColumn) 
-                    ? "Wpisz kwotę (np. 100 lub 100,50)..." 
-                    : "Szukaj w bazie..."}
+                  placeholder={openFilterColumn && isAmountColumn(openFilterColumn)
+                    ? 'Wpisz kwotę (np. 100 lub 100,50)...'
+                    : 'Szukaj w bazie...'}
                   className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                   style={{ borderRadius: 0 }}
                 />
@@ -6220,14 +6220,14 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               </div>
               {filterSearchQuery && (
                 <p className="mt-1 text-xs text-gray-500">
-                  {openFilterColumn && isAmountColumn(openFilterColumn) 
+                  {openFilterColumn && isAmountColumn(openFilterColumn)
                     ? `Znaleziono: ${getFilterDisplayValues(openFilterColumn).length} wyników`
                     : (isFilterSearching ? 'Szukam...' : `Znaleziono: ${filterSearchResults.length} wyników`)
                   }
                 </p>
               )}
             </div>
-            
+
             {/* Values list - fixed height, load more on scroll */}
             <div className="border border-gray-200" style={{ borderRadius: 0 }}>
               <div

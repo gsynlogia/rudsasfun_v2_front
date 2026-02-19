@@ -125,7 +125,7 @@ export default function ReservationsTable() {
 
   // Server-side pagination metadata
   const [serverPagination, setServerPagination] = useState<PaginationInfo | null>(null);
-  
+
   // Load user settings (items_per_page) on mount
   // First check localStorage for immediate value, then sync from API
   useEffect(() => {
@@ -143,15 +143,15 @@ export default function ReservationsTable() {
         // Then fetch from API to ensure sync with database
         const token = localStorage.getItem('token');
         if (!token) return;
-        
+
         const payload = JSON.parse(atob(token.split('.')[1]));
         const adminUserId = payload.admin_user_id;
         if (!adminUserId) return;
-        
+
         const settings = await authenticatedApiCall<{ items_per_page: number }>(
-          `/api/admin-users/${adminUserId}/settings`
+          `/api/admin-users/${adminUserId}/settings`,
         );
-        
+
         if (settings?.items_per_page) {
           setItemsPerPage(settings.items_per_page);
           // Update localStorage to stay in sync
@@ -162,7 +162,7 @@ export default function ReservationsTable() {
         // Keep localStorage value or default on error
       }
     };
-    
+
     loadUserSettings();
   }, []);
 

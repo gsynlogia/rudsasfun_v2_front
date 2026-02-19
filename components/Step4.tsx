@@ -14,7 +14,7 @@ import DashedLine from './DashedLine';
  * Step4 Component - Consents and Regulations
  * Contains: Consent checkboxes and downloadable documents
  */
-export default function Step4({ onNext, onPrevious, disabled = false }: StepComponentProps) {
+export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabled = false }: StepComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
   const safePathname = pathname || '';
@@ -200,7 +200,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
     }
 
     // Then try to find by display name (case-insensitive, partial match)
-    for (const [name, doc] of documents.entries()) {
+    for (const [_name, doc] of documents.entries()) {
       if (doc.display_name.toLowerCase().includes(documentNameOrDisplayName.toLowerCase()) ||
           documentNameOrDisplayName.toLowerCase().includes(doc.display_name.toLowerCase())) {
         return doc.file_url;
@@ -232,7 +232,7 @@ export default function Step4({ onNext, onPrevious, disabled = false }: StepComp
   // Get list of documents to display (all public documents from API)
   const getDocumentsList = () => {
     return Array.from(documents.entries())
-      .filter(([name, doc]) => doc.file_url) // Only documents with files
+      .filter(([_name, doc]) => doc.file_url) // Only documents with files
       .map(([name, doc]) => ({
         name,
         display_name: doc.display_name,

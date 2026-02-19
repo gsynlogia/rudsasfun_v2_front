@@ -4,11 +4,11 @@ import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 import { ContractForm } from '@/components/profile/ContractForm';
-import { authService } from '@/lib/services/AuthService';
 import {
   type ReservationData,
   mapReservationToContractForm,
 } from '@/lib/contractReservationMapping';
+import { authService } from '@/lib/services/AuthService';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -20,7 +20,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export default function ContractPage() {
   const params = useParams();
   const reservationId = params?.id ? String(params.id) : '';
-  
+
   const [reservationData, setReservationData] = useState<ReservationData | null>(null);
   const [contractSignedPayload, setContractSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,36 +29,36 @@ export default function ContractPage() {
   useEffect(() => {
     const fetchReservation = async () => {
       if (!reservationId) return;
-      
+
       try {
         setLoading(true);
-        
+
         // Pobierz token uwierzytelniający
         const token = authService.getToken();
         if (!token) {
           throw new Error('Brak autoryzacji. Zaloguj się ponownie.');
         }
-        
+
         // reservationId może być w formacie "REZ-2026-442" lub "442"
         const isFullNumber = reservationId.startsWith('REZ-');
-        const endpoint = isFullNumber 
+        const endpoint = isFullNumber
           ? `${API_URL}/api/reservations/by-number/${reservationId}`
           : `${API_URL}/api/reservations/${reservationId}`;
-        
+
         const response = await fetch(endpoint, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         });
-        
+
         if (!response.ok) {
           if (response.status === 401) {
             throw new Error('Sesja wygasła. Zaloguj się ponownie.');
           }
           throw new Error('Nie udało się pobrać danych rezerwacji');
         }
-        
+
         const data = await response.json();
         setReservationData(data);
       } catch (err) {
@@ -116,10 +116,10 @@ export default function ContractPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ContractForm 
+      <ContractForm
         reservationId={reservationData?.id}
         reservationData={reservationData ? mapReservationToContractForm(reservationData) : {
-          reservationNumber: reservationId.startsWith('REZ-') ? reservationId : `REZ-2026-${reservationId}`
+          reservationNumber: reservationId.startsWith('REZ-') ? reservationId : `REZ-2026-${reservationId}`,
         }}
         signedPayload={contractSignedPayload ?? undefined}
       />

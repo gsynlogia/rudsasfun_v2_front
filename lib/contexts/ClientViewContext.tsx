@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 interface ClientViewInfo {
   userId: number;
@@ -34,7 +34,7 @@ export function ClientViewProvider({
           userName: initialUserName || null,
           userEmail: initialUserEmail || null,
         }
-      : null
+      : null,
   );
 
   const isClientViewMode = viewedUser !== null;

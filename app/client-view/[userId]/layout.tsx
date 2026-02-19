@@ -60,7 +60,7 @@ export default function ClientViewRootLayout({
       // Fetch client info from backend
       try {
         const data = await authenticatedApiCall<ClientInfo>(
-          `/api/admin/client-view/user/${userId}`
+          `/api/admin/client-view/user/${userId}`,
         );
 
         if (!data.can_view) {

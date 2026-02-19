@@ -88,16 +88,16 @@ export function filterJustificationForSave(
 ): Record<string, unknown> {
   const type = getPromotionType(promotionName);
   const out: Record<string, unknown> = {};
-  if (type === 'duza_rodzina' && draft.card_number != null) out.card_number = draft.card_number;
+  if (type === 'duza_rodzina' && draft.card_number !== null && draft.card_number !== undefined) out.card_number = draft.card_number;
   else if (type === 'rodzenstwo_razem') {
-    if (draft.sibling_first_name != null) out.sibling_first_name = draft.sibling_first_name;
-    if (draft.sibling_last_name != null) out.sibling_last_name = draft.sibling_last_name;
+    if (draft.sibling_first_name !== null && draft.sibling_first_name !== undefined) out.sibling_first_name = draft.sibling_first_name;
+    if (draft.sibling_last_name !== null && draft.sibling_last_name !== undefined) out.sibling_last_name = draft.sibling_last_name;
   } else if (type === 'obozy_na_maxa') {
-    if (draft.first_camp_date != null) out.first_camp_date = draft.first_camp_date;
-    if (draft.first_camp_name != null) out.first_camp_name = draft.first_camp_name;
+    if (draft.first_camp_date !== null && draft.first_camp_date !== undefined) out.first_camp_date = draft.first_camp_date;
+    if (draft.first_camp_name !== null && draft.first_camp_name !== undefined) out.first_camp_name = draft.first_camp_name;
   } else if (type === 'first_minute' || type === 'bonowych' || type === 'other') {
-    if (draft.reason != null) out.reason = draft.reason;
-    if (type === 'bonowych' && draft.years != null) out.years = draft.years;
+    if (draft.reason !== null && draft.reason !== undefined) out.reason = draft.reason;
+    if (type === 'bonowych' && draft.years !== null && draft.years !== undefined) out.years = draft.years;
   }
   return out;
 }
@@ -110,16 +110,16 @@ export function getJustificationForCurrentPromotion(
   if (!currentJustification || typeof currentJustification !== 'object') return {};
   const type = getPromotionType(promotionName);
   const filtered: Record<string, unknown> = {};
-  if (type === 'duza_rodzina' && currentJustification.card_number != null) filtered.card_number = currentJustification.card_number;
+  if (type === 'duza_rodzina' && currentJustification.card_number !== null && currentJustification.card_number !== undefined) filtered.card_number = currentJustification.card_number;
   else if (type === 'rodzenstwo_razem') {
-    if (currentJustification.sibling_first_name != null) filtered.sibling_first_name = currentJustification.sibling_first_name;
-    if (currentJustification.sibling_last_name != null) filtered.sibling_last_name = currentJustification.sibling_last_name;
+    if (currentJustification.sibling_first_name !== null && currentJustification.sibling_first_name !== undefined) filtered.sibling_first_name = currentJustification.sibling_first_name;
+    if (currentJustification.sibling_last_name !== null && currentJustification.sibling_last_name !== undefined) filtered.sibling_last_name = currentJustification.sibling_last_name;
   } else if (type === 'obozy_na_maxa') {
-    if (currentJustification.first_camp_date != null) filtered.first_camp_date = currentJustification.first_camp_date;
-    if (currentJustification.first_camp_name != null) filtered.first_camp_name = currentJustification.first_camp_name;
+    if (currentJustification.first_camp_date !== null && currentJustification.first_camp_date !== undefined) filtered.first_camp_date = currentJustification.first_camp_date;
+    if (currentJustification.first_camp_name !== null && currentJustification.first_camp_name !== undefined) filtered.first_camp_name = currentJustification.first_camp_name;
   } else {
-    if (currentJustification.reason != null) filtered.reason = currentJustification.reason;
-    if (type === 'bonowych' && currentJustification.years != null) filtered.years = currentJustification.years;
+    if (currentJustification.reason !== null && currentJustification.reason !== undefined) filtered.reason = currentJustification.reason;
+    if (type === 'bonowych' && currentJustification.years !== null && currentJustification.years !== undefined) filtered.years = currentJustification.years;
   }
   return filtered;
 }

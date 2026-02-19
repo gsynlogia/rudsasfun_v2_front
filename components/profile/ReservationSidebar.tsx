@@ -1,7 +1,6 @@
 'use client';
 
 import { FileText, Download, CheckCircle, XCircle } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
@@ -39,24 +38,24 @@ interface FileHistoryItem {
  */
 export default function ReservationSidebar({ reservationId, reservation, isDetailsExpanded, basePath = '/profil' }: ReservationSidebarProps) {
   const router = useRouter();
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [_isGenerating, setIsGenerating] = useState(false);
   const [qualificationCard, setQualificationCard] = useState<QualificationCardResponse | null>(null);
   const [loadingCard, setLoadingCard] = useState(false);
-  const [downloadingCard, setDownloadingCard] = useState(false);
+  const [_downloadingCard, setDownloadingCard] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [fileHistory, setFileHistory] = useState<FileHistoryItem[]>([]);
   const [isFullyPaid, setIsFullyPaid] = useState(false);
-  const [hasContract, setHasContract] = useState(false);
-  const [loadingContract, setLoadingContract] = useState(false);
+  const [_hasContract, setHasContract] = useState(false);
+  const [_loadingContract, setLoadingContract] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
-  const [generatingCard, setGeneratingCard] = useState(false);
+  const [_generatingCard, setGeneratingCard] = useState(false);
   const certificateInputRef = useRef<HTMLInputElement>(null);
-  const contractInputRef = useRef<HTMLInputElement>(null);
-  const qualificationCardInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingContract, setUploadingContract] = useState(false);
-  const [uploadingCard, setUploadingCard] = useState(false);
+  const _contractInputRef = useRef<HTMLInputElement>(null);
+  const _qualificationCardInputRef = useRef<HTMLInputElement>(null);
+  const [_uploadingContract, setUploadingContract] = useState(false);
+  const [_uploadingCard, setUploadingCard] = useState(false);
   const [showQualificationCardModal, setShowQualificationCardModal] = useState(false);
   const [cardDataCompleted, setCardDataCompleted] = useState(false);
   const [autoContractTriggered, setAutoContractTriggered] = useState(false);
@@ -215,7 +214,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
     }
   };
 
-  const handleDownloadContract = async () => {
+  const _handleDownloadContract = async () => {
     try {
       setIsGenerating(true);
       if (!isValidReservationId) {
@@ -281,7 +280,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
     }
   };
 
-  const handleDownloadCard = async () => {
+  const _handleDownloadCard = async () => {
     if (!isValidReservationId) {
       alert('Nieprawidłowy numer rezerwacji');
       return;
@@ -375,7 +374,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
             </div>
           </div>
         </div>
-        {/* 
+        {/*
         ORIGINAL AGREEMENT CARD - COMMENTED OUT FOR UPDATE
         <div>
           <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Umowa</p>
@@ -449,7 +448,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
             </div>
           </div>
         </div>
-        END OF ORIGINAL AGREEMENT CARD 
+        END OF ORIGINAL AGREEMENT CARD
         */}
 
         {/* Qualification Card */}
@@ -530,7 +529,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
             </div>
           </div>
         </div>
-        {/* 
+        {/*
         ORIGINAL QUALIFICATION CARD - COMMENTED OUT FOR UPDATE
         <div>
           <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Karta kwalifikacyjna</p>

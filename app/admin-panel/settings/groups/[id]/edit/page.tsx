@@ -155,7 +155,7 @@ export default function EditGroupPage() {
               `${API_BASE_URL}/api/groups/${group.id}/users/${userId}`,
               { method: 'DELETE' },
             ).catch(() => {}); // Ignore errors if user not in group
-          } catch (err) {
+          } catch {
             // Ignore
           }
         }
@@ -184,7 +184,7 @@ export default function EditGroupPage() {
               `${API_BASE_URL}/api/groups/${groupId}/users/${user.id}`,
               { method: 'DELETE' },
             ).catch(() => {});
-          } catch (err) {
+          } catch {
             // Ignore
           }
         }

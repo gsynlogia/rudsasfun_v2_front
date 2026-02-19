@@ -19,7 +19,7 @@ interface HeaderTopProps {
 }
 
 export default function HeaderTop({ fixed = false, hideLogo = false, fixedHeight = false }: HeaderTopProps) {
-  const router = useRouter();
+  const _router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);

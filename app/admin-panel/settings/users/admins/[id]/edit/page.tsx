@@ -93,7 +93,7 @@ export default function EditAdminUserPage() {
       setUserLoading(true);
       const response = await authenticatedApiCall<{ users: AdminUser[] }>(`${API_BASE_URL}/api/admin-users`);
       const foundUser = response.users.find(u => u.id === parseInt(userId));
-      
+
       if (foundUser) {
         setUser(foundUser);
         setLogin(foundUser.login);
@@ -127,7 +127,7 @@ export default function EditAdminUserPage() {
     try {
       setSettingsLoading(true);
       const settings = await authenticatedApiCall<AdminUserSettings>(
-        `${API_BASE_URL}/api/admin-users/${userId}/settings`
+        `${API_BASE_URL}/api/admin-users/${userId}/settings`,
       );
       setUserSettings(settings);
     } catch (err) {
@@ -159,7 +159,7 @@ export default function EditAdminUserPage() {
       // Get current localStorage settings
       const paymentsConfig = localStorage.getItem(PAYMENTS_STORAGE_KEY);
       const reservationsConfig = localStorage.getItem(RESERVATIONS_STORAGE_KEY);
-      
+
       const syncData = {
         items_per_page: userSettings.items_per_page,
         payments_columns_config: paymentsConfig,
@@ -173,22 +173,22 @@ export default function EditAdminUserPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(syncData),
-        }
+        },
       );
-      
+
       // Also save items_per_page to localStorage for immediate use in other components
       localStorage.setItem('admin_items_per_page', userSettings.items_per_page.toString());
-      
+
       // Update local state
       setUserSettings(prev => ({
         ...prev,
         payments_columns_config: paymentsConfig,
         reservations_columns_config: reservationsConfig,
       }));
-      
+
       setSyncStatus('success');
       showSuccess('Ustawienia zostały zapisane do chmury');
-      
+
       setTimeout(() => setSyncStatus('idle'), 2000);
     } catch (err) {
       setSyncStatus('error');
@@ -203,9 +203,9 @@ export default function EditAdminUserPage() {
     setSyncStatus('syncing');
     try {
       const settings = await authenticatedApiCall<AdminUserSettings>(
-        `${API_BASE_URL}/api/admin-users/${userId}/settings`
+        `${API_BASE_URL}/api/admin-users/${userId}/settings`,
       );
-      
+
       // Apply settings to localStorage
       if (settings.payments_columns_config) {
         localStorage.setItem(PAYMENTS_STORAGE_KEY, settings.payments_columns_config);
@@ -220,11 +220,11 @@ export default function EditAdminUserPage() {
       if (typeof (settings as { excel_decimal_dot?: boolean }).excel_decimal_dot !== 'undefined') {
         localStorage.setItem('admin_excel_decimal_dot', (settings as { excel_decimal_dot?: boolean }).excel_decimal_dot ? '1' : '0');
       }
-      
+
       setUserSettings(settings);
       setSyncStatus('success');
       showSuccess('Ustawienia zostały pobrane z chmury i zastosowane w przeglądarce');
-      
+
       setTimeout(() => setSyncStatus('idle'), 2000);
     } catch (err) {
       setSyncStatus('error');
@@ -248,7 +248,7 @@ export default function EditAdminUserPage() {
         is_superadmin: isSuperadmin,
         group_ids: groupIds,
       };
-      
+
       // Only include password if it was changed
       if (password) {
         updateData.password = password;
@@ -260,7 +260,7 @@ export default function EditAdminUserPage() {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updateData),
-        }
+        },
       );
 
       // Update settings
@@ -273,7 +273,7 @@ export default function EditAdminUserPage() {
             items_per_page: userSettings.items_per_page,
             excel_decimal_dot: userSettings.excel_decimal_dot === true,
           }),
-        }
+        },
       );
 
       // Also save to localStorage for immediate use in other components
@@ -471,7 +471,7 @@ export default function EditAdminUserPage() {
                 <Settings size={20} className="text-[#03adf0]" />
                 <span className="text-sm font-medium text-gray-900">Ustawienia interfejsu</span>
               </div>
-              
+
               {settingsLoading ? (
                 <div className="flex items-center justify-center py-4">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#03adf0]"></div>
@@ -529,7 +529,7 @@ export default function EditAdminUserPage() {
                     <p className="text-xs text-gray-500 mb-3">
                       Zapisz lub pobierz konfigurację kolumn tabel (widoczność, kolejność, filtry) między przeglądarką a bazą danych.
                     </p>
-                    
+
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -562,7 +562,7 @@ export default function EditAdminUserPage() {
                         <span>Pobierz z chmury</span>
                       </button>
                     </div>
-                    
+
                     {/* Saved configs info */}
                     {(userSettings.payments_columns_config || userSettings.reservations_columns_config) && (
                       <div className="mt-3 p-2 bg-gray-50 border border-gray-200" style={{ borderRadius: 0 }}>

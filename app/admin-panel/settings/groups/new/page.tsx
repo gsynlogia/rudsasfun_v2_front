@@ -3,7 +3,7 @@
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import { authenticatedApiCall } from '@/utils/api-auth';

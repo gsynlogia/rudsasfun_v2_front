@@ -4,11 +4,11 @@ import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 import { ContractForm } from '@/components/profile/ContractForm';
-import { authService } from '@/lib/services/AuthService';
 import {
   type ReservationData,
   mapReservationToContractForm,
 } from '@/lib/contractReservationMapping';
+import { authService } from '@/lib/services/AuthService';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 

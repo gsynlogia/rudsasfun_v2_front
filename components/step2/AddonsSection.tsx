@@ -27,7 +27,7 @@ export default function AddonsSection() {
   const params = useParams();
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
   const editionIdFromUrl = params?.editionId as string | undefined;
-  const propertyIdFromUrl = editionIdFromUrl != null && editionIdFromUrl !== '' && !Number.isNaN(Number(editionIdFromUrl))
+  const propertyIdFromUrl = editionIdFromUrl !== null && editionIdFromUrl !== undefined && editionIdFromUrl !== '' && !Number.isNaN(Number(editionIdFromUrl))
     ? Number(editionIdFromUrl)
     : undefined;
 
@@ -86,14 +86,14 @@ export default function AddonsSection() {
         const selectedCity = reservation.camp?.properties?.city;
         const propertyId = propertyIdFromContext ?? propertyIdFromUrl;
 
-        if (propertyId == null && !selectedCity) {
+        if ((propertyId === null || propertyId === undefined) && !selectedCity) {
           console.warn('[AddonsSection] Brak property_id (kontekst i URL) ani city – nie pobieram dodatków');
           setAddons([]);
           setLoadingAddons(false);
           return;
         }
 
-        const url = propertyId != null
+        const url = propertyId !== null && propertyId !== undefined
           ? `${API_BASE_URL}/api/addons/public?property_id=${propertyId}`
           : `${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(selectedCity!)}`;
 

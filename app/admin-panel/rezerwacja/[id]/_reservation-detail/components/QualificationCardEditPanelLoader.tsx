@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { ReservationDetailsWithNumber } from '../types';
+
+import { QualificationCardEditPanel } from '@/components/admin/QualificationCardEditPanel';
 import type { SignedQualificationPayload } from '@/lib/qualificationReservationMapping';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
 import { authenticatedApiCall } from '@/utils/api-auth';
-import { QualificationCardEditPanel } from '@/components/admin/QualificationCardEditPanel';
+
+import type { ReservationDetailsWithNumber } from '../types';
 
 export interface QualificationCardEditPanelLoaderProps {
   reservation: ReservationDetailsWithNumber;
@@ -25,7 +27,7 @@ export function QualificationCardEditPanelLoader({
   refetchReservation,
   closeRightPanel,
   showSuccess,
-  showError,
+  showError: _showError,
 }: QualificationCardEditPanelLoaderProps) {
   const [loading, setLoading] = useState(true);
   const [formSnapshot, setFormSnapshot] = useState<string | null>(null);
@@ -138,7 +140,7 @@ export function QualificationCardEditPanelLoader({
       onSaveAdmin={async (body) => {
         await authenticatedApiCall(
           `/api/qualification-cards/by-number/${reservationNumber}/data/admin-full`,
-          { method: 'PATCH', body: JSON.stringify(body) }
+          { method: 'PATCH', body: JSON.stringify(body) },
         );
         await refetchReservation();
         closeRightPanel();

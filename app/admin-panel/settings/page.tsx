@@ -30,7 +30,7 @@ export default function SettingsPage() {
           setCanAccessSuperFunctions(
             user.id === 0 ||
             user.user_type === 'admin' ||
-            !!(user.groups && user.groups.includes('admin'))
+            !!(user.groups && user.groups.includes('admin')),
           );
         }
       }

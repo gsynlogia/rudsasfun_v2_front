@@ -33,7 +33,7 @@ export default function NewAdminUserPage() {
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Settings
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
@@ -87,7 +87,7 @@ export default function NewAdminUserPage() {
             is_superadmin: isSuperadmin,
             group_ids: groupIds,
           }),
-        }
+        },
       );
 
       // Create settings for the new user
@@ -99,7 +99,7 @@ export default function NewAdminUserPage() {
           body: JSON.stringify({
             items_per_page: itemsPerPage,
           }),
-        }
+        },
       );
 
       showSuccess(`Użytkownik ${login} został utworzony`);
@@ -237,7 +237,7 @@ export default function NewAdminUserPage() {
                 <Settings size={20} className="text-[#03adf0]" />
                 <span className="text-sm font-medium text-gray-900">Ustawienia interfejsu</span>
               </div>
-              
+
               <div>
                 <label htmlFor="itemsPerPage" className="block text-sm font-medium text-gray-700 mb-2">
                   Ilość pozycji w tabelach

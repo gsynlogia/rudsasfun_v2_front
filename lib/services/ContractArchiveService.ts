@@ -28,14 +28,14 @@ export const contractArchiveService = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reservation_id: reservationId, snapshot }),
-      }
+      },
     );
   },
 
   /** Lista wersji umowy dla rezerwacji. */
   async list(reservationId: number): Promise<ContractArchiveVersionItem[]> {
     return authenticatedApiCall<ContractArchiveVersionItem[]>(
-      `/api/contract-archive?reservation_id=${reservationId}`
+      `/api/contract-archive?reservation_id=${reservationId}`,
     );
   },
 

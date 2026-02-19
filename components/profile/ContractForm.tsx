@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Printer } from 'lucide-react';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
+
 import { authService } from '@/lib/services/AuthService';
 
 interface ContractFormProps {
@@ -114,7 +115,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
 
   // Pobierz status najnowszego podpisanego dokumentu (umowa) – czy można podpisać ponownie (tylko gdy odrzucona)
   useEffect(() => {
-    if (printMode || reservationId == null) return;
+    if (printMode || reservationId === null || reservationId === undefined) return;
     const token = authService.getToken();
     if (!token) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -181,43 +182,43 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
     departurePlace: reservationData?.departurePlace ?? '',
     returnPlace: reservationData?.returnPlace ?? '',
     invoice: reservationData?.invoice ?? '',
-    promotions: reservationData?.promotions ?? ''
+    promotions: reservationData?.promotions ?? '',
   };
   const formData: typeof base = { ...base };
   if (overlay) {
-    if (overlay.reservationNumber != null) formData.reservationNumber = String(overlay.reservationNumber);
-    if (overlay.contractDate != null) formData.contractDate = String(overlay.contractDate);
-    if (overlay.tournamentName != null) formData.tournamentName = String(overlay.tournamentName);
-    if (overlay.tournamentDates != null) formData.tournamentDates = String(overlay.tournamentDates);
-    if (overlay.parentName != null) formData.parentName = String(overlay.parentName);
-    if (overlay.parentEmail != null) formData.parentEmail = String(overlay.parentEmail);
-    if (overlay.parentPhone != null) formData.parentPhone = String(overlay.parentPhone);
-    if (overlay.parentCity != null) formData.parentCity = String(overlay.parentCity);
-    if (overlay.childName != null) formData.childName = String(overlay.childName);
-    if (overlay.childCity != null) formData.childCity = String(overlay.childCity);
-    if (overlay.childYear != null) formData.childYear = String(overlay.childYear);
-    if (overlay.childGender != null) formData.childGender = String(overlay.childGender);
-    if (overlay.locationName != null) formData.locationName = String(overlay.locationName);
-    if (overlay.locationAddress != null) formData.locationAddress = String(overlay.locationAddress);
-    if (overlay.facilityName != null) formData.facilityName = String(overlay.facilityName);
-    if (overlay.transportTo != null) formData.transportTo = String(overlay.transportTo);
-    if (overlay.transportFrom != null) formData.transportFrom = String(overlay.transportFrom);
-    if (overlay.baseCost != null) formData.baseCost = String(overlay.baseCost);
-    if (overlay.diet != null) formData.diet = String(overlay.diet);
-    if (overlay.attractions != null) formData.attractions = String(overlay.attractions);
-    if (overlay.insurance1 != null) formData.insurance1 = String(overlay.insurance1);
-    if (overlay.insurance2 != null) formData.insurance2 = String(overlay.insurance2);
-    if (overlay.transport != null) formData.transport = String(overlay.transport);
-    if (overlay.totalCost != null) formData.totalCost = String(overlay.totalCost);
-    if (overlay.deposit != null) formData.deposit = String(overlay.deposit);
-    if (overlay.remainingPayment != null) formData.remainingPayment = String(overlay.remainingPayment);
-    if (overlay.accommodation != null) formData.accommodation = String(overlay.accommodation);
-    if (overlay.meals != null) formData.meals = String(overlay.meals);
-    if (overlay.transportInfo != null) formData.transportInfo = String(overlay.transportInfo);
-    if (overlay.departurePlace != null) formData.departurePlace = String(overlay.departurePlace);
-    if (overlay.returnPlace != null) formData.returnPlace = String(overlay.returnPlace);
-    if (overlay.invoice != null) formData.invoice = String(overlay.invoice);
-    if (overlay.promotions != null) formData.promotions = String(overlay.promotions);
+    if (overlay.reservationNumber !== null && overlay.reservationNumber !== undefined) formData.reservationNumber = String(overlay.reservationNumber);
+    if (overlay.contractDate !== null && overlay.contractDate !== undefined) formData.contractDate = String(overlay.contractDate);
+    if (overlay.tournamentName !== null && overlay.tournamentName !== undefined) formData.tournamentName = String(overlay.tournamentName);
+    if (overlay.tournamentDates !== null && overlay.tournamentDates !== undefined) formData.tournamentDates = String(overlay.tournamentDates);
+    if (overlay.parentName !== null && overlay.parentName !== undefined) formData.parentName = String(overlay.parentName);
+    if (overlay.parentEmail !== null && overlay.parentEmail !== undefined) formData.parentEmail = String(overlay.parentEmail);
+    if (overlay.parentPhone !== null && overlay.parentPhone !== undefined) formData.parentPhone = String(overlay.parentPhone);
+    if (overlay.parentCity !== null && overlay.parentCity !== undefined) formData.parentCity = String(overlay.parentCity);
+    if (overlay.childName !== null && overlay.childName !== undefined) formData.childName = String(overlay.childName);
+    if (overlay.childCity !== null && overlay.childCity !== undefined) formData.childCity = String(overlay.childCity);
+    if (overlay.childYear !== null && overlay.childYear !== undefined) formData.childYear = String(overlay.childYear);
+    if (overlay.childGender !== null && overlay.childGender !== undefined) formData.childGender = String(overlay.childGender);
+    if (overlay.locationName !== null && overlay.locationName !== undefined) formData.locationName = String(overlay.locationName);
+    if (overlay.locationAddress !== null && overlay.locationAddress !== undefined) formData.locationAddress = String(overlay.locationAddress);
+    if (overlay.facilityName !== null && overlay.facilityName !== undefined) formData.facilityName = String(overlay.facilityName);
+    if (overlay.transportTo !== null && overlay.transportTo !== undefined) formData.transportTo = String(overlay.transportTo);
+    if (overlay.transportFrom !== null && overlay.transportFrom !== undefined) formData.transportFrom = String(overlay.transportFrom);
+    if (overlay.baseCost !== null && overlay.baseCost !== undefined) formData.baseCost = String(overlay.baseCost);
+    if (overlay.diet !== null && overlay.diet !== undefined) formData.diet = String(overlay.diet);
+    if (overlay.attractions !== null && overlay.attractions !== undefined) formData.attractions = String(overlay.attractions);
+    if (overlay.insurance1 !== null && overlay.insurance1 !== undefined) formData.insurance1 = String(overlay.insurance1);
+    if (overlay.insurance2 !== null && overlay.insurance2 !== undefined) formData.insurance2 = String(overlay.insurance2);
+    if (overlay.transport !== null && overlay.transport !== undefined) formData.transport = String(overlay.transport);
+    if (overlay.totalCost !== null && overlay.totalCost !== undefined) formData.totalCost = String(overlay.totalCost);
+    if (overlay.deposit !== null && overlay.deposit !== undefined) formData.deposit = String(overlay.deposit);
+    if (overlay.remainingPayment !== null && overlay.remainingPayment !== undefined) formData.remainingPayment = String(overlay.remainingPayment);
+    if (overlay.accommodation !== null && overlay.accommodation !== undefined) formData.accommodation = String(overlay.accommodation);
+    if (overlay.meals !== null && overlay.meals !== undefined) formData.meals = String(overlay.meals);
+    if (overlay.transportInfo !== null && overlay.transportInfo !== undefined) formData.transportInfo = String(overlay.transportInfo);
+    if (overlay.departurePlace !== null && overlay.departurePlace !== undefined) formData.departurePlace = String(overlay.departurePlace);
+    if (overlay.returnPlace !== null && overlay.returnPlace !== undefined) formData.returnPlace = String(overlay.returnPlace);
+    if (overlay.invoice !== null && overlay.invoice !== undefined) formData.invoice = String(overlay.invoice);
+    if (overlay.promotions !== null && overlay.promotions !== undefined) formData.promotions = String(overlay.promotions);
   }
 
   const handlePrint = () => {
@@ -312,7 +313,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
   };
 
   const handleSignDocument = async () => {
-    if (reservationId == null) return;
+    if (reservationId === null || reservationId === undefined) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const token = authService.getToken();
     if (!token) return;
@@ -337,7 +338,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
   };
 
   const handleResendCode = async () => {
-    if (resendTimer > 0 || reservationId == null) return;
+    if (resendTimer > 0 || reservationId === null || reservationId === undefined) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const token = authService.getToken();
     if (!token) return;
@@ -358,7 +359,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
   };
 
   const handleConfirmSignature = async () => {
-    if (signatureCode.length !== 4 || currentDocumentId == null) return;
+    if (signatureCode.length !== 4 || currentDocumentId === null || currentDocumentId === undefined) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const token = authService.getToken();
     if (!token) {
@@ -501,7 +502,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
           {/* Szczegóły wyjazdu */}
           <section className="section">
             <h2 className="section-title">SZCZEGÓŁY KOLONII/OBOZU:</h2>
-            
+
             <div className="field-group">
               <label>Temat kolonii/obozu, ośrodek i data:</label>
               <div className="field-value-multiline">{formData.locationName}</div>
@@ -511,9 +512,9 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
               <label>Nazwa i adres ośrodka (zakwaterowanie):</label>
               <div className="field-value-multiline">
                 <div className="facility-name">{formData.facilityName}</div>
-                <a 
+                <a
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.locationAddress)}`}
-                  target="_blank" 
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="location-link"
                 >
@@ -543,8 +544,8 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
           <section className="section">
             <h2 className="section-title">PŁATNOŚCI:</h2>
             <p className="info-text-small">
-              KOSZT PODSTAWOWY zawiera: atrakcje, które są w cenie obozu i ubezpieczenia (NNW, TFG, TFP) 
-              </p> 
+              KOSZT PODSTAWOWY zawiera: atrakcje, które są w cenie obozu i ubezpieczenia (NNW, TFG, TFP)
+              </p>
               <p className="info-text-small">
               KOSZT CAŁKOWITY zawiera: diety, atrakcje dodatkowe, ochrony, transport i promocje
             </p>
@@ -601,7 +602,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
                 <div className="field-value">{formData.promotions}</div>
                 <span>zł</span>
               </div>
-              
+
             </div>
 
             <div className="total-cost">
@@ -652,7 +653,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
           {/* Transport */}
           <section className="section">
             <h2 className="section-title">TRANSPORT:</h2>
-            <h2 className="section-title">Specyfikacja transportu:</h2> 
+            <h2 className="section-title">Specyfikacja transportu:</h2>
             <div className="field-value-multiline">{formData.transportInfo}</div>
           </section>
 
@@ -682,11 +683,11 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
           <section className="section">
             <h2 className="section-title">OBOWIĄZKI ORGANIZATORA:</h2>
             <ul className="bullet-list">
-              <li>Organizator zapewnia zakwaterowanie, wyżywienie, realizację programu dostępnego na stronie wybranej kolonii/obozu oraz możliwość transportu.</li> 
-              <li>Organizator zapewnia opiekę pedagogiczną, instruktorską oraz dostęp do opieki medycznej</li> 
-              <li>Program kolonii/obozu dostępny jest na www.radsas-fun.pl w zakładce danej kolonii/obozu. Zmiany w realizacji programu zależą od czynników niezależnych od Organizatora. 
+              <li>Organizator zapewnia zakwaterowanie, wyżywienie, realizację programu dostępnego na stronie wybranej kolonii/obozu oraz możliwość transportu.</li>
+              <li>Organizator zapewnia opiekę pedagogiczną, instruktorską oraz dostęp do opieki medycznej</li>
+              <li>Program kolonii/obozu dostępny jest na www.radsas-fun.pl w zakładce danej kolonii/obozu. Zmiany w realizacji programu zależą od czynników niezależnych od Organizatora.
                 W przypadku złych warunków atmosferycznych, Organizator zastrzega sobie prawo do wprowadzenia zmian w programie lub zmiany atrakcji na równorzędne.</li>
-              <li>Organizator nie ponosi odpowiedzialności za rzeczy wartościowe uczestnika (pieniądze, telefony, tablety, biżuteria itp.).</li>  
+              <li>Organizator nie ponosi odpowiedzialności za rzeczy wartościowe uczestnika (pieniądze, telefony, tablety, biżuteria itp.).</li>
             </ul>
          </section>
 
@@ -730,7 +731,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
               <li>Ewentualne spory wynikające z umowy rozstrzygane będą polubownie, a w razie braku porozumienia przez sąd właściwy dla siedziby Organizatora.</li>
               <li>Umowa sporządzona została w dwóch jednobrzmiących egzemplarzach, po jednym dla każdej ze stron.</li>
               <li>Klient ma możliwość wglądu w umowę przed jej podpisaniem i dokonaniem wpłaty.</li>
-              <li>Wszelkiego rodzaju zmiany w Panelu Klienta (np: dokupienie atrakcji dodatkowych, poprawienie danych) stanowią aneks do niniejszej umowy i nie wymagają dodatkowego podpisu.</li>             
+              <li>Wszelkiego rodzaju zmiany w Panelu Klienta (np: dokupienie atrakcji dodatkowych, poprawienie danych) stanowią aneks do niniejszej umowy i nie wymagają dodatkowego podpisu.</li>
             </ul>
           </section>
 
@@ -789,14 +790,14 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
         </div>
       </div>
 
-      
+
       {/* Modal do potwierdzenia podpisu */}
       {showSignatureModal && (
         <div className="modal-overlay no-print" onClick={() => setShowSignatureModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">Potwierdzenie</h3>
             <p className="modal-text">
-              Na podany w rezerwacji numer telefonu <strong>{formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod. 
+              Na podany w rezerwacji numer telefonu <strong>{formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod.
               Wpisanie kodu jest jednoznaczne z podpisaniem niniejszego dokumentu.
             </p>
             <div className="modal-input-group">
@@ -811,21 +812,21 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
               />
             </div>
             <div className="modal-buttons">
-              <button 
-                onClick={() => setShowSignatureModal(false)} 
+              <button
+                onClick={() => setShowSignatureModal(false)}
                 className="modal-button modal-button-cancel"
               >
                 Anuluj
               </button>
-              <button 
-                onClick={handleResendCode} 
+              <button
+                onClick={handleResendCode}
                 className="modal-button modal-button-resend"
                 disabled={resendTimer > 0}
               >
                 {resendTimer > 0 ? `Ponownie za ${resendTimer}s` : 'Wyślij ponownie kod'}
               </button>
-              <button 
-                onClick={handleConfirmSignature} 
+              <button
+                onClick={handleConfirmSignature}
                 className="modal-button modal-button-confirm"
                 disabled={signatureCode.length !== 4}
               >

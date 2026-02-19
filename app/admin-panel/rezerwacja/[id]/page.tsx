@@ -1,21 +1,33 @@
 'use client';
 
-import { ArrowLeft, Edit, X, FileText, Download, Upload, Trash2, User, Tent, Users, Utensils, Shield, Gift, Bus, FileCheck, Receipt, Heart, MessageSquare, CheckCircle2, RotateCcw, CheckCircle, XCircle, SquarePen, Mic, Play } from 'lucide-react';
+import { Edit, X, FileText, Download, Upload, Trash2, User, CheckCircle2, CheckCircle, XCircle, SquarePen, Mic, Play } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-import { RESERVATION_PANELS, PARTICIPANT_FIELD_LABELS, type PanelId } from './_reservation-detail/constants';
-import { formatDate, formatDateTime, formatCurrency } from './_reservation-detail/formatters';
-import {
-  getPromotionType,
-  requiresJustification,
-  hasJustificationData,
-  formatJustificationForDisplay,
-  formatJustificationToLogText,
-  filterJustificationForSave,
-  getJustificationForCurrentPromotion,
-  validateJustificationDraft as validateJustificationDraftUtil,
-} from './_reservation-detail/promotionUtils';
+import AdminLayout from '@/components/admin/AdminLayout';
+import { ContractEditPanel } from '@/components/admin/ContractEditPanel';
+import { QualificationTemplateNew } from '@/components/admin/QualificationTemplateNew';
+import { ReservationDetailRightSidebar, RIGHT_SIDEBAR_WIDTH } from '@/components/admin/ReservationDetailRightSidebar';
+import SectionGuard from '@/components/admin/SectionGuard';
+import UniversalModal from '@/components/admin/UniversalModal';
+import { ContractForm } from '@/components/profile/ContractForm';
+import { useToast } from '@/components/ToastContainer';
+import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
+import type { ReservationData } from '@/lib/contractReservationMapping';
+import { mapReservationToContractForm } from '@/lib/contractReservationMapping';
+import { mapReservationToQualificationForm, type SignedQualificationPayload } from '@/lib/qualificationReservationMapping';
+import { contractArchiveService, type ContractArchiveVersionItem } from '@/lib/services/ContractArchiveService';
+import { contractService } from '@/lib/services/ContractService';
+import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
+import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
+import { qualificationCardService } from '@/lib/services/QualificationCardService';
+import { authenticatedApiCall } from '@/utils/api-auth';
+
+import { PaymentsPanel } from './_reservation-detail/components/PaymentsPanel';
+import { QualificationCardEditPanelLoader } from './_reservation-detail/components/QualificationCardEditPanelLoader';
+import { RejectDocumentPanelContent } from './_reservation-detail/components/RejectDocumentPanelContent';
+import { ReservationDetailHeader } from './_reservation-detail/components/ReservationDetailHeader';
+import { RESERVATION_PANELS, type PanelId } from './_reservation-detail/constants';
 import type {
   ReservationDetails,
   Addon,
@@ -24,36 +36,9 @@ import type {
   PromotionOption,
   Diet,
   ReservationNote,
-  ReservationEventItem,
-  AnnexItem,
-  GuardianEntry,
   SpeechRecognitionResultEventLike,
   SpeechRecognitionLike,
-  ReservationDetailsWithNumber,
 } from './_reservation-detail/types';
-import { RejectDocumentPanelContent } from './_reservation-detail/components/RejectDocumentPanelContent';
-import { QualificationCardEditPanelLoader } from './_reservation-detail/components/QualificationCardEditPanelLoader';
-
-import AdminLayout from '@/components/admin/AdminLayout';
-import SectionGuard from '@/components/admin/SectionGuard';
-import { ReservationDetailRightSidebar, RIGHT_SIDEBAR_WIDTH } from '@/components/admin/ReservationDetailRightSidebar';
-import { useToast } from '@/components/ToastContainer';
-import UniversalModal from '@/components/admin/UniversalModal';
-import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
-import { ContractForm } from '@/components/profile/ContractForm';
-import { ContractEditPanel } from '@/components/admin/ContractEditPanel';
-import { ContractTemplateNew } from '@/components/admin/ContractTemplateNew';
-import { QualificationTemplateNew } from '@/components/admin/QualificationTemplateNew';
-import { QualificationCardEditPanel } from '@/components/admin/QualificationCardEditPanel';
-import { contractArchiveService, type ContractArchiveVersionItem } from '@/lib/services/ContractArchiveService';
-import type { ReservationData } from '@/lib/contractReservationMapping';
-import { mapReservationToContractForm } from '@/lib/contractReservationMapping';
-import { mapReservationToQualificationForm, type SignedQualificationPayload } from '@/lib/qualificationReservationMapping';
-import { contractService } from '@/lib/services/ContractService';
-import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
-import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
-import { qualificationCardService } from '@/lib/services/QualificationCardService';
-import { authenticatedApiCall } from '@/utils/api-auth';
 
 export default function ReservationDetailPage() {
   const params = useParams();
@@ -80,15 +65,15 @@ export default function ReservationDetailPage() {
   });
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);
-  const [addons, setAddons] = useState<Map<number, Addon>>(new Map());
-  const [protections, setProtections] = useState<Map<number, Protection>>(new Map());
+  const [_addons, setAddons] = useState<Map<number, Addon>>(new Map());
+  const [_protections, setProtections] = useState<Map<number, Protection>>(new Map());
   const [promotions, setPromotions] = useState<Map<number, Promotion>>(new Map());
   const [promotionOptions, setPromotionOptions] = useState<PromotionOption[]>([]);
   const [promotionDraftId, setPromotionDraftId] = useState<number | null>(null);
   const [pendingPromotionId, setPendingPromotionId] = useState<number | null>(null);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [savingPromotion, setSavingPromotion] = useState(false);
-  const [diets, setDiets] = useState<Map<number, Diet>>(new Map());
+  const [_diets, setDiets] = useState<Map<number, Diet>>(new Map());
   const [transportCities, setTransportCities] = useState<Array<{ id: number; city: string; departure_price: number | null; return_price: number | null }>>([]);
   // Dostępne opcje dla turnusu (do wyświetlania nawet gdy rezerwacja nie ma wybranych)
   const [availableProtections, setAvailableProtections] = useState<Protection[]>([]);
@@ -144,24 +129,19 @@ export default function ReservationDetailPage() {
   }>({ wants_invoice: false, invoice_type: 'private' });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [contractHtmlExists, setContractHtmlExists] = useState(false);
-  const [cardHtmlExists, setCardHtmlExists] = useState(false);
   const [contractFiles, setContractFiles] = useState<any[]>([]);
   const [cardFiles, setCardFiles] = useState<any[]>([]);
-  const [_rejectingContract, _setRejectingContract] = useState(false);
-  const [_rejectingCard, _setRejectingCard] = useState(false);
   const [latestSignedContract, setLatestSignedContract] = useState<{ id: number; status: string; client_message: string | null } | null>(null);
   const [latestSignedCard, setLatestSignedCard] = useState<{ id: number; status: string; client_message: string | null; reverted_after_approval?: number } | null>(null);
   const [qualificationCardSignedPayload, setQualificationCardSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [contractSignedPayload, setContractSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [contractArchiveVersions, setContractArchiveVersions] = useState<ContractArchiveVersionItem[]>([]);
   const [signedDocumentsList, setSignedDocumentsList] = useState<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null }>>([]);
-  const [uploadingContract, setUploadingContract] = useState(false);
   const [uploadingCard, setUploadingCard] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingReservation, setDeletingReservation] = useState(false);
   const [showJustificationModal, setShowJustificationModal] = useState(false);
-  
+
   // Restore reservation states
   const [restoringReservation, setRestoringReservation] = useState(false);
   const [showNoSpotsModal, setShowNoSpotsModal] = useState(false);
@@ -172,7 +152,7 @@ export default function ReservationDetailPage() {
   const [justificationError, setJustificationError] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
   const [manualPayments, setManualPayments] = useState<ManualPaymentResponse[]>([]);
-  
+
   // Notes state (admin only)
   const [notes, setNotes] = useState<ReservationNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -185,7 +165,15 @@ export default function ReservationDetailPage() {
   const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
 
   /** Sekcja Opiekunowie (#dane): draft 1–2 opiekunów, edycja, zapis przez PATCH by-number/partial */
-  type GuardianEntry = { firstName?: string; lastName?: string; email?: string; phoneNumber?: string; street?: string; city?: string; postalCode?: string };
+  interface GuardianEntry {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phoneNumber?: string;
+    street?: string;
+    city?: string;
+    postalCode?: string;
+  }
   const [guardiansDraft, setGuardiansDraft] = useState<GuardianEntry[]>([]);
   const [editingGuardianIndex, setEditingGuardianIndex] = useState<number | null>(null);
   const [savingGuardians, setSavingGuardians] = useState(false);
@@ -196,7 +184,14 @@ export default function ReservationDetailPage() {
   const [removeSecondGuardianError, setRemoveSecondGuardianError] = useState<string | null>(null);
 
   /** Zdarzenia klienta (system_events) – tylko dla bieżącej rezerwacji */
-  type ReservationEventItem = { id: number; action: string; payload?: string | null; created_at?: string | null; author_display: string; author_role: string };
+  interface ReservationEventItem {
+    id: number;
+    action: string;
+    payload?: string | null;
+    created_at?: string | null;
+    author_display: string;
+    author_role: string;
+  }
   const [reservationEvents, setReservationEvents] = useState<ReservationEventItem[]>([]);
   const [loadingReservationEvents, setLoadingReservationEvents] = useState(false);
 
@@ -225,7 +220,15 @@ export default function ReservationDetailPage() {
   const [notifyCardEmail, setNotifyCardEmail] = useState(true);
   const [notifyCardSms, setNotifyCardSms] = useState(false);
   /** Aneksy do umowy (admin – lista + Anuluj) */
-  type AnnexItem = { id: number; reservation_id: number; change_type: string; description: string; status: string; cancellation_reason: string | null; created_at: string | null };
+  interface AnnexItem {
+    id: number;
+    reservation_id: number;
+    change_type: string;
+    description: string;
+    status: string;
+    cancellation_reason: string | null;
+    created_at: string | null;
+  }
   const [reservationAnnexes, setReservationAnnexes] = useState<AnnexItem[]>([]);
   const [cancelAnnexId, setCancelAnnexId] = useState<number | null>(null);
   const [cancelAnnexReason, setCancelAnnexReason] = useState('');
@@ -296,7 +299,7 @@ export default function ReservationDetailPage() {
     try {
       const res = await authenticatedApiCall<{ ok: boolean; sent_sms: boolean; sent_email: boolean; errors?: string[] }>(
         `/api/reservations/by-number/${reservationNumber}/remind-sign`,
-        { method: 'POST', body: JSON.stringify({ send_sms: remindSignSms, send_email: remindSignEmail }) }
+        { method: 'POST', body: JSON.stringify({ send_sms: remindSignSms, send_email: remindSignEmail }) },
       );
       if (res.ok) {
         const parts: string[] = [];
@@ -322,7 +325,7 @@ export default function ReservationDetailPage() {
     try {
       const res = await authenticatedApiCall<{ ok: boolean; sent_sms: boolean; sent_email: boolean; errors?: string[] }>(
         `/api/reservations/by-number/${reservationNumber}/remind-sign`,
-        { method: 'POST', body: JSON.stringify({ send_sms: remindCardSms, send_email: remindCardEmail, document_type: 'qualification_card' }) }
+        { method: 'POST', body: JSON.stringify({ send_sms: remindCardSms, send_email: remindCardEmail, document_type: 'qualification_card' }) },
       );
       if (res.ok) {
         const parts: string[] = [];
@@ -371,7 +374,7 @@ export default function ReservationDetailPage() {
           window.location.hash = 'dokumenty';
           openedContractEditFromHashRef.current = false;
         }
-      }
+      },
     );
   }, [reservation, contractEditStepFromHash, openDocument, closeRightPanel, refetchReservation]);
 
@@ -394,7 +397,7 @@ export default function ReservationDetailPage() {
       'Edytuj kartę kwalifikacyjną',
       () => {
         if (typeof window !== 'undefined') window.location.hash = 'dokumenty';
-      }
+      },
     );
   }, [reservation, reservationNumber, cardEditFromHash, qualificationCardSignedPayload, openDocument, closeRightPanel, refetchReservation, showSuccess, showError]);
 
@@ -418,8 +421,7 @@ export default function ReservationDetailPage() {
   // Wniosek o zakwaterowanie uczestnika (krok 1 – edycja tylko tego pola)
   const [accommodationRequest, setAccommodationRequest] = useState('');
   const [savingAccommodationRequest, setSavingAccommodationRequest] = useState(false);
-  
-  const contractUploadInputRef = useRef<HTMLInputElement>(null);
+
   const cardUploadInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (reservation) {
@@ -595,7 +597,7 @@ export default function ReservationDetailPage() {
                         ...generalDiet,
                         price: foundDiet.price || generalDiet.price, // Use turnus-specific price
                       });
-                    } catch (generalDietError) {
+                    } catch {
                       // If general diet not found, use data from turnus diet
                       dietsMap.set(dietId, {
                         id: foundDiet.general_diet_id,
@@ -608,7 +610,7 @@ export default function ReservationDetailPage() {
                     try {
                       const diet = await authenticatedApiCall<Diet>(`/api/diets/${foundDiet.id}`);
                       dietsMap.set(dietId, diet);
-                    } catch (dietError) {
+                    } catch {
                       // If diet not found, use data from turnus diet
                       dietsMap.set(dietId, {
                         id: foundDiet.id,
@@ -622,7 +624,7 @@ export default function ReservationDetailPage() {
                   try {
                     const diet = await authenticatedApiCall<Diet>(`/api/general-diets/${dietId}`);
                     dietsMap.set(dietId, diet);
-                  } catch (err) {
+                  } catch {
                     console.warn(`Diet ${dietId} not found in turnus diets or general diets`);
                   }
                 }
@@ -710,7 +712,7 @@ export default function ReservationDetailPage() {
         }
 
         // Pobierz dostępne dodatki dla turnusu (prefer property_id, fallback city)
-        const addonsUrl = reservationData.property_id != null
+        const addonsUrl = reservationData.property_id !== null && reservationData.property_id !== undefined
           ? `/api/addons/public?property_id=${reservationData.property_id}`
           : reservationData.property_city
             ? `/api/addons/public?city=${encodeURIComponent(reservationData.property_city)}`
@@ -725,10 +727,10 @@ export default function ReservationDetailPage() {
           }
         }
 
-        if (reservationData.camp_id != null && reservationData.property_id != null) {
+        if (reservationData.camp_id !== null && reservationData.property_id !== null) {
           try {
             const dietsRes = await authenticatedApiCall<Array<{ id: number; relation_id?: number; name: string; price?: number }>>(
-              `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/diets`
+              `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/diets`,
             );
             setTurnusDietsList(Array.isArray(dietsRes) ? dietsRes : []);
           } catch (err) {
@@ -759,7 +761,7 @@ export default function ReservationDetailPage() {
 
   // Sync invoice draft from reservation (for initial load and after save)
   useEffect(() => {
-    if (reservation == null) return;
+    if (reservation === null) return;
     setInvoiceDraft({
       wants_invoice: reservation.wants_invoice ?? false,
       invoice_type: reservation.invoice_type ?? 'private',
@@ -816,20 +818,20 @@ export default function ReservationDetailPage() {
             const n = parseInt(s, 10);
             return Number.isNaN(n) ? null : n;
           })
-          .filter((n): n is number => n != null)
+          .filter((n): n is number => n !== null && n !== undefined)
       : [];
     setProtectionDraft(ids);
   }, [reservation?.id, reservation?.selected_protection, protectionDraftDirty]);
 
   // Sync diet draft from reservation (for initial load and after save)
   useEffect(() => {
-    if (reservation == null) return;
+    if (reservation === null || reservation === undefined) return;
     setDietDraft(reservation.diet ?? null);
   }, [reservation?.id, reservation?.diet]);
 
   // Sync source draft from reservation (for initial load and after save)
   useEffect(() => {
-    if (reservation == null) return;
+    if (reservation === null || reservation === undefined) return;
     setSourceDraft({
       selected_source: reservation.selected_source ?? '',
       source_inne_text: reservation.source_inne_text ?? null,
@@ -838,7 +840,7 @@ export default function ReservationDetailPage() {
 
   // Sync transport draft from reservation (for initial load and after save)
   useEffect(() => {
-    if (reservation == null) return;
+    if (reservation === null || reservation === undefined) return;
     const r = reservation as ReservationDetails & { departure_transport_city_id?: number | null; return_transport_city_id?: number | null };
     setTransportDraft({
       departure_type: reservation.departure_type ?? 'wlasny',
@@ -864,8 +866,6 @@ export default function ReservationDetailPage() {
   const loadDocuments = useCallback(async () => {
     if (!reservation) return;
     if (reservation.is_archived) {
-      setContractHtmlExists(false);
-      setCardHtmlExists(false);
       setContractFiles([]);
       setCardFiles([]);
       setLatestSignedContract(null);
@@ -875,10 +875,6 @@ export default function ReservationDetailPage() {
       return;
     }
     try {
-      const contractHtmlCheck = await contractService.checkHtmlExists(reservation.id);
-      setContractHtmlExists(contractHtmlCheck.exists);
-      const cardHtmlCheck = await qualificationCardService.checkHtmlExists(reservation.id);
-      setCardHtmlExists(cardHtmlCheck.exists);
       const contractFilesData = await contractService.getContractFiles(reservation.id);
       setContractFiles(contractFilesData.filter(f => f.source === 'user'));
       const cardFilesData = await qualificationCardService.getQualificationCardFiles(reservation.id);
@@ -915,7 +911,7 @@ export default function ReservationDetailPage() {
   useEffect(() => {
     const loadPayments = async () => {
       if (!reservation) return;
-      
+
       // Skip loading payments for archived reservations
       // They don't exist in the main tables anymore
       if (reservation.is_archived) {
@@ -960,31 +956,31 @@ export default function ReservationDetailPage() {
   useEffect(() => {
     const loadNotes = async () => {
       if (!reservation) return;
-      
+
       console.log('DEBUG loadNotes - reservation:', {
         id: reservation.id,
         is_archived: reservation.is_archived,
         archive_id: reservation.archive_id,
-        keys: Object.keys(reservation)
+        keys: Object.keys(reservation),
       });
-      
+
       try {
         setLoadingNotes(true);
-        
+
         let notesData: ReservationNote[];
-        
+
         if (reservation.is_archived && reservation.archive_id) {
           // For archived reservations, fetch from archived notes endpoint
           notesData = await authenticatedApiCall<ReservationNote[]>(
-            `/api/reservations/archived/${reservation.archive_id}/notes`
+            `/api/reservations/archived/${reservation.archive_id}/notes`,
           );
         } else {
           // For active reservations, fetch from regular notes endpoint
           notesData = await authenticatedApiCall<ReservationNote[]>(
-            `/api/reservations/${reservation.id}/notes`
+            `/api/reservations/${reservation.id}/notes`,
           );
         }
-        
+
         setNotes(notesData);
       } catch (err) {
         console.error('Error loading notes:', err);
@@ -1012,7 +1008,7 @@ export default function ReservationDetailPage() {
         {
           method: 'POST',
           body: JSON.stringify({ content: newNoteContent.trim() }),
-        }
+        },
       );
       setNotes(prev => [newNote, ...prev]);
       setNewNoteContent('');
@@ -1035,7 +1031,7 @@ export default function ReservationDetailPage() {
         {
           method: 'PUT',
           body: JSON.stringify({ content: editingNoteContent.trim() }),
-        }
+        },
       );
       setNotes(prev => prev.map(n => n.id === noteId ? updatedNote : n));
       setEditingNoteId(null);
@@ -1056,7 +1052,7 @@ export default function ReservationDetailPage() {
       setDeletingNoteId(noteId);
       await authenticatedApiCall(
         `/api/reservations/${reservation.id}/notes/${noteId}`,
-        { method: 'DELETE' }
+        { method: 'DELETE' },
       );
       setNotes(prev => prev.filter(n => n.id !== noteId));
       showSuccess('Notatka została usunięta');
@@ -1098,7 +1094,7 @@ export default function ReservationDetailPage() {
       const result = event.results[event.resultIndex];
       const transcript = result[0].transcript;
       if (result.isFinal) {
-        setNewNoteContent((prev) => (prev ? prev + ' ' + transcript : transcript));
+        setNewNoteContent((prev) => (prev ? `${prev} ${transcript}` : transcript));
       }
     };
     rec.onend = () => setNoteSpeechListening(false);
@@ -1123,7 +1119,7 @@ export default function ReservationDetailPage() {
     setNoteSpeechListening(true);
     try {
       rec.start();
-    } catch (err) {
+    } catch {
       setNoteSpeechListening(false);
       noteSpeechRecognitionRef.current = null;
       showError('Nie udało się uruchomić mikrofonu. Zezwól na dostęp do mikrofonu w ustawieniach przeglądarki.');
@@ -1298,34 +1294,6 @@ export default function ReservationDetailPage() {
     return parts.join('\n');
   };
 
-  /** Format uzasadnienia promocji do jednej linii tekstu w logu zdarzeń (tylko znane pola, po polsku). */
-  const formatJustificationToLogText = (just: Record<string, unknown> | null | undefined): string => {
-    if (!just || typeof just !== 'object') return '(brak)';
-    const parts: string[] = [];
-    if (just.card_number) parts.push(`Numer karty dużej rodziny: ${String(just.card_number)}`);
-    if (just.sibling_first_name || just.sibling_last_name) {
-      const name = [just.sibling_first_name, just.sibling_last_name].filter(Boolean).map(String).join(' ');
-      if (name) parts.push(`Rodzeństwo: ${name}`);
-    }
-    if (just.first_camp_date) parts.push(`Data pierwszego obozu: ${String(just.first_camp_date)}`);
-    if (just.first_camp_name) parts.push(`Nazwa pierwszego obozu: ${String(just.first_camp_name)}`);
-    if (just.reason) parts.push(`Powód wyboru promocji: ${String(just.reason)}`);
-    if (just.years) {
-      const y = just.years;
-      const yearsStr = Array.isArray(y) ? (y as unknown[]).join(', ') : String(y);
-      if (yearsStr) parts.push(`Lata uczestnictwa: ${yearsStr}`);
-    }
-    return parts.length ? parts.join('. ') : '(brak)';
-  };
-
-  const PARTICIPANT_FIELD_LABELS: Record<string, string> = {
-    participant_first_name: 'Imię',
-    participant_last_name: 'Nazwisko',
-    participant_age: 'Rocznik',
-    participant_gender: 'Płeć',
-    participant_city: 'Miasto',
-  };
-
   const validateJustificationDraft = (): boolean => {
     setJustificationError(null);
     if (!reservation) return false;
@@ -1380,7 +1348,7 @@ export default function ReservationDetailPage() {
     return true;
   };
 
-  const openJustificationModal = () => {
+  const _openJustificationModal = () => {
     if (reservation) {
       // Wczytujemy tylko uzasadnienie dla obecnej promocji (filtrowane)
       const filteredJustification = getJustificationForCurrentPromotion();
@@ -1393,14 +1361,14 @@ export default function ReservationDetailPage() {
 
   const getJustificationForCurrentPromotion = (): Record<string, any> => {
     if (!reservation || currentPromotionId === null) return {};
-    
+
     const promotionName = reservation.promotion_name || reservation.selected_promotion || '';
     const type = getPromotionType(promotionName);
     const currentJustification = reservation.promotion_justification || {};
-    
+
     // Tworzymy nowy obiekt zawierający tylko pola potrzebne dla obecnej promocji
     const filteredJustification: Record<string, any> = {};
-    
+
     if (type === 'duza_rodzina') {
       if (currentJustification.card_number) {
         filteredJustification.card_number = currentJustification.card_number;
@@ -1433,19 +1401,19 @@ export default function ReservationDetailPage() {
         filteredJustification.reason = currentJustification.reason;
       }
     }
-    
+
     return filteredJustification;
   };
 
   const filterJustificationForSave = (draft: Record<string, any>): Record<string, any> => {
     if (!reservation || currentPromotionId === null) return {};
-    
+
     const promotionName = reservation.promotion_name || reservation.selected_promotion || '';
     const type = getPromotionType(promotionName);
-    
+
     // Tworzymy nowy obiekt zawierający tylko pola potrzebne dla obecnej promocji
     const filteredJustification: Record<string, any> = {};
-    
+
     if (type === 'duza_rodzina') {
       if (draft.card_number) {
         filteredJustification.card_number = draft.card_number;
@@ -1478,7 +1446,7 @@ export default function ReservationDetailPage() {
         filteredJustification.reason = draft.reason;
       }
     }
-    
+
     return filteredJustification;
   };
 
@@ -1528,7 +1496,7 @@ export default function ReservationDetailPage() {
 
   // Oblicz wyższą kwotę (dokładnie jak w TransportSection.tsx linia 255-256)
   const prices = [departurePrice, returnPrice].filter((p): p is number => p !== null && p !== undefined);
-  const transportPrice = prices.length > 0 ? Math.max(...prices) : 0;
+  const _transportPrice = prices.length > 0 ? Math.max(...prices) : 0;
 
   // Cena transportu na podstawie DRAFT (czas rzeczywisty podczas edycji) – ta sama logika co wyżej (TransportSection.tsx)
   let draftDepPrice: number | null = null;
@@ -1708,171 +1676,68 @@ export default function ReservationDetailPage() {
             <div className="h-full min-h-0 flex flex-col lg:flex-row animate-fadeIn -m-4">
               {/* Lewa kolumna: header, banner, karta z zakładkami */}
               <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          {/* Header - ciemny pasek jak w PaymentsManagement */}
-          <div className="bg-slate-800 shadow-md p-3 sticky top-0 z-20 mb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => {
-                    // Check if there's browser history to go back to
-                    // window.history.length > 1 means there's history
-                    // But we also need to check if we came from within the app
-                    if (window.history.length > 1 && document.referrer.includes(window.location.host)) {
-                      // Use browser back - preserves all URL params from previous page
-                      router.back();
-                    } else {
-                      // No history (new tab) - navigate to admin-panel with any saved params
-                      const returnParams = new URLSearchParams();
-                      if (fromPage) {
-                        returnParams.set('page', fromPage);
-                      }
-                      filterParams.forEach((value, key) => {
-                        returnParams.set(key, value);
-                      });
-                      const returnUrl = returnParams.toString()
-                        ? `/admin-panel?${returnParams.toString()}`
-                        : '/admin-panel';
-                      router.push(returnUrl);
-                    }
-                  }}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 transition-all duration-200 rounded"
-                  style={{ borderRadius: 0, cursor: 'pointer' }}
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-white">
-                    Szczegóły rezerwacji: {reservationNumber}
-                  </h1>
-                  <p className="text-sm text-slate-400 mt-1">
-                    Status: <span className="font-medium text-slate-300">{reservation.status || 'Brak danych'}</span> |
-                    Utworzona: {formatDateTime(reservation.created_at || null)} |
-                    Zaktualizowana: {formatDateTime(reservation.updated_at || null)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-              {/* For archived reservations: Restore button, for active: View client profile */}
-              {reservation.is_archived ? (
-                <button
-                  onClick={async () => {
-                    if (!reservation?.id || restoringReservation) return;
-                    
-                    setRestoringReservation(true);
-                    try {
-                      const response = await authenticatedApiCall<{
-                        message: string;
-                        reservation_id: number;
-                        reservation_number: string;
-                        original_id: number;
-                        turnus: string;
-                        available_spots_after: number;
-                      }>(`/api/reservations/restore/${reservation.id}`, {
-                        method: 'POST'
-                      });
-                      
-                      showSuccess(`Rezerwacja została przywrócona pomyślnie! Turnus: ${response.turnus}`, 5000);
-                      
-                      // Redirect to the restored reservation using the preserved reservation_number
-                      router.push(`/admin-panel/rezerwacja/${response.reservation_number}`);
-                    } catch (err) {
-                      console.error('Error restoring reservation:', err);
-                      const errorMessage = err instanceof Error ? err.message : 'Błąd podczas przywracania rezerwacji';
-                      
-                      // Check if it's a "no spots" error
-                      if (errorMessage.includes('Brak wolnych miejsc')) {
-                        setNoSpotsMessage(errorMessage);
-                        setShowNoSpotsModal(true);
-                      } else {
-                        showError(errorMessage, 5000);
-                      }
-                    } finally {
-                      setRestoringReservation(false);
-                    }
-                  }}
-                  disabled={restoringReservation}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ borderRadius: 0 }}
-                >
-                  {restoringReservation ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Przywracanie...</span>
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="w-4 h-4" />
-                      <span>Przywróć rezerwację</span>
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={async () => {
-                    if (!reservation?.id) return;
-                    try {
-                      // Fetch client info from reservation
-                      const response = await authenticatedApiCall<{
-                        user_id: number;
-                        user_email: string | null;
-                        user_name: string | null;
-                        can_view: boolean;
-                      }>(`/api/admin/client-view/from-reservation/${reservation.id}`);
-
-                      if (response.can_view) {
-                        // Open client view in new window
-                        window.open(`/client-view/${response.user_id}`, '_blank');
-                      } else {
-                        alert('Nie można wyświetlić profilu tego klienta');
-                      }
-                    } catch (err) {
-                      console.error('Error opening client view:', err);
-                      alert(err instanceof Error ? err.message : 'Błąd podczas otwierania profilu klienta');
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200"
-                  style={{ borderRadius: 0 }}
-                >
-                  <User className="w-3.5 h-3.5" />
-                  <span>Zobacz profil klienta</span>
-                </button>
-              )}
-              {/* Hide delete button for archived reservations */}
-              {!reservation.is_archived && (
-                <button
-                  onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white hover:bg-red-700 transition-all duration-200"
-                  style={{ borderRadius: 0 }}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Usuń rezerwację</span>
-                </button>
-              )}
-              </div>
-            </div>
-          </div>
-
-          {/* Archived reservation banner - delikatny, czerwony, bez border-left */}
-          {reservation.is_archived && (
-            <div className="mx-4 mt-4">
-              <div className="rounded-xl bg-red-50 p-4 sm:p-5 shadow-sm ring-1 ring-red-100/80">
-                <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                    <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-red-800 font-semibold text-base sm:text-lg">Rezerwacja zarchiwizowana</h3>
-                    <p className="text-red-700/90 text-sm mt-1">
-                      Ta rezerwacja została zarchiwizowana{reservation.archived_at ? ` dnia ${new Date(reservation.archived_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}.
-                      Dane są tylko do odczytu. Edycja i usuwanie są niedostępne.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          <ReservationDetailHeader
+            reservation={reservation}
+            reservationNumber={reservationNumber}
+            onBack={() => {
+              if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer.includes(window.location.host)) {
+                router.back();
+              } else {
+                const returnParams = new URLSearchParams();
+                if (fromPage) returnParams.set('page', fromPage);
+                filterParams.forEach((value, key) => returnParams.set(key, value));
+                router.push(returnParams.toString() ? `/admin-panel?${returnParams.toString()}` : '/admin-panel');
+              }
+            }}
+            onRestore={async () => {
+              if (!reservation?.id || restoringReservation) return;
+              setRestoringReservation(true);
+              try {
+                const response = await authenticatedApiCall<{
+                  message: string;
+                  reservation_id: number;
+                  reservation_number: string;
+                  original_id: number;
+                  turnus: string;
+                  available_spots_after: number;
+                }>(`/api/reservations/restore/${reservation.id}`, { method: 'POST' });
+                showSuccess(`Rezerwacja została przywrócona pomyślnie! Turnus: ${response.turnus}`, 5000);
+                router.push(`/admin-panel/rezerwacja/${response.reservation_number}`);
+              } catch (err) {
+                console.error('Error restoring reservation:', err);
+                const errorMessage = err instanceof Error ? err.message : 'Błąd podczas przywracania rezerwacji';
+                if (errorMessage.includes('Brak wolnych miejsc')) {
+                  setNoSpotsMessage(errorMessage);
+                  setShowNoSpotsModal(true);
+                } else {
+                  showError(errorMessage, 5000);
+                }
+              } finally {
+                setRestoringReservation(false);
+              }
+            }}
+            onViewClient={async () => {
+              if (!reservation?.id) return;
+              try {
+                const response = await authenticatedApiCall<{
+                  user_id: number;
+                  user_email: string | null;
+                  user_name: string | null;
+                  can_view: boolean;
+                }>(`/api/admin/client-view/from-reservation/${reservation.id}`);
+                if (response.can_view) {
+                  window.open(`/client-view/${response.user_id}`, '_blank');
+                } else {
+                  alert('Nie można wyświetlić profilu tego klienta');
+                }
+              } catch (err) {
+                console.error('Error opening client view:', err);
+                alert(err instanceof Error ? err.message : 'Błąd podczas otwierania profilu klienta');
+              }
+            }}
+            onDeleteClick={() => setShowDeleteModal(true)}
+            restoringReservation={restoringReservation}
+          />
 
           <div className="p-4 flex-1 min-h-0 overflow-hidden lg:h-[calc(100vh-11rem)]">
             <div className="relative h-full min-h-0">
@@ -1908,82 +1773,14 @@ export default function ReservationDetailPage() {
                   role="tabpanel"
                   aria-labelledby={`tab-${activePanel}`}
                 >
-            {/* Płatności */}
-            {activePanel === 'platnosci' && (() => {
-              // Oblicz rzeczywiste wpłaty
-              const tpayPaid = payments
-                .filter(p => p.status === 'paid' || p.status === 'completed' || p.status === 'success')
-                .reduce((sum, p) => sum + (p.paid_amount || p.amount || 0), 0);
-              const manualPaid = manualPayments.reduce((sum, mp) => sum + (mp.amount || 0), 0);
-              const totalPaid = tpayPaid + manualPaid;
-              const totalAmount = reservation.total_price || 0;
-              const remainingAmount = Math.max(0, totalAmount - totalPaid);
-
-              // Połącz i posortuj wszystkie płatności
-              const allPaymentsList = [
-                ...payments
-                  .filter(p => p.status === 'paid' || p.status === 'completed' || p.status === 'success')
-                  .map(p => ({
-                    amount: p.paid_amount || p.amount || 0,
-                    date: p.paid_at || p.created_at,
-                    method: p.channel_id === 64 ? 'BLIK' : p.channel_id === 53 ? 'Karta' : 'Online',
-                    source: 'tpay' as const,
-                  })),
-                ...manualPayments.map(mp => ({
-                  amount: mp.amount || 0,
-                  date: mp.created_at,
-                  method: mp.payment_method || 'Ręczna',
-                  source: 'manual' as const,
-                })),
-              ].sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
-
-              return (
-                <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
-                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-                    <h2 className="text-sm font-semibold text-slate-700">Płatności</h2>
-                    <button
-                      onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments${fromPage ? `?fromPage=${fromPage}` : ''}`)}
-                      className="text-xs text-[#03adf0] hover:text-[#0288c7] hover:underline"
-                    >
-                      Zarządzaj płatnościami
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div className="text-center p-3 bg-gray-50 rounded">
-                      <p className="text-xs text-gray-500 mb-1">Kwota całkowita</p>
-                      <p className="text-lg font-bold text-gray-900">{formatCurrency(totalAmount)}</p>
-                    </div>
-                    <div className="text-center p-3 bg-green-50 rounded">
-                      <p className="text-xs text-gray-500 mb-1">Wpłacono</p>
-                      <p className="text-lg font-bold text-green-600">{formatCurrency(totalPaid)}</p>
-                    </div>
-                    <div className={`text-center p-3 rounded ${remainingAmount > 0 ? 'bg-red-50' : 'bg-green-50'}`}>
-                      <p className="text-xs text-gray-500 mb-1">Pozostało</p>
-                      <p className={`text-lg font-bold ${remainingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatCurrency(remainingAmount)}
-                      </p>
-                    </div>
-                  </div>
-                  {allPaymentsList.length > 0 ? (
-                    <div>
-                      <p className="text-xs text-gray-500 mb-2">Historia wpłat ({allPaymentsList.length})</p>
-                      <div className="space-y-1 max-h-32 overflow-y-auto">
-                        {allPaymentsList.map((payment, idx) => (
-                          <div key={idx} className="flex justify-between text-sm py-1 border-b border-gray-50 last:border-0">
-                            <span className="text-gray-600">
-                              {payment.method} - {formatDate(payment.date)}
-                            </span>
-                            <span className="text-gray-900 font-medium">{formatCurrency(payment.amount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">Brak zarejestrowanych wpłat</p>
-                  )}
-                </div>
-              );
-            })()}
+            {activePanel === 'platnosci' && (
+              <PaymentsPanel
+                reservation={reservation}
+                payments={payments}
+                manualPayments={manualPayments}
+                onManagePayments={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments${fromPage ? `?fromPage=${fromPage}` : ''}`)}
+              />
+            )}
 
             {activePanel === 'dane' && (
             <div className="space-y-4">
@@ -2114,7 +1911,7 @@ export default function ReservationDetailPage() {
                                 participant_gender: participantDraft.participant_gender.trim(),
                                 participant_city: participantDraft.participant_city.trim(),
                               }),
-                            }
+                            },
                           );
                           setReservation((prev) => prev ? { ...prev, ...updated } : null);
                           setEditingParticipant(false);
@@ -2219,7 +2016,7 @@ export default function ReservationDetailPage() {
                               reservationData={mapReservationToContractForm(reservation as unknown as ReservationData)}
                               signedPayload={contractSignedPayload ?? undefined}
                             />,
-                            'Podgląd umowy'
+                            'Podgląd umowy',
                           );
                         }}
                         className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
@@ -2259,7 +2056,7 @@ export default function ReservationDetailPage() {
                                 window.location.hash = 'dokumenty';
                                 openedContractEditFromHashRef.current = false;
                               }
-                            }
+                            },
                           );
                         }}
                         className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
@@ -2319,7 +2116,7 @@ export default function ReservationDetailPage() {
                                   notifyEmail={notifyContractEmail}
                                   notifySms={notifyContractSms}
                                 />,
-                                'Odrzuć umowę'
+                                'Odrzuć umowę',
                               );
                             }}
                             className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors cursor-pointer"
@@ -2369,7 +2166,7 @@ export default function ReservationDetailPage() {
                                       reservationId={reservation.id}
                                       reservationData={mapReservationToContractForm(snapshot)}
                                     />,
-                                    `Wersja umowy ${v.created_at ? new Date(v.created_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : v.id}`
+                                    `Wersja umowy ${v.created_at ? new Date(v.created_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : v.id}`,
                                   );
                                 } catch {
                                   showError('Nie udało się wczytać wersji.');
@@ -2495,7 +2292,7 @@ export default function ReservationDetailPage() {
                               signedPayload={qualificationCardSignedPayload ?? undefined}
                               previewOnly={true}
                             />,
-                            'Podgląd karty kwalifikacyjnej'
+                            'Podgląd karty kwalifikacyjnej',
                           );
                         }}
                         className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
@@ -2522,7 +2319,7 @@ export default function ReservationDetailPage() {
                             'Edytuj kartę kwalifikacyjną',
                             () => {
                               if (typeof window !== 'undefined') window.location.hash = 'dokumenty';
-                            }
+                            },
                           );
                         }}
                         className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
@@ -2568,7 +2365,7 @@ export default function ReservationDetailPage() {
                                 signedPayload={qualificationCardSignedPayload ?? undefined}
                                 previewOnly={true}
                               />,
-                              'Podgląd karty kwalifikacyjnej'
+                              'Podgląd karty kwalifikacyjnej',
                             );
                           }}
                           className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-gray-100 text-gray-800 font-medium text-sm hover:bg-gray-200 transition-colors cursor-pointer"
@@ -2615,7 +2412,7 @@ export default function ReservationDetailPage() {
                                 notifyEmail={notifyCardEmail}
                                 notifySms={notifyCardSms}
                               />,
-                              'Odrzuć kartę kwalifikacyjną'
+                              'Odrzuć kartę kwalifikacyjną',
                             );
                           }}
                           className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors cursor-pointer"
@@ -2786,7 +2583,7 @@ export default function ReservationDetailPage() {
                                   }));
                                   const updated = await authenticatedApiCall<ReservationDetails>(
                                     `/api/reservations/by-number/${reservationNumber}/partial`,
-                                    { method: 'PATCH', body: JSON.stringify({ parents_data: payload }) }
+                                    { method: 'PATCH', body: JSON.stringify({ parents_data: payload }) },
                                   );
                                   setReservation((prev) => prev ? { ...prev, parents_data: updated.parents_data ?? [] } : null);
                                   setEditingGuardianIndex(null);
@@ -2865,7 +2662,7 @@ export default function ReservationDetailPage() {
                 <h2 className="text-sm font-semibold text-slate-700">Ochrony</h2>
                 {availableProtections.length > 0 && (() => {
                   const saved = (reservation.selected_protection ?? []).map((id) =>
-                    typeof id === 'number' ? id : parseInt(String(id).replace(/^protection-/, ''), 10)
+                    typeof id === 'number' ? id : parseInt(String(id).replace(/^protection-/, ''), 10),
                   ).filter((n) => !Number.isNaN(n));
                   const same =
                     saved.length === protectionDraft.length &&
@@ -2881,13 +2678,13 @@ export default function ReservationDetailPage() {
                         try {
                           const updated = await authenticatedApiCall<ReservationDetails>(
                             `/api/reservations/by-number/${reservationNumber}/admin/protection`,
-                            { method: 'PATCH', body: JSON.stringify({ selected_protection: protectionDraft }) }
+                            { method: 'PATCH', body: JSON.stringify({ selected_protection: protectionDraft }) },
                           );
                           setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
                           setProtectionDraft(
                             (updated.selected_protection ?? []).map((id) =>
-                              typeof id === 'number' ? id : parseInt(String(id).replace(/^protection-/, ''), 10)
-                            ).filter((n) => !Number.isNaN(n))
+                              typeof id === 'number' ? id : parseInt(String(id).replace(/^protection-/, ''), 10),
+                            ).filter((n) => !Number.isNaN(n)),
                           );
                           setProtectionDraftDirty(false);
                           showSuccess('Pakiety ochrony zostały zaktualizowane.');
@@ -2917,7 +2714,7 @@ export default function ReservationDetailPage() {
                   <div className="space-y-2">
                     {availableProtections.map((prot) => {
                       const savedIds = (reservation.selected_protection ?? []).map((id) =>
-                        typeof id === 'number' ? id : parseInt(String(id).replace(/^protection-/, ''), 10)
+                        typeof id === 'number' ? id : parseInt(String(id).replace(/^protection-/, ''), 10),
                       ).filter((n) => !Number.isNaN(n));
                       const isChecked = protectionDraft.includes(prot.id);
                       const isPendingAdded = isChecked && !savedIds.includes(prot.id);
@@ -2937,7 +2734,7 @@ export default function ReservationDetailPage() {
                                 setProtectionDraft((prev) =>
                                   prev.includes(prot.id)
                                     ? prev.filter((id) => id !== prot.id)
-                                    : [...prev, prot.id]
+                                    : [...prev, prot.id],
                                 );
                                 setProtectionDraftDirty(true);
                               }}
@@ -2965,7 +2762,7 @@ export default function ReservationDetailPage() {
                 <h2 className="text-sm font-semibold text-slate-700">Dodatki</h2>
                 {availableAddons.length > 0 && (() => {
                   const saved = (reservation.selected_addons ?? []).map((id) =>
-                    typeof id === 'number' ? id : parseInt(String(id), 10)
+                    typeof id === 'number' ? id : parseInt(String(id), 10),
                   ).filter((n) => !Number.isNaN(n));
                   const same =
                     saved.length === addonsDraft.length &&
@@ -2981,13 +2778,13 @@ export default function ReservationDetailPage() {
                         try {
                           const updated = await authenticatedApiCall<ReservationDetails>(
                             `/api/reservations/by-number/${reservationNumber}/admin/addons`,
-                            { method: 'PATCH', body: JSON.stringify({ selected_addons: addonsDraft }) }
+                            { method: 'PATCH', body: JSON.stringify({ selected_addons: addonsDraft }) },
                           );
                           setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
                           setAddonsDraft(
                             (updated.selected_addons ?? []).map((id) =>
-                              typeof id === 'number' ? id : parseInt(String(id), 10)
-                            ).filter((n) => !Number.isNaN(n))
+                              typeof id === 'number' ? id : parseInt(String(id), 10),
+                            ).filter((n) => !Number.isNaN(n)),
                           );
                           setAddonsDraftDirty(false);
                           showSuccess('Dodatki zostały zaktualizowane.');
@@ -3017,7 +2814,7 @@ export default function ReservationDetailPage() {
                   <div className="space-y-2">
                     {availableAddons.map((addon) => {
                       const savedIds = (reservation.selected_addons ?? []).map((id) =>
-                        typeof id === 'number' ? id : parseInt(String(id), 10)
+                        typeof id === 'number' ? id : parseInt(String(id), 10),
                       ).filter((n) => !Number.isNaN(n));
                       const isChecked = addonsDraft.includes(addon.id);
                       const isPendingAdded = isChecked && !savedIds.includes(addon.id);
@@ -3037,7 +2834,7 @@ export default function ReservationDetailPage() {
                                 setAddonsDraft((prev) =>
                                   prev.includes(addon.id)
                                     ? prev.filter((id) => id !== addon.id)
-                                    : [...prev, addon.id]
+                                    : [...prev, addon.id],
                                 );
                                 setAddonsDraftDirty(true);
                               }}
@@ -3114,7 +2911,7 @@ export default function ReservationDetailPage() {
                       <div>
                         <p className="text-sm text-gray-900 flex items-center justify-between gap-2">
                           <span>{reservation.promotion_name}</span>
-                          {reservation.promotion_price != null && reservation.promotion_price !== undefined && (
+                          {reservation.promotion_price !== null && reservation.promotion_price !== undefined && (
                             <span className="text-gray-700">{formatCurrency(reservation.promotion_price)}</span>
                           )}
                         </p>
@@ -3137,7 +2934,7 @@ export default function ReservationDetailPage() {
                     <p className="text-sm text-gray-900 font-medium">
                       {reservation.promotion_name || `Promocja #${reservation.selected_promotion}`}
                     </p>
-                    {reservation.promotion_price != null && reservation.promotion_price !== undefined && (
+                    {reservation.promotion_price !== null && reservation.promotion_price !== undefined && (
                       <p className="text-sm text-gray-600">
                         Cena: {formatCurrency(reservation.promotion_price)}
                       </p>
@@ -3525,7 +3322,7 @@ export default function ReservationDetailPage() {
                               return_city: transportDraft.return_city ?? null,
                               return_transport_city_id: transportDraft.return_transport_city_id ?? null,
                               transport_different_cities: transportDraft.transport_different_cities,
-                            }) }
+                            }) },
                           );
                           setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
                           setTransportDraft({
@@ -3592,7 +3389,7 @@ export default function ReservationDetailPage() {
                       >
                         {transportCities.map((c) => (
                           <option key={c.id} value={c.city}>
-                            {c.city}{c.departure_price != null ? ` (${formatCurrency(c.departure_price)})` : ''}
+                            {c.city}{c.departure_price !== null && c.departure_price !== undefined ? ` (${formatCurrency(c.departure_price)})` : ''}
                           </option>
                         ))}
                         {transportCities.length === 0 && <option value="">Brak miast</option>}
@@ -3635,7 +3432,7 @@ export default function ReservationDetailPage() {
                       >
                         {transportCities.map((c) => (
                           <option key={c.id} value={c.city}>
-                            {c.city}{c.return_price != null ? ` (${formatCurrency(c.return_price)})` : ''}
+                            {c.city}{c.return_price !== null && c.return_price !== undefined ? ` (${formatCurrency(c.return_price)})` : ''}
                           </option>
                         ))}
                         {transportCities.length === 0 && <option value="">Brak miast</option>}
@@ -3686,7 +3483,7 @@ export default function ReservationDetailPage() {
                         try {
                           const updated = await authenticatedApiCall<ReservationDetails>(
                             `/api/reservations/by-number/${reservationNumber}/admin/source`,
-                            { method: 'PATCH', body: JSON.stringify({ selected_source: sourceDraft.selected_source, source_inne_text: sourceDraft.source_inne_text ?? null }) }
+                            { method: 'PATCH', body: JSON.stringify({ selected_source: sourceDraft.selected_source, source_inne_text: sourceDraft.source_inne_text ?? null }) },
                           );
                           setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
                           setSourceDraft({
@@ -3724,7 +3521,7 @@ export default function ReservationDetailPage() {
                   ))}
                   {sourcesList.length === 0 && <option value="">Ładowanie…</option>}
                 </select>
-                {(sourceDraft.selected_source === 'inne' || sourceDraft.source_inne_text != null) && (
+                {(sourceDraft.selected_source === 'inne' || (sourceDraft.source_inne_text !== null && sourceDraft.source_inne_text !== undefined)) && (
                   <div className="mt-2">
                     <label className="block text-xs text-gray-500">Szczegóły (np. inne)</label>
                     <input
@@ -3780,7 +3577,7 @@ export default function ReservationDetailPage() {
                           };
                           const updated = await authenticatedApiCall<ReservationDetails>(
                             `/api/reservations/by-number/${reservationNumber}/admin/invoice`,
-                            { method: 'PATCH', body: JSON.stringify(body) }
+                            { method: 'PATCH', body: JSON.stringify(body) },
                           );
                           setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
                           setInvoiceDraft({
@@ -3969,7 +3766,7 @@ export default function ReservationDetailPage() {
                             if (healthDraft.additional_notes !== undefined) payload.additional_notes = healthDraft.additional_notes || null;
                             const updated = await authenticatedApiCall<ReservationDetails>(
                               `/api/reservations/by-number/${reservationNumber}/admin/health`,
-                              { method: 'PATCH', body: JSON.stringify(payload) }
+                              { method: 'PATCH', body: JSON.stringify(payload) },
                             );
                             setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
                             setEditingHealth(false);
@@ -4065,7 +3862,7 @@ export default function ReservationDetailPage() {
                           body: JSON.stringify({
                             participant_additional_info: participantAdditionalInfo.trim() || null,
                           }),
-                        }
+                        },
                       );
                       setReservation((prev) => prev ? { ...prev, participant_additional_info: result.participant_additional_info ?? null } : null);
                       showSuccess('Informacje dodatkowe zostały zapisane.');
@@ -4106,7 +3903,7 @@ export default function ReservationDetailPage() {
                           body: JSON.stringify({
                             accommodation_request: accommodationRequest.trim() || null,
                           }),
-                        }
+                        },
                       );
                       setReservation((prev) => prev ? { ...prev, accommodation_request: result.accommodation_request ?? null } : null);
                       showSuccess('Wniosek o zakwaterowanie został zapisany.');
@@ -4143,7 +3940,7 @@ export default function ReservationDetailPage() {
                         try {
                           const updated = await authenticatedApiCall<ReservationDetails>(
                             `/api/reservations/by-number/${reservationNumber}/admin/diet`,
-                            { method: 'PATCH', body: JSON.stringify({ diet: dietDraft }) }
+                            { method: 'PATCH', body: JSON.stringify({ diet: dietDraft }) },
                           );
                           setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
                           setDietDraft(updated.diet ?? null);
@@ -4172,7 +3969,7 @@ export default function ReservationDetailPage() {
                 <div className="space-y-2">
                   <label className="block text-xs text-gray-500">Wybrana dieta (jedna)</label>
                   <select
-                    value={dietDraft != null ? String(dietDraft) : 'none'}
+                    value={dietDraft !== null && dietDraft !== undefined ? String(dietDraft) : 'none'}
                     onChange={(e) => {
                       const raw = e.target.value;
                       const diet = raw === '' || raw === 'none' ? null : parseInt(raw, 10);
@@ -4186,15 +3983,15 @@ export default function ReservationDetailPage() {
                       const val = d.relation_id ?? d.id;
                       return (
                         <option key={val} value={val}>
-                          {d.name} {d.price != null ? ` – ${formatCurrency(d.price)}` : ''}
+                          {d.name} {d.price !== null && d.price !== undefined ? ` – ${formatCurrency(d.price)}` : ''}
                         </option>
                       );
                     })}
                   </select>
-                  {(dietDraft ?? reservation.diet) != null && (() => {
+                  {(dietDraft ?? reservation.diet) !== null && (dietDraft ?? reservation.diet) !== undefined && (() => {
                     const currentId = dietDraft ?? reservation.diet ?? null;
                     const d = turnusDietsList.find((x) => (x.relation_id ?? x.id) === currentId);
-                    return d?.price != null ? (
+                    return d?.price !== null && d?.price !== undefined ? (
                       <p className="text-xs text-gray-500 mt-1">Cena: {formatCurrency(d.price)}</p>
                     ) : null;
                   })()}
@@ -4289,7 +4086,7 @@ export default function ReservationDetailPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
                   <div className="flex items-center gap-2 text-amber-800 text-sm">
                     <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
@@ -4300,7 +4097,7 @@ export default function ReservationDetailPage() {
                     <span>W razie potrzeby rezerwację można przywrócić z archiwum</span>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-3 justify-end">
                   <button
                     onClick={() => setShowDeleteModal(false)}
@@ -4368,14 +4165,14 @@ export default function ReservationDetailPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6">
                   <p className="text-sm text-gray-600">
                     Aby przywrócić tę rezerwację, musisz najpierw zwolnić miejsce na tym turnusie
                     (np. przenieść inną rezerwację na inny turnus lub zarchiwizować inną rezerwację).
                   </p>
                 </div>
-                
+
                 <div className="flex justify-end">
                   <button
                     onClick={() => setShowNoSpotsModal(false)}
@@ -4444,7 +4241,7 @@ export default function ReservationDetailPage() {
                       try {
                         const updated = await authenticatedApiCall<ReservationDetails>(
                           `/api/reservations/by-number/${reservationNumber}/remove-second-guardian`,
-                          { method: 'POST', body: JSON.stringify({ reason }) }
+                          { method: 'POST', body: JSON.stringify({ reason }) },
                         );
                         setReservation((prev) => prev ? { ...prev, parents_data: updated.parents_data ?? [] } : null);
                         const nextParents = updated.parents_data && Array.isArray(updated.parents_data)
@@ -4483,7 +4280,7 @@ export default function ReservationDetailPage() {
             </UniversalModal>
 
             {/* Modal anulowania aneksu */}
-            {cancelAnnexId != null && (
+            {cancelAnnexId !== null && cancelAnnexId !== undefined && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-3">
                 <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-4">
                   <p className="text-sm text-gray-700 mb-2">Powód anulowania aneksu (min. 5 znaków):</p>

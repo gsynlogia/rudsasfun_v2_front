@@ -1,6 +1,7 @@
 'use client';
 
 import { Menu, X } from 'lucide-react';
+import Link from 'next/link';
 import { ReactNode, useState, useEffect } from 'react';
 
 import Footer from '../Footer';
@@ -59,7 +60,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
             <Menu className="w-6 h-6" />
             <span className="text-xs font-medium">Menu</span>
           </button>
-          <a
+          <Link
             href="/profil/aktualne-rezerwacje"
             className="flex flex-col items-center gap-1 px-4 py-2 text-gray-600 hover:text-[#03adf0] transition-colors"
           >
@@ -70,7 +71,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
               <line x1="3" y1="10" x2="21" y2="10" strokeWidth="2"></line>
             </svg>
             <span className="text-xs font-medium">Rezerwacje</span>
-          </a>
+          </Link>
           <a
             href="/profil/faktury-i-platnosci"
             className="flex flex-col items-center gap-1 px-4 py-2 text-gray-600 hover:text-[#03adf0] transition-colors"
@@ -139,7 +140,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
             {/* System Update Alert */}
             <div className="mb-4 sm:mb-6 relative">
               {/* Main alert - simplified clipPath for mobile */}
-              <div 
+              <div
                 className="bg-red-600 p-4 sm:p-5 rounded-lg sm:rounded-none"
                 style={{ clipPath: isSmallScreen ? 'none' : 'polygon(0 0, calc(100% - 25px) 0, 100% 25px, 100% 100%, 25px 100%, 0 calc(100% - 25px))' }}
               >

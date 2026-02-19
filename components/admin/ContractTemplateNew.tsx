@@ -6,9 +6,9 @@
  * Używany w panelu admin (rezerwacja #dokumenty) zamiast starego szablonu HTML z backendu.
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import Image from 'next/image';
 import { Printer } from 'lucide-react';
+import Image from 'next/image';
+import { useState, useEffect, useMemo } from 'react';
 
 export interface ContractTemplateNewProps {
   reservationId?: number;
@@ -110,7 +110,7 @@ function EditableField({
   className?: string;
 }) {
   const baseClass = multiline ? 'field-value-multiline' : 'field-value';
-  const withYellow = readOnly ? '' : ' admin-editable-field';
+  const _withYellow = readOnly ? '' : ' admin-editable-field';
   if (readOnly) {
     return <div className={`${baseClass} ${className}`}>{value}</div>;
   }
@@ -181,7 +181,7 @@ export function ContractTemplateNew({ reservationData, signedPayload, readOnly =
     if (overlay) {
       Object.keys(overlay).forEach((k) => {
         const v = (overlay as Record<string, unknown>)[k];
-        if (v != null && k in data) (data as Record<string, string>)[k] = String(v);
+        if (v !== null && v !== undefined && k in data) (data as Record<string, string>)[k] = String(v);
       });
     }
     return data;

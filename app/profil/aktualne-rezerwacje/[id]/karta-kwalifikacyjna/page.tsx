@@ -4,9 +4,9 @@ import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 import { QualificationForm } from '@/components/profile/QualificationForm';
-import { authService } from '@/lib/services/AuthService';
 import type { ReservationData } from '@/lib/contractReservationMapping';
 import { mapReservationToQualificationForm } from '@/lib/qualificationReservationMapping';
+import { authService } from '@/lib/services/AuthService';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 

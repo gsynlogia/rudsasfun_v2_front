@@ -19,10 +19,10 @@ export default function AuthorizationPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AuthorizationForm 
+      <AuthorizationForm
         reservationData={{
           reservationId: reservationId,
-          parentPhone: '+48 724680812' // TODO: pobierać z API
+          parentPhone: '+48 724680812', // TODO: pobierać z API
         }}
       />
     </div>

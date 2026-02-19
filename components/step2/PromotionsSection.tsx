@@ -71,7 +71,7 @@ function sortPromotionsByOrder(promotions: Promotion[]): Promotion[] {
  * Displays promotions from API for the selected turnus with justification fields
  */
 export default function PromotionsSection() {
-  const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
+  const { reservation: _reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
   const safePathname = pathname || '';
   const [promotions, setPromotions] = useState<Promotion[]>([]);

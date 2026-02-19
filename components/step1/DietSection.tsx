@@ -1,6 +1,5 @@
 'use client';
 
-import { Info } from 'lucide-react';
 import { usePathname, useParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
@@ -8,7 +7,6 @@ import { useReservation } from '@/context/ReservationContext';
 import { DEFAULT_DIET } from '@/types/defaults';
 import { BackendUnavailableError } from '@/utils/api-auth';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
-import { fetchWithDefaults } from '@/utils/api-fetch';
 import { loadStep1FormData, saveStep1FormData, type Step1FormData } from '@/utils/sessionStorage';
 
 interface Diet {
@@ -27,7 +25,7 @@ interface Diet {
  * Replaces hardcoded standard/vegetarian diets
  */
 export default function DietSection() {
-  const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
+  const { reservation: _reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
   const safePathname = pathname || '';
   const params = useParams();

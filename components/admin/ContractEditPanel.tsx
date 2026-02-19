@@ -2,6 +2,7 @@
 
 import { Save } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import EditReservationStep1 from '@/components/admin/EditReservationStep1';
 import EditReservationStep2 from '@/components/admin/EditReservationStep2';
 import { useToast } from '@/components/ToastContainer';
@@ -173,7 +174,7 @@ export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: Contr
       };
       await authenticatedApiCall<ReservationDetails>(
         `/api/reservations/${reservation.id}`,
-        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updateRequest) }
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updateRequest) },
       );
       showSuccess('Umowa zapisana. Poprzednia wersja dodana do archiwum.');
       onSaveSuccess();

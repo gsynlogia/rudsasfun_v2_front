@@ -21,8 +21,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { authService } from '@/lib/services/AuthService';
 import { useSidebar } from '@/context/SidebarContext';
+import { authService } from '@/lib/services/AuthService';
 
 /**
  * Admin Sidebar Component
@@ -49,7 +49,7 @@ export default function AdminSidebar() {
         setCanAccessSuperFunctions(
           user.id === 0 ||
           user.user_type === 'admin' ||
-          !!(user.groups && user.groups.includes('admin'))
+          !!(user.groups && user.groups.includes('admin')),
         );
       } else {
         const storedUser = authService.getCurrentUser();
@@ -60,7 +60,7 @@ export default function AdminSidebar() {
           setCanAccessSuperFunctions(
             storedUser.id === 0 ||
             storedUser.user_type === 'admin' ||
-            !!(storedUser.groups && storedUser.groups.includes('admin'))
+            !!(storedUser.groups && storedUser.groups.includes('admin')),
           );
         }
       }
@@ -160,7 +160,7 @@ export default function AdminSidebar() {
       }}
     >
       {/* Logo section */}
-      <div 
+      <div
         className="flex items-center justify-center relative"
         style={{ height: '64px' }}
       >
@@ -172,7 +172,7 @@ export default function AdminSidebar() {
               width={isCollapsed ? 40 : 100}
               height={isCollapsed ? 20 : 40}
               className="h-auto w-auto"
-              style={{ 
+              style={{
                 maxHeight: isCollapsed ? '28px' : '36px',
                 maxWidth: isCollapsed ? '40px' : '90px',
               }}
@@ -253,7 +253,7 @@ export default function AdminSidebar() {
 
                   {/* Tooltip for collapsed state */}
                   {isCollapsed && isHovered && (
-                    <div 
+                    <div
                       className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50"
                       style={{ pointerEvents: 'none' }}
                     >
@@ -312,7 +312,7 @@ export default function AdminSidebar() {
 
           {/* Tooltip for collapsed logout */}
           {isCollapsed && hoveredItem === 'logout' && (
-            <div 
+            <div
               className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50"
               style={{ pointerEvents: 'none' }}
             >
@@ -330,7 +330,7 @@ export default function AdminSidebar() {
   );
 }
 
-/* 
+/*
 ========================================
 BACKUP - POPRZEDNIA WERSJA (BIAŁA)
 ========================================

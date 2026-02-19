@@ -6,7 +6,6 @@ import { useState } from 'react';
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import { useToast } from '@/components/ToastContainer';
-import { authenticatedApiCall } from '@/utils/api-auth';
 import { getApiBaseUrl } from '@/utils/api-config';
 
 /**
@@ -50,7 +49,7 @@ export default function ContactPage() {
         throw new Error(error.detail || `HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const _data = await response.json();
 
       showSuccess('Dziękujemy za wiadomość! Otrzymaliśmy Twoją wiadomość i odpowiemy wkrótce.');
 

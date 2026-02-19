@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { API_BASE_URL } from '@/utils/api-config';
@@ -184,11 +184,11 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
     returnTransportCityId: data.return_transport_city_id ?? undefined,
     differentCities: data.transport_different_cities || false,
   });
-  const [selectedSource, setSelectedSource] = useState<string>(data.selected_source != null ? String(data.selected_source) : '');
+  const [selectedSource, setSelectedSource] = useState<string>(data.selected_source !== null && data.selected_source !== undefined ? String(data.selected_source) : '');
   const [inneText, setInneText] = useState<string>(data.source_inne_text || '');
 
   useEffect(() => {
-    setSelectedSource(data.selected_source != null ? String(data.selected_source) : '');
+    setSelectedSource(data.selected_source !== null && data.selected_source !== undefined ? String(data.selected_source) : '');
     setInneText(data.source_inne_text || '');
   }, [data.selected_source, data.source_inne_text]);
 
@@ -208,7 +208,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
 
         // Fetch addons (prefer property_id, fallback property_city)
         const selectedAddonIds = normalizeSelectedAddons(data.selected_addons);
-        const addonsUrl = property_id != null
+        const addonsUrl = property_id !== null && property_id !== undefined
           ? `${API_BASE_URL}/api/addons/public?property_id=${property_id}`
           : property_city
             ? `${API_BASE_URL}/api/addons/public?city=${encodeURIComponent(property_city)}`
@@ -550,7 +550,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
                 <p className="text-sm text-gray-900 font-medium">
                   {promotion_name || `Promocja #${data.selected_promotion}`}
                 </p>
-                {promotion_price != null && promotion_price !== undefined && (
+                {promotion_price !== null && promotion_price !== undefined && (
                   <p className="text-sm text-gray-600">
                     Cena: {formatPromotionPrice(promotion_price)}
                   </p>
@@ -717,7 +717,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
                   {transportCities.map((c) => (
                     <option key={c.id ?? c.city} value={c.city}>
                       {c.city}
-                      {c.departure_price != null ? ` (${c.departure_price.toFixed(2)} PLN)` : ''}
+                      {c.departure_price !== null && c.departure_price !== undefined ? ` (${c.departure_price.toFixed(2)} PLN)` : ''}
                     </option>
                   ))}
                 </select>
@@ -764,7 +764,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
                   {transportCities.map((c) => (
                     <option key={c.id ?? c.city} value={c.city}>
                       {c.city}
-                      {c.return_price != null ? ` (${c.return_price.toFixed(2)} PLN)` : ''}
+                      {c.return_price !== null && c.return_price !== undefined ? ` (${c.return_price.toFixed(2)} PLN)` : ''}
                     </option>
                   ))}
                 </select>

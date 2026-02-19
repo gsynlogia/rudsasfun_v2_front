@@ -28,7 +28,7 @@ interface Protection {
  * NOTE: Multiple selection allowed (checkboxes), NO justification required
  */
 export default function ProtectionsSection() {
-  const { reservation, addReservationItem, removeReservationItemsByType } = useReservation();
+  const { reservation: _reservation, addReservationItem, removeReservationItemsByType } = useReservation();
   const pathname = usePathname();
   const safePathname = pathname || '';
   const [protections, setProtections] = useState<Protection[]>([]);

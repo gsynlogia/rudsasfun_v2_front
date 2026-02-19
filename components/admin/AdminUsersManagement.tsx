@@ -72,7 +72,7 @@ export default function AdminUsersManagement() {
   // Filtered users
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
-      const matchesSearch = 
+      const matchesSearch =
         user.login.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesSearch;
@@ -103,11 +103,11 @@ export default function AdminUsersManagement() {
     try {
       await authenticatedApiCall(
         `${API_BASE_URL}/api/admin-users/${userToDelete.id}`,
-        { method: 'DELETE' }
+        { method: 'DELETE' },
       );
 
       showSuccess(`Użytkownik ${userToDelete.login} został usunięty`);
-      
+
       // Reload users and close modal
       await loadUsers();
       setDeleteModalOpen(false);
@@ -242,10 +242,10 @@ export default function AdminUsersManagement() {
                           {user.email || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span 
+                          <span
                             className={`px-2 py-1 text-xs font-medium ${
-                              user.is_active 
-                                ? 'bg-green-100 text-green-800' 
+                              user.is_active
+                                ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                             }`}
                             style={{ borderRadius: 0 }}
@@ -257,8 +257,8 @@ export default function AdminUsersManagement() {
                           <div className="flex flex-wrap gap-1">
                             {user.groups && user.groups.length > 0 ? (
                               user.groups.map((group) => (
-                                <span 
-                                  key={group} 
+                                <span
+                                  key={group}
                                   className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800"
                                   style={{ borderRadius: 0 }}
                                 >

@@ -258,7 +258,7 @@ const getCategoryLabel = (category: string) => {
 function SystemLogsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const getInitialFilters = useCallback((): SearchFilters => ({
     search: searchParams?.get('search') || '',
     action: searchParams?.get('action') || '',
@@ -267,7 +267,7 @@ function SystemLogsContent() {
     dateFrom: searchParams?.get('date_from') || '',
     dateTo: searchParams?.get('date_to') || '',
   }), [searchParams]);
-  
+
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -312,7 +312,7 @@ function SystemLogsContent() {
   // Update URL with current filters
   const updateURL = useCallback((newFilters: SearchFilters, page: number) => {
     const params = new URLSearchParams();
-    
+
     if (newFilters.search) params.set('search', newFilters.search);
     if (newFilters.action) params.set('action', newFilters.action);
     if (newFilters.category) params.set('category', newFilters.category);
@@ -320,12 +320,12 @@ function SystemLogsContent() {
     if (newFilters.dateFrom) params.set('date_from', newFilters.dateFrom);
     if (newFilters.dateTo) params.set('date_to', newFilters.dateTo);
     if (page > 1) params.set('page', page.toString());
-    
+
     const queryString = params.toString();
-    const newUrl = queryString 
+    const newUrl = queryString
       ? `${window.location.pathname}?${queryString}`
       : window.location.pathname;
-    
+
     window.history.replaceState({}, '', newUrl);
   }, []);
 
@@ -338,11 +338,11 @@ function SystemLogsContent() {
     // Apply filters
     if (appliedFilters.search) {
       const search = appliedFilters.search.toLowerCase();
-      filtered = filtered.filter(log => 
+      filtered = filtered.filter(log =>
         log.user_name.toLowerCase().includes(search) ||
         log.user_email.toLowerCase().includes(search) ||
         log.description.toLowerCase().includes(search) ||
-        (log.target_name && log.target_name.toLowerCase().includes(search))
+        (log.target_name && log.target_name.toLowerCase().includes(search)),
       );
     }
 
@@ -363,7 +363,7 @@ function SystemLogsContent() {
     }
 
     if (appliedFilters.dateTo) {
-      filtered = filtered.filter(log => log.timestamp <= appliedFilters.dateTo + 'T23:59:59');
+      filtered = filtered.filter(log => log.timestamp <= `${appliedFilters.dateTo}T23:59:59`);
     }
 
     setLogs(filtered);
@@ -459,7 +459,7 @@ function SystemLogsContent() {
               />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
-            
+
             {/* Action type */}
             <div>
               <select
@@ -476,7 +476,7 @@ function SystemLogsContent() {
                 <option value="logout">Wylogowanie</option>
               </select>
             </div>
-            
+
             {/* Category */}
             <div>
               <select
@@ -495,7 +495,7 @@ function SystemLogsContent() {
                 <option value="report">Raport</option>
               </select>
             </div>
-            
+
             {/* User */}
             <div className="relative">
               <select
@@ -510,7 +510,7 @@ function SystemLogsContent() {
               </select>
               <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
-            
+
             {/* Date from */}
             <div className="relative">
               <input
@@ -521,7 +521,7 @@ function SystemLogsContent() {
               />
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
-            
+
             {/* Date to */}
             <div className="relative">
               <input
@@ -533,7 +533,7 @@ function SystemLogsContent() {
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
           </div>
-          
+
           {/* Action buttons */}
           <div className="flex items-center gap-3 mt-3">
             <button
@@ -683,7 +683,7 @@ function SystemLogsContent() {
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              
+
               {/* Page numbers */}
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 let pageNum: number;
@@ -710,7 +710,7 @@ function SystemLogsContent() {
                   </button>
                 );
               })}
-              
+
               <button
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}

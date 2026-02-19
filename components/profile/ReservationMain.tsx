@@ -786,7 +786,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
               <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Promocja</h5>
               <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-gray-700">
                 <span>{promotion}</span>
-                {reservation.promotion_price != null && reservation.promotion_price !== undefined && (
+                {reservation.promotion_price !== null && reservation.promotion_price !== undefined && (
                   <span>{reservation.promotion_price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł</span>
                 )}
               </div>

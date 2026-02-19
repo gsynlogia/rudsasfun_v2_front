@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /** Typy strony szczegółów rezerwacji. */
 
 export interface SpeechRecognitionResultEventLike {
@@ -111,6 +110,6 @@ export interface ReservationNote {
   updated_at: string;
 }
 
-export type ReservationEventItem = { id: number; action: string; payload?: string | null; created_at?: string | null; author_display: string; author_role: string; };
-export type AnnexItem = { id: number; reservation_id: number; change_type: string; description: string; status: string; cancellation_reason: string | null; created_at: string | null; };
-export type GuardianEntry = { firstName?: string; lastName?: string; email?: string; phoneNumber?: string; street?: string; city?: string; postalCode?: string; };
+export interface ReservationEventItem { id: number; action: string; payload?: string | null; created_at?: string | null; author_display: string; author_role: string; }
+export interface AnnexItem { id: number; reservation_id: number; change_type: string; description: string; status: string; cancellation_reason: string | null; created_at: string | null; }
+export interface GuardianEntry { firstName?: string; lastName?: string; email?: string; phoneNumber?: string; street?: string; city?: string; postalCode?: string; }

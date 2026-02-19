@@ -51,7 +51,8 @@ class ContractService {
    * @returns URL to download contract PDF
    */
   getContractDownloadUrl(reservationId: number): string {
-    // Import authService to get token
+    // Import authService to get token (sync context - require used intentionally)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { authService } = require('@/lib/services/AuthService');
     const token = authService.getToken();
 
@@ -139,7 +140,7 @@ class ContractService {
     // This ensures contract is always generated on first click
     try {
       await this.generateContract(reservationId);
-    } catch (error: any) {
+    } catch {
       // If generation fails, try to download existing contract
       console.log('Contract generation failed, trying to download existing contract...');
     }

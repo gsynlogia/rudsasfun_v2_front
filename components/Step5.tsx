@@ -76,7 +76,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const [createdReservationId, setCreatedReservationId] = useState<number | null>(null);
   const [_paymentInstallments, _setPaymentInstallments] = useState<'full' | '2' | '3'>('full');
   const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
-  const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
+  const [_loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
   const [step1Diet, setStep1Diet] = useState<{ id: number; name: string; price: number } | null>(null);
 
   const makeReservationNumber = (id: number) => {
@@ -449,7 +449,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     // Second priority: Use step2Data.selectedProtection if available
     if (step2Data.selectedProtection && Array.isArray(step2Data.selectedProtection) && step2Data.selectedProtection.length > 0) {
       // Extract numeric IDs from "protection-{id}" format
-      const protectionIds = step2Data.selectedProtection
+      const _protectionIds = step2Data.selectedProtection
         .map((id: string) => {
           const match = id.match(/^protection-(\d+)$/);
           return match ? parseInt(match[1], 10) : null;
