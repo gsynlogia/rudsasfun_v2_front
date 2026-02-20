@@ -4,6 +4,7 @@ import { MapPin, User, Calendar, Mail, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
+import { useReservationPaymentHeader } from '@/contexts/ReservationPaymentHeaderContext';
 import { contractService } from '@/lib/services/ContractService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse, CreatePaymentRequest } from '@/lib/services/PaymentService';
@@ -15,6 +16,14 @@ import DashedLine from '../DashedLine';
 
 
 import AdditionalServicesTiles from './AdditionalServicesTiles';
+
+/** Linki do Map Google dla nazw ośrodków (otwierane w nowej karcie) */
+const CENTER_MAP_LINKS: Record<string, string> = {
+  beaver: 'https://www.google.com/maps/place/O%C5%9Brodek+BEAVER+-+Obozy+Radsas-Fun/@53.930431,17.82408,13z/data=!4m6!3m5!1s0x47026f7b1d4add13:0x2c1d171fb42a4a4d!8m2!3d53.9304311!4d17.8240802!16s%2Fg%2F11sc3kpv2s?hl=pl-PL&entry=ttu',
+  wiele: 'https://www.google.com/maps/place/O%C5%9Brodek+BEAVER+-+Obozy+Radsas-Fun/@53.930431,17.82408,13z/data=!4m6!3m5!1s0x47026f7b1d4add13:0x2c1d171fb42a4a4d!8m2!3d53.9304311!4d17.8240802!16s%2Fg%2F11sc3kpv2s?hl=pl-PL&entry=ttu',
+  sawa: 'https://www.google.com/maps?ll=54.332345,19.057051&z=11&t=m&hl=pl-PL&gl=US&mapclient=embed&cid=14839320515448778601',
+  limba: 'https://www.google.com/maps?ll=49.329466,20.038894&z=13&t=m&hl=pl-PL&gl=US&mapclient=embed&cid=14078562888214195223',
+};
 
 interface ReservationMainProps {
   reservation: ReservationResponse;
@@ -31,6 +40,7 @@ interface ReservationMainProps {
  */
 export default function ReservationMain({ reservation, isDetailsExpanded, onToggleDetails, onReservationUpdate, basePath = '/profil' }: ReservationMainProps) {
   const router = useRouter();
+  const paymentHeaderCtx = useReservationPaymentHeader();
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
   const [manualPayments, setManualPayments] = useState<ManualPaymentResponse[]>([]);
   const [_loadingPayments, _setLoadingPayments] = useState(false);
@@ -373,6 +383,14 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         setPaidAmount(paidAmount);
         setIsFullyPaid(paidAmount >= totalAmount);
 
+        if (paymentHeaderCtx) {
+          paymentHeaderCtx.setPaymentHeader({
+            totalPrice: totalAmount,
+            totalPaid: paidAmount,
+            paymentStatus: paidAmount >= totalAmount ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid',
+          });
+        }
+
         // Update payment installments from reservation.payment_plan if available
         if (reservation.payment_plan && (reservation.payment_plan === 'full' || reservation.payment_plan === '2' || reservation.payment_plan === '3')) {
           setPaymentInstallments(reservation.payment_plan as 'full' | '2' | '3');
@@ -497,6 +515,13 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
   // Get dates
   const dates = formatDateRange(reservation.property_start_date, reservation.property_end_date);
+
+  // Tytuł przelewu: nazwa kolonii/obozu, termin, imię i nazwisko uczestnika, nr tel. wpłacającego
+  const firstParent = reservation.parents_data?.[0];
+  const payerPhone = firstParent
+    ? [firstParent.phone, firstParent.phoneNumber].filter(Boolean).join(' ').trim() || ''
+    : '';
+  const transferTitle = [campName, dates, participantName, payerPhone ? `tel. ${payerPhone}` : ''].filter(Boolean).join(', ');
 
   // Get center/city
   const _center = reservation.property_city || 'Brak danych';
@@ -730,16 +755,31 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
       <div>
         <h4 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
           {campName}
-          {reservation.property_city && (
-            <span className="text-xs sm:text-sm font-normal text-gray-600 ml-2">
-              - {reservation.property_city}
-            </span>
-          )}
+          {reservation.property_city && (() => {
+            const key = reservation.property_city!.trim().toLowerCase();
+            const href = CENTER_MAP_LINKS[key];
+            return (
+              <span className="text-xs sm:text-sm font-normal text-gray-600 ml-2">
+                - {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#03adf0] hover:text-[#0288c7] underline"
+                  >
+                    {reservation.property_city}
+                  </a>
+                ) : (
+                  reservation.property_city
+                )}
+              </span>
+            );
+          })()}
         </h4>
         <div className="text-xs sm:text-sm text-gray-600 space-y-1">
           <div className="flex items-center gap-1.5 sm:gap-2">
             <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-            <span>Termin: {dates}</span>
+            <span className="font-semibold text-gray-900">Termin: {dates}</span>
           </div>
         </div>
       </div>
@@ -891,6 +931,103 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           />
 
           <DashedLine />
+
+          {/* Cost breakdown (same structure as step 4 basket) – dynamic from API, no hardcoded amounts */}
+          {(() => {
+            const hasBase = reservation.base_price != null && reservation.base_price > 0;
+            const hasDiet = reservation.diet_name && (reservation.diet_price ?? 0) !== 0;
+            const hasAddons = reservation.addons_data && reservation.addons_data.length > 0;
+            const hasProtection =
+              reservation.selected_protection &&
+              reservation.selected_protection.length > 0 &&
+              reservation.protection_names &&
+              reservation.protection_prices;
+            const hasTransport = reservation.transport_price != null && reservation.transport_price > 0;
+            const hasPromotion = reservation.promotion_name != null && reservation.promotion_name !== '';
+            const showBreakdown =
+              hasBase || hasDiet || hasAddons || hasProtection || hasTransport || hasPromotion;
+
+            if (!showBreakdown) return null;
+
+            const formatAmount = (value: number): string => {
+              if (value >= 0) return `+${value.toFixed(2)} zł`;
+              return `${value.toFixed(2)} zł`;
+            };
+
+            const rows: { label: string; amount?: number; infoOnly?: boolean }[] = [];
+
+            if (hasBase) {
+              rows.push({ label: 'Cena podstawowa', amount: reservation.base_price! });
+            }
+            if (hasDiet) {
+              rows.push({
+                label: reservation.diet_name!,
+                amount: reservation.diet_price ?? 0,
+              });
+            }
+            if (hasAddons) {
+              for (const addon of reservation.addons_data!) {
+                rows.push({ label: addon.name, amount: addon.price });
+              }
+            }
+            if (hasProtection) {
+              for (const id of reservation.selected_protection!) {
+                const name = reservation.protection_names![id] ?? reservation.protection_names![String(id)];
+                if (!name) continue;
+                const price = reservation.protection_prices![name.toLowerCase()] ?? 0;
+                rows.push({ label: name, amount: price });
+              }
+            }
+            if (hasTransport) {
+              const dep =
+                reservation.departure_type === 'wlasny'
+                  ? 'Własny transport'
+                  : (reservation.departure_city ?? '');
+              const ret =
+                reservation.return_type === 'wlasny'
+                  ? 'Własny transport'
+                  : (reservation.return_city ?? '');
+              rows.push({
+                label: `Transport (WYJAZD: ${dep} / POWRÓT: ${ret})`,
+                amount: reservation.transport_price!,
+              });
+            }
+            if (hasPromotion) {
+              if (reservation.promotion_does_not_reduce_price) {
+                rows.push({
+                  label: `${reservation.promotion_name} – nie obniża ceny`,
+                  infoOnly: true,
+                });
+              } else if (reservation.promotion_price != null && reservation.promotion_price !== 0) {
+                rows.push({
+                  label: reservation.promotion_name!,
+                  amount: -Math.abs(reservation.promotion_price),
+                });
+              } else {
+                rows.push({ label: reservation.promotion_name!, infoOnly: true });
+              }
+            }
+
+            return (
+              <div className="mb-3 sm:mb-4">
+                <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2">Szczegóły kosztów</h5>
+                <div className="bg-gray-50 rounded-lg p-3 sm:p-4 space-y-1.5 text-xs sm:text-sm">
+                  {rows.map((row, idx) => (
+                    <div key={idx} className="flex justify-between items-center">
+                      <span className="text-gray-700">{row.label}</span>
+                      {row.infoOnly ? (
+                        <span className="text-gray-500 italic">–</span>
+                      ) : (
+                        <span className="font-medium tabular-nums text-gray-900">
+                          {row.amount! >= 0 ? formatAmount(row.amount!) : `${row.amount!.toFixed(2)} zł`}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Total Cost and Actions */}
           <div>
@@ -1294,12 +1431,10 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                                     <span className="ml-2 text-gray-900">{bankAccount.address}</span>
                                   </div>
                                 )}
-                                {bankAccount.transfer_title_template && (
-                                  <div className="pt-2 border-t border-gray-200">
-                                    <span className="font-medium text-gray-700">Tytuł przelewu:</span>
-                                    <p className="mt-1 text-gray-900 italic">{bankAccount.transfer_title_template}</p>
-                                  </div>
-                                )}
+                                <div className="pt-2 border-t border-gray-200">
+                                  <span className="font-medium text-gray-700">Tytuł przelewu:</span>
+                                  <p className="mt-1 text-gray-900">{transferTitle || '—'}</p>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -1323,7 +1458,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             onClick={onToggleDetails}
             className="text-xs sm:text-sm text-[#03adf0] hover:text-[#0288c7] flex items-center gap-1 mx-auto transition-colors"
           >
-            ukryj szczegóły
+            ukryj szczegóły rezerwacji
             <svg
               className="w-3 h-3 sm:w-4 sm:h-4 transition-transform"
               fill="none"
@@ -1340,7 +1475,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
             }}
             className="text-xs sm:text-sm text-[#03adf0] hover:text-[#0288c7] flex items-center gap-1 mx-auto transition-colors"
           >
-            pokaż szczegóły
+            pokaż szczegóły rezerwacji
             <svg
               className="w-3 h-3 sm:w-4 sm:h-4 transition-transform rotate-180"
               fill="none"

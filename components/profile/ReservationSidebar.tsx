@@ -1,12 +1,12 @@
 'use client';
 
-import { FileText, Download, CheckCircle, XCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { FileText, Download, XCircle } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-
 
 import { certificateService, CertificateResponse } from '@/lib/services/CertificateService';
 import { contractService } from '@/lib/services/ContractService';
+import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService } from '@/lib/services/PaymentService';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { ReservationResponse } from '@/lib/services/ReservationService';
@@ -38,6 +38,8 @@ interface FileHistoryItem {
  */
 export default function ReservationSidebar({ reservationId, reservation, isDetailsExpanded, basePath = '/profil' }: ReservationSidebarProps) {
   const router = useRouter();
+  const pathname = usePathname() ?? '';
+  const isDetailPage = /\/aktualne-rezerwacje\/[^/]+$/.test(pathname);
   const [_isGenerating, setIsGenerating] = useState(false);
   const [qualificationCard, setQualificationCard] = useState<QualificationCardResponse | null>(null);
   const [loadingCard, setLoadingCard] = useState(false);
@@ -46,6 +48,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [fileHistory, setFileHistory] = useState<FileHistoryItem[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Array<{ date: string; amount: number; label: string }>>([]);
   const [isFullyPaid, setIsFullyPaid] = useState(false);
   const [_hasContract, setHasContract] = useState(false);
   const [_loadingContract, setLoadingContract] = useState(false);
@@ -145,6 +148,40 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
       loadFileHistory();
     }
   }, [reservationIdNum, isDetailsExpanded, isValidReservationId]);
+
+  // Load payment history (widoczna na liście i na szczegółach)
+  useEffect(() => {
+    const loadPaymentHistory = async () => {
+      if (!isValidReservationId) return;
+      try {
+        const [paymentsRes, manualPayments] = await Promise.all([
+          paymentService.listPayments(0, 1000),
+          manualPaymentService.getByReservation(reservationIdNum),
+        ]);
+        const online = (paymentsRes || [])
+          .filter((p: { order_id: string }) => p.order_id === String(reservation.id))
+          .filter((p: { status: string }) => p.status === 'paid' || p.status === 'success')
+          .map((p: { paid_at: string | null; created_at: string; amount: number; paid_amount: number | null }) => ({
+            date: p.paid_at || p.created_at,
+            amount: p.paid_amount ?? p.amount,
+            label: 'Płatność online',
+          }));
+        const manual = (manualPayments || []).map((p: ManualPaymentResponse) => ({
+          date: p.payment_date,
+          amount: p.amount,
+          label: p.payment_method ? `Wpłata ręczna (${p.payment_method})` : 'Wpłata ręczna',
+        }));
+        const merged = [...online, ...manual].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        );
+        setPaymentHistory(merged);
+      } catch (error) {
+        console.error('Error loading payment history:', error);
+        setPaymentHistory([]);
+      }
+    };
+    loadPaymentHistory();
+  }, [reservation.id, reservationIdNum, isValidReservationId]);
 
   // Load qualification card on mount
   useEffect(() => {
@@ -622,24 +659,10 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         */}
       </div>
 
-      {/* Collapsible Section - Everything after Qualification Card */}
-      {isDetailsExpanded && (
+      {/* Collapsible: tylko przycisk rezygnacja (na stronie szczegółów) */}
+      {isDetailsExpanded && isDetailPage && (
         <>
           <DashedLine />
-
-          {/* Full Payment Status */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            {isFullyPaid ? (
-              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 flex-shrink-0" />
-            ) : (
-              <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
-            )}
-            <span className={`text-xs sm:text-sm ${isFullyPaid ? 'text-green-700' : 'text-gray-700'}`}>
-              Pełna wpłata
-            </span>
-          </div>
-
-          {/* Action Buttons */}
           <div className="space-y-1.5 sm:space-y-2">
             <button
               onClick={() => setShowCancellationModal(true)}
@@ -648,75 +671,44 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               rezygnacja
             </button>
           </div>
-
-          <DashedLine />
-
-          {/* File History */}
-          <div>
-            <h4 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">Historia plików</h4>
-            {fileHistory.length > 0 ? (
-              <div className="space-y-1.5 sm:space-y-2 text-[10px] sm:text-xs text-gray-600">
-                {fileHistory.map((file) => {
-                  const date = new Date(file.date);
-                  const formattedDate = date.toLocaleDateString('pl-PL', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
-
-                  const handleDownload = async () => {
-                    if (file.type === 'certificate' && file.id.startsWith('certificate-')) {
-                      const certId = parseInt(file.id.replace('certificate-', ''));
-                      try {
-                        const blob = await certificateService.downloadCertificate(certId);
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = file.name;
-                        a.style.display = 'none';
-                        document.body.appendChild(a);
-                        a.click();
-                        setTimeout(() => {
-                          window.URL.revokeObjectURL(url);
-                          if (document.body.contains(a)) {
-                            document.body.removeChild(a);
-                          }
-                        }, 100);
-                      } catch (error) {
-                        console.error('Error downloading certificate:', error);
-                        alert('Nie udało się pobrać zaświadczenia. Spróbuj ponownie.');
-                      }
-                    } else if (file.fileUrl) {
-                      window.open(file.fileUrl, '_blank');
-                    }
-                  };
-
-                  return (
-                    <div key={file.id} className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{formattedDate}</div>
-                        <div>{file.name} {file.type === 'qualification_card' ? '(wgranie)' : ''}</div>
-                      </div>
-                      {(file.type === 'certificate' || file.fileUrl) && (
-                        <button
-                          onClick={handleDownload}
-                          className="ml-2 px-2 py-1 text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                        >
-                          <Download className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-[10px] sm:text-xs text-gray-500">Brak przesłanych plików</div>
-            )}
-          </div>
         </>
       )}
+
+      {/* Historia wpłat – zawsze widoczna (lista i szczegóły), pod Upoważnieniami */}
+      <DashedLine />
+      <div>
+        <h4 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">Historia wpłat</h4>
+        {paymentHistory.length > 0 ? (
+          <div className="space-y-1.5 sm:space-y-2 text-[10px] sm:text-xs text-gray-600">
+            {paymentHistory.map((entry, idx) => {
+              const date = new Date(entry.date);
+              const formattedDate = date.toLocaleDateString('pl-PL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+              const amountStr = new Intl.NumberFormat('pl-PL', {
+                style: 'currency',
+                currency: 'PLN',
+                minimumFractionDigits: 2,
+              }).format(entry.amount);
+              return (
+                <div key={`pay-${idx}`} className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="font-medium">{formattedDate}</div>
+                    <div>{entry.label}</div>
+                  </div>
+                  <div className="font-medium text-gray-900">{amountStr}</div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-[10px] sm:text-xs text-gray-500">Brak wpłat</div>
+        )}
+      </div>
 
       {/* Upload Certificate Modal */}
       <UniversalModal

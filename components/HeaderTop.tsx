@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
+import { useReservationPaymentHeader } from '@/contexts/ReservationPaymentHeaderContext';
 import { authService } from '@/lib/services/AuthService';
 
 /**
@@ -20,6 +21,8 @@ interface HeaderTopProps {
 
 export default function HeaderTop({ fixed = false, hideLogo = false, fixedHeight = false }: HeaderTopProps) {
   const _router = useRouter();
+  const paymentHeaderCtx = useReservationPaymentHeader();
+  const paymentHeader = paymentHeaderCtx?.value ?? null;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -82,6 +85,50 @@ export default function HeaderTop({ fixed = false, hideLogo = false, fixedHeight
                   priority
                 />
               </Link>
+            </div>
+          )}
+
+          {/* Mobile: płatności na pasku – cena większa, pod nią status; skeleton gdy loading */}
+          {!hideLogo && !fixedHeight && paymentHeader && (
+            <div className="lg:hidden flex-1 flex items-center justify-center min-w-0 px-1 sm:px-2">
+              <div className="flex flex-col items-center justify-center gap-0.5">
+                {paymentHeader.loading ? (
+                  <>
+                    <div className="h-6 w-16 bg-gray-200 rounded animate-pulse" aria-hidden />
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" aria-hidden />
+                  </>
+                ) : (
+                  <>
+                <span className="text-lg sm:text-xl font-bold text-gray-800 leading-tight">
+                  {paymentHeader.totalPrice.toFixed(0)} PLN
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                  <>
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded ${
+                          paymentHeader.paymentStatus === 'paid'
+                            ? 'bg-green-100 text-green-800'
+                            : paymentHeader.paymentStatus === 'partial'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {paymentHeader.paymentStatus === 'paid'
+                          ? 'Opłacona'
+                          : paymentHeader.paymentStatus === 'partial'
+                            ? 'Częściowo'
+                            : 'Brak wpłaty'}
+                      </span>
+                      {paymentHeader.totalPaid > 0 && (
+                        <span className="text-xs text-gray-600">
+                          {paymentHeader.totalPaid.toFixed(0)} PLN wpłacono
+                        </span>
+                      )}
+                  </>
+                </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
 

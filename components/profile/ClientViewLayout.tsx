@@ -4,6 +4,7 @@ import { Menu, X, Eye, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { ReactNode, useState } from 'react';
 
+import { ReservationPaymentHeaderProvider } from '@/contexts/ReservationPaymentHeaderContext';
 import Footer from '../Footer';
 import HeaderTop from '../HeaderTop';
 
@@ -30,9 +31,10 @@ export default function ClientViewLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
-      {/* Admin View Banner */}
-      <div className="bg-amber-500 text-white py-2 px-4 sticky top-0 z-[60]">
+    <ReservationPaymentHeaderProvider initialTotalPrice={null}>
+      <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
+        {/* Admin View Banner */}
+        <div className="bg-amber-500 text-white py-2 px-4 sticky top-0 z-[60]">
         <div className="max-w-container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Eye className="w-5 h-5" />
@@ -142,6 +144,7 @@ export default function ClientViewLayout({
 
       {/* Footer - Existing component */}
       <Footer />
-    </div>
+      </div>
+    </ReservationPaymentHeaderProvider>
   );
 }

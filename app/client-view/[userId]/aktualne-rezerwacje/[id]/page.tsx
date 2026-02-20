@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { useReservationPaymentHeader } from '@/contexts/ReservationPaymentHeaderContext';
 import ReservationMain from '@/components/profile/ReservationMain';
 import ReservationSidebar from '@/components/profile/ReservationSidebar';
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
@@ -16,6 +17,7 @@ import { reservationService, ReservationResponse } from '@/lib/services/Reservat
 export default function ClientViewReservationDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const paymentHeaderCtx = useReservationPaymentHeader();
   const userId = params?.userId ? parseInt(params.userId as string, 10) : undefined;
   const reservationNumber = params?.id ? String(params.id) : ''; // e.g., "REZ-2025-016"
   const basePath = userId ? `/client-view/${userId}` : '/profil';
@@ -30,26 +32,29 @@ export default function ClientViewReservationDetailPage() {
         setIsLoading(true);
         setError(null);
 
-        // Get user's reservations (with view_as_user_id for admin)
-        const reservations = await reservationService.getMyReservations(0, 100, userId);
+        // Use by-number for full cost breakdown (admin has access to any reservation)
+        const isRezFormat = /^REZ-\d{4}-\d+$/i.test(reservationNumber);
+        if (isRezFormat) {
+          const fullReservation = await reservationService.getReservationByNumber(reservationNumber);
+          setReservation(fullReservation);
+          return;
+        }
 
-        // Find reservation by number
+        // Fallback: list (with view_as_user_id) + find by formatted number
+        const reservations = await reservationService.getMyReservations(0, 100, userId);
         const formatReservationNumber = (reservationId: number, createdAt: string) => {
           const year = new Date(createdAt).getFullYear();
           const paddedId = String(reservationId).padStart(3, '0');
           return `REZ-${year}-${paddedId}`;
         };
-
         const foundReservation = reservations.find((r: ReservationResponse) => {
           const rNumber = formatReservationNumber(r.id, r.created_at);
           return rNumber === reservationNumber;
         });
-
         if (!foundReservation) {
           setError('Rezerwacja nie została znaleziona');
           return;
         }
-
         setReservation(foundReservation);
       } catch (err) {
         console.error('Error fetching reservation:', err);
@@ -63,6 +68,34 @@ export default function ClientViewReservationDetailPage() {
       fetchReservation();
     }
   }, [reservationNumber, userId]);
+
+  useEffect(() => {
+    const isRez = /^REZ-\d{4}-\d+$/i.test(reservationNumber);
+    if (isRez && reservationNumber && userId) {
+      paymentHeaderCtx?.setPaymentHeader({
+        totalPrice: 0,
+        totalPaid: 0,
+        paymentStatus: 'unpaid',
+        loading: true,
+      });
+    }
+    return () => {
+      paymentHeaderCtx?.setPaymentHeader(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reservationNumber, userId]);
+
+  useEffect(() => {
+    if (!reservation) return;
+    const total = Number(reservation.total_price) || 0;
+    paymentHeaderCtx?.setPaymentHeader({
+      totalPrice: total,
+      totalPaid: 0,
+      paymentStatus: 'unpaid',
+      loading: false,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reservation?.id]);
 
   // Dummy toggle function (not used, but required by ReservationMain)
   const handleToggleDetails = () => {
@@ -99,7 +132,6 @@ export default function ClientViewReservationDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
-        {/* Back Button */}
         <button
           onClick={() => router.push(`${basePath}/aktualne-rezerwacje`)}
           className="mb-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
@@ -107,24 +139,17 @@ export default function ClientViewReservationDetailPage() {
           <ArrowLeft className="w-4 h-4" />
           <span>Wróć do listy rezerwacji</span>
         </button>
-
-        {/* Reservation Card */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="flex flex-col lg:flex-row">
-            {/* Left: Main Content */}
             <div className="flex-1 p-3 sm:p-4 md:p-6">
               <ReservationMain
                 reservation={reservation}
                 isDetailsExpanded={true}
                 onToggleDetails={handleToggleDetails}
                 basePath={basePath}
-                onReservationUpdate={(updatedReservation) => {
-                  setReservation(updatedReservation);
-                }}
+                onReservationUpdate={(updatedReservation) => setReservation(updatedReservation)}
               />
             </div>
-
-            {/* Right: Sidebar */}
             <div className="lg:w-80 border-t lg:border-t-0 lg:border-l border-gray-200 p-3 sm:p-4 md:p-6 bg-gray-50">
               <ReservationSidebar
                 reservationId={String(reservation.id)}

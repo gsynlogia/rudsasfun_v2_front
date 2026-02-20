@@ -1389,6 +1389,33 @@ export default function PaymentsManagement() {
     depositAmount: 'Zaliczka',
   };
 
+  /** Kolumny z datami – w filtrach sortowane od najnowszej do najstarszej */
+  const DATE_FILTER_COLUMNS = ['createdAt', 'payment1Date', 'payment2Date', 'payment3Date'] as const;
+
+  const parseDateForSort = (s: string): number => {
+    if (!s || s === '-') return 0;
+    const trimmed = s.trim();
+    const plMatch = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:,\s*\d{1,2}:\d{2})?/);
+    if (plMatch) {
+      const [, d, m, y] = plMatch;
+      const date = new Date(parseInt(y!, 10), parseInt(m!, 10) - 1, parseInt(d!, 10));
+      return isNaN(date.getTime()) ? 0 : date.getTime();
+    }
+    const iso = new Date(trimmed);
+    return isNaN(iso.getTime()) ? 0 : iso.getTime();
+  };
+
+  const sortDateFilterValues = (arr: string[]): string[] => {
+    return [...arr].sort((a, b) => {
+      const ta = parseDateForSort(a);
+      const tb = parseDateForSort(b);
+      if (ta === 0 && tb === 0) return 0;
+      if (ta === 0) return 1;
+      if (tb === 0) return -1;
+      return tb - ta;
+    });
+  };
+
   // Default column order and visibility (zgodnie z zadaniem)
   const DEFAULT_COLUMN_ORDER = [
     'reservationName',
@@ -1603,11 +1630,13 @@ export default function PaymentsManagement() {
   // Get unique values for a column - prefer backend filter_options (all values from DB)
   // For columns not in filter_options, calculate from current page data
   const getUniqueColumnValues = (columnKey: string): string[] => {
+    const isDateCol = DATE_FILTER_COLUMNS.includes(columnKey as typeof DATE_FILTER_COLUMNS[number]);
     // First check if backend provides filter options for this column
     if (filterOptions) {
       const backendKey = columnKey as keyof FilterOptions;
       if (filterOptions[backendKey] && filterOptions[backendKey].length > 0) {
-        return filterOptions[backendKey];
+        const list = filterOptions[backendKey];
+        return isDateCol ? sortDateFilterValues(list) : list;
       }
     }
 
@@ -1736,7 +1765,8 @@ export default function PaymentsManagement() {
         values.add(value);
       }
     });
-    return Array.from(values).sort();
+    const list = Array.from(values);
+    return isDateCol ? sortDateFilterValues(list) : list.sort();
   };
 
   // Update filters in URL
@@ -1889,15 +1919,20 @@ export default function PaymentsManagement() {
       }
     }
 
-    // If user is searching and has results, show search results
+    const isDateCol = DATE_FILTER_COLUMNS.includes(columnKey as typeof DATE_FILTER_COLUMNS[number]);
+
+    // If user is searching and has results, show search results (dla dat: sortuj od najnowszej)
     if (filterSearchQuery.trim() && filterSearchResults.length > 0) {
-      return filterSearchResults;
+      return isDateCol ? sortDateFilterValues(filterSearchResults) : filterSearchResults;
     }
     // If searching but no results yet or empty, show nothing during search
     if (filterSearchQuery.trim() && isFilterSearching) {
       return [];
     }
-    // Default: return frozen or base options
+    // Default: return frozen or base options (dla dat już posortowane z getUniqueColumnValues / sortuj frozen)
+    if (isDateCol && baseOptions.length > 0) {
+      return sortDateFilterValues(baseOptions);
+    }
     return baseOptions;
   };
 

@@ -44,11 +44,11 @@ const menuItems: MenuItem[] = [
     href: '/profil/kontakt-do-kierownictwa',
     iconSvg: '<path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><circle cx="12" cy="10" r="2"></circle><line x1="8" x2="8" y1="2" y2="4"></line><line x1="16" x2="16" y1="2" y2="4"></line>',
   },
-  {
-    label: 'Cennik usług dodatkowych',
-    href: '/profil/cennik-uslug-dodatkowych',
-    iconSvg: '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>',
-  },
+  // {
+  //   label: 'Cennik usług dodatkowych',
+  //   href: '/profil/cennik-uslug-dodatkowych',
+  //   iconSvg: '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>',
+  // },
   {
     label: 'Faktury i płatności',
     href: '/profil/faktury-i-platnosci',

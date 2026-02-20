@@ -43,11 +43,11 @@ const menuItems: MenuItem[] = [
     path: 'kontakt-do-kierownictwa',
     iconSvg: 'contact',
   },
-  {
-    label: 'Cennik usług dodatkowych',
-    path: 'cennik-uslug-dodatkowych',
-    iconSvg: 'dollar',
-  },
+  // {
+  //   label: 'Cennik usług dodatkowych',
+  //   path: 'cennik-uslug-dodatkowych',
+  //   iconSvg: 'dollar',
+  // },
   {
     label: 'Faktury i płatności',
     path: 'faktury-i-platnosci',

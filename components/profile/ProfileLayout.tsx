@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { ReactNode, useState, useEffect } from 'react';
 
+import { ReservationPaymentHeaderProvider } from '@/contexts/ReservationPaymentHeaderContext';
 import Footer from '../Footer';
 import HeaderTop from '../HeaderTop';
 
@@ -46,9 +47,9 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
   }, [mobileMenuOpen]);
 
   return (
-    <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
-      {/* Top Bar - Existing component */}
-      <HeaderTop />
+    <ReservationPaymentHeaderProvider initialTotalPrice={null}>
+      <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
+        <HeaderTop />
 
       {/* Mobile Bottom Navigation Bar */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-area-bottom">
@@ -171,6 +172,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
 
       {/* Footer - Existing component */}
       <Footer />
-    </div>
+      </div>
+    </ReservationPaymentHeaderProvider>
   );
 }

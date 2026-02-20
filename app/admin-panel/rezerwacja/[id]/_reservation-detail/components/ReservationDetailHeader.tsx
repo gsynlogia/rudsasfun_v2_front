@@ -39,6 +39,7 @@ export function ReservationDetailHeader({
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-white">
                 Szczegóły rezerwacji: {reservationNumber}
+                {reservation.property_tag ? ` (${reservation.property_tag})` : ''}
               </h1>
               <p className="text-sm text-slate-400 mt-1">
                 Status: <span className="font-medium text-slate-300">{reservation.status || 'Brak danych'}</span> |

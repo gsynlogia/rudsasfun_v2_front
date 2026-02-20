@@ -195,6 +195,29 @@ export default function ReservationsTable() {
     createdAt: 'Data utworzenia',
   };
 
+  const DATE_FILTER_COLUMNS = ['createdAt'] as const;
+  const parseDateForSort = (s: string): number => {
+    if (!s || s === '-') return 0;
+    const t = s.trim();
+    const pl = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:,\s*\d{1,2}:\d{2})?/);
+    if (pl) {
+      const date = new Date(parseInt(pl[3], 10), parseInt(pl[2], 10) - 1, parseInt(pl[1], 10));
+      return isNaN(date.getTime()) ? 0 : date.getTime();
+    }
+    const iso = new Date(t);
+    return isNaN(iso.getTime()) ? 0 : iso.getTime();
+  };
+  const sortDateFilterValues = (arr: string[]): string[] => {
+    return [...arr].sort((a, b) => {
+      const ta = parseDateForSort(a);
+      const tb = parseDateForSort(b);
+      if (ta === 0 && tb === 0) return 0;
+      if (ta === 0) return 1;
+      if (tb === 0) return -1;
+      return tb - ta;
+    });
+  };
+
   // Default column order and visibility
   const DEFAULT_COLUMN_ORDER = ['reservationName', 'participantName', 'email', 'campName', 'campLocation', 'tag', 'promotionName', 'status', 'totalPrice', 'createdAt'];
   const DEFAULT_COLUMNS = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true }));
@@ -325,7 +348,11 @@ export default function ReservationsTable() {
         values.add(value);
       }
     });
-    return Array.from(values).sort();
+    const list = Array.from(values);
+    if (DATE_FILTER_COLUMNS.includes(columnKey as typeof DATE_FILTER_COLUMNS[number])) {
+      return sortDateFilterValues(list);
+    }
+    return list.sort();
   };
 
   // Handle filter toggle for a column value (updates temp state only)

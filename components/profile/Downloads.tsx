@@ -36,6 +36,8 @@ interface Document {
   source?: string; // 'user' or 'system'
   fileUrl?: string; // For CMS documents
   isHtml?: boolean; // True if document is HTML (for contracts/cards)
+  /** Umowa/karta: tylko aktualne są pokazywane w Do pobrania – oznaczamy jako aktualna */
+  isCurrent?: boolean;
 }
 
 /**
@@ -68,43 +70,14 @@ export default function Downloads() {
         // Fetch contract files; systemowe zamieniamy na link HTML, user-uploads zostawiamy do pobrania
         const allContractsList: Document[] = [];
 
+        // Tylko aktualna umowa (HTML) per rezerwacja – stare umowy wgrane nie są dostępne w Do pobrania
         for (const reservation of reservations) {
           try {
-            // Get ALL contract files for this reservation (both system-generated and user-uploaded)
-            const contractFiles = await contractService.getContractFiles(reservation.id);
             const campName = reservation.camp_name || 'Brak danych';
             const participantName = reservation.participant_first_name && reservation.participant_last_name
               ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
               : 'Brak danych';
 
-            // User-uploaded contracts (zostawiamy do pobrania)
-            contractFiles
-              .filter(file => file.source === 'user')
-              .forEach((file) => {
-                const date = new Date(file.uploaded_at);
-                const dateStr = date.toLocaleDateString('pl-PL', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                });
-
-                allContractsList.push({
-                  id: `uploaded-contract-${file.id}`,
-                  type: 'uploaded_contract',
-                  name: `Umowa wgrana (${dateStr}) - ${campName}`,
-                  reservationId: reservation.id,
-                  reservationName: campName,
-                  participantName,
-                  date: dateStr,
-                  amount: reservation.total_price || 0,
-                  status: 'available',
-                  fileId: file.id,
-                  source: file.source,
-                  contract_status: reservation.contract_status || null,
-                });
-              });
-
-            // Systemowe kontrakty prezentujemy jako HTML link (zawsze)
             const dateStr = reservation.created_at
               ? new Date(reservation.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
               : new Date().toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -122,10 +95,10 @@ export default function Downloads() {
               source: 'system',
               contract_status: reservation.contract_status || null,
               isHtml: true,
+              isCurrent: true,
             });
           } catch (error) {
-            // Ignore errors for individual reservations
-            console.error(`Error loading contract files for reservation ${reservation.id}:`, error);
+            console.error(`Error loading contract for reservation ${reservation.id}:`, error);
           }
         }
 
@@ -137,7 +110,7 @@ export default function Downloads() {
           console.error('Error loading user qualification cards list:', error);
         }
 
-        // Fetch ALL qualification card files for each reservation (both SYSTEM and USER)
+        // Tylko aktualna karta kwalifikacyjna (HTML) per rezerwacja – stare karty wgrane/wygenerowane nie są dostępne w Do pobrania
         const allQualificationCardsList: Document[] = [];
 
         for (const reservation of reservations) {
@@ -146,14 +119,8 @@ export default function Downloads() {
             ? `${reservation.participant_first_name} ${reservation.participant_last_name}`
             : 'Brak danych';
 
-          let cardFiles: Awaited<ReturnType<typeof qualificationCardService.getQualificationCardFiles>> = [];
           let cardFromGet: Awaited<ReturnType<typeof qualificationCardService.getQualificationCard>> | null = null;
           let hasHtmlEndpoint = false;
-          try {
-            cardFiles = await qualificationCardService.getQualificationCardFiles(reservation.id);
-          } catch (error) {
-            console.error(`Error loading qualification card files for reservation ${reservation.id}:`, error);
-          }
           try {
             cardFromGet = await qualificationCardService.getQualificationCard(reservation.id);
           } catch (error) {
@@ -175,41 +142,10 @@ export default function Downloads() {
             console.error(`Error probing qualification card HTML for reservation ${reservation.id}:`, error);
           }
 
-          cardFiles.forEach((file) => {
-            const date = new Date(file.uploaded_at);
-            const dateStr = date.toLocaleDateString('pl-PL', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            });
-
-            // Determine document type based on source
-            const isSystem = file.source === 'system';
-            const documentType = isSystem ? 'qualification_card' as const : 'uploaded_qualification_card' as const;
-
-            allQualificationCardsList.push({
-              id: `${isSystem ? 'qualification-card' : 'uploaded-card'}-${file.id}`,
-              type: documentType,
-              name: isSystem
-                ? `Karta kwalifikacyjna wygenerowana (${dateStr}) - ${campName}`
-                : `Karta kwalifikacyjna wgrana (${dateStr}) - ${campName}`,
-              reservationId: reservation.id,
-              reservationName: campName,
-              participantName: participantName,
-              date: dateStr,
-              amount: reservation.total_price || 0,
-              status: 'available' as const,
-              fileId: file.id,
-              source: file.source,
-            });
-          });
-
-          // Dodaj wpis HTML jeśli istnieje systemowa karta (wygenerowana) lub lista /my zwraca kartę
-          const hasSystemCard = cardFiles.some(f => f.source === 'system');
           const hasCardFromList = userQualificationCards.some(c => c.reservation_id === reservation.id);
           const hasCardSingle = !!cardFromGet;
           const hasStatus = !!reservation.qualification_card_status;
-          if (hasSystemCard || hasCardFromList || hasCardSingle || hasStatus || hasHtmlEndpoint) {
+          if (hasCardFromList || hasCardSingle || hasStatus || hasHtmlEndpoint) {
             const dateStr = reservation.created_at
               ? new Date(reservation.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
               : new Date().toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -226,6 +162,7 @@ export default function Downloads() {
               status: 'available' as const,
               source: 'system',
               isHtml: true,
+              isCurrent: true,
             });
           }
         }
@@ -357,7 +294,7 @@ export default function Downloads() {
       // For HTML qualification cards, open in new tab instead of downloading
       if (document.isHtml && document.reservationId) {
         try {
-          const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
+          const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 1000);
           const reservation = reservations.find(r => r.id === document.reservationId);
           if (reservation) {
             const formatReservationNumber = (reservationId: number, createdAt: string) => {
@@ -365,7 +302,7 @@ export default function Downloads() {
               const paddedId = String(reservationId).padStart(3, '0');
               return `REZ-${year}-${paddedId}`;
             };
-            const reservationNumber = formatReservationNumber(document.reservationId, reservation.created_at);
+            const reservationNumber = formatReservationNumber(document.reservationId!, reservation.created_at);
             const url = `/profil/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
             window.open(url, '_blank');
             return;
@@ -543,10 +480,10 @@ export default function Downloads() {
           Dokumenty do pobrania
         </h3>
 
-        {/* CMS Documents Section */}
+        {/* Dokumenty z CMS (admin-panel/cms/documents, tylko is_public) */}
         {cmsDocuments.length > 0 && (
           <div className="mb-6">
-            <h4 className="text-sm sm:text-base font-semibold text-gray-800 mb-3">Dokumenty ogólne</h4>
+            <h4 className="text-sm sm:text-base font-semibold text-gray-800 mb-3">Dokumenty do pobrania (z panelu CMS)</h4>
             <div className="space-y-2">
               {cmsDocuments.map((doc) => (
                 <div key={doc.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -647,7 +584,7 @@ export default function Downloads() {
                   {isExpanded && (
                     <div className="border-t border-gray-200 bg-gray-50">
                       <div className="p-4 sm:p-6 space-y-4">
-                        {/* Aneksy do umowy – oczekujące na podpis */}
+                        {/* Aneksy do umowy – do podpisania (oczekujące) */}
                         {(() => {
                           const annexes = annexesByReservation.get(reservationId) || [];
                           const pendingAnnexes = annexes.filter((a) => a.status === 'pending_signing');
@@ -690,6 +627,29 @@ export default function Downloads() {
                             </div>
                           );
                         })()}
+                        {/* Wszystkie aneksy z oznaczeniem Aktualna / Nieaktualna */}
+                        {(() => {
+                          const annexes = annexesByReservation.get(reservationId) || [];
+                          if (annexes.length === 0) return null;
+                          return (
+                            <div className="mb-4">
+                              <h4 className="text-sm font-semibold text-gray-800 mb-2">Aneksy do umowy</h4>
+                              <ul className="space-y-2">
+                                {annexes.map((a) => {
+                                  const isCurrent = a.status !== 'cancelled';
+                                  return (
+                                    <li key={a.id} className="flex items-center justify-between gap-2 bg-white border border-gray-200 rounded p-2 text-sm">
+                                      <span className="flex-1 text-gray-800">{a.description}</span>
+                                      <span className={`text-xs px-2 py-0.5 rounded ${isCurrent ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+                                        {isCurrent ? 'Aktualna' : 'Nieaktualna'}
+                                      </span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          );
+                        })()}
                         {reservationDocs.map((document) => (
                           <div key={document.id} className="bg-white rounded-lg p-4 border border-gray-200">
                             <div className="flex items-start justify-between">
@@ -703,13 +663,9 @@ export default function Downloads() {
                                      document.type === 'uploaded_qualification_card' ? 'Karta kwalifikacyjna wgrana' :
                                      'Inny dokument'}
                                   </span>
-                                  {document.source && (
-                                    <span className={`text-xs px-2 py-0.5 rounded ${
-                                      document.source === 'system'
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'bg-green-100 text-green-700'
-                                    }`}>
-                                      {document.source === 'system' ? 'Wygenerowana' : 'Wgrana'}
+                                  {document.isCurrent && (
+                                    <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">
+                                      Aktualna
                                     </span>
                                   )}
                                 </div>

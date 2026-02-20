@@ -28,6 +28,7 @@ export interface ReservationDetails {
   property_name?: string | null;
   property_city?: string | null;
   property_period?: string | null;
+  property_tag?: string | null;
   property_start_date?: string | null;
   property_end_date?: string | null;
   participant_first_name?: string | null;

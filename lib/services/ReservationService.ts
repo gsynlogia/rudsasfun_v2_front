@@ -181,6 +181,15 @@ export interface ReservationResponse {
   payment_plan?: string | null;
   promotion_justification?: Record<string, any> | null;
   contract_read_at?: string | null;
+  /** Cost breakdown (from by-number / detail endpoints) */
+  reservation_number?: string | null;
+  base_price?: number | null;
+  diet_price?: number | null;
+  addons_data?: Array<{ id: number; name: string; price: number }> | null;
+  protection_names?: Record<string, string> | null;
+  protection_prices?: Record<string, number> | null;
+  transport_price?: number | null;
+  promotion_does_not_reduce_price?: boolean | null;
 }
 
 export interface ValidationErrorDetail {

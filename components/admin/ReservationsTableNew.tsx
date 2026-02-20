@@ -1684,6 +1684,36 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     depositAmount: 'Zaliczka',
   };
 
+  /** Kolumny z datami – w filtrach sortowane od najnowszej do najstarszej */
+  const DATE_FILTER_COLUMNS = ['createdAt', 'payment1Date', 'payment2Date', 'payment3Date'] as const;
+
+  /** Parsuje wartość wyświetlaną daty (DD.MM.YYYY lub DD.MM.YYYY, HH:mm lub YYYY-MM-DD) do timestampu do sortowania */
+  const parseDateForSort = (s: string): number => {
+    if (!s || s === '-') return 0;
+    const trimmed = s.trim();
+    // DD.MM.YYYY lub DD.MM.YYYY, HH:mm
+    const plMatch = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:,\s*\d{1,2}:\d{2})?/);
+    if (plMatch) {
+      const [, d, m, y] = plMatch;
+      const date = new Date(parseInt(y!, 10), parseInt(m!, 10) - 1, parseInt(d!, 10));
+      return isNaN(date.getTime()) ? 0 : date.getTime();
+    }
+    // YYYY-MM-DD
+    const iso = new Date(trimmed);
+    return isNaN(iso.getTime()) ? 0 : iso.getTime();
+  };
+
+  const sortDateFilterValues = (arr: string[]): string[] => {
+    return [...arr].sort((a, b) => {
+      const ta = parseDateForSort(a);
+      const tb = parseDateForSort(b);
+      if (ta === 0 && tb === 0) return 0;
+      if (ta === 0) return 1;
+      if (tb === 0) return -1;
+      return tb - ta; // najnowsza pierwsza
+    });
+  };
+
   // Kolejność domyślna: rezerwacja → uczestnik → opiekun → płatności → obóz → transport → usługi dodatkowe → dokumenty
   const DEFAULT_COLUMN_ORDER: (keyof typeof COLUMN_DEFINITIONS)[] = [
     'reservationName',
@@ -2103,7 +2133,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         values.add(value);
       }
     });
-    return Array.from(values).sort();
+    const list = Array.from(values);
+    if (DATE_FILTER_COLUMNS.includes(columnKey as typeof DATE_FILTER_COLUMNS[number])) {
+      return sortDateFilterValues(list);
+    }
+    return list.sort();
   };
 
   // Handle filter toggle: check/uncheck. When "all" selected and user unchecks one → switch to "all except" mode.
@@ -2352,15 +2386,20 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       }
     }
 
-    // If user is searching and has results, show search results
+    const isDateCol = DATE_FILTER_COLUMNS.includes(columnKey as typeof DATE_FILTER_COLUMNS[number]);
+
+    // If user is searching and has results, show search results (dla dat: sortuj od najnowszej)
     if (filterSearchQuery.trim() && filterSearchResults.length > 0) {
-      return filterSearchResults;
+      return isDateCol ? sortDateFilterValues(filterSearchResults) : filterSearchResults;
     }
     // If searching but no results yet or empty, show nothing during search
     if (filterSearchQuery.trim() && isFilterSearching) {
       return [];
     }
-    // Default: return frozen or base options
+    // Default: return frozen or base options (baseOptions już posortowane z getUniqueColumnValues; frozen z API – sortuj przy dacie)
+    if (isDateCol && frozenFilterOptions.length > 0) {
+      return sortDateFilterValues(baseOptions);
+    }
     return baseOptions;
   };
 
@@ -4767,55 +4806,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             className="px-3 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white placeholder:text-slate-400 w-[120px]"
           />
 
-          {/* Data rezerwacji: tryb jedna data / zakres */}
-          <select
-            value={dateFilterMode}
-            onChange={(e) => setDateFilterMode(e.target.value as 'single' | 'range')}
-            onKeyDown={handleSearchKeyDown}
-            className="px-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white"
-            title="Tryb daty"
-          >
-            <option value="single">Jedna data</option>
-            <option value="range">Zakres dat</option>
-          </select>
-          {dateFilterMode === 'single' ? (
-            <div className="relative">
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                className="pl-8 pr-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white w-[140px]"
-                title="Data rezerwacji"
-              />
-              <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            </div>
-          ) : (
-            <>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={filters.dateFrom}
-                  onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  className="pl-8 pr-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white w-[140px]"
-                  title="Data od"
-                />
-                <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              </div>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={filters.dateTo}
-                  onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  className="pl-8 pr-2 py-1.5 border border-slate-600 focus:ring-2 focus:ring-[#03adf0] focus:border-transparent text-sm bg-slate-700 text-white w-[140px]"
-                  title="Data do"
-                />
-                <Calendar className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              </div>
-            </>
-          )}
+          {/* Zakres dat / pola dat – ukryte (wyszukiwarka tylko: aktualne/archiwalne/wszystkie, uczestnik, opiekun, telefon, rezerwacje) */}
 
           {/* Divider */}
           <div className="h-6 w-px bg-slate-500 mx-1 hidden sm:block" />
