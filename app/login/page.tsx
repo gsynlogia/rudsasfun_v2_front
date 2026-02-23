@@ -18,6 +18,9 @@ function LoginContent() {
 
   // Get redirect URL from query params
   const redirectUrl = searchParams?.get('redirect') || '/';
+  const registerUrl = redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')
+    ? `/register?redirect=${encodeURIComponent(redirectUrl)}`
+    : '/register';
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -108,7 +111,7 @@ function LoginContent() {
                         Nie masz konta?{' '}
                         <button
                           type="button"
-                          onClick={() => router.push('/register')}
+                          onClick={() => router.push(registerUrl)}
                           className="underline font-medium hover:text-red-900"
                         >
                           Zarejestruj się
@@ -131,7 +134,7 @@ function LoginContent() {
                     Nie masz konta?{' '}
                     <button
                       type="button"
-                      onClick={() => router.push('/register')}
+                      onClick={() => router.push(registerUrl)}
                       className="text-[#03adf0] hover:text-[#0288c7] font-medium underline"
                     >
                       Zarejestruj się
