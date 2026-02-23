@@ -53,6 +53,7 @@ interface FilterOptions {
   transportDeparture: string[];
   transportReturn: string[];
   promotionName: string[];
+  sourceName: string[];
   protectionNames: string[];
   status: string[];
   qualificationCardStatus: string[];
@@ -119,6 +120,9 @@ interface BackendReservationWithPayments {
     phoneNumber: string;
   }> | null;
   invoice_email: string | null;
+  selected_source: string | null;
+  source_inne_text: string | null;
+  source_name: string | null;
   selected_protection: string | (string | number)[] | null;
   selected_addons: string | (string | number)[] | null;
   selected_promotion: string | null;
@@ -226,6 +230,7 @@ interface ReservationPayment {
   createdAt: string;
   paymentDetails: PaymentDetails;
   promotionName?: string | null;
+  sourceName?: string | null;
   protectionNames?: string | null;
   depositAmount?: number;
   campId?: number;
@@ -1669,6 +1674,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     location: 'Lokalizacja',
     propertyTag: 'Tag turnusu',
     promotionName: 'Promocja',
+    sourceName: 'Źródło',
     createdAt: 'Data rezerwacji',
     transportDeparture: 'Transport wyjazd',
     transportReturn: 'Transport powrót',
@@ -1739,6 +1745,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     'location',
     'propertyTag',
     'promotionName',
+    'sourceName',
     'transportDeparture',
     'transportReturn',
     'hasOaza',
@@ -1782,29 +1789,62 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
   // Header quick-filter input per column (uses filter-search endpoint)
   const [columnHeaderFilterInput, setColumnHeaderFilterInput] = useState<Record<string, string>>({});
+  const [createdAtModalRangeDraft, setCreatedAtModalRangeDraft] = useState<{ from: string; to: string }>({ from: '', to: '' });
+  const [createdAtHeaderRangeDraft, setCreatedAtHeaderRangeDraft] = useState<{ from: string; to: string }>({ from: '', to: '' });
   // Która kolumna ma otwarty popover z powiększonym inputem (klik w pole pod ikoną filtra)
   const [expandedFilterInputColumn, setExpandedFilterInputColumn] = useState<string | null>(null);
   const headerFilterThRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
   const [headerFilterPopoverRect, setHeaderFilterPopoverRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const headerFilterPopoverInputRef = useRef<HTMLInputElement>(null);
   const tableScrollContainerRef = useRef<HTMLDivElement>(null);
+  const tableElementRef = useRef<HTMLTableElement>(null);
   const horizontalScrollBarRef = useRef<HTMLDivElement>(null);
   const isScrollingFromBarRef = useRef(false);
   const [tableScrollWidth, setTableScrollWidth] = useState(0);
 
   // Pomiar szerokości tabeli do paska przewijania poziomego (po renderze)
+  const measureTableWidth = useCallback(() => {
+    const container = tableScrollContainerRef.current;
+    if (!container) return;
+    const tableEl = tableElementRef.current;
+    const width = tableEl?.scrollWidth || container.scrollWidth || 0;
+    setTableScrollWidth(width);
+  }, []);
+
   useEffect(() => {
-    const el = tableScrollContainerRef.current;
-    if (!el) return;
-    const measure = () => {
-      const w = el.scrollWidth;
-      setTableScrollWidth(w);
+    const container = tableScrollContainerRef.current;
+    const tableEl = tableElementRef.current;
+    if (!container) return;
+
+    const scheduleMeasure = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          measureTableWidth();
+        });
+      });
     };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [reservations.length, columnConfig.length]);
+
+    scheduleMeasure();
+    const roContainer = new ResizeObserver(scheduleMeasure);
+    roContainer.observe(container);
+
+    let roTable: ResizeObserver | null = null;
+    if (tableEl) {
+      roTable = new ResizeObserver(scheduleMeasure);
+      roTable.observe(tableEl);
+    }
+
+    window.addEventListener('resize', scheduleMeasure);
+    if (typeof document !== 'undefined' && 'fonts' in document) {
+      (document as any).fonts?.ready?.then(scheduleMeasure).catch(() => {});
+    }
+
+    return () => {
+      roContainer.disconnect();
+      if (roTable) roTable.disconnect();
+      window.removeEventListener('resize', scheduleMeasure);
+    };
+  }, [measureTableWidth, isLoading, reservations.length, columnConfig.length]);
 
   const syncTableScrollToBar = useCallback(() => {
     if (isScrollingFromBarRef.current) return;
@@ -1842,6 +1882,24 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const parsed = parseFloat(normalized);
     return isNaN(parsed) ? null : parsed;
   };
+
+  const applyCreatedAtRangeFilter = useCallback((from: string, to: string) => {
+    let dateFrom = (from || '').trim();
+    let dateTo = (to || '').trim();
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      [dateFrom, dateTo] = [dateTo, dateFrom];
+    }
+    const next = {
+      ...filtersRef.current,
+      dateFrom,
+      dateTo,
+    };
+    setFilters(next);
+    setAppliedFilters(next);
+    filtersRef.current = next;
+    setDateFilterMode(dateFrom && dateTo && dateFrom === dateTo ? 'single' : 'range');
+    setCurrentPage(1);
+  }, []);
 
   // Load column configuration from cloud (priority) or localStorage (fallback)
   useEffect(() => {
@@ -2076,6 +2134,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         case 'promotionName':
           value = reservation.promotionName || '-';
           break;
+        case 'sourceName':
+          value = reservation.sourceName || '-';
+          break;
         case 'createdAt':
           value = new Date(reservation.createdAt).toLocaleDateString('pl-PL');
           break;
@@ -2206,6 +2267,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     setAppliedColumnFilters(JSON.stringify(filtersForApi));
     setAppliedColumnFiltersExclude(JSON.stringify(excludeForApi));
     setColumnHeaderFilterInput(prev => ({ ...prev, [columnKey]: '' }));
+    if (columnKey === 'createdAt') {
+      setCreatedAtModalRangeDraft({ from: '', to: '' });
+      setCreatedAtHeaderRangeDraft({ from: '', to: '' });
+      applyCreatedAtRangeFilter('', '');
+    }
     setCurrentPage(1);
   };
 
@@ -2275,6 +2341,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   // Open filter modal: load first 10 unique values from DB
   const handleOpenFilterModal = async (columnKey: string) => {
     setOpenFilterColumn(columnKey);
+    if (columnKey === 'createdAt') {
+      setCreatedAtModalRangeDraft({ from: appliedFilters.dateFrom || '', to: appliedFilters.dateTo || '' });
+    }
     setFilterSearchQuery('');
     setFilterSearchResults([]);
     setFrozenFilterOptions([]);
@@ -2465,6 +2534,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       setHeaderFilterPopoverRect(null);
       return;
     }
+    if (expandedFilterInputColumn === 'createdAt') {
+      setCreatedAtHeaderRangeDraft({ from: appliedFilters.dateFrom || '', to: appliedFilters.dateTo || '' });
+    }
     const th = headerFilterThRefs.current[expandedFilterInputColumn];
     if (!th) return;
     const updateRect = () => {
@@ -2472,7 +2544,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       setHeaderFilterPopoverRect({ left: r.left, top: r.top, width: r.width, height: r.height });
     };
     updateRect();
-    requestAnimationFrame(() => headerFilterPopoverInputRef.current?.focus());
+    if (expandedFilterInputColumn !== 'createdAt') {
+      requestAnimationFrame(() => headerFilterPopoverInputRef.current?.focus());
+    }
     const onScrollOrResize = () => updateRect();
     window.addEventListener('scroll', onScrollOrResize, true);
     window.addEventListener('resize', onScrollOrResize);
@@ -2480,7 +2554,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       window.removeEventListener('scroll', onScrollOrResize, true);
       window.removeEventListener('resize', onScrollOrResize);
     };
-  }, [expandedFilterInputColumn]);
+  }, [expandedFilterInputColumn, appliedFilters.dateFrom, appliedFilters.dateTo]);
 
   // Select all values currently displayed in filter modal (from DB/search results)
   const handleSelectAllFilterValues = () => {
@@ -2507,6 +2581,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
   // Remove single filter value (from include or exclude pill)
   const handleRemoveFilter = (columnKey: string, value: string) => {
+    if (columnKey === '__createdAtRange') {
+      applyCreatedAtRangeFilter('', '');
+      setCurrentPage(1);
+      return;
+    }
     const updated = columnConfig.map(col => {
       if (col.key !== columnKey) return col;
       const exclude = col.exclude || [];
@@ -2533,6 +2612,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
   // Check if column has active filters (include or exclude)
   const columnHasActiveFilters = (columnKey: string): boolean => {
+    if (columnKey === 'createdAt') {
+      if (appliedFilters.dateFrom || appliedFilters.dateTo) {
+        return true;
+      }
+    }
     const col = columnConfig.find(c => c.key === columnKey);
     return col ? ((col.filters?.length || 0) > 0 || (col.exclude?.length || 0) > 0) : false;
   };
@@ -2763,6 +2847,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           location,
           propertyTag: item.property_tag || '',
           promotionName: item.promotion_name || '',
+          sourceName: item.source_name || item.selected_source || '',
           createdAt: item.created_at || '',
           transportDeparture,
           transportReturn,
@@ -2850,6 +2935,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               break;
             case 'promotionName':
               value = reservation.promotionName || '';
+              break;
+            case 'sourceName':
+              value = reservation.sourceName || '';
               break;
             case 'createdAt':
               value = new Date(reservation.createdAt).toLocaleDateString('pl-PL');
@@ -3447,6 +3535,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               orderDate: createdAtFormatted,
             },
             promotionName: reservation.promotion_name || null,
+            sourceName: reservation.source_name || reservation.selected_source || null,
             protectionNames: protectionNamesStr || null,
             depositAmount: reservation.deposit_amount || 500,
             campId: reservation.camp_id || undefined,
@@ -3651,6 +3740,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         return reservation.propertyTag || '-';
       case 'promotionName':
         return reservation.promotionName || '-';
+      case 'sourceName':
+        return reservation.sourceName || '-';
       case 'createdAt':
         return new Date(reservation.createdAt).toLocaleDateString('pl-PL');
       case 'transportDeparture':
@@ -4878,6 +4969,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         {/* Active column filters - small orange buttons with X to remove */}
         {(() => {
           const activeFilters: { columnKey: string; columnName: string; value: string; isExclude?: boolean }[] = [];
+          if (appliedFilters.dateFrom || appliedFilters.dateTo) {
+            activeFilters.push({
+              columnKey: '__createdAtRange',
+              columnName: 'Data rezerwacji',
+              value: `${appliedFilters.dateFrom || '...'} - ${appliedFilters.dateTo || '...'}`,
+            });
+          }
           columnConfig.forEach(col => {
             const columnName = COLUMN_DEFINITIONS[col.key as keyof typeof COLUMN_DEFINITIONS] || col.key;
             if (col.filters && col.filters.length > 0) {
@@ -4932,6 +5030,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                     setColumnHeaderFilterInput({});
                     setExpandedFilterInputColumn(null);
                     setHeaderFilterPopoverRect(null);
+                    applyCreatedAtRangeFilter('', '');
                     setCurrentPage(1);
                   }}
                   className="text-xs text-orange-600 hover:text-orange-800 underline ml-2"
@@ -4987,7 +5086,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           className="overflow-x-auto table-scroll-no-bar payments-table-scroll"
           onScroll={syncTableScrollToBar}
         >
-          <table className="min-w-full divide-y divide-gray-200">
+          <table ref={tableElementRef} className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-20">
               <tr>
                 {orderedVisibleColumns.map((col) => {
@@ -4995,6 +5094,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                   const columnLabel = COLUMN_DEFINITIONS[columnKey as keyof typeof COLUMN_DEFINITIONS] || columnKey;
                   const isFilterOpen = openFilterColumn === columnKey;
                   const hasFilters = columnHasActiveFilters(columnKey);
+                  const createdAtRangeLabel = appliedFilters.dateFrom || appliedFilters.dateTo
+                    ? `${appliedFilters.dateFrom || '...'} - ${appliedFilters.dateTo || '...'}`
+                    : '';
+                  const headerFilterValue = columnKey === 'createdAt'
+                    ? createdAtRangeLabel
+                    : (columnHeaderFilterInput[columnKey]?.trim() || '');
 
                   return (
                     <th
@@ -5040,7 +5145,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                         style={{ borderRadius: 2 }}
                         title="Kliknij, aby wpisać (Enter = wyszukaj)"
                       >
-                        {columnHeaderFilterInput[columnKey]?.trim() || <span className="text-gray-400">Szukaj {columnLabel.toLowerCase()}...</span>}
+                        {headerFilterValue || <span className="text-gray-400">{columnKey === 'createdAt' ? 'Wybierz zakres dat...' : `Szukaj ${columnLabel.toLowerCase()}...`}</span>}
                       </div>
                     </th>
                   );
@@ -5294,6 +5399,14 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
                                 <span className="text-sm text-gray-600">
                                   {reservation.promotionName || '-'}
+                                </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'sourceName') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className="text-sm text-gray-600">
+                                  {reservation.sourceName || '-'}
                                 </span>
                               </td>
                             );
@@ -6099,19 +6212,69 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               borderRadius: 4,
             }}
           >
-            <input
-              ref={headerFilterPopoverInputRef}
-              type={expandedFilterInputColumn === 'guardianPhone' ? 'tel' : isAmountColumn(expandedFilterInputColumn) ? 'text' : 'text'}
-              inputMode={isAmountColumn(expandedFilterInputColumn) ? 'decimal' : 'text'}
-              value={columnHeaderFilterInput[expandedFilterInputColumn] ?? ''}
-              onChange={(e) => handleHeaderFilterInputChange(expandedFilterInputColumn, e.target.value)}
-              onKeyDown={(e) => handleHeaderFilterKeyDown(expandedFilterInputColumn, e)}
-              onBlur={() => { setExpandedFilterInputColumn(null); setHeaderFilterPopoverRect(null); }}
-              placeholder={`Szukaj ${COLUMN_DEFINITIONS[expandedFilterInputColumn as keyof typeof COLUMN_DEFINITIONS] || expandedFilterInputColumn}... (Enter)`}
-              className="w-full py-2.5 px-3 text-sm border-0 focus:ring-0 focus:outline-none"
-              style={{ borderRadius: 4 }}
-              autoFocus
-            />
+            {expandedFilterInputColumn === 'createdAt' ? (
+              <div className="p-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Od</label>
+                    <input
+                      type="date"
+                      value={createdAtHeaderRangeDraft.from}
+                      onChange={(e) => setCreatedAtHeaderRangeDraft(prev => ({ ...prev, from: e.target.value }))}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#03adf0]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">Do</label>
+                    <input
+                      type="date"
+                      value={createdAtHeaderRangeDraft.to}
+                      onChange={(e) => setCreatedAtHeaderRangeDraft(prev => ({ ...prev, to: e.target.value }))}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#03adf0]"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreatedAtHeaderRangeDraft({ from: '', to: '' });
+                      applyCreatedAtRangeFilter('', '');
+                      setExpandedFilterInputColumn(null);
+                      setHeaderFilterPopoverRect(null);
+                    }}
+                    className="px-2 py-1 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200"
+                  >
+                    Wyczyść
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      applyCreatedAtRangeFilter(createdAtHeaderRangeDraft.from, createdAtHeaderRangeDraft.to);
+                      setExpandedFilterInputColumn(null);
+                      setHeaderFilterPopoverRect(null);
+                    }}
+                    className="px-2 py-1 text-xs text-white bg-[#03adf0] hover:bg-[#0288c7]"
+                  >
+                    Zastosuj
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <input
+                ref={headerFilterPopoverInputRef}
+                type={expandedFilterInputColumn === 'guardianPhone' ? 'tel' : isAmountColumn(expandedFilterInputColumn) ? 'text' : 'text'}
+                inputMode={isAmountColumn(expandedFilterInputColumn) ? 'decimal' : 'text'}
+                value={columnHeaderFilterInput[expandedFilterInputColumn] ?? ''}
+                onChange={(e) => handleHeaderFilterInputChange(expandedFilterInputColumn, e.target.value)}
+                onKeyDown={(e) => handleHeaderFilterKeyDown(expandedFilterInputColumn, e)}
+                onBlur={() => { setExpandedFilterInputColumn(null); setHeaderFilterPopoverRect(null); }}
+                placeholder={`Szukaj ${COLUMN_DEFINITIONS[expandedFilterInputColumn as keyof typeof COLUMN_DEFINITIONS] || expandedFilterInputColumn}... (Enter)`}
+                className="w-full py-2.5 px-3 text-sm border-0 focus:ring-0 focus:outline-none"
+                style={{ borderRadius: 4 }}
+                autoFocus
+              />
+            )}
           </div>
         )}
 
@@ -6123,7 +6286,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         ref={horizontalScrollBarRef}
         className="flex-shrink-0 overflow-x-auto border-t border-gray-200 bg-gray-50 payments-table-scroll"
         onScroll={syncBarScrollToTable}
-        style={{ maxHeight: 14 }}
+        style={{ height: 14, minHeight: 14, overflowY: 'hidden' }}
       >
         <div style={{ width: tableScrollWidth, height: 1 }} aria-hidden />
       </div>
@@ -6209,15 +6372,60 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                   </button>
                 )}
               </div>
-              {filterSearchQuery && (
-                <p className="mt-1 text-xs text-gray-500">
-                  {openFilterColumn && isAmountColumn(openFilterColumn)
-                    ? `Znaleziono: ${getFilterDisplayValues(openFilterColumn).length} wyników`
-                    : (isFilterSearching ? 'Szukam...' : `Znaleziono: ${filterSearchResults.length} wyników`)
-                  }
-                </p>
-              )}
+            {filterSearchQuery && (
+              <p className="mt-1 text-xs text-gray-500">
+                {openFilterColumn && isAmountColumn(openFilterColumn)
+                  ? `Znaleziono: ${getFilterDisplayValues(openFilterColumn).length} wyników`
+                  : (isFilterSearching ? 'Szukam...' : `Znaleziono: ${filterSearchResults.length} wyników`)
+                }
+              </p>
+            )}
             </div>
+
+            {openFilterColumn === 'createdAt' && (
+              <div className="mb-3 p-3 border border-gray-200 bg-gray-50">
+                <div className="text-xs font-medium text-gray-700 mb-2">Zakres dat rezerwacji</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Od</label>
+                    <input
+                      type="date"
+                      value={createdAtModalRangeDraft.from}
+                      onChange={(e) => setCreatedAtModalRangeDraft(prev => ({ ...prev, from: e.target.value }))}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#03adf0]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Do</label>
+                    <input
+                      type="date"
+                      value={createdAtModalRangeDraft.to}
+                      onChange={(e) => setCreatedAtModalRangeDraft(prev => ({ ...prev, to: e.target.value }))}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#03adf0]"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreatedAtModalRangeDraft({ from: '', to: '' });
+                      applyCreatedAtRangeFilter('', '');
+                    }}
+                    className="px-3 py-1.5 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200"
+                  >
+                    Wyczyść zakres
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyCreatedAtRangeFilter(createdAtModalRangeDraft.from, createdAtModalRangeDraft.to)}
+                    className="px-3 py-1.5 text-xs text-white bg-[#03adf0] hover:bg-[#0288c7]"
+                  >
+                    Zastosuj zakres
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Values list - fixed height, load more on scroll */}
             <div className="border border-gray-200" style={{ borderRadius: 0 }}>
