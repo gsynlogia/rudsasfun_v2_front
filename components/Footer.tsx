@@ -10,16 +10,9 @@ const COOKIEBOT_CONTAINER_ID = 'footer-cookiebot-widget-container';
 
 declare global {
   interface Window {
-    Cookiebot?: { renew?: () => void; show?: () => void };
-    CookieConsent?: { renew?: () => void; show?: () => void };
     CookieConsentCallback_OnAccept?: () => void;
     CookieConsentCallback_OnDecline?: () => void;
   }
-}
-
-function openCookieConsentDialog() {
-  if (typeof window === 'undefined') return;
-  (window.Cookiebot?.renew ?? window.Cookiebot?.show ?? window.CookieConsent?.renew ?? window.CookieConsent?.show)?.();
 }
 
 const COOKIEBOT_HIDDEN_CONTAINER_ID = 'footer-cookiebot-widget-hidden';
@@ -33,18 +26,22 @@ export default function Footer() {
   // Widget Cookiebot ma być widoczny tylko w rozwiniętym panelu; domyślnie trzymamy go w ukrytym kontenerze
   // (skrypt zewnętrzny wstrzykuje widget asynchronicznie – obsługa przez MutationObserver).
   useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const visibleContainer = cookieWidgetContainerRef.current;
+    if (typeof document === 'undefined' || !document.body) return;
     const hiddenContainer = cookieWidgetHiddenRef.current;
     if (!hiddenContainer) return;
+    const visibleContainer = cookieWidgetContainerRef.current;
 
     const targetContainer = cookiePanelExpanded ? visibleContainer : hiddenContainer;
 
     const ensureWidgetInContainer = (target: HTMLElement | null) => {
       if (!target) return;
-      const widget = document.getElementById(COOKIEBOT_WIDGET_ID);
-      if (widget && widget.parentElement !== target) {
-        target.appendChild(widget);
+      try {
+        const widget = document.getElementById(COOKIEBOT_WIDGET_ID);
+        if (widget && widget.parentElement !== target) {
+          target.appendChild(widget);
+        }
+      } catch {
+        // Zewnętrzny skrypt Cookiebot może jednocześnie manipulować węzłem – nie wysadzamy aplikacji
       }
     };
 
@@ -54,9 +51,19 @@ export default function Footer() {
       const target = cookiePanelExpanded ? cookieWidgetContainerRef.current : cookieWidgetHiddenRef.current;
       ensureWidgetInContainer(target);
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    try {
+      observer.observe(document.body, { childList: true, subtree: true });
+    } catch {
+      // body może być niedostępny (SSR / early mount)
+    }
 
-    return () => observer.disconnect();
+    return () => {
+      try {
+        observer.disconnect();
+      } catch {
+        // ignore
+      }
+    };
   }, [cookiePanelExpanded]);
 
   // Po zatwierdzeniu/odrzuceniu zgód w Cookiebot – zwijamy panel.
@@ -324,13 +331,7 @@ export default function Footer() {
         <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200">
           <button
             type="button"
-            onClick={() => {
-              setCookiePanelExpanded((prev) => {
-                const next = !prev;
-                if (next) openCookieConsentDialog();
-                return next;
-              });
-            }}
+            onClick={() => setCookiePanelExpanded((prev) => !prev)}
             className="w-full sm:w-auto min-w-[200px] px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-colors"
             aria-expanded={cookiePanelExpanded}
           >
