@@ -32,7 +32,7 @@ export default function ClientViewLayout({
 
   return (
     <ReservationPaymentHeaderProvider initialTotalPrice={null}>
-      <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
+      <div className="min-h-screen w-full flex flex-col" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Admin View Banner */}
         <div className="bg-amber-500 text-white py-2 px-4 sticky top-0 z-[60]">
         <div className="max-w-container mx-auto flex items-center justify-between">
@@ -59,7 +59,7 @@ export default function ClientViewLayout({
       <HeaderTop />
 
       {/* Main Content Area with Sidebar */}
-      <main className="max-w-container mx-auto px-[60px] py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
+      <main className="flex-1 max-w-container mx-auto w-full px-[60px] py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

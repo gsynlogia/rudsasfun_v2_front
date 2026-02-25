@@ -48,7 +48,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
 
   return (
     <ReservationPaymentHeaderProvider initialTotalPrice={null}>
-      <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
+      <div className="min-h-screen w-full flex flex-col" style={{ overflow: 'visible', position: 'relative' }}>
         <HeaderTop />
 
       {/* Mobile Bottom Navigation Bar */}
@@ -128,7 +128,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
       </div>
 
       {/* Main Content Area with Sidebar */}
-      <main className="max-w-container mx-auto px-4 sm:px-6 lg:px-[60px] py-4 sm:py-6 lg:py-8 pb-24 lg:pb-8" style={{ overflow: 'visible', position: 'relative' }}>
+      <main className="flex-1 max-w-container mx-auto w-full px-4 sm:px-6 lg:px-[60px] py-4 sm:py-6 lg:py-8 pb-24 lg:pb-8" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Content Layout */}
         <div className="flex flex-col lg:flex-row gap-0">
           {/* Desktop Sidebar - Inside wrapper, wider to fit all text */}

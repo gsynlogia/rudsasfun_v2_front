@@ -46,10 +46,10 @@ export default function Layout({
   };
 
   return (
-    <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
+    <div className="min-h-screen w-full flex flex-col" style={{ overflow: 'visible', position: 'relative' }}>
       <Header />
 
-      <main className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
+      <main className="flex-1 max-w-container mx-auto w-full px-3 sm:px-6 py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Breadcrumbs */}
         <div className="mb-3 sm:mb-4">
           <nav className="text-xs sm:text-sm text-gray-500">

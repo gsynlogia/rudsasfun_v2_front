@@ -248,11 +248,11 @@ const lastLoggedStepRef = useRef<number | null>(null);
   }, [campData?.camp.id, campData?.property.id, campData?.camp.name, campData?.property.period, campData?.property.city, campData?.property.start_date, campData?.property.end_date, campData?.property.min_age, campData?.property.max_age, campData?.property.base_price, campExists, updateReservationCamp, setBasePrice, reservation.camp, reservation.basePrice]);
 
   return (
-    <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
+    <div className="min-h-screen w-full flex flex-col" style={{ overflow: 'visible', position: 'relative' }}>
       <HeaderTop />
       <HeaderSecondary />
 
-      <main className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-24 lg:pb-8" style={{ overflow: 'visible', position: 'relative' }}>
+      <main className="flex-1 max-w-container mx-auto w-full px-3 sm:px-6 py-4 sm:py-8 pb-24 lg:pb-8" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Breadcrumbs */}
         <div className="mb-3 sm:mb-4">
           <nav className="text-xs sm:text-sm text-gray-500">

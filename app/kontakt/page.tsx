@@ -82,9 +82,9 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="min-h-screen w-full" style={{ overflow: 'visible', position: 'relative' }}>
+    <div className="min-h-screen w-full flex flex-col" style={{ overflow: 'visible', position: 'relative' }}>
       <Header />
-      <main className="max-w-container mx-auto px-3 sm:px-6 py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
+      <main className="flex-1 max-w-container mx-auto w-full px-3 sm:px-6 py-4 sm:py-8" style={{ overflow: 'visible', position: 'relative' }}>
         <div className="max-w-2xl mx-auto">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
             Formularz kontaktowy

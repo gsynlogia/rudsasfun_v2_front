@@ -22,43 +22,41 @@ function openCookieConsentDialog() {
   (window.Cookiebot?.renew ?? window.Cookiebot?.show ?? window.CookieConsent?.renew ?? window.CookieConsent?.show)?.();
 }
 
+const COOKIEBOT_HIDDEN_CONTAINER_ID = 'footer-cookiebot-widget-hidden';
+
 export default function Footer() {
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const [cookiePanelExpanded, setCookiePanelExpanded] = useState(false);
   const cookieWidgetContainerRef = useRef<HTMLDivElement>(null);
-  const cookiebotWidgetOriginalParentRef = useRef<HTMLElement | null>(null);
+  const cookieWidgetHiddenRef = useRef<HTMLDivElement>(null);
 
-  // Po rozwinięciu panelu: przenieś #CookiebotWidget do naszego kontenera; po zwinięciu przywróć.
+  // Widget Cookiebot ma być widoczny tylko w rozwiniętym panelu; domyślnie trzymamy go w ukrytym kontenerze
+  // (skrypt zewnętrzny wstrzykuje widget asynchronicznie – obsługa przez MutationObserver).
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    const container = cookieWidgetContainerRef.current;
-    if (!container) return;
+    const visibleContainer = cookieWidgetContainerRef.current;
+    const hiddenContainer = cookieWidgetHiddenRef.current;
+    if (!hiddenContainer) return;
 
-    const moveWidgetIntoContainer = () => {
+    const targetContainer = cookiePanelExpanded ? visibleContainer : hiddenContainer;
+
+    const ensureWidgetInContainer = (target: HTMLElement | null) => {
+      if (!target) return;
       const widget = document.getElementById(COOKIEBOT_WIDGET_ID);
-      if (widget && widget.parentElement && widget.parentElement !== container) {
-        cookiebotWidgetOriginalParentRef.current = widget.parentElement;
-        container.appendChild(widget);
-      }
-    };
-    const restoreWidget = () => {
-      const widget = document.getElementById(COOKIEBOT_WIDGET_ID);
-      if (widget && cookiebotWidgetOriginalParentRef.current) {
-        cookiebotWidgetOriginalParentRef.current.appendChild(widget);
-        cookiebotWidgetOriginalParentRef.current = null;
+      if (widget && widget.parentElement !== target) {
+        target.appendChild(widget);
       }
     };
 
-    if (cookiePanelExpanded) {
-      moveWidgetIntoContainer();
-      const observer = new MutationObserver(() => moveWidgetIntoContainer());
-      observer.observe(document.body, { childList: true, subtree: true });
-      return () => {
-        observer.disconnect();
-        restoreWidget();
-      };
-    }
-    restoreWidget();
+    ensureWidgetInContainer(targetContainer);
+
+    const observer = new MutationObserver(() => {
+      const target = cookiePanelExpanded ? cookieWidgetContainerRef.current : cookieWidgetHiddenRef.current;
+      ensureWidgetInContainer(target);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
   }, [cookiePanelExpanded]);
 
   // Po zatwierdzeniu/odrzuceniu zgód w Cookiebot – zwijamy panel.
@@ -129,7 +127,15 @@ export default function Footer() {
   );
 
   return (
-    <footer className="bg-white border-t border-gray-200 mt-12 sm:mt-16">
+    <footer className="relative bg-white border-t border-gray-200 mt-12 sm:mt-16">
+      {/* Kontener ukryty – widget Cookiebot trzymany tu gdy panel „Zmień zgody cookie” jest zwinięty (nie zasłania UI). */}
+      <div
+        id={COOKIEBOT_HIDDEN_CONTAINER_ID}
+        ref={cookieWidgetHiddenRef}
+        aria-hidden="true"
+        className="absolute w-0 h-0 overflow-hidden opacity-0 pointer-events-none"
+        style={{ left: -9999, top: 0 }}
+      />
       <div className="max-w-container mx-auto px-3 sm:px-6 py-8 sm:py-12">
         {/* Mobile: zwinięty – tylko logo + Znajdziesz nas na + ikony + przycisk rozwiń */}
         <div className="sm:hidden flex flex-col items-center text-center">
@@ -314,8 +320,8 @@ export default function Footer() {
           </p>
         </div>
 
-        {/* Zmień zgody cookie – podłużny przycisk, rozwijany panel z widgetem Cookiebot */}
-        <div className={`mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200 ${!mobileExpanded ? 'hidden sm:block' : ''}`}>
+        {/* Zmień zgody cookie – zawsze widoczny (także na mobile), żeby użytkownik mógł otworzyć panel bez rozwijania stopki */}
+        <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200">
           <button
             type="button"
             onClick={() => {
