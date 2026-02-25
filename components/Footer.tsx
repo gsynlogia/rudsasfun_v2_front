@@ -327,8 +327,8 @@ export default function Footer() {
           </p>
         </div>
 
-        {/* Zmień zgody cookie – zawsze widoczny (także na mobile), żeby użytkownik mógł otworzyć panel bez rozwijania stopki */}
-        <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200">
+        {/* Zmień zgody cookie – klik włącza/wyłącza widoczność kółka (bez rozwijania panelu) */}
+        <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200 flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => setCookiePanelExpanded((prev) => !prev)}
@@ -337,26 +337,13 @@ export default function Footer() {
           >
             Zmień zgody cookie
           </button>
-          {cookiePanelExpanded && (
-            <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div
-                  id={COOKIEBOT_CONTAINER_ID}
-                  ref={cookieWidgetContainerRef}
-                  className="min-h-[40px] flex items-center"
-                  aria-label="Widget ustawień plików cookie"
-                />
-                <button
-                  type="button"
-                  onClick={() => setCookiePanelExpanded(false)}
-                  className="flex items-center gap-1 text-sm text-gray-600 hover:text-[#03adf0]"
-                >
-                  <ChevronUp className="w-4 h-4" />
-                  Zwiń
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Kontener na kółko zawsze w DOM; widoczność tylko przez show/hide – bez rozwijania */}
+          <div
+            id={COOKIEBOT_CONTAINER_ID}
+            ref={cookieWidgetContainerRef}
+            className={`min-h-[40px] flex items-center ${cookiePanelExpanded ? 'inline-flex' : 'hidden'}`}
+            aria-label="Widget ustawień plików cookie"
+          />
         </div>
       </div>
     </footer>
