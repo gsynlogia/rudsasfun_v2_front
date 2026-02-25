@@ -537,32 +537,24 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           </div>
         </div>
 
-        {/* Authorization Card */}
-        <div>
-          <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Upoważnienia</p>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
+        {/* Authorization Card – niedostępny, moduł dostępny wkrótce */}
+        <div className="select-none opacity-75 cursor-not-allowed">
+          <p className="text-[10px] sm:text-xs font-medium text-gray-500 mb-1 sm:mb-2">Upoważnienia</p>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-gray-100 relative">
             <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
-              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full" />
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gray-400 rounded-full" />
             </div>
             <div className="flex flex-col items-center gap-2 sm:gap-3">
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
-              <p className="text-[10px] sm:text-xs text-gray-600 text-center">Upoważnienia</p>
-              <button
-                onClick={() => {
-                  const formatReservationNumber = (reservationId: number, createdAt: string) => {
-                    const year = new Date(createdAt).getFullYear();
-                    const paddedId = String(reservationId).padStart(3, '0');
-                    return `REZ-${year}-${paddedId}`;
-                  };
-                  const reservationNumber = formatReservationNumber(reservationIdNum, reservation.created_at);
-                  const url = `${basePath}/aktualne-rezerwacje/${reservationNumber}/upowaznienia`;
-                  window.open(url, '_blank');
-                }}
-                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] text-white text-[10px] sm:text-xs rounded hover:bg-[#0288c7] transition-colors flex items-center justify-center gap-1"
+              <p className="text-[10px] sm:text-xs text-gray-500 text-center">Upoważnienia</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 text-center font-medium">Moduł dostępny wkrótce</p>
+              <div
+                aria-disabled
+                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-gray-300 text-gray-500 text-[10px] sm:text-xs rounded flex items-center justify-center gap-1 cursor-not-allowed"
               >
                 <FileText className="w-3 h-3" />
                 <span>Upoważnienia</span>
-              </button>
+              </div>
             </div>
           </div>
         </div>
