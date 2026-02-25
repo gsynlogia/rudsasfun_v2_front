@@ -2,11 +2,84 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+
+const COOKIEBOT_WIDGET_ID = 'CookiebotWidget';
+const COOKIEBOT_CONTAINER_ID = 'footer-cookiebot-widget-container';
+
+declare global {
+  interface Window {
+    Cookiebot?: { renew?: () => void; show?: () => void };
+    CookieConsent?: { renew?: () => void; show?: () => void };
+    CookieConsentCallback_OnAccept?: () => void;
+    CookieConsentCallback_OnDecline?: () => void;
+  }
+}
+
+function openCookieConsentDialog() {
+  if (typeof window === 'undefined') return;
+  (window.Cookiebot?.renew ?? window.Cookiebot?.show ?? window.CookieConsent?.renew ?? window.CookieConsent?.show)?.();
+}
 
 export default function Footer() {
   const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [cookiePanelExpanded, setCookiePanelExpanded] = useState(false);
+  const cookieWidgetContainerRef = useRef<HTMLDivElement>(null);
+  const cookiebotWidgetOriginalParentRef = useRef<HTMLElement | null>(null);
+
+  // Po rozwinięciu panelu: przenieś #CookiebotWidget do naszego kontenera; po zwinięciu przywróć.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const container = cookieWidgetContainerRef.current;
+    if (!container) return;
+
+    const moveWidgetIntoContainer = () => {
+      const widget = document.getElementById(COOKIEBOT_WIDGET_ID);
+      if (widget && widget.parentElement && widget.parentElement !== container) {
+        cookiebotWidgetOriginalParentRef.current = widget.parentElement;
+        container.appendChild(widget);
+      }
+    };
+    const restoreWidget = () => {
+      const widget = document.getElementById(COOKIEBOT_WIDGET_ID);
+      if (widget && cookiebotWidgetOriginalParentRef.current) {
+        cookiebotWidgetOriginalParentRef.current.appendChild(widget);
+        cookiebotWidgetOriginalParentRef.current = null;
+      }
+    };
+
+    if (cookiePanelExpanded) {
+      moveWidgetIntoContainer();
+      const observer = new MutationObserver(() => moveWidgetIntoContainer());
+      observer.observe(document.body, { childList: true, subtree: true });
+      return () => {
+        observer.disconnect();
+        restoreWidget();
+      };
+    }
+    restoreWidget();
+  }, [cookiePanelExpanded]);
+
+  // Po zatwierdzeniu/odrzuceniu zgód w Cookiebot – zwijamy panel.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onClose = () => setCookiePanelExpanded(false);
+    const prevAccept = window.CookieConsentCallback_OnAccept;
+    const prevDecline = window.CookieConsentCallback_OnDecline;
+    window.CookieConsentCallback_OnAccept = () => {
+      onClose();
+      prevAccept?.();
+    };
+    window.CookieConsentCallback_OnDecline = () => {
+      onClose();
+      prevDecline?.();
+    };
+    return () => {
+      window.CookieConsentCallback_OnAccept = prevAccept;
+      window.CookieConsentCallback_OnDecline = prevDecline;
+    };
+  }, []);
 
   const logoAndSocial = (
     <div className="sm:col-span-2 lg:col-span-1">
@@ -239,6 +312,44 @@ export default function Footer() {
               Global Synlogia
             </a>
           </p>
+        </div>
+
+        {/* Zmień zgody cookie – podłużny przycisk, rozwijany panel z widgetem Cookiebot */}
+        <div className={`mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200 ${!mobileExpanded ? 'hidden sm:block' : ''}`}>
+          <button
+            type="button"
+            onClick={() => {
+              setCookiePanelExpanded((prev) => {
+                const next = !prev;
+                if (next) openCookieConsentDialog();
+                return next;
+              });
+            }}
+            className="w-full sm:w-auto min-w-[200px] px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-colors"
+            aria-expanded={cookiePanelExpanded}
+          >
+            Zmień zgody cookie
+          </button>
+          {cookiePanelExpanded && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div
+                  id={COOKIEBOT_CONTAINER_ID}
+                  ref={cookieWidgetContainerRef}
+                  className="min-h-[40px] flex items-center"
+                  aria-label="Widget ustawień plików cookie"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCookiePanelExpanded(false)}
+                  className="flex items-center gap-1 text-sm text-gray-600 hover:text-[#03adf0]"
+                >
+                  <ChevronUp className="w-4 h-4" />
+                  Zwiń
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </footer>
