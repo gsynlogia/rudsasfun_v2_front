@@ -7,6 +7,7 @@ import Footer from '@/components/Footer';
 import HeaderTop from '@/components/HeaderTop';
 import { authService } from '@/lib/services/AuthService';
 import { magicLinkService } from '@/lib/services/MagicLinkService';
+import { DEFAULT_POST_LOGIN_REDIRECT } from '@/lib/auth-constants';
 
 function VerifyContent() {
   const router = useRouter();
@@ -37,11 +38,10 @@ function VerifyContent() {
         // Get redirect URL from API response (stored in database)
         const redirectUrl = response.redirect_url;
 
-        // Redirect to saved URL if valid, otherwise go to home page
-        // User is already logged in at this point
+        // Redirect to saved URL if valid, otherwise go to default post-login page
         const finalRedirect = redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')
           ? redirectUrl
-          : '/';
+          : DEFAULT_POST_LOGIN_REDIRECT;
 
         setTimeout(() => {
           router.push(finalRedirect);

@@ -7,17 +7,37 @@ import Footer from '@/components/Footer';
 import HeaderTop from '@/components/HeaderTop';
 import { authService } from '@/lib/services/AuthService';
 import { magicLinkService } from '@/lib/services/MagicLinkService';
+import { sendAuthTelemetry } from '@/lib/services/AuthTelemetryService';
+import { DEFAULT_POST_LOGIN_REDIRECT } from '@/lib/auth-constants';
+
+const MIN_PASSWORD_LENGTH = 6;
 
 function RegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Get redirect URL from query params
-  const redirectUrl = searchParams?.get('redirect') || '/';
+  // Get redirect URL from query params; default = strona rezerwacji klienta
+  const redirectUrl = searchParams?.get('redirect') || DEFAULT_POST_LOGIN_REDIRECT;
+
+  // Telemetria: otwarcie widoku rejestracji (jednorazowo)
+  useEffect(() => {
+    sendAuthTelemetry({
+      event_type: 'register_view_opened',
+      details: 'Użytkownik wszedł w proces rejestracji.',
+    });
+  }, []);
+
+  // Prefill email when redirected from login (konto nie istnieje)
+  useEffect(() => {
+    const e = searchParams?.get('email');
+    if (e != null && e !== '') setEmail(e);
+  }, [searchParams]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -25,10 +45,10 @@ function RegisterContent() {
       if (authService.isAuthenticated()) {
         const user = await authService.verifyToken();
         if (user) {
-          // User is authenticated, redirect to intended page or home
+          // User is authenticated, redirect to intended page or default
           const finalRedirect = redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')
             ? redirectUrl
-            : '/';
+            : DEFAULT_POST_LOGIN_REDIRECT;
           router.replace(finalRedirect);
         } else {
           authService.logout();
@@ -40,23 +60,36 @@ function RegisterContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    sendAuthTelemetry({
+      email: email || undefined,
+      event_type: 'register_submit_clicked',
+      auth_method: 'password',
+      details: 'Użytkownik nacisnął przycisk pozwalający na rejestrację.',
+    });
     setError(null);
     setSuccess(false);
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Hasło musi mieć co najmniej ${MIN_PASSWORD_LENGTH} znaków.`);
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('Hasła muszą być identyczne.');
+      return;
+    }
     setLoading(true);
-
     try {
-      // Pass redirect URL to magic link service (will be stored in database)
-      await magicLinkService.register(email, redirectUrl);
+      await magicLinkService.register(email, password, passwordConfirm, redirectUrl);
       setSuccess(true);
-      setEmail(''); // Clear email for security
+      sendAuthTelemetry({
+        email,
+        event_type: 'register_success_screen_viewed',
+        details: 'Wyświetlono informację, że może zalogować się Magic Linkiem z maila lub podanym hasłem.',
+      });
+      setEmail('');
+      setPassword('');
+      setPasswordConfirm('');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Błąd podczas rejestracji';
-      setError(errorMessage);
-
-      // If user already exists, suggest logging in
-      if (errorMessage.includes('już istnieje')) {
-        // Error message already contains suggestion to login
-      }
+      setError(err instanceof Error ? err.message : 'Błąd podczas rejestracji');
     } finally {
       setLoading(false);
     }
@@ -73,7 +106,7 @@ function RegisterContent() {
               Rejestracja
             </h1>
             <p className="text-sm sm:text-base text-gray-600 mb-6 text-center">
-              Wprowadź swój adres email, aby utworzyć konto i otrzymać link do logowania
+              Wprowadź adres e-mail oraz hasło, aby utworzyć konto i otrzymać link do logowania
             </p>
 
             {success ? (
@@ -86,18 +119,110 @@ function RegisterContent() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Adres email
+                    Adres e-mail <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
                     id="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => {
+                      if (email.trim()) {
+                        sendAuthTelemetry({
+                          email: email.trim(),
+                          event_type: 'register_email_filled',
+                          auth_method: 'password',
+                          details: 'Użytkownik wpisał swój adres e-mail w formularzu rejestracji.',
+                        });
+                      }
+                    }}
                     required
                     disabled={loading}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="twoj@email.com"
                   />
+                </div>
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                    Hasło <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onBlur={() => {
+                      if (password.length > 0) {
+                        sendAuthTelemetry({
+                          email: email || undefined,
+                          event_type: 'register_password_filled',
+                          auth_method: 'password',
+                          details: 'Użytkownik wypełnił pole hasła.',
+                        });
+                      }
+                    }}
+                    required
+                    minLength={MIN_PASSWORD_LENGTH}
+                    disabled={loading}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Min. 6 znaków"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="passwordConfirm" className="block text-sm font-medium text-gray-700 mb-2">
+                    Powtórz hasło <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    id="passwordConfirm"
+                    value={passwordConfirm}
+                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                    onBlur={() => {
+                      if (passwordConfirm.length > 0) {
+                        sendAuthTelemetry({
+                          email: email || undefined,
+                          event_type: 'register_password_repeated',
+                          auth_method: 'password',
+                          details: 'Użytkownik powtórzył hasło.',
+                        });
+                      }
+                    }}
+                    required
+                    minLength={MIN_PASSWORD_LENGTH}
+                    disabled={loading}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Powtórz hasło"
+                  />
+                </div>
+
+                <div className="text-sm" role="list" aria-label="Wymogi hasła">
+                  <p className="text-gray-600 mb-1 sm:mb-2">Wymogi hasła:</p>
+                  <ul className="space-y-1 list-none pl-0">
+                    <li
+                      className={
+                        password.length === 0
+                          ? 'text-gray-400'
+                          : password.length >= MIN_PASSWORD_LENGTH
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                      }
+                    >
+                      {password.length >= MIN_PASSWORD_LENGTH ? '✓ ' : ''}
+                      Min. {MIN_PASSWORD_LENGTH} znaków
+                    </li>
+                    <li
+                      className={
+                        passwordConfirm.length === 0
+                          ? 'text-gray-400'
+                          : password === passwordConfirm
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                      }
+                    >
+                      {password === passwordConfirm && passwordConfirm.length > 0 ? '✓ ' : ''}
+                      Hasła są identyczne
+                    </li>
+                  </ul>
                 </div>
 
                 {error && (
@@ -120,7 +245,7 @@ function RegisterContent() {
 
                 <button
                   type="submit"
-                  disabled={loading || !email}
+                  disabled={loading || !email || password.length < MIN_PASSWORD_LENGTH || password !== passwordConfirm}
                   className="w-full bg-[#03adf0] text-white py-2 px-4 rounded-lg font-medium hover:bg-[#0288c7] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Wysyłanie...' : 'Zarejestruj się'}

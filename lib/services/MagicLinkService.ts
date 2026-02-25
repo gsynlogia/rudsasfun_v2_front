@@ -10,6 +10,18 @@ export interface MagicLinkRequest {
   redirect_url?: string;
 }
 
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  password_confirm: string;
+  redirect_url?: string;
+}
+
+export interface LoginPasswordRequest {
+  email: string;
+  password: string;
+}
+
 export interface MagicLinkResponse {
   message: string;
   success: boolean;
@@ -79,21 +91,26 @@ class MagicLinkService {
   }
 
   /**
-   * Register a new user and request a magic link
-   * @param email - Email address to register
-   * @param redirectUrl - Optional redirect URL after successful login
+   * Register a new user (hasło obowiązkowe) i wyślij magic link
    */
-  async register(email: string, redirectUrl?: string): Promise<MagicLinkResponse> {
-    const body: MagicLinkRequest = { email };
+  async register(
+    email: string,
+    password: string,
+    passwordConfirm: string,
+    redirectUrl?: string
+  ): Promise<MagicLinkResponse> {
+    const body: RegisterRequest = {
+      email,
+      password,
+      password_confirm: passwordConfirm,
+    };
     if (redirectUrl && redirectUrl !== '/' && redirectUrl.startsWith('/')) {
       body.redirect_url = redirectUrl;
     }
 
     const response = await fetch(`${API_BASE_URL}/api/auth/magic-link/register`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 
@@ -101,7 +118,23 @@ class MagicLinkService {
       const error = await response.json().catch(() => ({ detail: 'Błąd podczas rejestracji' }));
       throw new Error(error.detail || 'Błąd podczas rejestracji');
     }
+    return response.json();
+  }
 
+  /**
+   * Logowanie klienta hasłem (Dual Auth)
+   */
+  async loginPassword(email: string, password: string): Promise<MagicLinkVerifyResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/login-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Nieprawidłowy e-mail lub hasło' }));
+      throw new Error(error.detail || 'Nieprawidłowy e-mail lub hasło');
+    }
     return response.json();
   }
 }

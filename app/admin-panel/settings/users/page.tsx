@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Users, Shield } from 'lucide-react';
+import { ArrowLeft, Users, Shield, FileText, UserX } from 'lucide-react';
 import Link from 'next/link';
 
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -9,7 +9,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
  * Admin Panel - Settings Users Page
  * Route: /admin-panel/settings/users
  *
- * Selection page with two tiles: Clients and System Users
+ * Kafelki: Użytkownicy klienci, Użytkownicy systemu, Logi, Użytkownicy bez rezerwacji
  */
 export default function SettingsUsersPage() {
   return (
@@ -68,6 +68,48 @@ export default function SettingsUsersPage() {
                 </h2>
                 <p className="text-sm text-gray-600">
                   Zarządzaj kontami administratorów i operatorów systemu. Twórz, edytuj i usuwaj użytkowników z dostępem do panelu administracyjnego.
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          {/* Logi Tile */}
+          <Link
+            href="/admin-panel/settings/users/logi"
+            className="block bg-white shadow hover:shadow-lg transition-all duration-200 p-6 border-l-4 border-emerald-600 group"
+            style={{ borderRadius: 0, cursor: 'pointer' }}
+          >
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-emerald-50 group-hover:bg-emerald-100 transition-colors" style={{ borderRadius: 0 }}>
+                <FileText className="w-8 h-8 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-emerald-600 transition-colors">
+                  Logi
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Przeglądaj logi zdarzeń autoryzacyjnych (logowanie, rejestracja, Magic Link) z tabeli auth_logs.
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          {/* Użytkownicy bez rezerwacji Tile */}
+          <Link
+            href="/admin-panel/settings/users/uzytkownicy-bez-rezerwacji"
+            className="block bg-white shadow hover:shadow-lg transition-all duration-200 p-6 border-l-4 border-amber-600 group"
+            style={{ borderRadius: 0, cursor: 'pointer' }}
+          >
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-amber-50 group-hover:bg-amber-100 transition-colors" style={{ borderRadius: 0 }}>
+                <UserX className="w-8 h-8 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors">
+                  Użytkownicy bez rezerwacji
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Klienci bez rezerwacji: z tokenem (prawdopodobnie nie dostali maila) lub bez tokenu (zalogowali się, nie złożyli rezerwacji).
                 </p>
               </div>
             </div>

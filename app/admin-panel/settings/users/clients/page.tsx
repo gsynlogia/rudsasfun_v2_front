@@ -30,7 +30,7 @@ export default function SettingsClientUsersPage() {
         </div>
 
         {/* Users Management */}
-        <UsersManagement />
+        <UsersManagement clientOnly pageSize={10} />
       </div>
     </AdminLayout>
   );

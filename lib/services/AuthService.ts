@@ -33,6 +33,8 @@ export interface User {
   accessible_sections?: string[];
   created_at?: string;
   updated_at?: string;
+  /** Czy użytkownik ma ustawione hasło (klient). */
+  has_password?: boolean;
 }
 
 class AuthService {
