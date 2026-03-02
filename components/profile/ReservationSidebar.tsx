@@ -399,7 +399,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                     const paddedId = String(reservationId).padStart(3, '0');
                     return `REZ-${year}-${paddedId}`;
                   };
-                  const reservationNumber = formatReservationNumber(reservationIdNum, reservation.created_at);
+                  const reservationNumber = reservation.reservation_number ?? formatReservationNumber(reservationIdNum, reservation.created_at);
                   const url = `${basePath}/aktualne-rezerwacje/${reservationNumber}/umowa`;
                   window.open(url, '_blank');
                 }}
@@ -521,7 +521,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                       const paddedId = String(reservationId).padStart(3, '0');
                       return `REZ-${year}-${paddedId}`;
                     };
-                    const reservationNumber = formatReservationNumber(reservationIdNum, reservation.created_at);
+                    const reservationNumber = reservation.reservation_number ?? formatReservationNumber(reservationIdNum, reservation.created_at);
                     const url = `${basePath}/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
                     window.open(url, '_blank');
                   } catch (error: any) {

@@ -31,6 +31,10 @@ interface EditReservationStep2Props {
   promotion_name?: string | null;
   /** Cena promocji z rezerwacji. */
   promotion_price?: number | null;
+  /** Dane z snapshotu umowy – tylko w modalu Cicha edycja. Nagłówki (z snapshotu) i żółte bloki. */
+  snapshotData?: EditReservationStep2Props['data'] | null;
+  /** Surowy payload snapshotu (m.in. transport_price z backendu). */
+  snapshotPayload?: Record<string, unknown> | null;
 }
 
 interface Addon {
@@ -134,7 +138,11 @@ function formatJustificationForDisplay(just: any): string {
   return parts.join('\n');
 }
 
-export default function EditReservationStep2({ data, camp_id, property_id, property_city, onChange, promotion_name, promotion_price }: EditReservationStep2Props) {
+const SNAPSHOT_LABEL = ' (z snapshotu)';
+
+export default function EditReservationStep2({ data, camp_id, property_id, property_city, onChange, promotion_name, promotion_price, snapshotData, snapshotPayload }: EditReservationStep2Props) {
+  const showSnapshot = Boolean(snapshotData);
+  const snapshotTransportPrice = typeof snapshotPayload?.transport_price === 'number' ? snapshotPayload.transport_price : undefined;
   // Normalize data - ensure arrays are properly formatted
   const normalizeArray = (arr: any): any[] => {
     if (!arr) return [];
@@ -379,7 +387,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
 
       {/* Diety (dodatkowe diety z turnusu) */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Diety (dostępne w turnusie)</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Diety (dostępne w turnusie){showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <div className="space-y-2">
           {turnusDiets.length > 0 ? (
             turnusDiets.map((diet) => {
@@ -413,7 +421,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
 
       {/* Dodatki */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dodatki</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dodatki{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <div className="space-y-2">
           {addons.length > 0 ? (
             addons.map((addon) => {
@@ -458,7 +466,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
 
       {/* Ochrony */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Ochrony</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Ochrony{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <div className="space-y-2">
           {protections.map((protection) => {
             const protectionId = `protection-${protection.id}`;
@@ -488,7 +496,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
 
       {/* Promocje – ta sama logika i dane co #promocje-transport */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Promocje</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Promocje{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Promocja:</label>
@@ -677,7 +685,7 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
 
       {/* Transport */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Transport</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Transport{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Wyjazd:</label>
@@ -785,11 +793,16 @@ export default function EditReservationStep2({ data, camp_id, property_id, prope
             </label>
           </div>
         </div>
+        {showSnapshot && snapshotTransportPrice !== undefined && (
+          <div className="mt-4 p-3 bg-amber-100 border border-amber-300 rounded text-sm text-amber-900">
+            <span className="font-medium">Na umowie (snapshot):</span> Transport: {snapshotTransportPrice.toFixed(2)} zł
+          </div>
+        )}
       </div>
 
       {/* Źródło */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Źródło</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Źródło{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <select
           value={selectedSource}
           onChange={(e) => setSelectedSource(e.target.value)}

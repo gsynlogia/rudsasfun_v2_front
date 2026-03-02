@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, RotateCcw, Trash2, User } from 'lucide-react';
+import { ArrowLeft, Link2, RotateCcw, Trash2, User } from 'lucide-react';
 
 import { formatDateTime } from '../formatters';
 import type { ReservationDetails } from '../types';
@@ -11,8 +11,15 @@ export interface ReservationDetailHeaderProps {
   onBack: () => void;
   onRestore: () => void;
   onViewClient: () => void;
+  /** Generuje magic link, kopiuje do schowka i pokazuje modal (bez wyszukiwania – rezerwacja znana). */
+  onMagicLinkClick: () => void;
   onDeleteClick: () => void;
   restoringReservation: boolean;
+  /** Po kliknięciu „Zaloguj się bezpośrednio…” – przycisk zmienia się na „Skopiowano” (szary). */
+  magicLinkCopied: boolean;
+  magicLinkLoading: boolean;
+  /** Po kliknięciu „Zobacz profil klienta” (kopiowanie linku) – przycisk zmienia się na „Skopiowano - Link do profilu klienta” (szary). */
+  profileLinkCopied: boolean;
 }
 
 export function ReservationDetailHeader({
@@ -21,8 +28,12 @@ export function ReservationDetailHeader({
   onBack,
   onRestore,
   onViewClient,
+  onMagicLinkClick,
   onDeleteClick,
   restoringReservation,
+  magicLinkCopied,
+  magicLinkLoading,
+  profileLinkCopied,
 }: ReservationDetailHeaderProps) {
   return (
     <>
@@ -48,7 +59,7 @@ export function ReservationDetailHeader({
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             {reservation.is_archived ? (
               <button
                 onClick={onRestore}
@@ -69,14 +80,36 @@ export function ReservationDetailHeader({
                 )}
               </button>
             ) : (
-              <button
-                onClick={onViewClient}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200"
-                style={{ borderRadius: 0 }}
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Zobacz profil klienta</span>
-              </button>
+              <>
+                <button
+                  onClick={onMagicLinkClick}
+                  disabled={magicLinkLoading}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-all duration-200 ${magicLinkCopied ? 'bg-slate-500 text-slate-200 cursor-default' : 'bg-[#03adf0] text-white hover:bg-[#0288c7]'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                  style={{ borderRadius: 0 }}
+                >
+                  {magicLinkLoading ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Generowanie...</span>
+                    </>
+                  ) : magicLinkCopied ? (
+                    <span>Skopiowano</span>
+                  ) : (
+                    <>
+                      <Link2 className="w-3.5 h-3.5" />
+                      <span>Zaloguj się bezpośrednio na konto klienta</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={onViewClient}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-all duration-200 ${profileLinkCopied ? 'bg-slate-500 text-slate-200 cursor-default' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                  style={{ borderRadius: 0 }}
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>{profileLinkCopied ? 'Skopiowano - Link do profilu klienta' : 'Zobacz profil klienta'}</span>
+                </button>
+              </>
             )}
             {!reservation.is_archived && (
               <button

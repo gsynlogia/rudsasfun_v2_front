@@ -120,6 +120,9 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
   const [showAuthorizationError, setShowAuthorizationError] = useState(false);
   const [childPeselError, setChildPeselError] = useState<string | null>(null);
   const [noPeselYearError, setNoPeselYearError] = useState<string | null>(null);
+  /** Checkbox "Dziecko nie posiada numeru PESEL" – osobny stan, żeby snapshot mógł ustawiać uczestnik.brakPesel niezależnie od szczepienia Odra (vaccination.measles). */
+  const [childHasNoPesel, setChildHasNoPesel] = useState(false);
+  const [childNoPeselYear, setChildNoPeselYear] = useState('');
   const [noSecondParent, setNoSecondParent] = useState(false);
   const [secondParentName, setSecondParentName] = useState('');
   const [secondParentAddress, setSecondParentAddress] = useState('');
@@ -182,9 +185,16 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
       setSecondParentAddress(overlay.secondParent.address);
       setSecondParentPhone(overlay.secondParent.phone);
     }
+    // childPesel ze snapshotu (również pusty gdy uczestnik nie ma PESEL)
+    const childPeselFromOverlay = overlay.childPesel ?? '';
+    // Checkbox "Dziecko nie posiada numeru PESEL" – ze snapshotu uczestnik.brakPesel; fallback na vaccination.measles (stare snapshoty łączące to z odra)
+    const noPeselChecked = overlay.noPesel !== undefined ? overlay.noPesel : overlay.vaccination.measles;
+    const noPeselYearFromOverlay = overlay.noPeselYear !== undefined && overlay.noPeselYear !== '' ? overlay.noPeselYear : overlay.vaccination.measlesYear;
+    setChildHasNoPesel(noPeselChecked);
+    setChildNoPeselYear(noPeselYearFromOverlay);
     setFormData((prev) => ({
       ...prev,
-      childPesel: overlay.childPesel !== undefined && overlay.childPesel !== '' ? overlay.childPesel : prev.childPesel,
+      childPesel: childPeselFromOverlay,
       vaccination: overlay.vaccination,
       regulationConfirm: overlay.regulationConfirm,
       pickupInfo: overlay.pickupInfo,
@@ -393,7 +403,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
       if (!firstErrorSection) firstErrorSection = document.getElementById('child-dob-field');
     }
 
-    if (!formData.vaccination.measles) {
+    if (!childHasNoPesel) {
       const peselTrim = formData.childPesel.trim();
       if (!peselTrim || !isValidPesel(peselTrim)) {
         setChildPeselError('To pole jest obowiązkowe');
@@ -402,7 +412,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
       }
     } else {
       if (!formData.vaccination.calendar) {
-        const yearTrim = (formData.vaccination.measlesYear || '').trim();
+        const yearTrim = (childNoPeselYear || '').trim();
         if (!yearTrim) {
           setNoPeselYearError('To pole jest obowiązkowe');
           hasAnyError = true;
@@ -469,7 +479,14 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
         nazwaTurnusu: fd.turnName,
         miejsceKoloniiObozu: fd.campLocation,
         termin: fd.campDates,
-        uczestnik: { imieNazwisko: fd.childName, dataUrodzenia: fd.childDOB, pesel: fd.childPesel, adres: fd.childAddress },
+        uczestnik: {
+          imieNazwisko: fd.childName,
+          dataUrodzenia: fd.childDOB,
+          pesel: fd.childPesel,
+          adres: fd.childAddress,
+          brakPesel: childHasNoPesel,
+          rokUrodzeniaGdyBrakPesel: childNoPeselYear || undefined,
+        },
         opiekunowie: { imionaNazwiska: fd.parentNames, adres: fd.parentAddress, telefon: fd.parentPhone },
         drugiOpiekun: reservationData?.parentCount === 1 && !noSecondParent
           ? { imieNazwisko: secondParentName, adres: secondParentAddress, telefon: secondParentPhone }
@@ -852,13 +869,13 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
 
             <div className={`field-group ${childPeselError ? 'border-2 border-red-500 rounded p-2 bg-red-50' : ''}`} data-pesel-field>
               <label>3) PESEL uczestnika/dziecka</label>
-              <div className={formData.vaccination.measles ? 'pesel-input-crossed' : ''}>
+              <div className={childHasNoPesel ? 'pesel-input-crossed' : ''}>
                 <input
                   type="text"
                   inputMode="numeric"
                   maxLength={11}
-                  value={formData.vaccination.measles ? 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' : formData.childPesel}
-                  readOnly={readOnlyView || formData.vaccination.measles}
+                  value={childHasNoPesel ? 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' : formData.childPesel}
+                  readOnly={readOnlyView || childHasNoPesel}
                   onChange={(e) => {
                     const v = e.target.value.replace(/\D/g, '');
                     handleChange('childPesel', v);
@@ -889,20 +906,20 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               <label className="checkbox-label">
                 <input
                   type="checkbox"
-                  checked={formData.vaccination.measles}
+                  checked={childHasNoPesel}
                   onChange={(e) => {
-                    handleVaccinationChange('measles', e.target.checked);
+                    setChildHasNoPesel(e.target.checked);
                     setNoPeselYearError(null);
                   }}
                   disabled={readOnlyView}
                 />
                 Dziecko nie posiada numeru PESEL
-                {formData.vaccination.measles && !formData.vaccination.calendar && (
+                {childHasNoPesel && !formData.vaccination.calendar && (
                   <input
                     type="text"
-                    value={formData.vaccination.measlesYear}
+                    value={childNoPeselYear}
                     onChange={(e) => {
-                      handleVaccinationChange('measlesYear', e.target.value);
+                      setChildNoPeselYear(e.target.value);
                       if (noPeselYearError) setNoPeselYearError(null);
                     }}
                     readOnly={readOnlyView}

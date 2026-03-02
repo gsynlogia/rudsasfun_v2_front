@@ -95,14 +95,18 @@ interface QualificationFormProps {
   printMode?: boolean;
   /** Po udanym „Zapisz zmiany” – np. do pokazania toastu z informacją o źródle danych */
   onSaveSuccess?: (message: string) => void;
+  /** Status najnowszej karty z rodzica (po refetch po zapisie); gdy podany, ma pierwszeństwo nad wewnętrznym fetch. */
+  latestCardStatusFromParent?: string | null;
 }
 
-export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, formSnapshotFromDb, printMode = false, onSaveSuccess }: QualificationFormProps) {
+export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, formSnapshotFromDb, printMode = false, onSaveSuccess, latestCardStatusFromParent }: QualificationFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [showReSignModal, setShowReSignModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
   const [currentDocumentId, setCurrentDocumentId] = useState<number | null>(null);
   const [latestCardStatus, setLatestCardStatus] = useState<'in_verification' | 'accepted' | 'rejected' | null>(null);
+  const effectiveLatestCardStatus = (latestCardStatusFromParent ?? latestCardStatus) as 'in_verification' | 'accepted' | 'rejected' | null;
   const [resendTimer, setResendTimer] = useState(60);
   const [showRegulationError, setShowRegulationError] = useState(false);
   const [showAuthorizationError, setShowAuthorizationError] = useState(false);
@@ -166,7 +170,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }
     setFormData((prev) => ({
       ...prev,
-      childPesel: overlay.childPesel !== undefined && overlay.childPesel !== '' ? overlay.childPesel : prev.childPesel,
+      childPesel: overlay.childPesel !== undefined ? (overlay.childPesel ?? '') : prev.childPesel,
       noPesel: overlay.noPesel ?? prev.noPesel,
       noPeselYear: overlay.noPeselYear ?? prev.noPeselYear,
       vaccination: overlay.vaccination,
@@ -197,7 +201,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }
     setFormData((prev) => ({
       ...prev,
-      childPesel: overlay.childPesel !== undefined && overlay.childPesel !== '' ? overlay.childPesel : prev.childPesel,
+      childPesel: overlay.childPesel !== undefined ? (overlay.childPesel ?? '') : prev.childPesel,
       noPesel: overlay.noPesel ?? prev.noPesel,
       noPeselYear: overlay.noPeselYear ?? prev.noPeselYear,
       vaccination: overlay.vaccination,
@@ -214,7 +218,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
   }, [signedPayload, reservationData?.parentCount]);
 
   /** Na wydruku pola tylko do oglądania. Gdy karta odrzucona – formularz edytowalny i można podpisać ponownie. */
-  const isEditable = !printMode && (!isSigned || latestCardStatus === 'rejected');
+  const isEditable = !printMode && (!isSigned || effectiveLatestCardStatus === 'rejected');
 
   // Pobierz status najnowszego podpisanego dokumentu (karta) – czy można podpisać ponownie (tylko gdy odrzucona)
   useEffect(() => {
@@ -632,7 +636,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [saveMessage, setSaveMessage] = useState('');
 
-  const handleSaveChanges = async () => {
+  const performSave = async () => {
     const reservationId = reservationData?.reservationId;
     if (!reservationId || !reservationId.startsWith('REZ-')) {
       setSaveMessage('Brak numeru rezerwacji');
@@ -718,6 +722,14 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       setSaveStatus('error');
       setSaveMessage(e instanceof Error ? e.message : 'Błąd zapisu');
     }
+  };
+
+  const handleSaveChanges = () => {
+    if (effectiveLatestCardStatus === 'accepted' || effectiveLatestCardStatus === 'in_verification') {
+      setShowReSignModal(true);
+      return;
+    }
+    void performSave();
   };
 
   return (
@@ -1433,16 +1445,16 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   <div className="signed-role">{formData.parentNames || 'Opiekun prawny'}</div>
                   <div className="signed-timestamp">{getCurrentDateTime()}</div>
                 </div>
-              ) : latestCardStatus === 'in_verification' ? (
+              ) : effectiveLatestCardStatus === 'in_verification' ? (
                 <p className="text-amber-700 font-medium no-print">Dokument w trakcie weryfikacji. Ponowne podpisanie nie jest możliwe.</p>
-              ) : latestCardStatus === 'accepted' ? (
+              ) : effectiveLatestCardStatus === 'accepted' ? (
                 <p className="text-green-700 font-medium no-print">Karta kwalifikacyjna została zaakceptowana.</p>
               ) : (
                 <button
                   onClick={handleSignDocument}
                   className="sign-button no-print"
                 >
-                  {latestCardStatus === 'rejected' ? 'PODPISZ PONOWNIE' : 'PODPISZ DOKUMENT'}
+                  {effectiveLatestCardStatus === 'rejected' ? 'PODPISZ PONOWNIE' : 'PODPISZ DOKUMENT'}
                 </button>
               )}
             </div>
@@ -1509,6 +1521,34 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           <div className="page-number">2/2</div>
         </div>
       </div>
+
+      {/* Modal: zapis zmodyfikowanej karty wymaga ponownego podpisu */}
+      {showReSignModal && (
+        <div className="modal-overlay no-print" onClick={() => setShowReSignModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Zmiany w karcie kwalifikacyjnej</h3>
+            <p className="modal-text">
+              Będziesz musiał podpisać kartę kwalifikacyjną na nowo. Zapisanie zmian utworzy nową wersję karty, która wymaga ponownego podpisu (kod SMS).
+            </p>
+            <div className="modal-buttons">
+              <button
+                type="button"
+                onClick={() => setShowReSignModal(false)}
+                className="modal-button modal-button-cancel"
+              >
+                Anuluj
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowReSignModal(false); void performSave(); }}
+                className="modal-button modal-button-confirm"
+              >
+                Rozumiem
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal do potwierdzenia podpisu */}
       {showSignatureModal && (

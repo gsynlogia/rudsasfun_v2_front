@@ -42,6 +42,8 @@ interface EditReservationStep1Props {
   camp_id: number;
   property_id: number;
   onChange: (data: any) => void;
+  /** Dane z snapshotu umowy – tylko w modalu Cicha edycja (#umowa-edycja-change). Nagłówki (z snapshotu) i żółte bloki. */
+  snapshotData?: EditReservationStep1Props['data'] | null;
 }
 
 interface Diet {
@@ -52,7 +54,10 @@ interface Diet {
 
 const MAX_PARENTS = 2;
 
-export default function EditReservationStep1({ data, camp_id, property_id, onChange }: EditReservationStep1Props) {
+const SNAPSHOT_LABEL = ' (z snapshotu)';
+
+export default function EditReservationStep1({ data, camp_id, property_id, onChange, snapshotData }: EditReservationStep1Props) {
+  const showSnapshot = Boolean(snapshotData);
   // Normalize parents_data - ensure it's an array, max MAX_PARENTS
   const normalizeParents = (parentsData: any): ParentData[] => {
     if (!parentsData) return [];
@@ -219,7 +224,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
       {/* Opiekunowie */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Opiekunowie <span className="text-sm font-normal text-gray-500">(maks. {MAX_PARENTS})</span></h3>
+          <h3 className="text-lg font-semibold text-gray-900">Opiekunowie{showSnapshot ? SNAPSHOT_LABEL : ''} <span className="text-sm font-normal text-gray-500">(maks. {MAX_PARENTS})</span></h3>
           <button
             type="button"
             onClick={addParent}
@@ -360,11 +365,22 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
             </div>
           ))}
         </div>
+        {showSnapshot && snapshotData?.parents_data && snapshotData.parents_data.length > 0 && (
+          <div className="mt-4 p-3 bg-amber-100 border border-amber-300 rounded text-sm text-amber-900">
+            <span className="font-medium">Dane z snapshotu:</span>{' '}
+            {snapshotData.parents_data.map((p: ParentData, i: number) => (
+              <span key={i}>
+                {i > 0 ? '; ' : ''}
+                Opiekun {i + 1}: {[p.firstName, p.lastName].filter(Boolean).join(' ') || '—'}, {p.email || '—'}, {p.phone || p.phoneNumber || '—'}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Uczestnik */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dane uczestnika</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dane uczestnika{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Imię *</label>
@@ -421,11 +437,17 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
             />
           </div>
         </div>
+        {showSnapshot && snapshotData && (
+          <div className="mt-4 p-3 bg-amber-100 border border-amber-300 rounded text-sm text-amber-900">
+            <span className="font-medium">Dane z snapshotu:</span>{' '}
+            {[snapshotData.participant_first_name, snapshotData.participant_last_name].filter(Boolean).join(' ') || '—'}, rocznik {snapshotData.participant_age || '—'}, {snapshotData.participant_gender || '—'}, {snapshotData.participant_city || '—'}
+          </div>
+        )}
       </div>
 
       {/* Dieta */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dieta główna</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dieta główna{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         {loadingDiets ? (
           <p className="text-sm text-gray-500">Ładowanie diet...</p>
         ) : (
@@ -447,7 +469,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
 
       {/* Prośba o zakwaterowanie */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Prośba o zakwaterowanie</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Prośba o zakwaterowanie{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <textarea
           value={accommodationRequest}
           onChange={(e) => setAccommodationRequest(e.target.value)}
@@ -459,7 +481,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
 
       {/* Informacje zdrowotne */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje zdrowotne</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje zdrowotne{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Choroby przewlekłe:</label>
@@ -571,7 +593,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
 
       {/* Dodatkowe informacje o stanie zdrowia uczestnika */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dodatkowe informacje o stanie zdrowia uczestnika</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dodatkowe informacje o stanie zdrowia uczestnika{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <textarea
           value={additionalNotes}
           onChange={(e) => setAdditionalNotes(e.target.value)}
@@ -583,7 +605,7 @@ export default function EditReservationStep1({ data, camp_id, property_id, onCha
 
       {/* Informacje dodatkowe dotyczące uczestnika */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje dodatkowe dotyczące uczestnika</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje dodatkowe dotyczące uczestnika{showSnapshot ? SNAPSHOT_LABEL : ''}</h3>
         <p className="text-sm text-gray-600 mb-3">
           Inne informacje, np. wyczesać włosy, nie je wieprzowiny, NIE dla quadów, ograniczone prawa rodzicielskie 2 rodzica itp.
         </p>

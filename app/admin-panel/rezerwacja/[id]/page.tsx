@@ -53,10 +53,11 @@ export default function ReservationDetailPage() {
       ? params.id[0]
       : '';
 
-  // Get fromPage param to return to correct pagination page
+  // Zadanie 3.2: pełny URL listy (returnTo) – przy powrocie zachowane filtry, strona, sort
+  const returnTo = searchParams?.get('returnTo');
   const fromPage = searchParams?.get('fromPage');
 
-  // Get all filter params to preserve filters when returning
+  // Fallback: parametry filtrów gdy brak returnTo (stare linki)
   const filterParams = new URLSearchParams();
   searchParams?.forEach((value, key) => {
     if (key.startsWith('filter_')) {
@@ -147,6 +148,23 @@ export default function ReservationDetailPage() {
   const [restoringReservation, setRestoringReservation] = useState(false);
   const [showNoSpotsModal, setShowNoSpotsModal] = useState(false);
   const [noSpotsMessage, setNoSpotsMessage] = useState('');
+  /** Magic link (zaloguj się na konto klienta) – przycisk w headerze, modal jak w Super-funkcjach */
+  const [magicLinkCopied, setMagicLinkCopied] = useState(false);
+  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
+  const [magicLinkResult, setMagicLinkResult] = useState<{
+    link_local: string;
+    link_production: string;
+    user_id: number;
+    user_email: string;
+    reservation_number: string;
+    environment: 'local' | 'production';
+  } | null>(null);
+  const [magicLinkModalOpen, setMagicLinkModalOpen] = useState(false);
+  /** Link do profilu klienta (Zobacz profil klienta → kopiuj) */
+  const [profileLinkCopied, setProfileLinkCopied] = useState(false);
+  const [profileLinkUrl, setProfileLinkUrl] = useState('');
+  const [profileLinkUserEmail, setProfileLinkUserEmail] = useState<string | null>(null);
+  const [profileLinkModalOpen, setProfileLinkModalOpen] = useState(false);
   const [editingJustification, setEditingJustification] = useState(false);
   const [justificationDraft, setJustificationDraft] = useState<Record<string, any>>({});
   const [savingJustification, setSavingJustification] = useState(false);
@@ -242,6 +260,9 @@ export default function ReservationDetailPage() {
   /** Sygnał do otwarcia panelu edycji karty, gdy w hash jest #dokumenty/karta-edycja. */
   const [cardEditFromHash, setCardEditFromHash] = useState(false);
   const openedCardEditFromHashRef = useRef(false);
+  /** Sygnał do otwarcia panelu cichej korekty umowy (#dokumenty/umowa-edycja-change). */
+  const [silentFixFromHash, setSilentFixFromHash] = useState<number | null>(null);
+  const openedSilentFixFromHashRef = useRef(false);
 
   const setPanelFromHash = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -255,15 +276,27 @@ export default function ReservationDetailPage() {
         setContractEditStepFromHash(1);
         setCardEditFromHash(false);
         openedCardEditFromHashRef.current = false;
+        setSilentFixFromHash(null);
+        openedSilentFixFromHashRef.current = false;
       } else if (panelId === 'dokumenty' && parts[1] === 'karta-edycja') {
         setContractEditStepFromHash(null);
         openedContractEditFromHashRef.current = false;
         setCardEditFromHash(true);
+        setSilentFixFromHash(null);
+        openedSilentFixFromHashRef.current = false;
+      } else if (panelId === 'dokumenty' && parts[1] === 'umowa-edycja-change') {
+        setContractEditStepFromHash(null);
+        setCardEditFromHash(false);
+        openedContractEditFromHashRef.current = false;
+        openedCardEditFromHashRef.current = false;
+        setSilentFixFromHash(1);
       } else {
         setContractEditStepFromHash(null);
         setCardEditFromHash(false);
         openedContractEditFromHashRef.current = false;
         openedCardEditFromHashRef.current = false;
+        setSilentFixFromHash(null);
+        openedSilentFixFromHashRef.current = false;
       }
     } else {
       setActivePanel('platnosci');
@@ -272,6 +305,8 @@ export default function ReservationDetailPage() {
       setCardEditFromHash(false);
       openedContractEditFromHashRef.current = false;
       openedCardEditFromHashRef.current = false;
+      setSilentFixFromHash(null);
+      openedSilentFixFromHashRef.current = false;
     }
   }, []);
 
@@ -378,6 +413,52 @@ export default function ReservationDetailPage() {
       },
     );
   }, [reservation, contractEditStepFromHash, openDocument, closeRightPanel, refetchReservation]);
+
+  /** Otwarcie panelu „Cicha edycja” po odświeżeniu, gdy w adresie jest #dokumenty/umowa-edycja-change */
+  useEffect(() => {
+    if (!reservation || silentFixFromHash !== 1 || openedSilentFixFromHashRef.current) return;
+    openedSilentFixFromHashRef.current = true;
+    setSilentFixFromHash(null);
+    if (typeof window !== 'undefined')
+      window.history.replaceState(null, '', `${window.location.pathname}#dokumenty/umowa-edycja-change`);
+    const hasSignedDoc = Boolean(latestSignedContract);
+    const hasPayloadForForm = Boolean(latestSignedContract && contractSignedPayload);
+    openDocument(
+      <ContractEditPanel
+        reservation={reservation}
+        silentFixDocumentId={hasSignedDoc ? latestSignedContract!.id : undefined}
+        initialSnapshot={hasPayloadForForm ? (contractSignedPayload as Record<string, unknown>) : undefined}
+        silentFixReservationOnly={!hasSignedDoc}
+        onSaveSuccess={async () => {
+          await refetchReservation();
+          await loadDocuments();
+          closeRightPanel();
+          if (typeof window !== 'undefined') window.location.hash = 'dokumenty';
+          openedSilentFixFromHashRef.current = false;
+        }}
+        onClose={() => {
+          if (typeof window !== 'undefined') window.location.hash = 'dokumenty';
+          openedSilentFixFromHashRef.current = false;
+          closeRightPanel();
+        }}
+      />,
+      'Cicha edycja',
+      () => {
+        if (typeof window !== 'undefined') {
+          window.location.hash = 'dokumenty';
+          openedSilentFixFromHashRef.current = false;
+        }
+      },
+    );
+  }, [
+    reservation,
+    silentFixFromHash,
+    latestSignedContract,
+    contractSignedPayload,
+    openDocument,
+    closeRightPanel,
+    refetchReservation,
+  ]);
 
   /** Otwarcie panelu „Edytuj kartę kwalifikacyjną” po odświeżeniu, gdy w adresie jest #dokumenty/karta-edycja */
   useEffect(() => {
@@ -1633,32 +1714,88 @@ export default function ReservationDetailPage() {
     );
   }
 
+  const contractDocs = signedDocumentsList.filter((d) => d.document_type === 'contract');
+  const cardDocs = signedDocumentsList.filter((d) => d.document_type === 'qualification_card');
+
+  const renderDocTile = (
+    doc: { id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null },
+    index: number,
+    isCurrent: boolean,
+  ) => {
+    const label = doc.document_type === 'contract' ? 'Umowa' : 'Karta kwalifikacyjna';
+    const handleClick = () => {
+      if (!reservation) return;
+      try {
+        const payload = doc.payload ? JSON.parse(doc.payload) : null;
+        if (doc.document_type === 'contract') {
+          openDocument(
+            <ContractForm
+              reservationData={mapReservationToContractForm(reservation as unknown as ReservationData)}
+              signedPayload={payload ?? undefined}
+              previewOnly={true}
+            />,
+            `Podgląd umowy (${formatDateTime(doc.created_at)})`,
+          );
+        } else {
+          openDocument(
+            <QualificationTemplateNew
+              reservationId={reservation.id}
+              reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
+              signedPayload={payload ?? undefined}
+              previewOnly={true}
+            />,
+            `Podgląd karty (${formatDateTime(doc.created_at)})`,
+          );
+        }
+      } catch {
+        showError?.('Nie udało się otworzyć podglądu dokumentu.');
+      }
+    };
+    return (
+      <button
+        key={doc.id}
+        type="button"
+        onClick={handleClick}
+        className={`w-full text-left rounded border p-2 text-sm transition-colors cursor-pointer ${
+          isCurrent
+            ? 'bg-green-100 border-green-300 text-green-900 hover:bg-green-200'
+            : 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100'
+        }`}
+      >
+        <div className="font-medium">{label}</div>
+        <div className="flex justify-between gap-1 mt-1 text-xs opacity-90">
+          <span>{formatDateTime(doc.created_at)}</span>
+          {!isCurrent && (
+            <span className="bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-xs font-medium">Dokument nieważny</span>
+          )}
+        </div>
+        {doc.client_message && (
+          <p className="text-xs mt-1 truncate opacity-80" title={doc.client_message}>{doc.client_message}</p>
+        )}
+      </button>
+    );
+  };
+
   const rightSidebarDocumentsContent = (
     <div className="flex-1 overflow-y-auto min-h-0 p-3 bg-white">
       <h3 className="text-sm font-semibold text-slate-700 mb-2 pb-2 border-b border-gray-100 flex-shrink-0">Wersje dokumentów z bazy</h3>
-      <div className="space-y-2 pr-1">
-        {signedDocumentsList.length === 0 ? (
-          <p className="text-sm text-gray-500 italic">Brak wpisów w bazie dla tej rezerwacji.</p>
-        ) : (
-          signedDocumentsList.map((doc) => (
-            <div key={doc.id} className="bg-gray-50 rounded border border-gray-200 p-2 text-sm">
-              <div className="font-medium text-gray-800">
-                {doc.document_type === 'contract' ? 'Umowa' : doc.document_type === 'qualification_card' ? 'Karta kwalifikacyjna' : doc.document_type}
-              </div>
-              <div className="flex justify-between gap-1 mt-1 text-xs text-gray-600">
-                <span>{formatDateTime(doc.created_at)}</span>
-                <span className={
-                  doc.status === 'accepted' ? 'text-green-600' : doc.status === 'rejected' ? 'text-red-600' : 'text-amber-600'
-                }>
-                  {doc.status === 'accepted' ? 'Zaakceptowana' : doc.status === 'rejected' ? 'Odrzucona' : 'W weryfikacji'}
-                </span>
-              </div>
-              {doc.client_message && (
-                <p className="text-xs text-gray-500 mt-1 truncate" title={doc.client_message}>{doc.client_message}</p>
-              )}
-            </div>
-          ))
-        )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pr-1">
+        <div className="space-y-2 min-w-0">
+          <h4 className="text-xs font-semibold text-gray-600 uppercase">Umowy</h4>
+          {contractDocs.length === 0 ? (
+            <p className="text-sm text-gray-500 italic">Brak umów.</p>
+          ) : (
+            contractDocs.map((doc, index) => renderDocTile(doc, index, index === 0))
+          )}
+        </div>
+        <div className="space-y-2 min-w-0">
+          <h4 className="text-xs font-semibold text-gray-600 uppercase">Karty kwalifikacyjne</h4>
+          {cardDocs.length === 0 ? (
+            <p className="text-sm text-gray-500 italic">Brak kart.</p>
+          ) : (
+            cardDocs.map((doc, index) => renderDocTile(doc, index, index === 0))
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1774,6 +1911,10 @@ export default function ReservationDetailPage() {
             reservation={reservation}
             reservationNumber={reservationNumber}
             onBack={() => {
+              if (returnTo) {
+                router.push(returnTo);
+                return;
+              }
               if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer.includes(window.location.host)) {
                 router.back();
               } else {
@@ -1819,18 +1960,55 @@ export default function ReservationDetailPage() {
                   user_name: string | null;
                   can_view: boolean;
                 }>(`/api/admin/client-view/from-reservation/${reservation.id}`);
-                if (response.can_view) {
-                  window.open(`/client-view/${response.user_id}`, '_blank');
+                if (response.can_view && typeof window !== 'undefined') {
+                  const url = `${window.location.origin}/client-view/${response.user_id}`;
+                  await navigator.clipboard.writeText(url);
+                  setProfileLinkUrl(url);
+                  setProfileLinkUserEmail(response.user_email ?? null);
+                  setProfileLinkCopied(true);
+                  setProfileLinkModalOpen(true);
                 } else {
                   alert('Nie można wyświetlić profilu tego klienta');
                 }
               } catch (err) {
-                console.error('Error opening client view:', err);
-                alert(err instanceof Error ? err.message : 'Błąd podczas otwierania profilu klienta');
+                console.error('Error copying profile link:', err);
+                alert(err instanceof Error ? err.message : 'Błąd podczas kopiowania linku do profilu klienta');
+              }
+            }}
+            onMagicLinkClick={async () => {
+              if (!reservationNumber?.trim()) return;
+              setMagicLinkLoading(true);
+              setMagicLinkResult(null);
+              try {
+                const data = await authenticatedApiCall<{
+                  link_local: string;
+                  link_production: string;
+                  user_id: number;
+                  user_email: string;
+                  reservation_number: string;
+                  environment: 'local' | 'production';
+                }>('/api/admin/super-functions/generate-magic-link', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ reservation_number: reservationNumber.trim() }),
+                });
+                setMagicLinkResult(data);
+                const linkToCopy = data.environment === 'local' ? data.link_local : data.link_production;
+                await navigator.clipboard.writeText(linkToCopy);
+                setMagicLinkCopied(true);
+                setMagicLinkModalOpen(true);
+              } catch (err) {
+                console.error('Error generating magic link:', err);
+                showError?.(err instanceof Error ? err.message : 'Nie udało się wygenerować linku.');
+              } finally {
+                setMagicLinkLoading(false);
               }
             }}
             onDeleteClick={() => setShowDeleteModal(true)}
             restoringReservation={restoringReservation}
+            magicLinkCopied={magicLinkCopied}
+            magicLinkLoading={magicLinkLoading}
+            profileLinkCopied={profileLinkCopied}
           />
 
           <div className="p-4 flex-1 min-h-0 overflow-hidden lg:h-[calc(100vh-11rem)]">
@@ -2159,6 +2337,46 @@ export default function ReservationDetailPage() {
                         <SquarePen className="w-4 h-4 flex-shrink-0" />
                         Edytuj umowę
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!reservation) return;
+                          if (typeof window !== 'undefined') window.location.hash = 'dokumenty/umowa-edycja-change';
+                          openedSilentFixFromHashRef.current = true;
+                          const hasSignedDoc = Boolean(latestSignedContract);
+                          const hasPayloadForForm = Boolean(latestSignedContract && contractSignedPayload);
+                          openDocument(
+                            <ContractEditPanel
+                              reservation={reservation}
+                              silentFixDocumentId={hasSignedDoc ? latestSignedContract!.id : undefined}
+                              initialSnapshot={hasPayloadForForm ? (contractSignedPayload as Record<string, unknown>) : undefined}
+                              silentFixReservationOnly={!hasSignedDoc}
+                              onSaveSuccess={async () => {
+                                await refetchReservation();
+                                await loadDocuments();
+                                closeRightPanel();
+                                if (typeof window !== 'undefined') window.location.hash = 'dokumenty';
+                                openedSilentFixFromHashRef.current = false;
+                              }}
+                              onClose={() => {
+                                if (typeof window !== 'undefined') window.location.hash = 'dokumenty';
+                                openedSilentFixFromHashRef.current = false;
+                                closeRightPanel();
+                              }}
+                            />,
+                            'Cicha edycja',
+                            () => {
+                              if (typeof window !== 'undefined') window.location.hash = 'dokumenty';
+                              openedSilentFixFromHashRef.current = false;
+                            },
+                          );
+                        }}
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors cursor-pointer"
+                        title="Cicha korekta danych umowy (bez powiadamiania klienta)"
+                      >
+                        <SquarePen className="w-4 h-4 flex-shrink-0" />
+                        Cicha edycja
+                      </button>
                       {latestSignedContract && (
                         <>
                           <div className="flex items-center gap-2 flex-wrap border border-gray-200 rounded-none px-3 py-2 bg-amber-50/80">
@@ -2303,6 +2521,30 @@ export default function ReservationDetailPage() {
 
                 {/* Karta kwalifikacyjna */}
                 <div className="space-y-2">
+                  {(() => {
+                    const cardStatus = latestSignedCard?.status ?? reservation?.qualification_card_status;
+                    const cardAlert =
+                      cardStatus === 'requires_signature' || (cardStatus === 'rejected' && latestSignedCard?.client_message?.includes('podpisu'))
+                        ? { type: 'red' as const, text: 'Karta wymaga podpisu' }
+                        : cardStatus === 'in_verification'
+                          ? { type: 'yellow' as const, text: 'Karta w trakcie weryfikacji' }
+                          : cardStatus === 'accepted' || reservation?.qualification_card_status === 'approved'
+                            ? { type: 'green' as const, text: 'Karta zaakceptowana' }
+                            : null;
+                    return cardAlert ? (
+                      <div
+                        className={`px-4 py-2 text-center font-medium text-sm ${
+                          cardAlert.type === 'red'
+                            ? 'bg-red-100 text-red-800 border border-red-200 rounded'
+                            : cardAlert.type === 'yellow'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200 rounded'
+                              : 'bg-green-100 text-green-800 border border-green-200 rounded'
+                        }`}
+                      >
+                        {cardAlert.text}
+                      </div>
+                    ) : null;
+                  })()}
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <div>
@@ -2312,6 +2554,10 @@ export default function ReservationDetailPage() {
                             <span className="text-green-600 font-medium">✓ Zatwierdzona</span>
                           ) : latestSignedCard?.status === 'rejected' ? (
                             <span className="text-red-600">Odrzucona{latestSignedCard.client_message ? `: ${latestSignedCard.client_message}` : ''}</span>
+                          ) : latestSignedCard?.status === 'requires_signature' ? (
+                            <span className="text-red-600 font-medium">Wymaga podpisu</span>
+                          ) : latestSignedCard?.status === 'superseded' ? (
+                            <span className="text-gray-500">Dokument nieważny (zastąpiony)</span>
                           ) : latestSignedCard?.status === 'in_verification' ? (
                             <span className="text-amber-600">W trakcie weryfikacji</span>
                           ) : (
@@ -4148,6 +4394,7 @@ export default function ReservationDetailPage() {
           </div>
           <ReservationDetailRightSidebar
             getContent={rightSidebarGetContent}
+            suggestedTab={activePanel === 'dokumenty' ? 'documents' : undefined}
           />
             <UniversalModal
               isOpen={showPromotionModal}
@@ -4230,19 +4477,15 @@ export default function ReservationDetailPage() {
                           method: 'DELETE',
                         });
                         showSuccess('Rezerwacja została zarchiwizowana. Dostępność turnusu została zwiększona o 1.');
-                        // Build return URL with page and filters
-                        const returnParams = new URLSearchParams();
-                        if (fromPage) {
-                          returnParams.set('page', fromPage);
+                        if (returnTo) {
+                          router.push(returnTo);
+                        } else {
+                          const returnParams = new URLSearchParams();
+                          if (fromPage) returnParams.set('page', fromPage);
+                          filterParams.forEach((value, key) => returnParams.set(key, value));
+                          const returnUrl = returnParams.toString() ? `/admin-panel?${returnParams.toString()}` : '/admin-panel';
+                          router.push(returnUrl);
                         }
-                        // Add all filter params
-                        filterParams.forEach((value, key) => {
-                          returnParams.set(key, value);
-                        });
-                        const returnUrl = returnParams.toString()
-                          ? `/admin-panel?${returnParams.toString()}`
-                          : '/admin-panel';
-                        router.push(returnUrl);
                       } catch (err) {
                         showError(err instanceof Error ? err.message : 'Błąd podczas archiwizacji rezerwacji');
                       } finally {
@@ -4254,6 +4497,88 @@ export default function ReservationDetailPage() {
                     className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {deletingReservation ? 'Archiwizowanie...' : 'Archiwizuj'}
+                  </button>
+                </div>
+              </div>
+            </UniversalModal>
+
+            {/* Modal: Magic link do logowania (jak w Super-funkcjach) */}
+            <UniversalModal
+              isOpen={magicLinkModalOpen}
+              onClose={() => setMagicLinkModalOpen(false)}
+              title="Magic link do logowania"
+              maxWidth="md"
+            >
+              <div className="p-4 sm:p-6">
+                {magicLinkResult && (
+                  <>
+                    <p className="text-sm text-gray-700 mb-3">
+                      <strong>Klient:</strong> {magicLinkResult.user_email} · Rezerwacja: {magicLinkResult.reservation_number}
+                    </p>
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                      Link został skopiowany do schowka. Link należy wkleić w <strong>trybie incognito</strong> lub w <strong>innym profilu przeglądarki</strong>.
+                      Użycie w tym samym profilu spowoduje wylogowanie z panelu admina i zalogowanie na konto klienta.
+                    </p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                      {magicLinkResult.environment === 'local' ? 'Link (localhost)' : 'Link (produkcja)'}
+                    </p>
+                    <p className="text-sm text-gray-800 bg-gray-50 rounded border border-gray-200 px-3 py-2 break-all font-mono">
+                      {magicLinkResult.environment === 'local' ? magicLinkResult.link_local : magicLinkResult.link_production}
+                    </p>
+                    <a
+                      href={`/client-view/${magicLinkResult.user_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded hover:bg-amber-600"
+                    >
+                      <User className="w-4 h-4" />
+                      Otwórz podgląd profilu klienta
+                    </a>
+                  </>
+                )}
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setMagicLinkModalOpen(false)}
+                    className="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700"
+                  >
+                    Rozumiem
+                  </button>
+                </div>
+              </div>
+            </UniversalModal>
+
+            {/* Modal: Link do profilu klienta (skopiowany) */}
+            <UniversalModal
+              isOpen={profileLinkModalOpen}
+              onClose={() => setProfileLinkModalOpen(false)}
+              title="Link do profilu klienta"
+              maxWidth="md"
+            >
+              <div className="p-4 sm:p-6">
+                {profileLinkUrl && (
+                  <>
+                    {profileLinkUserEmail && (
+                      <p className="text-sm text-gray-700 mb-2">
+                        <strong>Klient:</strong> {profileLinkUserEmail}
+                      </p>
+                    )}
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                      Link został skopiowany do schowka. Otwórz go w <strong>trybie incognito</strong> lub w <strong>innym profilu przeglądarki</strong>, aby pozostać zalogowanym jako admin w tej karcie.
+                    </p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Link do podglądu profilu</p>
+                    <p className="text-sm text-gray-800 bg-gray-50 rounded border border-gray-200 px-3 py-2 break-all font-mono">
+                      {profileLinkUrl}
+                    </p>
+                  </>
+                )}
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setProfileLinkModalOpen(false)}
+                    className="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700"
+                  >
+                    Rozumiem
                   </button>
                 </div>
               </div>

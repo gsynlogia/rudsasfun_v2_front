@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 
 import { QualificationForm } from '@/components/profile/QualificationForm';
@@ -13,14 +13,19 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 /**
  * Qualification Card Page
  * Route: /profil/aktualne-rezerwacje/[id]/karta-kwalifikacyjna
- * Pobiera dane rezerwacji z API i przekazuje do karty kwalifikacyjnej (żółte pola wypełnione z profilu, edytowalne).
+ * Gdy w query jest document_id – wyświetlany jest ten snapshot (np. z Do pobrania). Bez document_id – najnowsza wersja (przycisk „Karta kwalifikacyjna” w aktualne-rezerwacje).
  */
 export default function QualificationCardPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const reservationId = params?.id ? String(params.id) : '';
+  const documentIdParam = searchParams?.get('document_id');
+  const documentId = documentIdParam ? parseInt(documentIdParam, 10) : null;
+  const isSpecificSnapshot = documentId != null && !Number.isNaN(documentId);
 
   const [reservationData, setReservationData] = useState<ReservationData | null>(null);
   const [qualificationCardSignedPayload, setQualificationCardSignedPayload] = useState<Record<string, unknown> | null>(null);
+  const [latestCardStatus, setLatestCardStatus] = useState<string | null>(null);
   const [formSnapshotFromDb, setFormSnapshotFromDb] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,24 +72,57 @@ export default function QualificationCardPage() {
     fetchReservation();
   }, [reservationId]);
 
+  /** Gdy jest document_id (np. z Do pobrania) – ładujemy ten snapshot. W przeciwnym razie – najnowszy z listy. */
   useEffect(() => {
     if (!reservationData?.id) return;
     const token = authService.getToken();
     if (!token) return;
+
+    if (isSpecificSnapshot && documentId != null) {
+      fetch(`${API_URL}/api/signed-documents/${documentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => {
+          if (!res.ok) return null;
+          return res.json();
+        })
+        .then((doc: { document_type?: string; payload?: string | null } | null) => {
+          if (doc && doc.document_type === 'qualification_card' && doc.payload) {
+            try {
+              setQualificationCardSignedPayload(JSON.parse(doc.payload) as Record<string, unknown>);
+            } catch {
+              setQualificationCardSignedPayload(null);
+            }
+          } else {
+            setQualificationCardSignedPayload(null);
+          }
+          setLatestCardStatus(null);
+        })
+        .catch(() => {
+          setQualificationCardSignedPayload(null);
+          setLatestCardStatus(null);
+        });
+      return;
+    }
+
     fetch(`${API_URL}/api/signed-documents/reservation/${reservationData.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ document_type: string; payload?: string | null }>) => {
+      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string }>) => {
         const cardDoc = docs.find((d) => d.document_type === 'qualification_card');
+        setLatestCardStatus(cardDoc?.status ?? null);
         try {
           setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload!) : null);
         } catch {
           setQualificationCardSignedPayload(null);
         }
       })
-      .catch(() => setQualificationCardSignedPayload(null));
-  }, [reservationData?.id]);
+      .catch(() => {
+        setQualificationCardSignedPayload(null);
+        setLatestCardStatus(null);
+      });
+  }, [reservationData?.id, isSpecificSnapshot, documentId]);
 
   const refetchFormSnapshot = useCallback(() => {
     if (!reservationData?.id) return;
@@ -106,6 +144,29 @@ export default function QualificationCardPage() {
         }
       })
       .catch(() => setFormSnapshotFromDb(null));
+  }, [reservationData?.id]);
+
+  const refetchSignedDocs = useCallback(() => {
+    if (!reservationData?.id) return;
+    const token = authService.getToken();
+    if (!token) return;
+    fetch(`${API_URL}/api/signed-documents/reservation/${reservationData.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string }>) => {
+        const cardDoc = docs.find((d) => d.document_type === 'qualification_card');
+        setLatestCardStatus(cardDoc?.status ?? null);
+        try {
+          setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload!) : null);
+        } catch {
+          setQualificationCardSignedPayload(null);
+        }
+      })
+      .catch(() => {
+        setQualificationCardSignedPayload(null);
+        setLatestCardStatus(null);
+      });
   }, [reservationData?.id]);
 
   useEffect(() => {
@@ -138,14 +199,40 @@ export default function QualificationCardPage() {
     ? mapReservationToQualificationForm(reservationData)
     : { reservationId: reservationId.startsWith('REZ-') ? reservationId : `REZ-2026-${reservationId}` };
 
+  const cardAlert =
+    latestCardStatus === 'requires_signature'
+      ? { type: 'red' as const, text: 'Karta wymaga podpisu' }
+      : latestCardStatus === 'in_verification'
+        ? { type: 'yellow' as const, text: 'Karta w trakcie weryfikacji' }
+        : latestCardStatus === 'accepted'
+          ? { type: 'green' as const, text: 'Karta zaakceptowana' }
+          : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {cardAlert && (
+        <div
+          className={`px-4 py-3 text-center font-medium ${
+            cardAlert.type === 'red'
+              ? 'bg-red-100 text-red-800 border-b border-red-200'
+              : cardAlert.type === 'yellow'
+                ? 'bg-amber-100 text-amber-800 border-b border-amber-200'
+                : 'bg-green-100 text-green-800 border-b border-green-200'
+          }`}
+        >
+          {cardAlert.text}
+        </div>
+      )}
       <QualificationForm
         reservationId={reservationData?.id}
         reservationData={qualificationData}
         signedPayload={qualificationCardSignedPayload ?? undefined}
         formSnapshotFromDb={formSnapshotFromDb ?? undefined}
-        onSaveSuccess={() => refetchFormSnapshot()}
+        onSaveSuccess={() => {
+          refetchFormSnapshot();
+          refetchSignedDocs();
+        }}
+        latestCardStatusFromParent={latestCardStatus}
       />
     </div>
   );

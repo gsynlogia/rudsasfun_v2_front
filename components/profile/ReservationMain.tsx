@@ -496,7 +496,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     return `REZ-${year}-${paddedId}`;
   };
 
-  const reservationNumber = formatReservationNumber(reservation.id, reservation.created_at);
+  const reservationNumber = reservation.reservation_number ?? formatReservationNumber(reservation.id, reservation.created_at);
 
   // Get age (rocznik - birth year)
   const age = reservation.participant_age ? `Rocznik: ${reservation.participant_age}` : 'Brak danych';

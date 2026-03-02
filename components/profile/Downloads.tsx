@@ -1,7 +1,8 @@
 'use client';
 
 import { FileText, Download, CheckCircle, XCircle, Calendar, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
@@ -40,6 +41,15 @@ interface Document {
   isCurrent?: boolean;
 }
 
+/** Element listy signed-documents (GET /api/signed-documents/reservation/:id) */
+interface SignedDocItem {
+  id: number;
+  document_type: string;
+  status: string;
+  created_at: string;
+  payload?: string | null;
+}
+
 /**
  * Downloads Component
  * Displays all downloadable documents except invoices (contracts, etc.)
@@ -57,9 +67,18 @@ export default function Downloads() {
   const [cancelAnnexReason, setCancelAnnexReason] = useState('');
   const [cancelAnnexLoading, setCancelAnnexLoading] = useState(false);
   const [refreshAnnexes, setRefreshAnnexes] = useState(0);
+  /** Lista signed-documents per rezerwacja (pełna historia wersji – Umowy | Karty) */
+  const [signedDocsByReservation, setSignedDocsByReservation] = useState<Record<number, SignedDocItem[]>>({});
+  /** Mapowanie id rezerwacji → numer (REZ-YYYY-NNN) do hash w URL (#/REZ-2026-445) */
+  const [reservationNumberById, setReservationNumberById] = useState<Record<number, string>>({});
 
   // Load user's contracts from backend
   useEffect(() => {
+    const formatReservationNumber = (reservationId: number, createdAt: string) => {
+      const year = new Date(createdAt).getFullYear();
+      const paddedId = String(reservationId).padStart(3, '0');
+      return `REZ-${year}-${paddedId}`;
+    };
     const loadDocuments = async () => {
       try {
         setIsLoading(true);
@@ -67,6 +86,13 @@ export default function Downloads() {
 
         // Get user's reservations to get contract_status
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 1000);
+        const numById: Record<number, string> = {};
+        reservations.forEach((r) => {
+          if (r.id != null) {
+            numById[r.id] = r.reservation_number ?? formatReservationNumber(r.id, r.created_at ?? new Date().toISOString());
+          }
+        });
+        setReservationNumberById(numById);
         // Fetch contract files; systemowe zamieniamy na link HTML, user-uploads zostawiamy do pobrania
         const allContractsList: Document[] = [];
 
@@ -229,6 +255,34 @@ export default function Downloads() {
     loadDocuments();
   }, [refreshAnnexes]);
 
+  // Pełna historia wersji (signed-documents) per rezerwacja – do układu Umowy | Karty
+  const reservationIds = useMemo(() => {
+    const ids = new Set<number>();
+    documents.forEach((d) => {
+      if (d.reservationId && d.type !== 'cms_document') ids.add(d.reservationId);
+    });
+    return Array.from(ids);
+  }, [documents]);
+
+  useEffect(() => {
+    if (reservationIds.length === 0) return;
+    let cancelled = false;
+    const load = async () => {
+      const next: Record<number, SignedDocItem[]> = {};
+      for (const rid of reservationIds) {
+        try {
+          const list = await authenticatedApiCall<SignedDocItem[]>(`/api/signed-documents/reservation/${rid}`);
+          if (!cancelled && Array.isArray(list)) next[rid] = list;
+        } catch {
+          if (!cancelled) next[rid] = [];
+        }
+      }
+      if (!cancelled) setSignedDocsByReservation((prev) => ({ ...prev, ...next }));
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [reservationIds.join(',')]);
+
   const handleDownloadDocument = async (document: Document) => {
     if (document.type === 'contract') {
       // Systemowa umowa: otwieramy HTML w nowej karcie; dla wgranych plików (user/system) zostawiamy download
@@ -388,16 +442,51 @@ export default function Downloads() {
 
   const [expandedReservations, setExpandedReservations] = useState<Set<number>>(new Set());
 
+  /** Synchronizacja hash (#/REZ-2026-445) z rozwiniętą rezerwacją – pamięć po odświeżeniu strony. */
+  const syncExpandedFromHash = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash.slice(1).replace(/^\/?/, '').trim();
+    if (!hash || !/^REZ-\d{4}-[\w-]+$/.test(hash)) {
+      setExpandedReservations((prev) => (prev.size === 0 ? prev : new Set<number>()));
+      return;
+    }
+    const entry = Object.entries(reservationNumberById).find(([, num]) => num === hash);
+    const id = entry != null ? Number(entry[0]) : NaN;
+    if (id != null && !Number.isNaN(id)) {
+      setExpandedReservations(new Set([id]));
+    }
+  }, [reservationNumberById]);
+
+  useEffect(() => {
+    syncExpandedFromHash();
+  }, [syncExpandedFromHash]);
+
+  /** Po załadowaniu numerów rezerwacji (np. po odświeżeniu) – przywróć rozwinięcie z hash. */
+  const hasReservationNumbers = Object.keys(reservationNumberById).length > 0;
+  useEffect(() => {
+    if (hasReservationNumbers && typeof window !== 'undefined' && window.location.hash) {
+      syncExpandedFromHash();
+    }
+  }, [hasReservationNumbers, syncExpandedFromHash]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onHashChange = () => syncExpandedFromHash();
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [syncExpandedFromHash]);
+
   const toggleReservation = (reservationId: number) => {
-    setExpandedReservations(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(reservationId)) {
-        newSet.delete(reservationId);
-      } else {
-        newSet.add(reservationId);
-      }
-      return newSet;
-    });
+    const num = reservationNumberById[reservationId];
+    const nextNum = num ?? `REZ-${new Date().getFullYear()}-${String(reservationId).padStart(3, '0')}`;
+    const alreadyExpanded = expandedReservations.has(reservationId);
+    if (alreadyExpanded) {
+      setExpandedReservations(new Set<number>());
+      if (typeof window !== 'undefined') window.history.replaceState(null, '', window.location.pathname);
+    } else {
+      setExpandedReservations(new Set([reservationId]));
+      if (typeof window !== 'undefined') window.history.replaceState(null, '', `${window.location.pathname}#/${nextNum}`);
+    }
   };
 
   const getStatusBadge = (status: Document['status']) => {
@@ -724,6 +813,69 @@ export default function Downloads() {
                             </div>
                           </div>
                         ))}
+                        {/* Wersje dokumentów z bazy – na dole, dwie kolumny (Umowy | Karty), zielony = obowiązujący, niebieski = nieważny */}
+                        {(() => {
+                          const list = signedDocsByReservation[reservationId] || [];
+                          if (list.length === 0) return null;
+                          const contractDocs = list.filter((d) => d.document_type === 'contract');
+                          const cardDocs = list.filter((d) => d.document_type === 'qualification_card');
+                          const formatDate = (s: string) => {
+                            try {
+                              const d = new Date(s);
+                              return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                            } catch {
+                              return s;
+                            }
+                          };
+                          const renderDocTile = (doc: SignedDocItem, index: number, type: 'contract' | 'qualification_card') => {
+                            const isCurrent = index === 0;
+                            const base = type === 'contract'
+                              ? `/profil/aktualne-rezerwacje/${reservationId}/umowa`
+                              : `/profil/aktualne-rezerwacje/${reservationId}/karta-kwalifikacyjna`;
+                            const href = type === 'qualification_card'
+                              ? `${base}?document_id=${doc.id}`
+                              : base;
+                            return (
+                              <Link
+                                key={doc.id}
+                                href={href}
+                                className={`block rounded-lg p-3 border text-left transition-colors ${
+                                  isCurrent
+                                    ? 'bg-green-50 border-green-200 text-green-900 hover:bg-green-100'
+                                    : 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100'
+                                }`}
+                              >
+                                <div className="text-xs font-medium text-gray-500">{formatDate(doc.created_at)}</div>
+                                {!isCurrent && (
+                                  <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                                    Dokument nieważny
+                                  </span>
+                                )}
+                              </Link>
+                            );
+                          };
+                          return (
+                            <div className="mb-4 mt-4">
+                              <h4 className="text-sm font-semibold text-gray-800 mb-2">Wersje dokumentów z bazy</h4>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <div className="text-xs font-semibold text-gray-600 mb-2">Umowy</div>
+                                  <div className="space-y-2">
+                                    {contractDocs.map((doc, idx) => renderDocTile(doc, idx, 'contract'))}
+                                    {contractDocs.length === 0 && <span className="text-xs text-gray-400">Brak</span>}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-xs font-semibold text-gray-600 mb-2">Karty kwalifikacyjne</div>
+                                  <div className="space-y-2">
+                                    {cardDocs.map((doc, idx) => renderDocTile(doc, idx, 'qualification_card'))}
+                                    {cardDocs.length === 0 && <span className="text-xs text-gray-400">Brak</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}

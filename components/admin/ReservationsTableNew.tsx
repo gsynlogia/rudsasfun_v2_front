@@ -1360,12 +1360,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const dateToUrl = searchParams?.get('date_to') || '';
     const archiveFromUrl = searchParams?.get('archive') as 'active' | 'archived' | 'all' | null;
 
-    // Parse column filters from URL (filter_columnKey=value1,value2)
+    // Parse column filters from URL. Źródło: nazwy zawierają przecinki – separator w URL to '|'
     const columnFiltersFromUrl: Record<string, string[]> = {};
     searchParams?.forEach((value, key) => {
-      if (key.startsWith('filter_')) {
+      if (key.startsWith('filter_') && !key.endsWith('_exclude')) {
         const colKey = key.replace('filter_', '');
-        columnFiltersFromUrl[colKey] = value.split(',').filter(v => v);
+        const sep = colKey === 'sourceName' ? '|' : ',';
+        columnFiltersFromUrl[colKey] = value.split(sep).map(v => v.trim()).filter(v => v);
       }
     });
     const hasColumnFilters = Object.keys(columnFiltersFromUrl).length > 0;
@@ -1411,6 +1412,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
       initialSyncDoneRef.current = true;
     }
+
+    // Zadanie 3.2: sort z URL przy powrocie (returnTo zawiera sort_by, sort_dir)
+    const sortByUrl = searchParams?.get('sort_by');
+    const sortDirUrl = searchParams?.get('sort_dir');
+    if (sortByUrl) setSortColumn(sortByUrl);
+    if (sortDirUrl === 'asc' || sortDirUrl === 'desc') setSortDirection(sortDirUrl);
   }, [searchParams]);
 
   // Debounce timer ref
@@ -1511,7 +1518,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         const parsed = JSON.parse(columnFilters);
         Object.entries(parsed).forEach(([colKey, values]) => {
           if (Array.isArray(values) && values.length > 0) {
-            params.set(`filter_${colKey}`, values.join(','));
+            const sep = colKey === 'sourceName' ? '|' : ',';
+            params.set(`filter_${colKey}`, values.join(sep));
           }
         });
       } catch (e) {
@@ -1523,7 +1531,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         const parsed = JSON.parse(columnFiltersExclude);
         Object.entries(parsed).forEach(([colKey, values]) => {
           if (Array.isArray(values) && values.length > 0) {
-            params.set(`filter_${colKey}_exclude`, values.join(','));
+            const sep = colKey === 'sourceName' ? '|' : ',';
+            params.set(`filter_${colKey}_exclude`, values.join(sep));
           }
         });
       } catch (e) {
@@ -1797,6 +1806,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const [headerFilterPopoverRect, setHeaderFilterPopoverRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const headerFilterPopoverInputRef = useRef<HTMLInputElement>(null);
   const tableScrollContainerRef = useRef<HTMLDivElement>(null);
+  const listVerticalScrollRef = useRef<HTMLDivElement>(null); // Zadanie 3.3: kontener z overflow-y-auto do zapisu/odtworzenia scrollTop
   const tableElementRef = useRef<HTMLTableElement>(null);
   const horizontalScrollBarRef = useRef<HTMLDivElement>(null);
   const isScrollingFromBarRef = useRef(false);
@@ -1990,12 +2000,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     if (searchParams) {
       searchParams.forEach((value, key) => {
         if (key.startsWith('filter_')) {
+          const sep = (key.replace('filter_', '').replace('_exclude', '') === 'sourceName') ? '|' : ',';
           if (key.endsWith('_exclude')) {
             const columnKey = key.replace('filter_', '').replace('_exclude', '');
-            excludeFromUrl[columnKey] = value.split(',').filter(v => v);
+            excludeFromUrl[columnKey] = value.split(sep).map(v => v.trim()).filter(v => v);
           } else {
             const columnKey = key.replace('filter_', '');
-            filtersFromUrl[columnKey] = value.split(',').filter(v => v);
+            filtersFromUrl[columnKey] = value.split(sep).map(v => v.trim()).filter(v => v);
           }
         }
       });
@@ -2738,12 +2749,14 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             const dbValues = filters.map(f => statusDisplayToDb[f] || f);
             params.set('filter_status', dbValues.join(','));
           } else {
-            params.set(`filter_${colKey}`, filters.join(','));
+            const sep = colKey === 'sourceName' ? '|' : ',';
+            params.set(`filter_${colKey}`, filters.join(sep));
           }
         }
         const exclude = col.exclude || [];
         if (exclude.length > 0) {
-          params.set(`filter_${col.key}_exclude`, exclude.join(','));
+          const sepEx = col.key === 'sourceName' ? '|' : ',';
+          params.set(`filter_${col.key}_exclude`, exclude.join(sepEx));
         }
       });
 
@@ -3294,15 +3307,21 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               const dbValues = filters.map(f => statusDisplayToDb[f] || f);
               params.set('filter_status', dbValues.join(','));
             } else {
-              params.set(`filter_${colKey}`, filters.join(','));
+              const sep = colKey === 'sourceName' ? '|' : ',';
+              params.set(`filter_${colKey}`, filters.join(sep));
             }
           }
         });
         Object.entries(parsedColumnFiltersExclude).forEach(([colKey, excludeVals]) => {
           if (excludeVals && excludeVals.length > 0) {
-            params.set(`filter_${colKey}_exclude`, excludeVals.join(','));
+            const sepEx = colKey === 'sourceName' ? '|' : ',';
+            params.set(`filter_${colKey}_exclude`, excludeVals.join(sepEx));
           }
         });
+
+        // Sortowanie po stronie serwera (Zadanie 3.1) – spójna kolejność na wszystkich stronach
+        params.set('sort_by', sortColumn || 'createdAt');
+        params.set('sort_dir', sortDirection || 'desc');
 
         // Fetch paginated data from backend (includes payments and manual_payments)
         const response = await authenticatedApiCall<PaginatedPaymentsResponse>(
@@ -3613,7 +3632,26 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     };
 
     fetchPayments();
-  }, [isProtectionsAndAddonsLoaded, currentPage, itemsPerPage, appliedFilters, protectionsMap, addonsMap, appliedColumnFilters, appliedColumnFiltersExclude, archiveFilter]);
+  }, [isProtectionsAndAddonsLoaded, currentPage, itemsPerPage, appliedFilters, protectionsMap, addonsMap, appliedColumnFilters, appliedColumnFiltersExclude, archiveFilter, sortColumn, sortDirection]);
+
+  // Zadanie 3.3: przywracanie pozycji scrolla po powrocie z rezerwacji (reservations – dane z API)
+  useEffect(() => {
+    if (reservations.length === 0) return;
+    const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('admin_list_scroll_top') : null;
+    if (raw == null) return;
+    const el = listVerticalScrollRef.current;
+    if (!el) return;
+    const top = parseInt(raw, 10);
+    if (isNaN(top)) {
+      sessionStorage.removeItem('admin_list_scroll_top');
+      return;
+    }
+    sessionStorage.removeItem('admin_list_scroll_top');
+    const id = requestAnimationFrame(() => {
+      el.scrollTop = top;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [reservations.length]);
 
   // HTTP Polling dla wykrywania zmian w rezerwacjach (tylko gdy na stronie /admin-panel)
   useEffect(() => {
@@ -3786,78 +3824,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     }
   };
 
-  // Client-side sorting only (filtering is now server-side)
+  // Kolejność z serwera (Zadanie 3.1: sortowanie po stronie serwera – brak sortowania po stronie klienta)
   const filteredReservations = useMemo(() => {
-    const filtered = [...reservations];
-
-    // NOTE: Column filters are now server-side (sent as filter_xxx params)
-    // NOTE: Search is server-side (appliedFilters)
-
-    // Client-side sorting
-    if (sortColumn) {
-      filtered.sort((a, b) => {
-        let aValue: string | number;
-        let bValue: string | number;
-
-        switch (sortColumn) {
-          case 'createdAt':
-            // Sort by date (newest first by default)
-            const aDate = new Date(a.createdAt).getTime();
-            const bDate = new Date(b.createdAt).getTime();
-            return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
-          case 'reservationName':
-            aValue = a.reservationName;
-            bValue = b.reservationName;
-            break;
-          case 'participantName':
-            aValue = a.participantName;
-            bValue = b.participantName;
-            break;
-          case 'totalAmount':
-            aValue = a.paymentDetails.totalAmount;
-            bValue = b.paymentDetails.totalAmount;
-            break;
-          case 'paidAmount':
-            aValue = a.paymentDetails.paidAmount;
-            bValue = b.paymentDetails.paidAmount;
-            break;
-          case 'remainingAmount':
-            aValue = a.paymentDetails.remainingAmount;
-            bValue = b.paymentDetails.remainingAmount;
-            break;
-          case 'payment1Amount':
-            aValue = a.payment1?.amount || 0;
-            bValue = b.payment1?.amount || 0;
-            break;
-          case 'payment2Amount':
-            aValue = a.payment2?.amount || 0;
-            bValue = b.payment2?.amount || 0;
-            break;
-          case 'payment3Amount':
-            aValue = a.payment3?.amount || 0;
-            bValue = b.payment3?.amount || 0;
-            break;
-          default:
-            // For string columns, use localeCompare
-            const aStr = getColumnValue(a, sortColumn) || '';
-            const bStr = getColumnValue(b, sortColumn) || '';
-            return sortDirection === 'asc'
-              ? aStr.localeCompare(bStr)
-              : bStr.localeCompare(aStr);
-        }
-
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          return sortDirection === 'asc'
-            ? aValue.localeCompare(bValue)
-            : bValue.localeCompare(aValue);
-        } else {
-          return sortDirection === 'asc' ? (aValue as number) - (bValue as number) : (bValue as number) - (aValue as number);
-        }
-      });
-    }
-
-    return filtered;
-  }, [sortColumn, sortDirection, reservations, columnConfig]);
+    // Backend zwraca strony już posortowane (sort_by, sort_dir). Zachowujemy kolejność z API.
+    return [...reservations];
+  }, [reservations]);
 
   // Server-side pagination (data is already paginated from backend)
   const totalPages = serverPagination?.total_pages || 1;
@@ -5043,8 +5014,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         })()}
       </div>
 
-      {/* Obszar przewijalny tylko w pionie; przewijanie poziome tabeli przez pasek u dołu */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+      {/* Obszar przewijalny tylko w pionie; przewijanie poziome tabeli przez pasek u dołu (Zadanie 3.3: ref do przywracania scrollTop) */}
+      <div ref={listVerticalScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
       {/* Alert o zmianach w płatnościach */}
       {paymentChangesAlert.isVisible && (
         <div className="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4 flex items-center justify-between shadow-sm">
@@ -5163,9 +5134,14 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                   const hasCanceledItems = reservation.paymentDetails.items.some(item => item.status === 'canceled');
                   const basePath = `/admin-panel/rezerwacja/${reservation.reservationName}`;
                   const detailPath = detailTarget === 'payment' ? `${basePath}/payments` : basePath;
-                  const reservationUrl = currentPage > 1
-                    ? `${detailPath}?fromPage=${currentPage}${detailTarget === 'reservation' ? '#dane' : ''}`
-                    : `${detailPath}${detailTarget === 'reservation' ? '#dane' : ''}`;
+                  // Zadanie 3.2: pełny URL listy (filtry, strona, sort) w returnTo – przy powrocie zachowane
+                  const returnParams = new URLSearchParams(searchParams?.toString() ?? '');
+                  if (sortColumn) {
+                    returnParams.set('sort_by', sortColumn);
+                    returnParams.set('sort_dir', sortDirection || 'desc');
+                  }
+                  const returnTo = (pathname || '/admin-panel') + (returnParams.toString() ? `?${returnParams.toString()}` : '');
+                  const reservationUrl = `${detailPath}?returnTo=${encodeURIComponent(returnTo)}${detailTarget === 'reservation' ? '#dane' : ''}`;
 
                   return (
                     <Fragment key={`reservation-row-${rowIndex}`}>
@@ -5174,6 +5150,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                         onClick={(e) => {
                           const target = e.target as HTMLElement;
                           if (target.closest('button, a, input, select')) return;
+                          // Zadanie 3.3: zapis pozycji scrolla przed wejściem w rezerwację
+                          const scrollEl = listVerticalScrollRef.current;
+                          if (scrollEl && typeof sessionStorage !== 'undefined') {
+                            sessionStorage.setItem('admin_list_scroll_top', String(scrollEl.scrollTop));
+                          }
                           router.push(reservationUrl);
                         }}
                         onAuxClick={(e) => {

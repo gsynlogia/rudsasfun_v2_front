@@ -1,7 +1,7 @@
 'use client';
 
 import { Save } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import EditReservationStep1 from '@/components/admin/EditReservationStep1';
 import EditReservationStep2 from '@/components/admin/EditReservationStep2';
@@ -64,6 +64,12 @@ interface ContractEditPanelProps {
   reservation: ReservationDetails;
   onSaveSuccess: () => void;
   onClose?: () => void;
+  /** Tryb cichej korekty: zapis do snapshotu umowy bez powiadamiania klienta. */
+  silentFixDocumentId?: number;
+  /** Dane początkowe z snapshotu umowy (payload signed_document). Używane tylko przy silentFixDocumentId. */
+  initialSnapshot?: Record<string, unknown>;
+  /** Gdy true (brak podpisanego dokumentu): zapisz tylko rezerwację step1/step2, bez archiwum i bez powiadamiania. */
+  silentFixReservationOnly?: boolean;
 }
 
 function mapReservationToStep1(r: ReservationDetails) {
@@ -84,7 +90,7 @@ function mapReservationToStep1(r: ReservationDetails) {
     participant_age: r.participant_age ?? '',
     participant_gender: r.participant_gender ?? '',
     participant_city: r.participant_city ?? '',
-    diet: r.diet,
+    diet: r.diet ?? null,
     accommodation_request: r.accommodation_request ?? '',
     health_questions: r.health_questions,
     health_details: r.health_details,
@@ -94,10 +100,12 @@ function mapReservationToStep1(r: ReservationDetails) {
 }
 
 function mapReservationToStep2(r: ReservationDetails) {
+  const toStrArr = (v: (string | number)[] | null | undefined): string[] =>
+    (v ?? []).map((x) => (typeof x === 'number' ? String(x) : x));
   return {
     selected_diets: r.selected_diets ?? [],
-    selected_addons: r.selected_addons ?? [],
-    selected_protection: r.selected_protection ?? [],
+    selected_addons: toStrArr(r.selected_addons ?? []),
+    selected_protection: toStrArr(r.selected_protection ?? []),
     selected_promotion: r.selected_promotion ?? '',
     promotion_justification: r.promotion_justification ?? {},
     departure_type: r.departure_type ?? 'zbiorowy',
@@ -112,17 +120,80 @@ function mapReservationToStep2(r: ReservationDetails) {
   };
 }
 
-export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: ContractEditPanelProps) {
+/** Normalizuje snapshot (może mieć snake_case z backendu) do kształtu ReservationDetails dla mapperów. */
+function normalizeSnapshotForMapping(snap: Record<string, unknown>): ReservationDetails {
+  const parents = (snap.parents_data ?? []) as any[];
+  const parentsNormalized = parents.slice(0, 2).map((p: any, idx: number) => ({
+    id: p?.id ?? String(idx + 1),
+    firstName: p?.firstName ?? p?.first_name ?? '',
+    lastName: p?.lastName ?? p?.last_name ?? '',
+    email: p?.email ?? '',
+    phone: p?.phone ?? p?.phoneNumber ?? '',
+    phoneNumber: p?.phoneNumber ?? p?.phone ?? '',
+    street: p?.street ?? '',
+    postalCode: p?.postalCode ?? p?.postal_code ?? '',
+    city: p?.city ?? '',
+  }));
+  return {
+    ...snap,
+    parents_data: parentsNormalized,
+    participant_first_name: (snap as any).participant_first_name ?? '',
+    participant_last_name: (snap as any).participant_last_name ?? '',
+    participant_age: (snap as any).participant_age ?? '',
+    participant_gender: (snap as any).participant_gender ?? '',
+    participant_city: (snap as any).participant_city ?? '',
+    diet: (snap as any).diet ?? null,
+    accommodation_request: (snap as any).accommodation_request ?? '',
+    selected_diets: (snap as any).selected_diets ?? [],
+    selected_addons: (snap as any).selected_addons ?? [],
+    selected_protection: (snap as any).selected_protection ?? [],
+    selected_promotion: (snap as any).selected_promotion ?? '',
+    departure_type: (snap as any).departure_type ?? 'zbiorowy',
+    departure_city: (snap as any).departure_city ?? '',
+    departure_transport_city_id: (snap as any).departure_transport_city_id ?? null,
+    return_type: (snap as any).return_type ?? 'zbiorowy',
+    return_city: (snap as any).return_city ?? '',
+    return_transport_city_id: (snap as any).return_transport_city_id ?? null,
+    transport_different_cities: (snap as any).transport_different_cities ?? false,
+    selected_source: (snap as any).selected_source ?? '',
+    source_inne_text: (snap as any).source_inne_text ?? '',
+  } as ReservationDetails;
+}
+
+export function ContractEditPanel({
+  reservation,
+  onSaveSuccess,
+  onClose,
+  silentFixDocumentId,
+  initialSnapshot,
+  silentFixReservationOnly,
+}: ContractEditPanelProps) {
   const { showSuccess, showError: showErrorToast } = useToast();
   const [formData, setFormData] = useState<{ step1: any; step2: any }>({ step1: null, step2: null });
   const [isSaving, setIsSaving] = useState(false);
 
+  const baseReservation = initialSnapshot
+    ? ({ ...reservation, ...initialSnapshot } as ReservationDetails)
+    : reservation;
+
+  const snapshotDataStep1 = useMemo(() => {
+    if (!initialSnapshot) return undefined;
+    const norm = normalizeSnapshotForMapping(initialSnapshot);
+    return mapReservationToStep1(norm);
+  }, [initialSnapshot]);
+
+  const snapshotDataStep2 = useMemo(() => {
+    if (!initialSnapshot) return undefined;
+    const norm = normalizeSnapshotForMapping(initialSnapshot);
+    return mapReservationToStep2(norm);
+  }, [initialSnapshot]);
+
   useEffect(() => {
     setFormData({
-      step1: mapReservationToStep1(reservation),
-      step2: mapReservationToStep2(reservation),
+      step1: mapReservationToStep1(baseReservation),
+      step2: mapReservationToStep2(baseReservation),
     });
-  }, [reservation.id]);
+  }, [reservation.id, silentFixDocumentId ?? 0]);
 
   const handleStep1Change = useCallback((data: any) => {
     setFormData(prev => (JSON.stringify(prev.step1) === JSON.stringify(data) ? prev : { ...prev, step1: data }));
@@ -131,47 +202,70 @@ export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: Contr
     setFormData(prev => (JSON.stringify(prev.step2) === JSON.stringify(data) ? prev : { ...prev, step2: data }));
   }, []);
 
+  const buildUpdateRequest = () => ({
+    step1: {
+      parents: formData.step1.parents_data || [],
+      participantData: {
+        firstName: formData.step1.participant_first_name || '',
+        lastName: formData.step1.participant_last_name || '',
+        age: formData.step1.participant_age || '',
+        gender: formData.step1.participant_gender || '',
+        city: formData.step1.participant_city || '',
+      },
+      selectedDietId: formData.step1.diet,
+      accommodationRequest: formData.step1.accommodation_request || '',
+      healthQuestions: formData.step1.health_questions || { chronicDiseases: 'Nie', dysfunctions: 'Nie', psychiatric: 'Nie' },
+      healthDetails: formData.step1.health_details || { chronicDiseases: '', dysfunctions: '', psychiatric: '' },
+      additionalNotes: formData.step1.additional_notes || '',
+      participantAdditionalInfo: formData.step1.participant_additional_info ?? undefined,
+    },
+    step2: {
+      selectedDiets: formData.step2.selected_diets || [],
+      selectedAddons: formData.step2.selected_addons || [],
+      selectedProtection: formData.step2.selected_protection || [],
+      selectedPromotion: formData.step2.selected_promotion || '',
+      promotionJustification: formData.step2.promotion_justification || {},
+      transportData: {
+        departureType: formData.step2.departure_type || 'zbiorowy',
+        departureCity: formData.step2.departure_city || '',
+        departureTransportCityId: formData.step2.departure_transport_city_id ?? undefined,
+        returnType: formData.step2.return_type || 'zbiorowy',
+        returnCity: formData.step2.return_city || '',
+        returnTransportCityId: formData.step2.return_transport_city_id ?? undefined,
+        differentCities: formData.step2.transport_different_cities || false,
+      },
+      selectedSource: formData.step2.selected_source || '',
+      inneText: formData.step2.source_inne_text || '',
+    },
+  });
+
   const handleSave = async () => {
     if (!formData.step1 || !formData.step2) return;
     try {
       setIsSaving(true);
+      const updateRequest = buildUpdateRequest();
+
+      if (silentFixDocumentId != null) {
+        await authenticatedApiCall(
+          `/api/signed-documents/${silentFixDocumentId}/silent-fix`,
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updateRequest) },
+        );
+        showSuccess('Poprawki zapisane. Klient nie jest informowany.');
+        onSaveSuccess();
+        return;
+      }
+
+      if (silentFixReservationOnly) {
+        await authenticatedApiCall<ReservationDetails>(
+          `/api/reservations/${reservation.id}`,
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updateRequest) },
+        );
+        showSuccess('Poprawki zapisane. Klient nie jest informowany.');
+        onSaveSuccess();
+        return;
+      }
+
       await contractArchiveService.create(reservation.id, reservation as unknown as Record<string, unknown>);
-      const updateRequest: any = {
-        step1: {
-          parents: formData.step1.parents_data || [],
-          participantData: {
-            firstName: formData.step1.participant_first_name || '',
-            lastName: formData.step1.participant_last_name || '',
-            age: formData.step1.participant_age || '',
-            gender: formData.step1.participant_gender || '',
-            city: formData.step1.participant_city || '',
-          },
-          selectedDietId: formData.step1.diet,
-          accommodationRequest: formData.step1.accommodation_request || '',
-          healthQuestions: formData.step1.health_questions || { chronicDiseases: 'Nie', dysfunctions: 'Nie', psychiatric: 'Nie' },
-          healthDetails: formData.step1.health_details || { chronicDiseases: '', dysfunctions: '', psychiatric: '' },
-          additionalNotes: formData.step1.additional_notes || '',
-          participantAdditionalInfo: formData.step1.participant_additional_info ?? undefined,
-        },
-        step2: {
-          selectedDiets: formData.step2.selected_diets || [],
-          selectedAddons: formData.step2.selected_addons || [],
-          selectedProtection: formData.step2.selected_protection || [],
-          selectedPromotion: formData.step2.selected_promotion || '',
-          promotionJustification: formData.step2.promotion_justification || {},
-          transportData: {
-            departureType: formData.step2.departure_type || 'zbiorowy',
-            departureCity: formData.step2.departure_city || '',
-            departureTransportCityId: formData.step2.departure_transport_city_id ?? undefined,
-            returnType: formData.step2.return_type || 'zbiorowy',
-            returnCity: formData.step2.return_city || '',
-            returnTransportCityId: formData.step2.return_transport_city_id ?? undefined,
-            differentCities: formData.step2.transport_different_cities || false,
-          },
-          selectedSource: formData.step2.selected_source || '',
-          inneText: formData.step2.source_inne_text || '',
-        },
-      };
       await authenticatedApiCall<ReservationDetails>(
         `/api/reservations/${reservation.id}`,
         { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updateRequest) },
@@ -243,6 +337,7 @@ export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: Contr
                 camp_id={campId}
                 property_id={propertyId}
                 onChange={handleStep1Change}
+                snapshotData={snapshotDataStep1}
               />
             )}
           </div>
@@ -256,6 +351,8 @@ export function ContractEditPanel({ reservation, onSaveSuccess, onClose }: Contr
                 onChange={handleStep2Change}
                 promotion_name={reservation.promotion_name}
                 promotion_price={reservation.promotion_price}
+                snapshotData={snapshotDataStep2}
+                snapshotPayload={initialSnapshot}
               />
             )}
           </div>

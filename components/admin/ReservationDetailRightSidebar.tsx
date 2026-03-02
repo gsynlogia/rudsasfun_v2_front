@@ -17,6 +17,8 @@ export const RIGHT_SIDEBAR_WIDTH = 320;
 interface ReservationDetailRightSidebarProps {
   /** Renderuje treść dla aktywnej zakładki (notes | events | documents). */
   getContent: (tab: ReservationRightTabId) => ReactNode;
+  /** Gdy ustawione (np. przy #dokumenty), prawy panel przełącza się na tę zakładkę, żeby historia wersji była od razu widoczna. */
+  suggestedTab?: ReservationRightTabId | null;
 }
 
 function getStoredTab(): ReservationRightTabId {
@@ -45,12 +47,20 @@ function setStoredTab(tab: ReservationRightTabId) {
  */
 export function ReservationDetailRightSidebar({
   getContent,
+  suggestedTab,
 }: ReservationDetailRightSidebarProps) {
   const [activeTab, setActiveTab] = useState<ReservationRightTabId>(getStoredTab);
 
   useEffect(() => {
     setActiveTab(getStoredTab());
   }, []);
+
+  useEffect(() => {
+    if (suggestedTab && suggestedTab !== activeTab) {
+      setActiveTab(suggestedTab);
+      setStoredTab(suggestedTab);
+    }
+  }, [suggestedTab]);
 
   const handleTab = (id: ReservationRightTabId) => {
     setActiveTab(id);
