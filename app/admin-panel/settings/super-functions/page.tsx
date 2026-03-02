@@ -143,6 +143,26 @@ export default function SuperFunctionsPage() {
               </div>
             </div>
 
+            {/* Magic link do profilu klienta */}
+            <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-[#03adf0] transition-colors">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Magic link do profilu klienta
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Generowanie linku logowania po numerze rezerwacji. Klient nie otrzymuje e-maila.
+                  </p>
+                </div>
+                <Link
+                  href="/admin-panel/settings/super-functions/magic-link"
+                  className="px-6 py-2 bg-[#03adf0] text-white font-medium rounded-lg hover:bg-[#0288c7] transition-colors inline-block"
+                >
+                  Uruchom
+                </Link>
+              </div>
+            </div>
+
             {/* Inteligentna analiza rezerwacji - WYŁĄCZONA */}
             {/*
             <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-[#03adf0] transition-colors">
