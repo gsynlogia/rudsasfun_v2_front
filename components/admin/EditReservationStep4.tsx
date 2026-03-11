@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 
 interface EditReservationStep4Props {
   data: {
@@ -37,7 +37,7 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
         const response = await fetch(`${API_BASE_URL}/api/documents/public`);
         if (response.ok) {
           const data = await response.json();
-          setDocuments((data.documents || []).filter((doc: any) => doc.file_url));
+          setDocuments((data.documents || []).filter((doc: any) => doc.file_url).map((doc: any) => ({ ...doc, file_url: getStaticAssetUrl(doc.file_url) || doc.file_url })));
         }
       } catch (err) {
         console.error('Error fetching documents:', err);

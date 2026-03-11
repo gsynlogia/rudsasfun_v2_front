@@ -11,6 +11,7 @@ import { paymentService } from '@/lib/services/PaymentService';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { ReservationResponse } from '@/lib/services/ReservationService';
 
+import { getStaticAssetUrl } from '@/utils/api-config';
 import UniversalModal from '../admin/UniversalModal';
 import DashedLine from '../DashedLine';
 
@@ -116,7 +117,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
               type: 'certificate',
               name: cert.file_name,
               date: cert.uploaded_at,
-              fileUrl: cert.file_url || undefined,
+              fileUrl: (cert.file_url ? getStaticAssetUrl(cert.file_url) : undefined) || cert.file_url || undefined,
             });
           });
         }
@@ -791,7 +792,7 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
                               type: 'certificate',
                               name: cert.file_name,
                               date: cert.uploaded_at,
-                              fileUrl: cert.file_url || undefined,
+                              fileUrl: (cert.file_url ? getStaticAssetUrl(cert.file_url) : undefined) || cert.file_url || undefined,
                             });
                           });
                         }

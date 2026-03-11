@@ -136,7 +136,7 @@ export default function ProtectionSection() {
         const docsMap = new Map<string, string>();
         (data.documents || []).forEach((doc: { name: string; file_url: string | null }) => {
           if (doc.file_url) {
-            docsMap.set(doc.name, doc.file_url);
+            docsMap.set(doc.name, getStaticAssetUrl(doc.file_url) || doc.file_url);
           }
         });
         setDocuments(docsMap);

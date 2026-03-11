@@ -104,6 +104,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
   const [currentDocumentId, setCurrentDocumentId] = useState<number | null>(null);
   const [printErrors, setPrintErrors] = useState<Partial<Record<PrintErrorKey, boolean>>>({});
   const [latestContractStatus, setLatestContractStatus] = useState<'in_verification' | 'accepted' | 'rejected' | null>(null);
+  const [latestContractSignedAt, setLatestContractSignedAt] = useState<string | null>(null);
 
   // Automatyczny druk w trybie printMode
   useEffect(() => {
@@ -125,15 +126,17 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ status: string }>) => {
+      .then((docs: Array<{ status: string; signed_at?: string | null }>) => {
         const latest = docs[0];
         if (latest && (latest.status === 'in_verification' || latest.status === 'accepted' || latest.status === 'rejected')) {
           setLatestContractStatus(latest.status as 'in_verification' | 'accepted' | 'rejected');
+          setLatestContractSignedAt(latest.signed_at ?? null);
         } else {
           setLatestContractStatus(null);
+          setLatestContractSignedAt(null);
         }
       })
-      .catch(() => setLatestContractStatus(null));
+      .catch(() => { setLatestContractStatus(null); setLatestContractSignedAt(null); });
   }, [reservationId, printMode]);
 
   // Aktualna data i godzina
@@ -756,37 +759,54 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
           {/* Podpisy – ukryte w trybie podglądu (krok 4 rezerwacji) */}
           {!previewOnly && (
           <section className="section signature-section">
-            <div className="signature-row-single">
-              <div className="signature-field-organizer">
-                <label>Data: {getCurrentDate()} i podpis Organizatora</label>
-                {latestContractStatus === 'accepted' && (
-                  <div className="signed-indicator-contract">
-                    <div className="signed-name">RADSAS FUN sp. z o.o.</div>
-                    <div className="signed-date">{getCurrentDate()}</div>
-                  </div>
-                )}
-              </div>
+            {(() => {
+              const firstParentName = (formData.parentName || '').split(',')[0].trim() || 'Opiekun prawny';
+              const signedAtDate = latestContractSignedAt
+                ? new Date(latestContractSignedAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : null;
+              const signedAtFull = latestContractSignedAt
+                ? (() => { const d = new Date(latestContractSignedAt); return `${d.toLocaleDateString('pl-PL')}, ${d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`; })()
+                : getCurrentDateTime();
 
-              {/* Przycisk podpisz dokument – tylko gdy brak podpisu lub najnowszy status = odrzucona */}
-              {isSigned ? (
-                <div className="signed-confirmation">
-                  <div className="signed-header">Dokument podpisany przez:</div>
-                  <div className="signed-role">Opiekun prawny</div>
-                  <div className="signed-timestamp">{getCurrentDateTime()}</div>
+              const showSignatureBoxes = isSigned || latestContractStatus === 'in_verification' || latestContractStatus === 'accepted';
+
+              if (showSignatureBoxes) {
+                return (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', maxWidth: '100%' }}>
+                    {/* Lewa strona — Organizator */}
+                    {latestContractStatus === 'accepted' ? (
+                      <div className="signed-confirmation" style={{ flex: '1 1 0', minWidth: 0, fontSize: '8pt' }}>
+                        <div className="signed-header" style={{ fontSize: '8pt' }}>Data: {signedAtDate || getCurrentDate()} i podpis Organizatora</div>
+                        <div className="signed-role" style={{ color: '#03adf0', fontSize: '9pt' }}>RADSAS FUN sp. z o.o.</div>
+                        <div className="signed-timestamp">{signedAtDate || getCurrentDate()}</div>
+                      </div>
+                    ) : (
+                      <div style={{ flex: '1 1 0', minWidth: 0, background: '#fef3c7', color: '#92400e', padding: '0.5rem 0.8rem', borderRadius: '4px', fontSize: '8pt', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                        Dokument w trakcie weryfikacji przez organizatora
+                      </div>
+                    )}
+
+                    {/* Prawa strona — Opiekun */}
+                    <div className="signed-confirmation" style={{ flex: '1 1 0', minWidth: 0, textAlign: 'right', fontSize: '8pt' }}>
+                      <div className="signed-header" style={{ fontSize: '8pt' }}>Dokument podpisany przez:</div>
+                      <div className="signed-role" style={{ fontSize: '9pt' }}>{firstParentName}</div>
+                      <div className="signed-timestamp">{signedAtFull}</div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={handleSignDocument}
+                    className="sign-button no-print"
+                  >
+                    {latestContractStatus === 'rejected' ? 'PODPISZ PONOWNIE' : 'PODPISZ DOKUMENT'}
+                  </button>
                 </div>
-              ) : latestContractStatus === 'in_verification' ? (
-                <p className="text-amber-700 font-medium no-print">Dokument w trakcie weryfikacji. Ponowne podpisanie nie jest możliwe.</p>
-              ) : latestContractStatus === 'accepted' ? (
-                <p className="text-green-700 font-medium no-print">Umowa została zaakceptowana.</p>
-              ) : (
-                <button
-                  onClick={handleSignDocument}
-                  className="sign-button no-print"
-                >
-                  {latestContractStatus === 'rejected' ? 'PODPISZ PONOWNIE' : 'PODPISZ DOKUMENT'}
-                </button>
-              )}
-            </div>
+              );
+            })()}
           </section>
           )}
 
@@ -941,6 +961,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
           max-height: 297mm;
           padding: 12mm 12mm;
           box-sizing: border-box;
+          overflow: hidden;
           position: relative;
           font-size: 9pt;
           line-height: 1.3;
@@ -1202,9 +1223,10 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
         }
 
         .signature-section {
-          margin-top: 2.5rem;
-          padding-top: 1.5rem;
+          margin-top: 1rem;
+          padding-top: 0.75rem;
           border-top: 2px solid #e0e0e0;
+          overflow: hidden;
         }
 
         .signature-row-single {
@@ -1312,7 +1334,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
 
         .page-number {
           position: absolute;
-          bottom: 10mm;
+          bottom: 4mm;
           right: 15mm;
           font-size: 8pt;
           font-weight: 600;

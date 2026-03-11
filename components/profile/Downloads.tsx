@@ -8,7 +8,7 @@ import { contractService } from '@/lib/services/ContractService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 import { authenticatedApiCall } from '@/utils/api-auth';
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 
 interface AnnexItem {
   id: number;
@@ -212,7 +212,7 @@ export default function Downloads() {
                     year: 'numeric',
                   }),
                   status: 'available' as const,
-                  fileUrl: doc.file_url,
+                  fileUrl: getStaticAssetUrl(doc.file_url) || doc.file_url,
                 });
               });
             }

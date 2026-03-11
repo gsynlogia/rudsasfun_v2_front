@@ -26,6 +26,7 @@ export default function QualificationCardPage() {
   const [reservationData, setReservationData] = useState<ReservationData | null>(null);
   const [qualificationCardSignedPayload, setQualificationCardSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [latestCardStatus, setLatestCardStatus] = useState<string | null>(null);
+  const [latestCardSignedAt, setLatestCardSignedAt] = useState<string | null>(null);
   const [formSnapshotFromDb, setFormSnapshotFromDb] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,9 +110,10 @@ export default function QualificationCardPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string }>) => {
+      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string; signed_at?: string | null }>) => {
         const cardDoc = docs.find((d) => d.document_type === 'qualification_card');
         setLatestCardStatus(cardDoc?.status ?? null);
+        setLatestCardSignedAt(cardDoc?.signed_at ?? null);
         try {
           setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload!) : null);
         } catch {
@@ -121,6 +123,7 @@ export default function QualificationCardPage() {
       .catch(() => {
         setQualificationCardSignedPayload(null);
         setLatestCardStatus(null);
+        setLatestCardSignedAt(null);
       });
   }, [reservationData?.id, isSpecificSnapshot, documentId]);
 
@@ -154,9 +157,10 @@ export default function QualificationCardPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string }>) => {
+      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string; signed_at?: string | null }>) => {
         const cardDoc = docs.find((d) => d.document_type === 'qualification_card');
         setLatestCardStatus(cardDoc?.status ?? null);
+        setLatestCardSignedAt(cardDoc?.signed_at ?? null);
         try {
           setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload!) : null);
         } catch {
@@ -166,6 +170,7 @@ export default function QualificationCardPage() {
       .catch(() => {
         setQualificationCardSignedPayload(null);
         setLatestCardStatus(null);
+        setLatestCardSignedAt(null);
       });
   }, [reservationData?.id]);
 
@@ -233,6 +238,7 @@ export default function QualificationCardPage() {
           refetchSignedDocs();
         }}
         latestCardStatusFromParent={latestCardStatus}
+        latestCardSignedAtFromParent={latestCardSignedAt}
       />
     </div>
   );

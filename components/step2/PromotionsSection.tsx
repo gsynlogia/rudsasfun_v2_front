@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
 interface Promotion {
@@ -177,7 +177,7 @@ export default function PromotionsSection() {
         const data = await response.json();
         const doc = (data.documents || []).find((d: { name: string }) => d.name === 'promotion_regulation');
         if (doc && doc.file_url) {
-          setPromotionDocumentUrl(doc.file_url);
+          setPromotionDocumentUrl(getStaticAssetUrl(doc.file_url) || doc.file_url);
         }
       } catch (err) {
         console.error('[PromotionsSection] Error fetching documents:', err);

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { getStaticAssetUrl } from '@/utils/api-config';
 
 interface Document {
   id: number;
@@ -216,7 +217,7 @@ export default function DocumentEditPage() {
                           {currentFilePath.split('/').pop() || currentFilePath}
                         </p>
                         <a
-                          href={currentFileUrl}
+                          href={getStaticAssetUrl(currentFileUrl) || currentFileUrl || '#'}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-2 text-sm text-[#03adf0] hover:text-[#0288c7] hover:underline transition-colors"

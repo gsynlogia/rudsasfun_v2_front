@@ -2773,8 +2773,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
         // Calculate payment details
         const allPayments: Array<{ status: string; paid_amount?: number | null; amount: number; created_at: string | null }> = [
-          ...payments.map(p => ({ status: p.status, paid_amount: p.paid_amount, amount: p.amount, created_at: p.created_at })),
-          ...manualPayments.map(mp => ({ status: 'paid', paid_amount: mp.amount, amount: mp.amount, created_at: mp.created_at })),
+          ...payments.map(p => ({ status: p.status, paid_amount: p.paid_amount, amount: p.amount, created_at: p.paid_at || p.created_at })),
+          ...manualPayments.map(mp => ({ status: 'paid', paid_amount: mp.amount, amount: mp.amount, created_at: mp.payment_date || mp.created_at })),
         ];
 
         const totalPaid = allPayments

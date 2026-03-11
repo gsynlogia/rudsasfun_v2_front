@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ContractForm } from '@/components/profile/ContractForm';
 import type { StepComponentProps } from '@/types/reservation';
 import { buildContractFormDataFromSteps } from '@/lib/buildContractPreviewFromSteps';
-import { API_BASE_URL } from '@/utils/api-config';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { saveStep4FormData, loadStep4FormData, loadStep1FormData, loadStep2FormData, loadStep3FormData, loadReservationState, type Step4FormData } from '@/utils/sessionStorage';
 
 import DashedLine from './DashedLine';
@@ -51,7 +51,7 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
         const docsMap = new Map<string, { display_name: string; file_url: string }>();
         (data.documents || []).forEach((doc: { name: string; display_name: string; file_url: string | null }) => {
           if (doc.file_url) {
-            docsMap.set(doc.name, { display_name: doc.display_name, file_url: doc.file_url });
+            docsMap.set(doc.name, { display_name: doc.display_name, file_url: getStaticAssetUrl(doc.file_url) || doc.file_url });
           }
         });
         setDocuments(docsMap);

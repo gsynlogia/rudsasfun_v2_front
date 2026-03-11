@@ -137,9 +137,19 @@ export default function SourceSection() {
     }
   };
 
+  // Sources blocked for new selections (existing selections still work)
+  const BLOCKED_SOURCE_NAMES = ['Od znajomych', 'Z Internetu'];
+
   // Filter active sources and sort by display_order
   const activeSources = sources
     .filter(source => source.is_active)
+    .filter(source => {
+      // Hide blocked sources unless already selected by user
+      if (BLOCKED_SOURCE_NAMES.includes(source.name)) {
+        return selectedSource === source.id.toString();
+      }
+      return true;
+    })
     .sort((a, b) => a.display_order - b.display_order);
 
   if (loading) {

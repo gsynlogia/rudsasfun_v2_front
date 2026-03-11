@@ -52,6 +52,17 @@ export function signedPayloadOverlayOnly(payload: SignedQualificationPayload | n
   const s4 = payload.sekcjaIV;
   const u = payload.upowaznienia;
   return {
+    // Sekcja I — dane podstawowe (aby snapshot/payload nadpisywał pola edytowane przez klienta)
+    childName: s1?.uczestnik?.imieNazwisko,
+    childDOB: s1?.uczestnik?.dataUrodzenia,
+    childAddress: s1?.uczestnik?.adres,
+    parentNames: s1?.opiekunowie?.imionaNazwiska,
+    parentAddress: s1?.opiekunowie?.adres,
+    parentPhone: s1?.opiekunowie?.telefon,
+    turnName: s1?.nazwaTurnusu,
+    campLocation: s1?.miejsceKoloniiObozu,
+    campDates: s1?.termin,
+    // Sekcja I — pola dodatkowe
     childPesel: s1?.uczestnik?.pesel ?? '',
     noPesel: s1?.uczestnik?.brakPesel ?? false,
     noPeselYear: s1?.uczestnik?.rokUrodzeniaGdyBrakPesel ?? '',

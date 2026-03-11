@@ -10,7 +10,8 @@ import { authenticatedApiCall } from '@/utils/api-auth';
 import { isFakeDataEnabled } from '@/utils/fakeData';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
+import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
+
 
 interface TransportCity {
   id?: number;
@@ -73,7 +74,7 @@ export default function TransportSection() {
         const docsMap = new Map<string, string>();
         (data.documents || []).forEach((doc: { name: string; file_url: string | null }) => {
           if (doc.file_url && (doc.name === 'transport_regulations' || doc.name === 'transport_list')) {
-            docsMap.set(doc.name, doc.file_url);
+            docsMap.set(doc.name, getStaticAssetUrl(doc.file_url) || doc.file_url);
           }
         });
         setTransportDocuments(docsMap);

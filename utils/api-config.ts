@@ -109,6 +109,11 @@ export function getStaticAssetUrl(iconUrl: string | null | undefined): string | 
 
   // If already a full URL (http:// or https://), check if it needs domain conversion
   if (iconUrl.startsWith('http://') || iconUrl.startsWith('https://')) {
+    // Replace localhost URLs with proper API base URL
+    if (iconUrl.includes('localhost:8000')) {
+      const currentBase = typeof window !== 'undefined' ? getApiBaseUrl() : (process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl');
+      return iconUrl.replace(/https?:\/\/localhost:8000/, currentBase);
+    }
     // Replace old domain with new API domain
     // Convert: https://rezerwacja.radsas-fun.pl/static/... -> https://api.rezerwacja.radsas-fun.pl/static/...
     // Also handle old domain: https://rejestracja.radsasfun.system-app.pl/static/... -> https://api.rezerwacja.radsas-fun.pl/static/...

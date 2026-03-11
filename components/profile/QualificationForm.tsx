@@ -97,9 +97,11 @@ interface QualificationFormProps {
   onSaveSuccess?: (message: string) => void;
   /** Status najnowszej karty z rodzica (po refetch po zapisie); gdy podany, ma pierwszeństwo nad wewnętrznym fetch. */
   latestCardStatusFromParent?: string | null;
+  /** Data podpisania dokumentu (signed_at z signed_documents). */
+  latestCardSignedAtFromParent?: string | null;
 }
 
-export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, formSnapshotFromDb, printMode = false, onSaveSuccess, latestCardStatusFromParent }: QualificationFormProps) {
+export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, formSnapshotFromDb, printMode = false, onSaveSuccess, latestCardStatusFromParent, latestCardSignedAtFromParent }: QualificationFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [showReSignModal, setShowReSignModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
@@ -170,6 +172,17 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }
     setFormData((prev) => ({
       ...prev,
+      // Sekcja I — nadpisuj z snapshotu jeśli obecne
+      childName: overlay.childName ?? prev.childName,
+      childDOB: overlay.childDOB ?? prev.childDOB,
+      childAddress: overlay.childAddress ?? prev.childAddress,
+      parentNames: overlay.parentNames ?? prev.parentNames,
+      parentAddress: overlay.parentAddress ?? prev.parentAddress,
+      parentPhone: overlay.parentPhone ?? prev.parentPhone,
+      turnName: overlay.turnName ?? prev.turnName,
+      campLocation: overlay.campLocation ?? prev.campLocation,
+      campDates: overlay.campDates ?? prev.campDates,
+      // Pozostałe pola
       childPesel: overlay.childPesel !== undefined ? (overlay.childPesel ?? '') : prev.childPesel,
       noPesel: overlay.noPesel ?? prev.noPesel,
       noPeselYear: overlay.noPeselYear ?? prev.noPeselYear,
@@ -201,6 +214,17 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }
     setFormData((prev) => ({
       ...prev,
+      // Sekcja I — nadpisuj z payloadu jeśli obecne
+      childName: overlay.childName ?? prev.childName,
+      childDOB: overlay.childDOB ?? prev.childDOB,
+      childAddress: overlay.childAddress ?? prev.childAddress,
+      parentNames: overlay.parentNames ?? prev.parentNames,
+      parentAddress: overlay.parentAddress ?? prev.parentAddress,
+      parentPhone: overlay.parentPhone ?? prev.parentPhone,
+      turnName: overlay.turnName ?? prev.turnName,
+      campLocation: overlay.campLocation ?? prev.campLocation,
+      campDates: overlay.campDates ?? prev.campDates,
+      // Pozostałe pola
       childPesel: overlay.childPesel !== undefined ? (overlay.childPesel ?? '') : prev.childPesel,
       noPesel: overlay.noPesel ?? prev.noPesel,
       noPeselYear: overlay.noPeselYear ?? prev.noPeselYear,
@@ -1438,26 +1462,56 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
           {/* Podpis dokumentu */}
           <section className="section">
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-              {printMode ? null : isSigned ? (
-                <div className="signed-confirmation">
-                  <div className="signed-header">Dokument podpisany przez:</div>
-                  <div className="signed-role">{formData.parentNames || 'Opiekun prawny'}</div>
-                  <div className="signed-timestamp">{getCurrentDateTime()}</div>
+            {(() => {
+              const firstParentName = (formData.parentNames || '').split(',')[0].trim() || 'Opiekun prawny';
+              const signedAtDate = latestCardSignedAtFromParent
+                ? new Date(latestCardSignedAtFromParent).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : null;
+              const signedAtFull = latestCardSignedAtFromParent
+                ? (() => { const d = new Date(latestCardSignedAtFromParent); return `${d.toLocaleDateString('pl-PL')}, ${d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`; })()
+                : getCurrentDateTime();
+
+              const showSignatureBoxes = isSigned || effectiveLatestCardStatus === 'in_verification' || effectiveLatestCardStatus === 'accepted';
+
+              if (printMode) return null;
+
+              if (showSignatureBoxes) {
+                return (
+                  <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', gap: '2rem' }}>
+                    {/* Lewa strona — Organizator */}
+                    {effectiveLatestCardStatus === 'accepted' ? (
+                      <div className="signed-confirmation" style={{ flex: 1 }}>
+                        <div className="signed-header">Data: {signedAtDate || getCurrentDateTime().split(',')[0]} i podpis Organizatora</div>
+                        <div className="signed-role" style={{ color: '#03adf0' }}>RADSAS FUN sp. z o.o.</div>
+                        <div className="signed-timestamp">{signedAtDate || getCurrentDateTime().split(',')[0]}</div>
+                      </div>
+                    ) : (
+                      <div style={{ flex: 1, background: '#fef3c7', color: '#92400e', padding: '0.6rem 1.2rem', borderRadius: '4px', fontSize: '9pt', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                        Dokument w trakcie weryfikacji przez organizatora
+                      </div>
+                    )}
+
+                    {/* Prawa strona — Opiekun */}
+                    <div className="signed-confirmation" style={{ flex: 1, textAlign: 'right' }}>
+                      <div className="signed-header">Dokument podpisany przez:</div>
+                      <div className="signed-role">{firstParentName}</div>
+                      <div className="signed-timestamp">{signedAtFull}</div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={handleSignDocument}
+                    className="sign-button no-print"
+                  >
+                    {effectiveLatestCardStatus === 'rejected' ? 'PODPISZ PONOWNIE' : 'PODPISZ DOKUMENT'}
+                  </button>
                 </div>
-              ) : effectiveLatestCardStatus === 'in_verification' ? (
-                <p className="text-amber-700 font-medium no-print">Dokument w trakcie weryfikacji. Ponowne podpisanie nie jest możliwe.</p>
-              ) : effectiveLatestCardStatus === 'accepted' ? (
-                <p className="text-green-700 font-medium no-print">Karta kwalifikacyjna została zaakceptowana.</p>
-              ) : (
-                <button
-                  onClick={handleSignDocument}
-                  className="sign-button no-print"
-                >
-                  {effectiveLatestCardStatus === 'rejected' ? 'PODPISZ PONOWNIE' : 'PODPISZ DOKUMENT'}
-                </button>
-              )}
-            </div>
+              );
+            })()}
           </section>
 
           {/* Część Organizatora */}
