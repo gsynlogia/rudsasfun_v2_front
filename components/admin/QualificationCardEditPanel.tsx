@@ -233,7 +233,13 @@ export function QualificationCardEditPanel({
         dysfunkcje: healthDysfunctionsTags,
         problemyPsychiatryczne: healthPsychiatricTags,
         dodatkoweInformacje: healthAdditionalNotes,
-        tekstZbiorczy: '',
+        // Faza 3.6: pełny opis (wszystkie wpisy) w payloadzie
+        tekstZbiorczy: [
+          healthChronicTags.length ? `Choroby przewlekłe: ${healthChronicTags.join(', ')}` : '',
+          healthDysfunctionsTags.length ? `Dysfunkcje: ${healthDysfunctionsTags.join(', ')}` : '',
+          healthPsychiatricTags.length ? `Problemy psychiatryczne/psychologiczne: ${healthPsychiatricTags.join(', ')}` : '',
+          healthAdditionalNotes.trim() || '',
+        ].filter(Boolean).join('; ') || '',
       },
       sekcjaII_szczepienia: {
         zgodnieZKalendarzem: vaccination.calendar,

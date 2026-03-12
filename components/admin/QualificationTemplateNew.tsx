@@ -497,7 +497,14 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
         dysfunkcje: healthDysfunctionsTags,
         problemyPsychiatryczne: healthPsychiatricTags,
         dodatkoweInformacje: healthAdditionalNotes,
-        tekstZbiorczy: fd.healthInfo,
+        // Faza 3.6: pełny opis (wszystkie wpisy) w payloadzie
+        tekstZbiorczy: [
+          healthChronicTags.length ? `Choroby przewlekłe: ${healthChronicTags.join(', ')}` : '',
+          healthDysfunctionsTags.length ? `Dysfunkcje: ${healthDysfunctionsTags.join(', ')}` : '',
+          healthPsychiatricTags.length ? `Problemy psychiatryczne/psychologiczne: ${healthPsychiatricTags.join(', ')}` : '',
+          healthAdditionalNotes.trim() || '',
+          (fd.healthInfo || '').trim(),
+        ].filter(Boolean).join('; ') || fd.healthInfo || '',
       },
       sekcjaII_szczepienia: {
         zgodnieZKalendarzem: fd.vaccination.calendar,
