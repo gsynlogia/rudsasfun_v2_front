@@ -138,7 +138,7 @@ export default function ReservationDetailPage() {
   const [qualificationCardSignedPayload, setQualificationCardSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [contractSignedPayload, setContractSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [contractArchiveVersions, setContractArchiveVersions] = useState<ContractArchiveVersionItem[]>([]);
-  const [signedDocumentsList, setSignedDocumentsList] = useState<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null }>>([]);
+  const [signedDocumentsList, setSignedDocumentsList] = useState<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; sms_verified_at?: string | null }>>([]);
   const [uploadingCard, setUploadingCard] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingReservation, setDeletingReservation] = useState(false);
@@ -982,12 +982,18 @@ export default function ReservationDetailPage() {
       setContractFiles(contractFilesData.filter(f => f.source === 'user'));
       const cardFilesData = await qualificationCardService.getQualificationCardFiles(reservation.id);
       setCardFiles(cardFilesData.filter(f => f.source === 'user'));
-      const signedDocs = await authenticatedApiCall<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; reverted_after_approval?: number }>>(
+      const signedDocs = await authenticatedApiCall<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; reverted_after_approval?: number; sms_verified_at?: string | null }>>(
         `/api/signed-documents/reservation/${reservation.id}`,
       );
       setSignedDocumentsList(signedDocs);
       const contractDoc = signedDocs.find(d => d.document_type === 'contract');
-      const cardDoc = signedDocs.find(d => d.document_type === 'qualification_card');
+      const cardDocs = signedDocs.filter(d => d.document_type === 'qualification_card');
+      // Najnowsza karta z payloadem i aktywnym statusem — do wyświetlenia danych.
+      const activeStatuses = ['accepted', 'in_verification', 'requires_signature'];
+      const cardDoc =
+        cardDocs.find((d) => d.payload && activeStatuses.includes(d.status ?? '')) ??
+        cardDocs.find((d) => d.payload) ??
+        cardDocs[0];
       setLatestSignedContract(contractDoc ? { id: contractDoc.id, status: contractDoc.status, client_message: contractDoc.client_message } : null);
       setLatestSignedCard(cardDoc ? { id: cardDoc.id, status: cardDoc.status, client_message: cardDoc.client_message, reverted_after_approval: cardDoc.reverted_after_approval } : null);
       try {
@@ -1718,7 +1724,7 @@ export default function ReservationDetailPage() {
   const cardDocs = signedDocumentsList.filter((d) => d.document_type === 'qualification_card');
 
   const renderDocTile = (
-    doc: { id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null },
+    doc: { id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; sms_verified_at?: string | null },
     index: number,
     isCurrent: boolean,
   ) => {
@@ -1792,9 +1798,11 @@ export default function ReservationDetailPage() {
           <h4 className="text-xs font-semibold text-gray-600 uppercase">Karty kwalifikacyjne</h4>
           {cardDocs.length === 0 ? (
             <p className="text-sm text-gray-500 italic">Brak kart.</p>
-          ) : (
-            cardDocs.map((doc, index) => renderDocTile(doc, index, index === 0))
-          )}
+          ) : (() => {
+            // Aktualna karta = najnowsza podpisana SMS-em (sms_verified_at)
+            const currentCardId = cardDocs.find((d) => d.sms_verified_at && d.payload)?.id ?? null;
+            return cardDocs.map((doc, index) => renderDocTile(doc, index, doc.id === currentCardId));
+          })()}
         </div>
       </div>
     </div>

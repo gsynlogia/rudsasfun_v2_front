@@ -16,6 +16,9 @@
     "test:payment": "playwright test --headed tests/payment-and-invoice.spec.ts",
     "test:admin": "playwright test --headed tests/admin-panel-full.spec.ts",
     "test:validation": "playwright test --headed tests/step*-validation.spec.ts",
+    "test:cypress": "cypress run",
+    "test:cypress:open": "cypress open",
+    "test:rez1223": "cypress run --spec cypress/e2e/rez-2026-1223-client.cy.ts",
     "test:unit": "jest",
     "test:unit:watch": "jest --watch"
   },
@@ -36,6 +39,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cypress": "^15.11.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
     "identity-obj-proxy": "^3.0.0",

@@ -43,16 +43,68 @@ export interface QualificationFormReservationData {
  * (PESEL, drugi opiekun gdy dopisany przy karcie, szczepienia, upoważnienia, potwierdzenia).
  * Źródła: reservations + signed_documents. qualification_card_data nie jest wczytywane.
  */
+/**
+ * Z obiektu opiekuna (payload) buduje { name, address, phone }.
+ * Analogicznie do opiekunowie (imionaNazwiska, adres, telefon): drugi opiekun może mieć
+ * imieNazwisko lub imionaNazwiska, adres, telefon.
+ */
+function buildSecondParentFromPayload(drugi: Record<string, unknown> | null | undefined) {
+  if (!drugi || typeof drugi !== 'object') return null;
+  const name =
+    (drugi.imieNazwisko as string)?.trim() ||
+    (drugi.imionaNazwiska as string)?.trim() ||
+    [drugi.firstName, drugi.lastName].filter(Boolean).map(String).join(' ').trim() ||
+    '';
+  const address = (drugi.adres as string)?.trim() ?? '';
+  const phone = (drugi.telefon as string)?.trim() ?? '';
+  return { name: name || ((drugi.imieNazwisko as string) ?? (drugi.imionaNazwiska as string) ?? ''), address, phone };
+}
+
+/**
+ * Wyciąga drugiego opiekuna z payloadu – analogicznie do opiekun 1 (sekcjaI.opiekunowie).
+ * Źródła: sekcjaI.drugiOpiekun lub sekcjaI.drugi_opiekun.
+ * Gdy opiekunowie jest tablicą [opiekun1, opiekun2], drugi = opiekunowie[1].
+ */
+export function getSecondParentFromPayload(
+  payload: SignedQualificationPayload | Record<string, unknown> | null | undefined,
+): { name: string; address: string; phone: string } | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const s1 = (payload as SignedQualificationPayload).sekcjaI ?? (payload as Record<string, unknown>).sekcjaI;
+  if (!s1 || typeof s1 !== 'object') return null;
+  const s1r = s1 as Record<string, unknown>;
+  let drugi = s1r.drugiOpiekun ?? s1r.drugi_opiekun ?? s1r.opiekun2 ?? s1r.opiekun_2;
+  if (!drugi && Array.isArray(s1r.opiekunowie) && s1r.opiekunowie.length >= 2) {
+    drugi = s1r.opiekunowie[1] as Record<string, unknown>;
+  }
+  if (!drugi || typeof drugi !== 'object') return null;
+  return buildSecondParentFromPayload(drugi as Record<string, unknown>);
+}
+
+/**
+ * Mapowanie payloadu snapshotu (signed_documents.payload) na overlay formularza.
+ *
+ * Opiekun 1 vs Opiekun 2 (sekcjaI) – ta sama logika, inne pola:
+ *
+ *   opiekunowie: { imionaNazwiska, adres, telefon }  →  parentNames, parentAddress, parentPhone (formData)
+ *   drugiOpiekun: { imieNazwisko, adres, telefon }   →  secondParent { name, address, phone } (state)
+ *
+ * Przykład z bazy (najnowszy snapshot REZ-2026-1223):
+ *   opiekunowie: { imionaNazwiska: "Test Test", adres: "Miastko", telefon: "735048660" }
+ *   drugiOpiekun: { imieNazwisko: "test2 test2", adres: "Gorzów", telefon: "898898898" }
+ */
 export function signedPayloadOverlayOnly(payload: SignedQualificationPayload | null | undefined) {
   if (!payload) return null;
   const s1 = payload.sekcjaI;
-  const drugi = s1?.drugiOpiekun;
   const s2vac = payload.sekcjaII_szczepienia;
   const s3 = payload.sekcjaIII;
   const s4 = payload.sekcjaIV;
   const u = payload.upowaznienia;
+  const secondParent = getSecondParentFromPayload(payload);
+  // Nie łączymy drugiego opiekuna z parentNames/parentAddress/parentPhone —
+  // komponenty same dołączają secondParent przy renderowaniu (parentCount === 1).
+  // Łączenie tutaj powodowało podwójne wyświetlanie.
   return {
-    // Sekcja I — dane podstawowe (aby snapshot/payload nadpisywał pola edytowane przez klienta)
+    // Sekcja I — opiekun 1 (opiekunowie) → parentNames, parentAddress, parentPhone
     childName: s1?.uczestnik?.imieNazwisko,
     childDOB: s1?.uczestnik?.dataUrodzenia,
     childAddress: s1?.uczestnik?.adres,
@@ -66,9 +118,7 @@ export function signedPayloadOverlayOnly(payload: SignedQualificationPayload | n
     childPesel: s1?.uczestnik?.pesel ?? '',
     noPesel: s1?.uczestnik?.brakPesel ?? false,
     noPeselYear: s1?.uczestnik?.rokUrodzeniaGdyBrakPesel ?? '',
-    secondParent: drugi
-      ? { name: drugi.imieNazwisko ?? '', address: drugi.adres ?? '', phone: drugi.telefon ?? '' }
-      : null,
+    secondParent, // sekcjaI.drugiOpiekun → { name, address, phone }
     vaccination: {
       calendar: s2vac?.zgodnieZKalendarzem ?? false,
       tetanus: s2vac?.tezec ?? false,
@@ -297,9 +347,9 @@ export function mapReservationToQualificationForm(
     .join(', ') || (firstParent.firstName || firstParent.lastName ? `${firstParent.firstName || ''} ${firstParent.lastName || ''}`.trim() : '');
   const parentAddress = parents.map((p) => (p.city || '').trim()).filter(Boolean).join(', ') || (firstParent.city || '');
   const parentPhone = parents
-    .map((p) => [p.phone, p.phoneNumber].filter(Boolean).join(' ').trim())
+    .map((p) => (p.phone || p.phoneNumber || '').trim())
     .filter(Boolean)
-    .join(', ') || [firstParent.phone, firstParent.phoneNumber].filter(Boolean).join(' ').trim() || '';
+    .join(', ') || (firstParent.phone || firstParent.phoneNumber || '').trim() || '';
   const parentCount = parents.length;
 
   const campDates =
@@ -326,7 +376,7 @@ export function mapReservationToQualificationForm(
       undefined
     : undefined;
   const secondParentPhone = secondParent
-    ? [secondParent.phone, (secondParent as { phoneNumber?: string }).phoneNumber].filter(Boolean).join(' ').trim() || undefined
+    ? (secondParent.phone || (secondParent as { phoneNumber?: string }).phoneNumber || '').trim() || undefined
     : undefined;
 
   return {

@@ -11,7 +11,7 @@ import Image from 'next/image';
 import { useState, useEffect, useCallback } from 'react';
 
 import type { SignedQualificationPayload } from '@/lib/qualificationReservationMapping';
-import { signedPayloadOverlayOnly, signedPayloadToFormState } from '@/lib/qualificationReservationMapping';
+import { signedPayloadOverlayOnly, signedPayloadToFormState, getSecondParentFromPayload } from '@/lib/qualificationReservationMapping';
 import { authService } from '@/lib/services/AuthService';
 import { isValidPesel } from '@/lib/utils/pesel';
 
@@ -153,19 +153,20 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
     setHealthAdditionalNotes((reservationData.additional_notes ?? '').trim());
   }, [reservationData?.health_details, reservationData?.additional_notes]);
 
-  /** Synchronizacja z reservationData (tylko rezerwacja, bez qualification_card_data) */
+  /** Synchronizacja z reservationData (tylko rezerwacja). Gdy jest signedPayload, drugiego opiekuna nie nadpisujemy – źródło = snapshot. */
   useEffect(() => {
     if (!reservationData) return;
     setFormData((prev) => ({
       ...prev,
       childPesel: reservationData.childPesel ?? prev.childPesel,
     }));
+    if (signedPayload) return;
     if (reservationData.secondParentName !== null && reservationData.secondParentName !== undefined) setSecondParentName(reservationData.secondParentName);
     if (reservationData.secondParentAddress !== null && reservationData.secondParentAddress !== undefined) setSecondParentAddress(reservationData.secondParentAddress);
     if (reservationData.secondParentPhone !== null && reservationData.secondParentPhone !== undefined) setSecondParentPhone(reservationData.secondParentPhone);
-  }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone]);
+  }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone, signedPayload]);
 
-  /** Overlay: form_snapshot (admin) lub signed_documents.payload. Źródła: reservations + form_snapshot lub signed_documents. */
+  /** Overlay: form_snapshot (admin) lub signed_documents.payload. Drugi opiekun zawsze ze signedPayload, gdy jest (snapshot z bazy). */
   useEffect(() => {
     let payload: SignedQualificationPayload | undefined;
     if (formSnapshotFromDb?.trim()) {
@@ -178,12 +179,31 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
       payload = signedPayload ?? undefined;
     }
     const overlay = signedPayloadOverlayOnly(payload ?? undefined);
+    const overlayFromSigned = signedPayload ? signedPayloadOverlayOnly(signedPayload) : null;
+    const s1Raw = signedPayload && typeof signedPayload === 'object' ? (signedPayload as Record<string, unknown>).sekcjaI : undefined;
+    const drugiRaw = s1Raw && typeof s1Raw === 'object' ? (s1Raw as Record<string, unknown>).drugiOpiekun : undefined;
+    const secondParentFromPayload =
+      drugiRaw && typeof drugiRaw === 'object'
+        ? (() => {
+            const d = drugiRaw as Record<string, unknown>;
+            const name = String(d.imieNazwisko ?? d.imionaNazwiska ?? '').trim();
+            const address = String(d.adres ?? '').trim();
+            const phone = String(d.telefon ?? '').trim();
+            return name || address || phone ? { name, address, phone } : null;
+          })()
+        : null;
+    const secondParent =
+      overlayFromSigned?.secondParent ??
+      overlay?.secondParent ??
+      getSecondParentFromPayload(signedPayload ?? undefined) ??
+      secondParentFromPayload;
     if (!overlay) return;
     setAuthorizations(overlay.authorizations);
-    if (overlay.secondParent) {
-      setSecondParentName(overlay.secondParent.name);
-      setSecondParentAddress(overlay.secondParent.address);
-      setSecondParentPhone(overlay.secondParent.phone);
+    if (secondParent) {
+      setSecondParentName(secondParent.name);
+      setSecondParentAddress(secondParent.address);
+      setSecondParentPhone(secondParent.phone);
+      setNoSecondParent(false);
     }
     // childPesel ze snapshotu (również pusty gdy uczestnik nie ma PESEL)
     const childPeselFromOverlay = overlay.childPesel ?? '';
@@ -372,6 +392,118 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
     }
   };
 
+  /** Overlay z qualification_card_data.form_snapshot (draft) – spójność z widokiem klienta. Pomijany, gdy jest signedPayload. */
+  useEffect(() => {
+    if (signedPayload) return;
+    const snapshot = formSnapshotFromDb as SignedQualificationPayload | undefined;
+    const overlay = signedPayloadOverlayOnly(snapshot ?? undefined);
+    if (!overlay) return;
+    setAuthorizations(overlay.authorizations);
+    const s2 = snapshot?.sekcjaII_stanZdrowia;
+    if (s2) {
+      const toTags = (v: unknown): string[] => Array.isArray(v) ? v.map((x) => String(x ?? '')) : typeof v === 'string' && v ? [v] : [];
+      setHealthChronicTags(toTags(s2.chorobyPrzewlekle));
+      setHealthDysfunctionsTags(toTags(s2.dysfunkcje));
+      setHealthPsychiatricTags(toTags(s2.problemyPsychiatryczne));
+      setHealthAdditionalNotes((s2.dodatkoweInformacje ?? '').trim());
+    }
+    if (overlay.secondParent) {
+      setSecondParentName(overlay.secondParent.name);
+      setSecondParentAddress(overlay.secondParent.address);
+      setSecondParentPhone(overlay.secondParent.phone);
+      setNoSecondParent(false);
+    } else if (reservationData?.parentCount === 1) {
+      setNoSecondParent(true);
+    }
+    const noPeselChecked = overlay.noPesel !== undefined ? overlay.noPesel : overlay.vaccination?.measles;
+    const noPeselYearFromOverlay = overlay.noPeselYear !== undefined && overlay.noPeselYear !== '' ? overlay.noPeselYear : overlay.vaccination?.measlesYear ?? '';
+    setChildHasNoPesel(!!noPeselChecked);
+    setChildNoPeselYear(noPeselYearFromOverlay ?? '');
+    setFormData((prev) => ({
+      ...prev,
+      childName: overlay.childName ?? prev.childName,
+      childDOB: overlay.childDOB ?? prev.childDOB,
+      childAddress: overlay.childAddress ?? prev.childAddress,
+      // parentNames/parentAddress/parentPhone — nie nadpisujemy z overlay,
+      // base z mapReservation ma poprawne dane, drugi opiekun przez osobny stan.
+      turnName: overlay.turnName ?? prev.turnName,
+      campLocation: overlay.campLocation ?? prev.campLocation,
+      campDates: overlay.campDates ?? prev.campDates,
+      childPesel: overlay.childPesel !== undefined ? (overlay.childPesel ?? '') : prev.childPesel,
+      vaccination: overlay.vaccination,
+      vaccineInfo: overlay.vaccineInfo ?? prev.vaccineInfo,
+      regulationConfirm: overlay.regulationConfirm,
+      pickupInfo: overlay.pickupInfo,
+      independentReturn: overlay.independentReturn,
+      parentDeclaration: overlay.parentDeclaration,
+      directorConfirmation: overlay.directorConfirmation,
+      directorDate: overlay.directorDate,
+      directorSignature: overlay.directorSignature,
+      organizerSignature: overlay.organizerSignature,
+    }));
+  }, [formSnapshotFromDb, signedPayload, reservationData?.parentCount]);
+
+  /** Overlay z signed_documents.payload – to samo źródło co widok klienta (data urodzenia, PESEL, opiekunowie, zdrowie). */
+  useEffect(() => {
+    const overlay = signedPayloadOverlayOnly(signedPayload ?? undefined);
+    if (!overlay) return;
+    setAuthorizations(overlay.authorizations);
+    const s2 = signedPayload?.sekcjaII_stanZdrowia;
+    if (s2) {
+      const toTags = (v: unknown): string[] => Array.isArray(v) ? v.map((x) => String(x ?? '')) : typeof v === 'string' && v ? [v] : [];
+      setHealthChronicTags(toTags(s2.chorobyPrzewlekle));
+      setHealthDysfunctionsTags(toTags(s2.dysfunkcje));
+      setHealthPsychiatricTags(toTags(s2.problemyPsychiatryczne));
+      setHealthAdditionalNotes((s2.dodatkoweInformacje ?? '').trim());
+    }
+    const s1 = signedPayload && typeof signedPayload === 'object' ? (signedPayload as Record<string, unknown>).sekcjaI : undefined;
+    const drugi = s1 && typeof s1 === 'object' ? (s1 as Record<string, unknown>).drugiOpiekun : undefined;
+    const secondParentDirect =
+      drugi && typeof drugi === 'object'
+        ? (() => {
+            const d = drugi as Record<string, unknown>;
+            const name = String(d.imieNazwisko ?? d.imionaNazwiska ?? '').trim();
+            const address = String(d.adres ?? '').trim();
+            const phone = String(d.telefon ?? '').trim();
+            return name || address || phone ? { name, address, phone } : null;
+          })()
+        : null;
+    const secondParent = overlay.secondParent ?? getSecondParentFromPayload(signedPayload ?? undefined) ?? secondParentDirect;
+    if (secondParent) {
+      setSecondParentName(secondParent.name);
+      setSecondParentAddress(secondParent.address);
+      setSecondParentPhone(secondParent.phone);
+      setNoSecondParent(false);
+    } else if (reservationData?.parentCount === 1) {
+      setNoSecondParent(true);
+    }
+    const noPeselChecked = overlay.noPesel !== undefined ? overlay.noPesel : overlay.vaccination?.measles;
+    const noPeselYearFromOverlay = overlay.noPeselYear !== undefined && overlay.noPeselYear !== '' ? overlay.noPeselYear : overlay.vaccination?.measlesYear ?? '';
+    setChildHasNoPesel(!!noPeselChecked);
+    setChildNoPeselYear(noPeselYearFromOverlay ?? '');
+    setFormData((prev) => ({
+      ...prev,
+      childName: overlay.childName ?? prev.childName,
+      childDOB: overlay.childDOB ?? prev.childDOB,
+      childAddress: overlay.childAddress ?? prev.childAddress,
+      // parentNames/parentAddress/parentPhone — nie nadpisujemy z overlay (jak wyżej)
+      turnName: overlay.turnName ?? prev.turnName,
+      campLocation: overlay.campLocation ?? prev.campLocation,
+      campDates: overlay.campDates ?? prev.campDates,
+      childPesel: overlay.childPesel !== undefined ? (overlay.childPesel ?? '') : prev.childPesel,
+      vaccination: overlay.vaccination,
+      vaccineInfo: overlay.vaccineInfo ?? prev.vaccineInfo,
+      regulationConfirm: overlay.regulationConfirm,
+      pickupInfo: overlay.pickupInfo,
+      independentReturn: overlay.independentReturn,
+      parentDeclaration: overlay.parentDeclaration,
+      directorConfirmation: overlay.directorConfirmation,
+      directorDate: overlay.directorDate,
+      directorSignature: overlay.directorSignature,
+      organizerSignature: overlay.organizerSignature,
+    }));
+  }, [signedPayload, reservationData?.parentCount]);
+
   /** Walidacja pól obowiązkowych (ta sama co przy podpisywaniu). Zwraca true, gdy formularz jest poprawny.
    * Zbiera wszystkie błędy naraz i ustawia state, żeby użytkownik widział czerwone ramki przy wszystkich błędnych polach (w tym drugi opiekun). */
   const runValidation = (): boolean => {
@@ -396,7 +528,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
     }
 
     const dobRaw = (formData.childDOB || '').trim();
-    const hasDOB = /^\d{4}(-\d{2}-\d{2})?$/.test(dobRaw) || /^\d{4}$/.test(dobRaw);
+    const hasDOB = /^\d{4}(-\d{2}-\d{2})?$/.test(dobRaw) || /^\d{4}$/.test(dobRaw) || /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(dobRaw);
     if (!hasDOB) {
       setChildDOBError('To pole jest obowiązkowe');
       hasAnyError = true;
@@ -481,7 +613,7 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
         termin: fd.campDates,
         uczestnik: {
           imieNazwisko: fd.childName,
-          dataUrodzenia: fd.childDOB,
+          dataUrodzenia: (fd.childDOB?.trim() && !/^dd\.mm\.yyyy$/i.test(fd.childDOB.trim())) ? fd.childDOB.trim() : '',
           pesel: fd.childPesel,
           adres: fd.childAddress,
           brakPesel: childHasNoPesel,
@@ -840,14 +972,18 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <div id="child-dob-field" className="field-group">
               <label>2) Data urodzenia uczestnika/dziecka</label>
               {(() => {
-                const dobRaw = formData.childDOB || '';
-                const yearMatch = dobRaw.match(/^(\d{4})/);
+                const dobRaw = (formData.childDOB || '').trim();
+                const ddmmyyyy = dobRaw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+                const normalized = ddmmyyyy
+                  ? `${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`
+                  : dobRaw;
+                const yearMatch = normalized.match(/^(\d{4})/);
                 const birthYear = yearMatch ? parseInt(yearMatch[1], 10) : null;
                 const minYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear - 1 : null;
                 const maxYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear : null;
                 const dobValue =
-                  /^\d{4}-\d{2}-\d{2}$/.test(dobRaw) ? dobRaw
-                  : /^\d{4}$/.test(dobRaw) ? `${dobRaw}-01-01`
+                  /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized
+                  : /^\d{4}$/.test(normalized) ? `${normalized}-01-01`
                   : '';
                 const minDate = minYear !== null && minYear !== undefined ? `${minYear}-01-01` : undefined;
                 const maxDate = maxYear !== null && maxYear !== undefined ? `${maxYear}-12-31` : undefined;
@@ -1559,7 +1695,7 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">Potwierdzenie</h3>
             <p className="modal-text">
-              Na podany w rezerwacji numer telefonu <strong>{formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod.
+              Na podany w rezerwacji numer telefonu <strong>{(formData.parentPhone || '').split(',')[0]?.trim() || formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod.
               Wpisanie kodu jest jednoznaczne z podpisaniem niniejszego dokumentu.
             </p>
             <div className="modal-input-group">

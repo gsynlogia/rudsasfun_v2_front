@@ -1,12 +1,26 @@
 'use client';
 
 import { useParams, useSearchParams } from 'next/navigation';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { QualificationForm } from '@/components/profile/QualificationForm';
 import type { ReservationData } from '@/lib/contractReservationMapping';
 import { mapReservationToQualificationForm } from '@/lib/qualificationReservationMapping';
 import { authService } from '@/lib/services/AuthService';
+
+/** Z payloadu snapshotu wyciąga drugiego opiekuna (sekcjaI.drugiOpiekun) – ten sam obiekt co dla opiekun 1. */
+function getSecondParentFromPayloadPage(payload: Record<string, unknown> | null | undefined): { name: string; address: string; phone: string } | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const s1 = payload.sekcjaI as Record<string, unknown> | undefined;
+  if (!s1 || typeof s1 !== 'object') return null;
+  const d = s1.drugiOpiekun as Record<string, unknown> | undefined;
+  if (!d || typeof d !== 'object') return null;
+  const name = String(d.imieNazwisko ?? d.imionaNazwiska ?? '').trim();
+  const address = String(d.adres ?? '').trim();
+  const phone = String(d.telefon ?? '').trim();
+  if (!name && !address && !phone) return null;
+  return { name, address, phone };
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -110,12 +124,18 @@ export default function QualificationCardPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string; signed_at?: string | null }>) => {
-        const cardDoc = docs.find((d) => d.document_type === 'qualification_card');
+      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string; signed_at?: string | null; sms_verified_at?: string | null }>) => {
+        const cardDocs = docs.filter((d) => d.document_type === 'qualification_card');
+        // Najnowszy snapshot z payloadem i aktywnym statusem — wyświetla aktualne dane do podpisu.
+        const activeStatuses = ['accepted', 'in_verification', 'requires_signature'];
+        const cardDoc =
+          cardDocs.find((d) => d.payload && activeStatuses.includes(d.status ?? '')) ??
+          cardDocs.find((d) => d.payload) ??
+          cardDocs[0];
         setLatestCardStatus(cardDoc?.status ?? null);
         setLatestCardSignedAt(cardDoc?.signed_at ?? null);
         try {
-          setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload!) : null);
+          setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload) : null);
         } catch {
           setQualificationCardSignedPayload(null);
         }
@@ -157,12 +177,17 @@ export default function QualificationCardPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string; signed_at?: string | null }>) => {
-        const cardDoc = docs.find((d) => d.document_type === 'qualification_card');
+      .then((docs: Array<{ document_type: string; payload?: string | null; status?: string; signed_at?: string | null; sms_verified_at?: string | null }>) => {
+        const cardDocs = docs.filter((d) => d.document_type === 'qualification_card');
+        const activeStatuses = ['accepted', 'in_verification', 'requires_signature'];
+        const cardDoc =
+          cardDocs.find((d) => d.payload && activeStatuses.includes(d.status ?? '')) ??
+          cardDocs.find((d) => d.payload) ??
+          cardDocs[0];
         setLatestCardStatus(cardDoc?.status ?? null);
         setLatestCardSignedAt(cardDoc?.signed_at ?? null);
         try {
-          setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload!) : null);
+          setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload) : null);
         } catch {
           setQualificationCardSignedPayload(null);
         }
@@ -177,6 +202,11 @@ export default function QualificationCardPage() {
   useEffect(() => {
     refetchFormSnapshot();
   }, [refetchFormSnapshot]);
+
+  const secondParentFromPayload = useMemo(
+    () => getSecondParentFromPayloadPage(qualificationCardSignedPayload),
+    [qualificationCardSignedPayload],
+  );
 
   if (loading) {
     return (
@@ -232,6 +262,7 @@ export default function QualificationCardPage() {
         reservationId={reservationData?.id}
         reservationData={qualificationData}
         signedPayload={qualificationCardSignedPayload ?? undefined}
+        secondParentFromPayload={secondParentFromPayload}
         formSnapshotFromDb={formSnapshotFromDb ?? undefined}
         onSaveSuccess={() => {
           refetchFormSnapshot();

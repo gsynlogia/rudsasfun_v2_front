@@ -2,10 +2,10 @@
 
 import { Printer } from 'lucide-react';
 import Image from 'next/image';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import type { SignedQualificationPayload } from '@/lib/qualificationReservationMapping';
-import { signedPayloadOverlayOnly, signedPayloadToFormState } from '@/lib/qualificationReservationMapping';
+import { signedPayloadOverlayOnly, signedPayloadToFormState, getSecondParentFromPayload } from '@/lib/qualificationReservationMapping';
 import { authService } from '@/lib/services/AuthService';
 import { isValidPesel } from '@/lib/utils/pesel';
 
@@ -90,6 +90,8 @@ interface QualificationFormProps {
   };
   /** Payload z signed_documents – overlay (szczepienia, upoważnienia, potwierdzenia). */
   signedPayload?: SignedQualificationPayload | null;
+  /** Drugi opiekun wyciągnięty z payloadu na stronie (sekcjaI.drugiOpiekun) – gdy podany, ma pierwszeństwo. */
+  secondParentFromPayload?: { name: string; address: string; phone: string } | null;
   /** Zapisany draft z qualification_card_data.form_snapshot – przywraca zaznaczenia po F5. */
   formSnapshotFromDb?: SignedQualificationPayload | Record<string, unknown> | null;
   printMode?: boolean;
@@ -101,9 +103,8 @@ interface QualificationFormProps {
   latestCardSignedAtFromParent?: string | null;
 }
 
-export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, formSnapshotFromDb, printMode = false, onSaveSuccess, latestCardStatusFromParent, latestCardSignedAtFromParent }: QualificationFormProps) {
+export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, secondParentFromPayload, formSnapshotFromDb, printMode = false, onSaveSuccess, latestCardStatusFromParent, latestCardSignedAtFromParent }: QualificationFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const [showReSignModal, setShowReSignModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
   const [currentDocumentId, setCurrentDocumentId] = useState<number | null>(null);
@@ -132,6 +133,22 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
   /** Który modal tagów zdrowia jest otwarty: null | 'chronic' | 'dysfunctions' | 'psychiatric' */
   const [healthTagModal, setHealthTagModal] = useState<null | 'chronic' | 'dysfunctions' | 'psychiatric'>(null);
 
+  /** Refy z aktualnymi tagami zdrowia – używane przy budowaniu payloadu do podpisu (001_umowa: pełny zapis przy Podpisz dokument). */
+  const healthChronicTagsRef = useRef<string[]>(healthChronicTags);
+  const healthDysfunctionsTagsRef = useRef<string[]>(healthDysfunctionsTags);
+  const healthPsychiatricTagsRef = useRef<string[]>(healthPsychiatricTags);
+  const healthAdditionalNotesRef = useRef(healthAdditionalNotes);
+  useEffect(() => {
+    healthChronicTagsRef.current = healthChronicTags;
+    healthDysfunctionsTagsRef.current = healthDysfunctionsTags;
+    healthPsychiatricTagsRef.current = healthPsychiatricTags;
+    healthAdditionalNotesRef.current = healthAdditionalNotes;
+  }, [healthChronicTags, healthDysfunctionsTags, healthPsychiatricTags, healthAdditionalNotes]);
+
+  /** Śledzenie zmian: snapshot stanu po załadowaniu danych → porównanie z bieżącym stanem. */
+  const savedStateRef = useRef<string | null>(null);
+  const dataReadyRef = useRef(false);
+
   /** Inicjalizacja sekcji zdrowia z rezerwacji (health_details, additional_notes) */
   useEffect(() => {
     if (!reservationData) return;
@@ -144,24 +161,34 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     setHealthAdditionalNotes((reservationData.additional_notes ?? '').trim());
   }, [reservationData?.health_details, reservationData?.additional_notes]);
 
-  /** Synchronizacja z reservationData (tylko rezerwacja, bez qualification_card_data) */
+  /** Synchronizacja z reservationData (tylko rezerwacja). Gdy jest signedPayload, drugiego opiekuna nie nadpisujemy – źródło = snapshot. */
   useEffect(() => {
     if (!reservationData) return;
     setFormData((prev) => ({
       ...prev,
       childPesel: reservationData.childPesel ?? prev.childPesel,
     }));
+    if (signedPayload) return;
     if (reservationData.secondParentName !== null && reservationData.secondParentName !== undefined) setSecondParentName(reservationData.secondParentName);
     if (reservationData.secondParentAddress !== null && reservationData.secondParentAddress !== undefined) setSecondParentAddress(reservationData.secondParentAddress);
     if (reservationData.secondParentPhone !== null && reservationData.secondParentPhone !== undefined) setSecondParentPhone(reservationData.secondParentPhone);
-  }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone]);
+  }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone, signedPayload]);
 
-  /** Overlay z qualification_card_data.form_snapshot (draft) – przywraca zapisane zaznaczenia po F5. Pomijany, gdy jest signedPayload (podpisany dokument ma pierwszeństwo). */
+  /** Overlay z qualification_card_data.form_snapshot (draft) – przywraca zapisane zaznaczenia po F5. Pomijany, gdy jest signedPayload. */
   useEffect(() => {
     if (signedPayload) return;
-    const overlay = signedPayloadOverlayOnly((formSnapshotFromDb as SignedQualificationPayload) ?? undefined);
+    const snapshot = formSnapshotFromDb as SignedQualificationPayload | undefined;
+    const overlay = signedPayloadOverlayOnly(snapshot ?? undefined);
     if (!overlay) return;
     setAuthorizations(overlay.authorizations);
+    const s2 = snapshot?.sekcjaII_stanZdrowia;
+    if (s2) {
+      const toTags = (v: unknown): string[] => Array.isArray(v) ? v.map((x) => String(x ?? '')) : typeof v === 'string' && v ? [v] : [];
+      setHealthChronicTags(toTags(s2.chorobyPrzewlekle));
+      setHealthDysfunctionsTags(toTags(s2.dysfunkcje));
+      setHealthPsychiatricTags(toTags(s2.problemyPsychiatryczne));
+      setHealthAdditionalNotes((s2.dodatkoweInformacje ?? '').trim());
+    }
     if (overlay.secondParent) {
       setSecondParentName(overlay.secondParent.name);
       setSecondParentAddress(overlay.secondParent.address);
@@ -176,9 +203,9 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       childName: overlay.childName ?? prev.childName,
       childDOB: overlay.childDOB ?? prev.childDOB,
       childAddress: overlay.childAddress ?? prev.childAddress,
-      parentNames: overlay.parentNames ?? prev.parentNames,
-      parentAddress: overlay.parentAddress ?? prev.parentAddress,
-      parentPhone: overlay.parentPhone ?? prev.parentPhone,
+      // parentNames/parentAddress/parentPhone NIE nadpisujemy — base z mapReservation ma poprawne dane,
+      // a drugi opiekun jest obsługiwany przez osobny stan (secondParentName/Address/Phone).
+      // Nadpisywanie powodowało duplikaty (snapshot ma tylko 1. opiekuna, a rendering dopisywał drugiego).
       turnName: overlay.turnName ?? prev.turnName,
       campLocation: overlay.campLocation ?? prev.campLocation,
       campDates: overlay.campDates ?? prev.campDates,
@@ -199,15 +226,48 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }));
   }, [formSnapshotFromDb, signedPayload, reservationData?.parentCount]);
 
-  /** Overlay z signed_documents.payload: PESEL, noPesel/noPeselYear, drugi opiekun, szczepienia, upoważnienia, potwierdzenia (nadpisuje draft). */
+  /** Gdy rodzic przekazał secondParentFromPayload (wyciągnięty ze snapshotu na stronie) – ustaw drugiego opiekuna z niego (pierwszeństwo). */
+  useEffect(() => {
+    if (secondParentFromPayload) {
+      setSecondParentName(secondParentFromPayload.name);
+      setSecondParentAddress(secondParentFromPayload.address);
+      setSecondParentPhone(secondParentFromPayload.phone);
+      setNoSecondParent(false);
+    }
+  }, [secondParentFromPayload]);
+
+  /** Overlay z signed_documents.payload: PESEL, drugi opiekun, szczepienia, upoważnienia, tagi zdrowia (spójność 3 widoków). */
   useEffect(() => {
     const overlay = signedPayloadOverlayOnly(signedPayload ?? undefined);
     if (!overlay) return;
     setAuthorizations(overlay.authorizations);
-    if (overlay.secondParent) {
-      setSecondParentName(overlay.secondParent.name);
-      setSecondParentAddress(overlay.secondParent.address);
-      setSecondParentPhone(overlay.secondParent.phone);
+    const s2 = signedPayload?.sekcjaII_stanZdrowia;
+    if (s2) {
+      const toTags = (v: unknown): string[] => Array.isArray(v) ? v.map((x) => String(x ?? '')) : typeof v === 'string' && v ? [v] : [];
+      setHealthChronicTags(toTags(s2.chorobyPrzewlekle));
+      setHealthDysfunctionsTags(toTags(s2.dysfunkcje));
+      setHealthPsychiatricTags(toTags(s2.problemyPsychiatryczne));
+      setHealthAdditionalNotes((s2.dodatkoweInformacje ?? '').trim());
+    }
+    const s1 = signedPayload && typeof signedPayload === 'object' ? (signedPayload as Record<string, unknown>).sekcjaI : undefined;
+    const drugi = s1 && typeof s1 === 'object' ? (s1 as Record<string, unknown>).drugiOpiekun : undefined;
+    const secondParent =
+      secondParentFromPayload ??
+      overlay.secondParent ??
+      getSecondParentFromPayload(signedPayload ?? undefined) ??
+      (drugi && typeof drugi === 'object'
+        ? (() => {
+            const d = drugi as Record<string, unknown>;
+            const name = String(d.imieNazwisko ?? d.imionaNazwiska ?? '').trim();
+            const address = String(d.adres ?? '').trim();
+            const phone = String(d.telefon ?? '').trim();
+            return name || address || phone ? { name, address, phone } : null;
+          })()
+        : null);
+    if (secondParent) {
+      setSecondParentName(secondParent.name);
+      setSecondParentAddress(secondParent.address);
+      setSecondParentPhone(secondParent.phone);
       setNoSecondParent(false);
     } else if (reservationData?.parentCount === 1) {
       setNoSecondParent(true);
@@ -218,9 +278,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       childName: overlay.childName ?? prev.childName,
       childDOB: overlay.childDOB ?? prev.childDOB,
       childAddress: overlay.childAddress ?? prev.childAddress,
-      parentNames: overlay.parentNames ?? prev.parentNames,
-      parentAddress: overlay.parentAddress ?? prev.parentAddress,
-      parentPhone: overlay.parentPhone ?? prev.parentPhone,
+      // parentNames/parentAddress/parentPhone — jak wyżej, nie nadpisujemy z overlay
       turnName: overlay.turnName ?? prev.turnName,
       campLocation: overlay.campLocation ?? prev.campLocation,
       campDates: overlay.campDates ?? prev.campDates,
@@ -241,8 +299,8 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }));
   }, [signedPayload, reservationData?.parentCount]);
 
-  /** Na wydruku pola tylko do oglądania. Gdy karta odrzucona – formularz edytowalny i można podpisać ponownie. */
-  const isEditable = !printMode && (!isSigned || effectiveLatestCardStatus === 'rejected');
+  /** Pola zawsze edytowalne (oprócz printMode). Po zmianie – pasek „Podpisz ponownie / Anuluj". */
+  const isEditable = !printMode;
 
   // Pobierz status najnowszego podpisanego dokumentu (karta) – czy można podpisać ponownie (tylko gdy odrzucona)
   useEffect(() => {
@@ -382,6 +440,65 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }
   };
 
+  /** Buduje snapshot edytowalnych pól – do porównania „czy użytkownik coś zmienił". */
+  const buildStateSnapshot = useCallback(() => JSON.stringify({
+    healthChronicTags, healthDysfunctionsTags, healthPsychiatricTags, healthAdditionalNotes,
+    childDOB: formData.childDOB, childPesel: formData.childPesel, noPesel: formData.noPesel,
+    noPeselYear: formData.noPeselYear, vaccination: formData.vaccination, vaccineInfo: formData.vaccineInfo,
+    additionalInfo: formData.additionalInfo, regulationConfirm: formData.regulationConfirm,
+    pickupInfo: formData.pickupInfo, independentReturn: formData.independentReturn,
+    secondParentName, secondParentAddress, secondParentPhone, noSecondParent, authorizations,
+  }), [healthChronicTags, healthDysfunctionsTags, healthPsychiatricTags, healthAdditionalNotes,
+    formData.childDOB, formData.childPesel, formData.noPesel, formData.noPeselYear,
+    formData.vaccination, formData.vaccineInfo, formData.additionalInfo,
+    formData.regulationConfirm, formData.pickupInfo, formData.independentReturn,
+    secondParentName, secondParentAddress, secondParentPhone, noSecondParent, authorizations]);
+
+  /** Przechwycenie stanu po załadowaniu danych — debounce 800ms po ostatniej zmianie. */
+  useEffect(() => {
+    if (dataReadyRef.current) return; // już przechwycono
+    const timer = setTimeout(() => {
+      dataReadyRef.current = true;
+      savedStateRef.current = buildStateSnapshot();
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [buildStateSnapshot]);
+
+  const cardIsSigned = isSigned || effectiveLatestCardStatus === 'in_verification' || effectiveLatestCardStatus === 'accepted';
+  const currentSnapshot = buildStateSnapshot();
+  const hasUnsavedChanges = dataReadyRef.current && cardIsSigned && savedStateRef.current !== null && currentSnapshot !== savedStateRef.current;
+
+  /** Anuluj zmiany — przywróć stan z bazy. */
+  const handleCancelChanges = useCallback(() => {
+    if (!savedStateRef.current) return;
+    try {
+      const s = JSON.parse(savedStateRef.current) as Record<string, unknown>;
+      setHealthChronicTags(s.healthChronicTags as string[]);
+      setHealthDysfunctionsTags(s.healthDysfunctionsTags as string[]);
+      setHealthPsychiatricTags(s.healthPsychiatricTags as string[]);
+      setHealthAdditionalNotes(s.healthAdditionalNotes as string);
+      setSecondParentName(s.secondParentName as string);
+      setSecondParentAddress(s.secondParentAddress as string);
+      setSecondParentPhone(s.secondParentPhone as string);
+      setNoSecondParent(s.noSecondParent as boolean);
+      setAuthorizations(s.authorizations as typeof authorizations);
+      setFormData((prev) => ({
+        ...prev,
+        childDOB: s.childDOB as string,
+        childPesel: s.childPesel as string,
+        noPesel: s.noPesel as boolean,
+        noPeselYear: s.noPeselYear as string,
+        vaccination: s.vaccination as typeof prev.vaccination,
+        vaccineInfo: s.vaccineInfo as string,
+        additionalInfo: s.additionalInfo as string,
+        regulationConfirm: s.regulationConfirm as boolean,
+        pickupInfo: s.pickupInfo as string,
+        independentReturn: s.independentReturn as boolean,
+      }));
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Funkcje obsługi upoważnień
   const handleAuthorizationChange = (index: number, field: string, value: any) => {
     const updated = [...authorizations];
@@ -518,7 +635,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
         termin: fd.campDates,
         uczestnik: {
           imieNazwisko: fd.childName,
-          dataUrodzenia: fd.childDOB,
+          dataUrodzenia: (fd.childDOB?.trim() && !/^dd\.mm\.yyyy$/i.test(fd.childDOB.trim())) ? fd.childDOB.trim() : '',
           pesel: fd.childPesel,
           adres: fd.childAddress,
           brakPesel: fd.noPesel,
@@ -534,7 +651,6 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
         dysfunkcje: healthDysfunctionsTags,
         problemyPsychiatryczne: healthPsychiatricTags,
         dodatkoweInformacje: healthAdditionalNotes,
-        // Faza 3.6: tekstZbiorczy = pełny opis (wszystkie wpisy), żeby podpis zapisywał całość
         tekstZbiorczy: [
           healthChronicTags.length ? `Choroby przewlekłe: ${healthChronicTags.join(', ')}` : '',
           healthDysfunctionsTags.length ? `Dysfunkcje: ${healthDysfunctionsTags.join(', ')}` : '',
@@ -649,6 +765,8 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       setShowSignatureModal(false);
       setSignatureCode('');
       setCurrentDocumentId(null);
+      // Zaktualizuj savedState — bieżący stan jest teraz „zapisany"
+      savedStateRef.current = buildStateSnapshot();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Nieprawidłowy kod lub błąd weryfikacji.');
     }
@@ -744,6 +862,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
         throw new Error(err.detail || 'Błąd zapisu danych karty');
       }
       setSaveStatus('ok');
+      savedStateRef.current = buildStateSnapshot();
       const sourceMsg = signedPayload
         ? 'Zapisano. Używane dane: rezerwacja i podpisany dokument (karta kwalifikacyjna).'
         : 'Zapisano. Używane dane: rezerwacja.';
@@ -756,10 +875,6 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
   };
 
   const handleSaveChanges = () => {
-    if (effectiveLatestCardStatus === 'accepted' || effectiveLatestCardStatus === 'in_verification') {
-      setShowReSignModal(true);
-      return;
-    }
     void performSave();
   };
 
@@ -1482,6 +1597,41 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
 
               if (printMode) return null;
 
+              // Gdy użytkownik zmienił dane na podpisanej karcie — przyciski zamiast podpisów
+              if (hasUnsavedChanges) {
+                return (
+                  <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', gap: '2rem', alignItems: 'center' }}>
+                    <div style={{ flex: 1, background: '#fef3c7', color: '#92400e', padding: '0.8rem 1.2rem', borderRadius: '6px', fontSize: '10pt', fontWeight: 600, textAlign: 'center' }}>
+                      Wprowadzono zmiany — wymagany ponowny podpis
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={handleCancelChanges}
+                        className="no-print"
+                        style={{
+                          padding: '10px 20px', borderRadius: '6px', border: '1px solid #d1d5db',
+                          background: 'white', color: '#374151', fontWeight: 500, fontSize: '13px', cursor: 'pointer',
+                        }}
+                      >
+                        Anuluj zmiany
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSignDocument}
+                        className="no-print"
+                        style={{
+                          padding: '10px 20px', borderRadius: '6px', border: 'none',
+                          background: '#03adf0', color: 'white', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+                        }}
+                      >
+                        Podpisz ponownie dokument
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
               if (showSignatureBoxes) {
                 return (
                   <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', gap: '2rem' }}>
@@ -1583,33 +1733,7 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
         </div>
       </div>
 
-      {/* Modal: zapis zmodyfikowanej karty wymaga ponownego podpisu */}
-      {showReSignModal && (
-        <div className="modal-overlay no-print" onClick={() => setShowReSignModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">Zmiany w karcie kwalifikacyjnej</h3>
-            <p className="modal-text">
-              Będziesz musiał podpisać kartę kwalifikacyjną na nowo. Zapisanie zmian utworzy nową wersję karty, która wymaga ponownego podpisu (kod SMS).
-            </p>
-            <div className="modal-buttons">
-              <button
-                type="button"
-                onClick={() => setShowReSignModal(false)}
-                className="modal-button modal-button-cancel"
-              >
-                Anuluj
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowReSignModal(false); void performSave(); }}
-                className="modal-button modal-button-confirm"
-              >
-                Rozumiem
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Sticky bar usunięty — przyciski re-sign są teraz w sekcji podpisów */}
 
       {/* Modal do potwierdzenia podpisu */}
       {showSignatureModal && (
@@ -1617,7 +1741,7 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">Potwierdzenie</h3>
             <p className="modal-text">
-              Na podany w rezerwacji numer telefonu <strong>{formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod.
+              Na podany w rezerwacji numer telefonu <strong>{(formData.parentPhone || '').split(',')[0]?.trim() || formData.parentPhone}</strong>, przesłany został 4 cyfrowy kod.
               Wpisanie kodu jest jednoznaczne z podpisaniem niniejszego dokumentu.
             </p>
             <div className="modal-input-group">

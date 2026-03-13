@@ -195,6 +195,30 @@ export function QualificationCardEditPanel({
     if (ov?.vaccination) setVaccination(ov.vaccination);
     if (ov?.regulationConfirm !== undefined) setRegulationConfirm(ov.regulationConfirm);
     if (ov?.authorizations?.length) setAuthorizations(ov.authorizations);
+    // Dane zdrowotne z payloadu/snapshotu (mają pierwszeństwo nad reservation.health_details)
+    let payloadForHealth: SignedQualificationPayload | undefined;
+    if (formSnapshotFromDb?.trim()) {
+      try { payloadForHealth = JSON.parse(formSnapshotFromDb) as SignedQualificationPayload; } catch { payloadForHealth = signedPayload ?? undefined; }
+    } else {
+      payloadForHealth = signedPayload ?? undefined;
+    }
+    const s2 = payloadForHealth?.sekcjaII_stanZdrowia;
+    if (s2) {
+      const toTags = (v: unknown): string[] => Array.isArray(v) ? v.map((x) => String(x ?? '')) : typeof v === 'string' && v ? v.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const chronic = toTags(s2.chorobyPrzewlekle);
+      const dysf = toTags(s2.dysfunkcje);
+      const psych = toTags(s2.problemyPsychiatryczne);
+      if (chronic.length) setHealthChronicTags(chronic);
+      if (dysf.length) setHealthDysfunctionsTags(dysf);
+      if (psych.length) setHealthPsychiatricTags(psych);
+      const dodatkowe = (s2.dodatkoweInformacje ?? '').trim();
+      if (dodatkowe) setHealthAdditionalNotes(dodatkowe);
+    }
+    // Informacje dodatkowe i wniosek z payloadu
+    const s3info = payloadForHealth?.sekcjaIII?.informacjeDodatkowe;
+    if (s3info && s3info.trim()) setAdditionalInfo(s3info.trim());
+    const s4wniosek = payloadForHealth?.sekcjaIV?.wniosekOZakwaterowanie;
+    if (s4wniosek && s4wniosek.trim()) setVaccineInfo(s4wniosek.trim());
   }, [formSnapshotFromDb, signedPayload, reservation]);
 
   const buildPayload = useCallback(() => {
@@ -219,7 +243,7 @@ export function QualificationCardEditPanel({
         termin: campDates,
         uczestnik: {
           imieNazwisko: childName,
-          dataUrodzenia: childDOB.trim() || (reservationData?.childDOB ?? ''),
+          dataUrodzenia: (childDOB?.trim() && !/^dd\.mm\.yyyy$/i.test(childDOB.trim())) ? childDOB.trim() : (reservationData?.childDOB ?? ''),
           pesel: noPesel ? '' : childPesel.trim(),
           brakPesel: noPesel,
           rokUrodzeniaGdyBrakPesel: noPeselYear || undefined,

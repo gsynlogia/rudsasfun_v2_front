@@ -55,7 +55,7 @@ export default function CampsList() {
       setError(null);
 
       const data = await fetchWithDefaults<{ camps: CampWithProperties[] }>(
-        '/api/camps/',
+        '/api/camps/?for_reservation=1',
         { camps: [] },
         { method: 'GET' },
       );
