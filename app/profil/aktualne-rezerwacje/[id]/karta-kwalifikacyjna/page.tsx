@@ -337,12 +337,25 @@ export default function QualificationCardPage() {
         </div>
       )}
       <QualificationForm
-        key={viewMode}
+        key={`${viewMode}-${verifiedSignedPayload ? 'v' : 'n'}-${formSnapshotFromDb ? 'f' : 'n'}`}
         reservationId={reservationData?.id}
         reservationData={qualificationData}
         signedPayload={viewMode === 'zatwierdzona' ? verifiedSignedPayload ?? undefined : qualificationCardSignedPayload ?? undefined}
         secondParentFromPayload={viewMode === 'zatwierdzona'
-          ? getSecondParentFromPayloadPage(verifiedSignedPayload)
+          ? (getSecondParentFromPayloadPage(verifiedSignedPayload) ?? (() => {
+              // Fallback: jesli snapshot nie ma drugiOpiekun (stary format) — wyciagnij z opiekunowie w payloadzie
+              if (!verifiedSignedPayload) return null;
+              const s1 = (verifiedSignedPayload as Record<string, unknown>).sekcjaI as Record<string, unknown> | undefined;
+              if (!s1) return null;
+              const opiek = s1.opiekunowie as Record<string, string> | undefined;
+              if (!opiek) return null;
+              // Jesli imionaNazwiska zawiera przecinek — drugi opiekun jest po przecinku
+              const names = (opiek.imionaNazwiska || '').split(',').map(s => s.trim());
+              if (names.length < 2) return null;
+              const addresses = (opiek.adres || '').split(';').map(s => s.trim());
+              const phones = (opiek.telefon || '').split(',').map(s => s.trim());
+              return { name: names[1] || '', address: addresses[1] || addresses[0] || '', phone: phones[1] || '' };
+            })())
           : (getSecondParentFromPayloadPage(formSnapshotFromDb) ?? secondParentFromPayload)
         }
         formSnapshotFromDb={viewMode === 'zatwierdzona' ? undefined : formSnapshotFromDb ?? undefined}
