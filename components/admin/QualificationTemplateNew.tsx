@@ -227,6 +227,82 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
     }));
   }, [signedPayload, formSnapshotFromDb]);
 
+  // Gdy signedPayload istnieje — nadpisz tagi zdrowia, adres, DOB z payloadu (nie z rezerwacji)
+  useEffect(() => {
+    if (!signedPayload) return;
+    const s2 = signedPayload.sekcjaII_stanZdrowia;
+    if (s2) {
+      const toTags = (v: unknown): string[] => Array.isArray(v) ? v.map((x) => String(x ?? '')) : typeof v === 'string' && v ? [v] : [];
+      setHealthChronicTags(toTags(s2.chorobyPrzewlekle));
+      setHealthDysfunctionsTags(toTags(s2.dysfunkcje));
+      setHealthPsychiatricTags(toTags(s2.problemyPsychiatryczne));
+      setHealthAdditionalNotes((s2.dodatkoweInformacje ?? '').trim());
+    }
+    const s1 = signedPayload.sekcjaI;
+    if (s1) {
+      // Drugi opiekun z payloadu
+      const drugi = s1.drugiOpiekun as Record<string, unknown> | null | undefined;
+      const p2Name = drugi ? String(drugi.imieNazwisko ?? '').trim() : '';
+      const p2Address = drugi ? String(drugi.adres ?? '').trim() : '';
+      const p2Phone = drugi ? String(drugi.telefon ?? '').trim() : '';
+
+      // Nazwy opiekunow: dolacz drugiego jesli jest w payloadzie
+      const baseNames = s1.opiekunowie?.imionaNazwiska ?? '';
+      const fullNames = p2Name && !baseNames.includes(p2Name) ? `${baseNames}, ${p2Name}` : baseNames;
+
+      // Adres opiekuna 1: jesli payload ma tylko miasto, wzbogac z reservationData.parents_data
+      const parents = (reservationData as unknown as { parents_data?: Array<Record<string, string>> })?.parents_data;
+      let p1FullAddress = s1.opiekunowie?.adres ?? '';
+      if (parents?.[0]) {
+        const p1 = parents[0];
+        const parts = [(p1.street || '').trim(), [(p1.postalCode || '').trim(), (p1.city || '').trim()].filter(Boolean).join(' ')].filter(Boolean);
+        if (parts.join(', ').length > p1FullAddress.length) p1FullAddress = parts.join(', ');
+      }
+      // Adres opiekuna 2: z payloadu drugiOpiekun.adres lub z parents_data[1]
+      let p2FullAddress = p2Address;
+      if (!p2FullAddress && parents?.[1]) {
+        const p2p = parents[1];
+        const parts = [(p2p.street || '').trim(), [(p2p.postalCode || '').trim(), (p2p.city || '').trim()].filter(Boolean).join(' ')].filter(Boolean);
+        p2FullAddress = parts.join(', ');
+      }
+      const fullAddress = p2FullAddress && !p1FullAddress.includes(p2FullAddress) ? `${p1FullAddress}; ${p2FullAddress}` : p1FullAddress;
+
+      const basePhone = s1.opiekunowie?.telefon ?? '';
+      const fullPhone = p2Phone && !basePhone.includes(p2Phone) ? `${basePhone}, ${p2Phone}` : basePhone;
+
+      setFormData((prev) => ({
+        ...prev,
+        childDOB: s1.uczestnik?.dataUrodzenia ?? prev.childDOB,
+        childAddress: s1.uczestnik?.adres ?? prev.childAddress,
+        childPesel: s1.uczestnik?.pesel ?? prev.childPesel,
+        parentNames: fullNames || prev.parentNames,
+        parentAddress: fullAddress || prev.parentAddress,
+        parentPhone: fullPhone || prev.parentPhone,
+      }));
+
+      if (p2Name || p2Address || p2Phone) {
+        setSecondParentName(p2Name);
+        setSecondParentAddress(p2Address);
+        setSecondParentPhone(p2Phone);
+        setNoSecondParent(false);
+      }
+    }
+    const s3 = signedPayload.sekcjaIII;
+    if (s3) {
+      setFormData((prev) => ({
+        ...prev,
+        additionalInfo: (s3.informacjeDodatkowe as string) ?? prev.additionalInfo,
+      }));
+    }
+    const s4 = signedPayload.sekcjaIV;
+    if (s4) {
+      setFormData((prev) => ({
+        ...prev,
+        vaccineInfo: (s4.wniosekOZakwaterowanie as string) ?? prev.vaccineInfo,
+      }));
+    }
+  }, [signedPayload]);
+
   /** Na wydruku lub w podglądzie (admin) – pola tylko do oglądania. */
   const readOnlyView = printMode || previewOnly;
   const isEditable = !readOnlyView && !isSigned;
@@ -1088,7 +1164,10 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               <div className="field-group">
                 <label>5) Imiona i nazwiska rodziców/opiekunów prawnych</label>
                 {(reservationData?.parentCount ?? 0) >= 2 ? (
-                  <div className="readonly-field">{formData.parentNames}</div>
+                  <div className="readonly-field">
+                    {formData.parentNames}
+                    {secondParentName.trim() && !formData.parentNames.includes(secondParentName.trim()) ? `, ${secondParentName.trim()}` : ''}
+                  </div>
                 ) : (reservationData?.parentCount ?? 0) === 1 ? (
                   <>
                     <div className="flex items-start gap-2 flex-wrap">
@@ -1144,7 +1223,10 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               <div className="field-group">
                 <label>6) Adresy zamieszkania rodziców/opiekunów prawnych</label>
                 {(reservationData?.parentCount ?? 0) >= 2 ? (
-                  <div className="readonly-field">{formData.parentAddress}</div>
+                  <div className="readonly-field">
+                    {formData.parentAddress}
+                    {secondParentAddress.trim() && !formData.parentAddress.includes(secondParentAddress.trim()) ? `; ${secondParentAddress.trim()}` : ''}
+                  </div>
                 ) : (reservationData?.parentCount ?? 0) === 1 ? (
                   <>
                     <div className="flex items-start gap-2 flex-wrap">
@@ -1181,7 +1263,10 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               <div className="field-group">
                 <label>7) Telefony do rodziców/ opiekunów prawnych</label>
                 {(reservationData?.parentCount ?? 0) >= 2 ? (
-                  <div className="readonly-field">{formData.parentPhone}</div>
+                  <div className="readonly-field">
+                    {formData.parentPhone}
+                    {secondParentPhone.trim() && !formData.parentPhone.includes(secondParentPhone.trim()) ? `, ${secondParentPhone.trim()}` : ''}
+                  </div>
                 ) : (reservationData?.parentCount ?? 0) === 1 ? (
                   <>
                     <div className="flex items-start gap-2 flex-wrap">

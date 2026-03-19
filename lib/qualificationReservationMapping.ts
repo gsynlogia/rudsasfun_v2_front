@@ -345,11 +345,21 @@ export function mapReservationToQualificationForm(
     .map((p) => `${(p.firstName || '').trim()} ${(p.lastName || '').trim()}`.trim())
     .filter(Boolean)
     .join(', ') || (firstParent.firstName || firstParent.lastName ? `${firstParent.firstName || ''} ${firstParent.lastName || ''}`.trim() : '');
-  const parentAddress = parents.map((p) => (p.city || '').trim()).filter(Boolean).join(', ') || (firstParent.city || '');
+  // Adres opiekuna: ulica, kod pocztowy miasto (pelny adres z parents_data)
+  const parentAddress = parents.map((p) => {
+    const parts = [(p.street || '').trim(), [(p.postalCode || '').trim(), (p.city || '').trim()].filter(Boolean).join(' ')].filter(Boolean);
+    return parts.join(', ');
+  }).filter(Boolean).join('; ') || (firstParent.city || '');
+  // Telefon opiekuna: prefix (phone) + numer (phoneNumber), deduplikacja
   const parentPhone = parents
-    .map((p) => (p.phone || p.phoneNumber || '').trim())
+    .map((p) => {
+      const prefix = (p.phone || '').trim();
+      const number = ((p as Record<string, string>).phoneNumber || '').trim();
+      if (prefix && number) return `${prefix} ${number}`;
+      return number || prefix || '';
+    })
     .filter(Boolean)
-    .join(', ') || (firstParent.phone || firstParent.phoneNumber || '').trim() || '';
+    .join(', ');
   const parentCount = parents.length;
 
   const campDates =
@@ -370,13 +380,22 @@ export function mapReservationToQualificationForm(
   const secondParentName = secondParent
     ? `${(secondParent.firstName || '').trim()} ${(secondParent.lastName || '').trim()}`.trim() || undefined
     : undefined;
+  // Adres drugiego opiekuna: ulica, kod pocztowy miasto
   const secondParentAddress = secondParent
-    ? (secondParent as { street?: string; postalCode?: string; city?: string }).street ||
-      (secondParent as { street?: string; city?: string }).city ||
-      undefined
+    ? (() => {
+        const sp = secondParent as { street?: string; postalCode?: string; city?: string };
+        const parts = [(sp.street || '').trim(), [(sp.postalCode || '').trim(), (sp.city || '').trim()].filter(Boolean).join(' ')].filter(Boolean);
+        return parts.join(', ') || undefined;
+      })()
     : undefined;
+  // Telefon drugiego opiekuna: prefix + numer
   const secondParentPhone = secondParent
-    ? (secondParent.phone || (secondParent as { phoneNumber?: string }).phoneNumber || '').trim() || undefined
+    ? (() => {
+        const prefix = (secondParent.phone || '').trim();
+        const number = ((secondParent as Record<string, string>).phoneNumber || '').trim();
+        if (prefix && number) return `${prefix} ${number}`;
+        return number || prefix || undefined;
+      })()
     : undefined;
 
   return {
@@ -386,6 +405,7 @@ export function mapReservationToQualificationForm(
     campDates: campDates || undefined,
     childName: childName || undefined,
     childDOB: data.participant_age || undefined,
+    // Adres uczestnika — bierzemy miasto z rezerwacji (participant_city). Pelny adres moze byc w snapshocie.
     childAddress: data.participant_city || undefined,
     parentNames: parentNames || undefined,
     parentAddress: parentAddress || undefined,

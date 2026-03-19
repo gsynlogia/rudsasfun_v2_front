@@ -556,6 +556,16 @@ class ReservationService {
         deliveryAddress: step3Data.wantsInvoice && step3Data.deliveryType === 'paper' && step3Data.differentAddress
           ? step3Data.deliveryAddress
           : undefined,
+        // Pola backendu (Step3Data schema) — flat: deliveryDifferentAddress, deliveryStreet, deliveryPostalCode, deliveryCity.
+        // Frontend przechowuje je jako nested deliveryAddress.{street,postalCode,city}, dlatego mapujemy ręcznie.
+        ...(step3Data.wantsInvoice && step3Data.deliveryType === 'paper' && step3Data.differentAddress && step3Data.deliveryAddress
+          ? {
+              deliveryDifferentAddress: true,
+              deliveryStreet: step3Data.deliveryAddress.street || undefined,
+              deliveryPostalCode: step3Data.deliveryAddress.postalCode || undefined,
+              deliveryCity: step3Data.deliveryAddress.city || undefined,
+            }
+          : { deliveryDifferentAddress: false }),
       },
       step4: {
         consent1: step4Data.consent1,

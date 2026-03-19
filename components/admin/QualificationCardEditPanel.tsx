@@ -94,6 +94,9 @@ export function QualificationCardEditPanel({
   const reservationData = mapReservationToQualificationForm(reservation as unknown as ReservationData);
   const parentCount = reservationData?.parentCount ?? 0;
 
+  // Kontrakt overlay admin edycja: formSnapshotFromDb (draft) > signedPayload > reservation.
+  // Celowe: admin widzi ostatni zapisany stan (draft), nie stan podpisu.
+  // Jeśli draft nie istnieje lub jest błędny, fallback na signedPayload.
   let overlay: ReturnType<typeof signedPayloadOverlayOnly> = null;
   if (formSnapshotFromDb?.trim()) {
     try {

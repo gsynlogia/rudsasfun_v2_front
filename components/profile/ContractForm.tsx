@@ -126,10 +126,14 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ status: string; signed_at?: string | null }>) => {
+      .then((docs: Array<{ status: string; signed_at?: string | null; sms_verified_at?: string | null }>) => {
         const latest = docs[0];
-        if (latest && (latest.status === 'in_verification' || latest.status === 'accepted' || latest.status === 'rejected')) {
-          setLatestContractStatus(latest.status as 'in_verification' | 'accepted' | 'rejected');
+        if (latest && (latest.status === 'accepted' || latest.status === 'rejected')) {
+          setLatestContractStatus(latest.status as 'accepted' | 'rejected');
+          setLatestContractSignedAt(latest.signed_at ?? null);
+        } else if (latest && latest.status === 'in_verification' && latest.sms_verified_at) {
+          // Tylko gdy SMS faktycznie zweryfikowany — bez sms_verified_at umowa NIE jest podpisana
+          setLatestContractStatus('in_verification');
           setLatestContractSignedAt(latest.signed_at ?? null);
         } else {
           setLatestContractStatus(null);

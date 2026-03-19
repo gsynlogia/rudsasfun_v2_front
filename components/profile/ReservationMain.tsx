@@ -8,7 +8,20 @@ import { useReservationPaymentHeader } from '@/contexts/ReservationPaymentHeader
 import { contractService } from '@/lib/services/ContractService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse, CreatePaymentRequest } from '@/lib/services/PaymentService';
+import { AlertTriangle } from 'lucide-react';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
+import { authService } from '@/lib/services/AuthService';
+
+/** Wyciaga roznice miedzy podpisanym a draftem. Jezeli draft zaczyna sie od podpisanego — zwraca tylko nowa czesc. */
+function getDiffText(signed: string, draft: string): string {
+  if (!signed) return draft;
+  if (draft === signed) return '';
+  if (draft.startsWith(signed)) {
+    const diff = draft.slice(signed.length).replace(/^[,;\s]+/, '').trim();
+    return diff || draft;
+  }
+  return draft;
+}
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
@@ -61,6 +74,244 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const [bankAccount, setBankAccount] = useState<any>(null);
   const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
   const [protections, setProtections] = useState<Map<number, { name: string; price: number }>>(new Map());
+  // Niezatwierdzone zmiany w karcie kwalifikacyjnej (draft vs podpisane SMS-em)
+  // Niezatwierdzone zmiany w karcie kwalifikacyjnej — per-sekcja (widoczne na profilu) + lista wszystkich zmian
+  const [unsignedCardChanges, setUnsignedCardChanges] = useState<{
+    accommodation: boolean;
+    health: boolean;
+    additionalInfo: boolean;
+    draftValues: {
+      accommodation?: string; health?: string; additionalInfo?: string;
+      chronicDiseases?: string; dysfunctions?: string; psychiatric?: string; additionalNotes?: string;
+    };
+    signedValues: {
+      accommodation?: string; additionalInfo?: string;
+      chronicDiseases?: string; dysfunctions?: string; psychiatric?: string; additionalNotes?: string;
+    };
+    // Pelna lista niezatwierdzonych zmian (nazwaPolska -> wartoscDraftu) do alertu rozwijanego
+    allChanges: Array<{ label: string; value: string }>;
+  }>({ accommodation: false, health: false, additionalInfo: false, draftValues: {}, signedValues: {}, allChanges: [] });
+
+  useEffect(() => {
+    if (!reservation?.id) return;
+    const token = authService.getToken();
+    if (!token) return;
+    const apiUrl = getApiBaseUrlRuntime();
+
+    // Sprawdz 2 zrodla niezatwierdzonych zmian:
+    // 1) signed_documents z in_verification bez sms_verified_at (klient kliknal "Podpisz" ale nie wpisal kodu)
+    // 2) qualification_card_data.form_snapshot (klient kliknal "Zapisz zmiany" ale nie podpisal SMS-em)
+    Promise.all([
+      fetch(`${apiUrl}/api/signed-documents/reservation/${reservation.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(r => r.ok ? r.json() : []),
+      fetch(`${apiUrl}/api/qualification-cards/${reservation.id}/data`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(r => r.ok ? r.json() : null),
+    ]).then(([docs, cardData]) => {
+      const cardDocs = (docs || []).filter(
+        (d: { document_type: string }) => d.document_type === 'qualification_card'
+      );
+
+      // Znajdz zrodlo niezatwierdzonych danych:
+      // - in_verification bez sms_verified_at (kliknal "Podpisz" ale nie wpisal kodu)
+      // - requires_signature (admin zmienil, klient nie podpisal ponownie)
+      const unverifiedDoc = cardDocs.find(
+        (d: { status: string; sms_verified_at?: string | null; payload?: string }) =>
+          ((d.status === 'in_verification' && !d.sms_verified_at) || d.status === 'requires_signature') && d.payload
+      );
+      // Znajdz ostatni zweryfikowany doc (podpisany SMS-em)
+      const verifiedDoc = cardDocs
+        .filter((d: { sms_verified_at?: string | null; payload?: string }) => !!d.sms_verified_at && !!d.payload)
+        .sort((a: { sms_verified_at: string }, b: { sms_verified_at: string }) =>
+          b.sms_verified_at.localeCompare(a.sms_verified_at))[0] as { payload?: string } | undefined;
+
+      // Wybierz snapshot do porownania: NOWSZY z form_snapshot vs niezweryfikowany doc.
+      // form_snapshot jest aktualizowany przez "Zapisz zmiany", niezweryfikowany doc przez admin-full.
+      let draftSnap: Record<string, unknown> | null = null;
+      let unverifiedSnap: Record<string, unknown> | null = null;
+      let formSnap: Record<string, unknown> | null = null;
+      if (unverifiedDoc?.payload) {
+        try { unverifiedSnap = JSON.parse(unverifiedDoc.payload as string); } catch { /* */ }
+      }
+      if (cardData?.form_snapshot) {
+        try {
+          formSnap = typeof cardData.form_snapshot === 'string'
+            ? JSON.parse(cardData.form_snapshot) : cardData.form_snapshot;
+        } catch { /* */ }
+      }
+      // Preferuj form_snapshot jesli jest nowszy (updated_at > unverifiedDoc.created_at)
+      if (formSnap && unverifiedSnap) {
+        const qcdUpdated = cardData?.updated_at || '';
+        const docCreated = (unverifiedDoc as { created_at?: string })?.created_at || '';
+        draftSnap = qcdUpdated > docCreated ? formSnap : unverifiedSnap;
+      } else {
+        draftSnap = formSnap || unverifiedSnap;
+      }
+      if (!draftSnap) return;
+
+      // Bazowe dane do porownania: ostatni zweryfikowany snapshot LUB dane z rezerwacji
+      let baseSnap: Record<string, unknown> | null = null;
+      if (verifiedDoc?.payload) {
+        try { baseSnap = JSON.parse(verifiedDoc.payload as string); } catch { /* */ }
+      }
+
+      // Wyciagnij dane draftu
+      const ds2 = (draftSnap.sekcjaII_stanZdrowia || {}) as Record<string, unknown>;
+      const ds3 = (draftSnap.sekcjaIII || {}) as Record<string, unknown>;
+      const ds4 = (draftSnap.sekcjaIV || {}) as Record<string, unknown>;
+      const draftAcc = ((ds4.wniosekOZakwaterowanie as string) || '').trim();
+      const draftHealthParts = [
+        ...(Array.isArray(ds2.chorobyPrzewlekle) ? ds2.chorobyPrzewlekle : []),
+        ...(Array.isArray(ds2.dysfunkcje) ? ds2.dysfunkcje : []),
+        ...(Array.isArray(ds2.problemyPsychiatryczne) ? ds2.problemyPsychiatryczne : []),
+        ((ds2.dodatkoweInformacje as string) || '').trim(),
+      ].filter(Boolean).join(', ');
+      const draftInfo = ((ds3.informacjeDodatkowe as string) || '').trim();
+
+      // Dane bazowe: WYLACZNIE z podpisanego SMS-em snapshotu.
+      // Jezeli brak podpisu — baza to puste stringi (wszystko z draftu jest niezatwierdzone).
+      let baseAcc = '', baseHealth = '', baseInfo = '';
+      if (baseSnap) {
+        const bs2 = (baseSnap.sekcjaII_stanZdrowia || {}) as Record<string, unknown>;
+        const bs3 = (baseSnap.sekcjaIII || {}) as Record<string, unknown>;
+        const bs4 = (baseSnap.sekcjaIV || {}) as Record<string, unknown>;
+        baseAcc = ((bs4.wniosekOZakwaterowanie as string) || '').trim();
+        baseHealth = [
+          ...(Array.isArray(bs2.chorobyPrzewlekle) ? bs2.chorobyPrzewlekle : []),
+          ...(Array.isArray(bs2.dysfunkcje) ? bs2.dysfunkcje : []),
+          ...(Array.isArray(bs2.problemyPsychiatryczne) ? bs2.problemyPsychiatryczne : []),
+          ((bs2.dodatkoweInformacje as string) || '').trim(),
+        ].filter(Boolean).join(', ');
+        baseInfo = ((bs3.informacjeDodatkowe as string) || '').trim();
+      }
+
+      // Porownaj pole po polu
+      const accChanged = draftAcc !== baseAcc;
+      const healthChanged = draftHealthParts !== baseHealth;
+      const infoChanged = draftInfo !== baseInfo;
+
+      // Szczegolowe wartosci per-pole zdrowia z draftu
+      const draftChronic = (Array.isArray(ds2.chorobyPrzewlekle) ? ds2.chorobyPrzewlekle : []).filter(Boolean).join(', ');
+      const draftDysf = (Array.isArray(ds2.dysfunkcje) ? ds2.dysfunkcje : []).filter(Boolean).join(', ');
+      const draftPsych = (Array.isArray(ds2.problemyPsychiatryczne) ? ds2.problemyPsychiatryczne : []).filter(Boolean).join(', ');
+      const draftNotes = ((ds2.dodatkoweInformacje as string) || '').trim();
+
+      // Wartosci podpisane SMS-em per-pole (do porownania i wyswietlenia)
+      const baseChronic = baseSnap ? (Array.isArray((baseSnap.sekcjaII_stanZdrowia as Record<string, unknown>)?.chorobyPrzewlekle) ? ((baseSnap.sekcjaII_stanZdrowia as Record<string, unknown>).chorobyPrzewlekle as string[]).filter(Boolean).join(', ') : '') : '';
+      const baseDysf = baseSnap ? (Array.isArray((baseSnap.sekcjaII_stanZdrowia as Record<string, unknown>)?.dysfunkcje) ? ((baseSnap.sekcjaII_stanZdrowia as Record<string, unknown>).dysfunkcje as string[]).filter(Boolean).join(', ') : '') : '';
+      const basePsych = baseSnap ? (Array.isArray((baseSnap.sekcjaII_stanZdrowia as Record<string, unknown>)?.problemyPsychiatryczne) ? ((baseSnap.sekcjaII_stanZdrowia as Record<string, unknown>).problemyPsychiatryczne as string[]).filter(Boolean).join(', ') : '') : '';
+      const baseNotes = baseSnap ? (((baseSnap.sekcjaII_stanZdrowia as Record<string, unknown>)?.dodatkoweInformacje as string) || '').trim() : '';
+
+      const diffChronic = draftChronic && draftChronic !== baseChronic ? getDiffText(baseChronic, draftChronic) : '';
+      const diffDysf = draftDysf && draftDysf !== baseDysf ? getDiffText(baseDysf, draftDysf) : '';
+      const diffPsych = draftPsych && draftPsych !== basePsych ? getDiffText(basePsych, draftPsych) : '';
+      const diffNotes = draftNotes && draftNotes !== baseNotes ? getDiffText(baseNotes, draftNotes) : '';
+
+      // Wartosci podpisane SMS-em (do porownania w UI)
+      let sv: typeof unsignedCardChanges.signedValues = {};
+      if (baseSnap) {
+          const bs2 = (baseSnap.sekcjaII_stanZdrowia || {}) as Record<string, unknown>;
+          const bs3 = (baseSnap.sekcjaIII || {}) as Record<string, unknown>;
+          const bs4 = (baseSnap.sekcjaIV || {}) as Record<string, unknown>;
+          sv = {
+            chronicDiseases: (Array.isArray(bs2.chorobyPrzewlekle) ? bs2.chorobyPrzewlekle : []).filter(Boolean).join(', ') || undefined,
+            dysfunctions: (Array.isArray(bs2.dysfunkcje) ? bs2.dysfunkcje : []).filter(Boolean).join(', ') || undefined,
+            psychiatric: (Array.isArray(bs2.problemyPsychiatryczne) ? bs2.problemyPsychiatryczne : []).filter(Boolean).join(', ') || undefined,
+            additionalNotes: ((bs2.dodatkoweInformacje as string) || '').trim() || undefined,
+            additionalInfo: ((bs3.informacjeDodatkowe as string) || '').trim() || undefined,
+            accommodation: ((bs4.wniosekOZakwaterowanie as string) || '').trim() || undefined,
+          };
+        }
+
+        // Porownanie WSZYSTKICH pol payload (do rozwijanej listy w alercie)
+        const allChanges: Array<{ label: string; value: string }> = [];
+        const ds1 = (draftSnap.sekcjaI || {}) as Record<string, unknown>;
+        const ds1u = (ds1.uczestnik || {}) as Record<string, unknown>;
+        const ds1d = (ds1.drugiOpiekun || null) as Record<string, unknown> | null;
+        const bs1 = baseSnap ? ((baseSnap.sekcjaI || {}) as Record<string, unknown>) : {};
+        const bs1u = (bs1.uczestnik || {}) as Record<string, unknown>;
+        const bs1d = (bs1.drugiOpiekun || null) as Record<string, unknown> | null;
+        const bs2Full = baseSnap ? ((baseSnap.sekcjaII_stanZdrowia || {}) as Record<string, unknown>) : {};
+        const bsVac = baseSnap ? ((baseSnap.sekcjaII_szczepienia || {}) as Record<string, unknown>) : {};
+        const dsVac = (draftSnap.sekcjaII_szczepienia || {}) as Record<string, unknown>;
+        const bs3Full = baseSnap ? ((baseSnap.sekcjaIII || {}) as Record<string, unknown>) : {};
+        const bs4Full = baseSnap ? ((baseSnap.sekcjaIV || {}) as Record<string, unknown>) : {};
+        const ds4Full = (draftSnap.sekcjaIV || {}) as Record<string, unknown>;
+        const bsAuth = baseSnap ? (baseSnap.upowaznienia || []) : [];
+        const dsAuth = draftSnap.upowaznienia || [];
+
+        // Helper: porownaj pole i dodaj do listy jesli sie rozni
+        const cmp = (label: string, dVal: unknown, bVal: unknown) => {
+          const d = typeof dVal === 'boolean' ? (dVal ? 'Tak' : 'Nie') : Array.isArray(dVal) ? dVal.filter(Boolean).join(', ') : String(dVal ?? '').trim();
+          const b = typeof bVal === 'boolean' ? (bVal ? 'Tak' : 'Nie') : Array.isArray(bVal) ? bVal.filter(Boolean).join(', ') : String(bVal ?? '').trim();
+          if (d !== b && d) allChanges.push({ label, value: getDiffText(b, d) });
+        };
+
+        // Sekcja I — uczestnik
+        cmp('Data urodzenia', ds1u.dataUrodzenia, bs1u.dataUrodzenia);
+        cmp('PESEL', ds1u.pesel, bs1u.pesel);
+        cmp('Brak PESEL', ds1u.brakPesel, bs1u.brakPesel);
+        cmp('Rok urodzenia (brak PESEL)', ds1u.rokUrodzeniaGdyBrakPesel, bs1u.rokUrodzeniaGdyBrakPesel);
+        // Drugi opiekun
+        if (ds1d) {
+          cmp('Drugi opiekun: imię i nazwisko', ds1d.imieNazwisko, bs1d?.imieNazwisko);
+          cmp('Drugi opiekun: adres', ds1d.adres, bs1d?.adres);
+          cmp('Drugi opiekun: telefon', ds1d.telefon, bs1d?.telefon);
+        }
+        // Sekcja II — zdrowie
+        if (diffChronic) allChanges.push({ label: 'Choroby przewlekłe', value: diffChronic });
+        if (diffDysf) allChanges.push({ label: 'Dysfunkcje', value: diffDysf });
+        if (diffPsych) allChanges.push({ label: 'Problemy psychiatryczne', value: diffPsych });
+        if (diffNotes) allChanges.push({ label: 'Uwagi dodatkowe (zdrowie)', value: diffNotes });
+        // Sekcja II — szczepienia
+        cmp('Szczepienia: zgodnie z kalendarzem', dsVac.zgodnieZKalendarzem, bsVac.zgodnieZKalendarzem);
+        cmp('Szczepienia: tężec', dsVac.tezec, bsVac.tezec);
+        cmp('Szczepienia: tężec rok', dsVac.tezecRok, bsVac.tezecRok);
+        cmp('Szczepienia: odra', dsVac.odra, bsVac.odra);
+        cmp('Szczepienia: odra rok', dsVac.odraRok, bsVac.odraRok);
+        cmp('Szczepienia: błonica', dsVac.blonica, bsVac.blonica);
+        cmp('Szczepienia: błonica rok', dsVac.blonicaRok, bsVac.blonicaRok);
+        cmp('Szczepienia: inne', dsVac.inne, bsVac.inne);
+        cmp('Szczepienia: inne rok', dsVac.inneRok, bsVac.inneRok);
+        cmp('Szczepienia: inne szczegóły', dsVac.inneSzczegoly, bsVac.inneSzczegoly);
+        // Sekcja III
+        if (infoChanged && draftInfo) allChanges.push({ label: 'Informacje dodatkowe uczestnika', value: getDiffText(baseInfo, draftInfo) });
+        cmp('Deklaracja opiekuna', (draftSnap.sekcjaIII as Record<string, unknown>)?.deklaracjaOpiekuna, bs3Full.deklaracjaOpiekuna);
+        // Sekcja IV
+        if (accChanged && draftAcc) allChanges.push({ label: 'Wniosek o zakwaterowanie', value: getDiffText(baseAcc, draftAcc) });
+        cmp('Potwierdzenie regulaminu', ds4Full.potwierdzenieRegulaminu, bs4Full.potwierdzenieRegulaminu);
+        cmp('Odbiór dziecka', ds4Full.odbiorDziecka, bs4Full.odbiorDziecka);
+        cmp('Zgoda na samodzielny powrót', ds4Full.zgodaNaSamodzielnyPowrot, bs4Full.zgodaNaSamodzielnyPowrot);
+        // Upoważnienia
+        const dsAuthStr = JSON.stringify(dsAuth);
+        const bsAuthStr = JSON.stringify(bsAuth);
+        if (dsAuthStr !== bsAuthStr && Array.isArray(dsAuth) && dsAuth.length > 0) {
+          allChanges.push({ label: 'Upoważnienia', value: (dsAuth as Array<Record<string, unknown>>).map((a) => `${a.imieNazwisko || ''} (${a.numerDokumentu || ''})`).filter(a => a.trim() !== '()').join(', ') });
+        }
+
+      // Ustaw stan — allChanges moze miec elementy nawet jesli 3 glowne sekcje sie nie zmienily (np. szczepionki)
+      if (allChanges.length > 0) {
+        setUnsignedCardChanges({
+          accommodation: accChanged,
+          health: healthChanged,
+          additionalInfo: infoChanged,
+          draftValues: {
+            accommodation: accChanged ? draftAcc : undefined,
+            health: healthChanged ? draftHealthParts : undefined,
+            additionalInfo: infoChanged ? draftInfo : undefined,
+            chronicDiseases: draftChronic || undefined,
+            dysfunctions: draftDysf || undefined,
+            psychiatric: draftPsych || undefined,
+            additionalNotes: draftNotes || undefined,
+          },
+          signedValues: sv,
+          allChanges,
+        });
+      }
+    }).catch(() => {});
+  }, [reservation?.id, reservation?.accommodation_request, reservation?.additional_notes, reservation?.participant_additional_info]);
+
   const [showJustificationModal, setShowJustificationModal] = useState(false);
   const [justificationDraft, setJustificationDraft] = useState<Record<string, any>>(reservation.promotion_justification || {});
   const [savingJustification, setSavingJustification] = useState(false);
@@ -589,6 +840,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   // Get source name (prefer source_name, fallback to selected_source)
   const source = reservation.source_name || reservation.selected_source || 'Brak danych';
 
+  const [unsignedAlertExpanded, setUnsignedAlertExpanded] = useState(false);
+
   // Get accommodation
   const accommodation = reservation.accommodation_request || 'Brak danych';
 
@@ -667,6 +920,39 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   return (
     <>
       <div className="space-y-4 sm:space-y-6">
+      {/* Alert: niezatwierdzone zmiany w karcie kwalifikacyjnej */}
+      {unsignedCardChanges.allChanges.length > 0 && (
+        <div className="bg-orange-50 border border-orange-300 rounded-xl p-3 sm:p-4">
+          <div
+            className="flex items-center gap-3 cursor-pointer select-none"
+            onClick={() => setUnsignedAlertExpanded(e => !e)}
+          >
+            <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+            <p className="text-sm font-medium text-orange-800 flex-1">
+              Karta kwalifikacyjna zawiera niezatwierdzone zmiany ({unsignedCardChanges.allChanges.length})
+            </p>
+            <svg className={`w-4 h-4 text-orange-500 transition-transform ${unsignedAlertExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+          {unsignedAlertExpanded && (
+            <div className="mt-2 pl-8 space-y-1">
+              {unsignedCardChanges.allChanges.map((c, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-orange-800">
+                  <span className="text-orange-400 mt-0.5">&#8226;</span>
+                  <span><span className="font-medium">{c.label}:</span> {c.value}</span>
+                </div>
+              ))}
+              <a
+                href={`${basePath}/aktualne-rezerwacje/${reservation.reservation_number || `REZ-2026-${reservation.id}`}/karta-kwalifikacyjna`}
+                className="inline-block mt-2 text-xs font-medium text-orange-700 underline hover:text-orange-900"
+              >
+                Przejdź do karty i potwierdź podpisem SMS
+              </a>
+            </div>
+          )}
+        </div>
+      )}
       {/* Header Section */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
@@ -713,14 +999,26 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
         <>
           <DashedLine />
           <div>
-            <h4 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3">
+            <h4 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-1">
               Opiekunowie/Rodzice
+              {unsignedCardChanges.allChanges.some(c => c.label.startsWith('Drugi opiekun')) && (
+                <span className="relative group cursor-help">
+                  <AlertTriangle className="w-4 h-4 text-orange-500" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-orange-50 border border-orange-300 text-orange-800 text-xs rounded px-2 py-1 whitespace-nowrap z-50 shadow-md">
+                    Niezatwierdzone zmiany dotyczące drugiego opiekuna
+                  </span>
+                </span>
+              )}
             </h4>
             <div className="space-y-3 sm:space-y-4">
-              {reservation.parents_data.map((parent, index) => (
-                <div key={`parent-${index}`} className="bg-gray-50 rounded-lg p-2 sm:p-3">
+              {reservation.parents_data.map((parent, index) => {
+                // Dla drugiego opiekuna (index=1): sprawdz czy dane sa niezatwierdzone
+                const isUnsignedParent2 = index === 1 && unsignedCardChanges.allChanges.some(c => c.label.startsWith('Drugi opiekun'));
+                return (
+                <div key={`parent-${index}`} className={`rounded-lg p-2 sm:p-3 ${isUnsignedParent2 ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`}>
                   <div className="text-xs sm:text-sm font-medium text-gray-900 mb-1 sm:mb-2">
                     {parent.firstName} {parent.lastName}
+                    {isUnsignedParent2 && <span className="ml-1 text-xs text-orange-600 font-normal">(niezatwierdzony SMS-em)</span>}
                   </div>
                   <div className="space-y-1 text-xs sm:text-sm text-gray-600">
                     {parent.email && (
@@ -743,7 +1041,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </>
@@ -879,19 +1178,85 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {/* Accommodation */}
             <div>
-              <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Zakwaterowanie</h5>
+              <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2 flex items-center gap-1">
+                Zakwaterowanie
+                {unsignedCardChanges.accommodation && (
+                  <span className="relative group cursor-help">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-orange-50 border border-orange-300 text-orange-800 text-xs rounded px-2 py-1 whitespace-nowrap z-50 shadow-md">
+                      Niezatwierdzona zmiana: {unsignedCardChanges.draftValues.accommodation}
+                    </span>
+                  </span>
+                )}
+              </h5>
               <p className="text-xs sm:text-sm text-gray-700">
                 {accommodation}
+                {unsignedCardChanges.accommodation && unsignedCardChanges.draftValues.accommodation && unsignedCardChanges.draftValues.accommodation !== (unsignedCardChanges.signedValues.accommodation || '') && (
+                  <span className="ml-1 text-xs text-orange-600 bg-orange-50 px-1 rounded">(niezatwierdzone: {getDiffText(unsignedCardChanges.signedValues.accommodation || '', unsignedCardChanges.draftValues.accommodation)})</span>
+                )}
               </p>
             </div>
 
             {/* Health Status */}
             <div>
-              <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Stan zdrowia</h5>
+              <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2 flex items-center gap-1">
+                Stan zdrowia
+                {unsignedCardChanges.health && (
+                  <span className="relative group cursor-help">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-orange-50 border border-orange-300 text-orange-800 text-xs rounded px-2 py-1 max-w-xs z-50 shadow-md">
+                      Niezatwierdzona zmiana w karcie kwalifikacyjnej (brak podpisu SMS)
+                    </span>
+                  </span>
+                )}
+              </h5>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-                {healthInfoParts.map((part, index) => (
-                  <div key={index}>{part}</div>
-                ))}
+                {(() => {
+                  const sv = unsignedCardChanges.health ? unsignedCardChanges.signedValues : null;
+                  const dv = unsignedCardChanges.health ? unsignedCardChanges.draftValues : null;
+                  // Uzyj podpisanych wartosci jesli sa, w przeciwnym razie z rezerwacji
+                  const hq = healthQuestions as Record<string, string> | null;
+                  const hd = healthDetails as Record<string, string> | null;
+
+                  const showField = (label: string, signedVal: string | undefined, resVal: string | undefined, draftVal: string | undefined) => {
+                    const base = signedVal ?? resVal ?? '';
+                    const diff = draftVal && draftVal !== base ? getDiffText(base, draftVal) : '';
+                    if (!base && !diff) return null;
+                    return (
+                      <div key={label}>
+                        {label}: {base || ''}
+                        {diff && <span className="ml-1 text-orange-600 bg-orange-50 px-1 rounded text-xs font-medium">(niezatwierdzone: {diff})</span>}
+                      </div>
+                    );
+                  };
+
+                  const parts: React.ReactNode[] = [];
+                  if (hq?.chronicDiseases === 'Tak' || hq?.chronicDiseases === 'tak') {
+                    const el = showField('Choroby przewlekłe', sv?.chronicDiseases, hd?.chronicDiseases, dv?.chronicDiseases);
+                    if (el) parts.push(el);
+                  }
+                  if (hq?.dysfunctions === 'Tak' || hq?.dysfunctions === 'tak') {
+                    const el = showField('Dysfunkcje', sv?.dysfunctions, hd?.dysfunctions, dv?.dysfunctions);
+                    if (el) parts.push(el);
+                  }
+                  if (hq?.psychiatric === 'Tak' || hq?.psychiatric === 'tak') {
+                    const el = showField('Problemy psychiatryczne', sv?.psychiatric, hd?.psychiatric, dv?.psychiatric);
+                    if (el) parts.push(el);
+                  }
+                  // Uwagi dodatkowe
+                  const baseNotes = sv?.additionalNotes ?? additionalNotes ?? '';
+                  const diffNotes = dv?.additionalNotes && dv.additionalNotes !== baseNotes ? getDiffText(baseNotes, dv.additionalNotes) : '';
+                  if (baseNotes || diffNotes) {
+                    parts.push(
+                      <div key="notes">
+                        {baseNotes}
+                        {diffNotes && <span className="ml-1 text-orange-600 bg-orange-50 px-1 rounded text-xs font-medium">(niezatwierdzone: {diffNotes})</span>}
+                      </div>
+                    );
+                  }
+
+                  return parts.length > 0 ? parts : <div>Brak danych</div>;
+                })()}
               </div>
             </div>
           </div>
@@ -899,9 +1264,22 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           {/* Participant Additional Info */}
           <DashedLine />
           <div>
-            <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Informacje dodatkowe dotyczące uczestnika</h5>
+            <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2 flex items-center gap-1">
+              Informacje dodatkowe dotyczące uczestnika
+              {unsignedCardChanges.additionalInfo && (
+                <span className="relative group cursor-help">
+                  <AlertTriangle className="w-4 h-4 text-orange-500" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-orange-50 border border-orange-300 text-orange-800 text-xs rounded px-2 py-1 max-w-xs z-50 shadow-md">
+                    Niezatwierdzona zmiana w karcie kwalifikacyjnej (brak podpisu SMS)
+                  </span>
+                </span>
+              )}
+            </h5>
             <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap">
               {participantAdditionalInfo || 'brak'}
+              {unsignedCardChanges.additionalInfo && unsignedCardChanges.draftValues.additionalInfo && unsignedCardChanges.draftValues.additionalInfo !== (unsignedCardChanges.signedValues.additionalInfo || '') && (
+                <span className="ml-1 text-xs text-orange-600 bg-orange-50 px-1 rounded">(niezatwierdzone: {getDiffText(unsignedCardChanges.signedValues.additionalInfo || '', unsignedCardChanges.draftValues.additionalInfo)})</span>
+              )}
             </p>
           </div>
 

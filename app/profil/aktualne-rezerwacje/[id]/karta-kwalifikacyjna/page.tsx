@@ -42,8 +42,35 @@ export default function QualificationCardPage() {
   const [latestCardStatus, setLatestCardStatus] = useState<string | null>(null);
   const [latestCardSignedAt, setLatestCardSignedAt] = useState<string | null>(null);
   const [formSnapshotFromDb, setFormSnapshotFromDb] = useState<Record<string, unknown> | null>(null);
+  // Podpisany SMS-em payload (osobny od qualificationCardSignedPayload ktory moze miec niezweryfikowane)
+  const [verifiedSignedPayload, setVerifiedSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Przelaczanie widoku: wersja robocza (draft) vs zatwierdzona (podpisana SMS-em)
+  const [viewMode, setViewMode] = useState<'robocza' | 'zatwierdzona'>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.slice(1);
+      if (hash === 'wersja-zatwierdzona') return 'zatwierdzona';
+    }
+    return 'robocza';
+  });
+
+  const refetchReservation = useCallback(async () => {
+    if (!reservationId) return;
+    const token = authService.getToken();
+    if (!token) return;
+    const isFullNumber = reservationId.startsWith('REZ-');
+    const endpoint = isFullNumber
+      ? `${API_URL}/api/reservations/by-number/${reservationId}`
+      : `${API_URL}/api/reservations/${reservationId}`;
+    try {
+      const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+      if (response.ok) {
+        const data = await response.json();
+        setReservationData(data);
+      }
+    } catch { /* */ }
+  }, [reservationId]);
 
   useEffect(() => {
     const fetchReservation = async () => {
@@ -132,16 +159,33 @@ export default function QualificationCardPage() {
           cardDocs.find((d) => d.payload && activeStatuses.includes(d.status ?? '')) ??
           cardDocs.find((d) => d.payload) ??
           cardDocs[0];
-        setLatestCardStatus(cardDoc?.status ?? null);
+        // Status in_verification uznajemy tylko gdy SMS zweryfikowany (sms_verified_at).
+        // Bez tego karta bylaby oznaczona jako "podpisana" po samym wyslaniu kodu (przed wpisaniem).
+        const docStatus = cardDoc?.status ?? null;
+        if (docStatus === 'in_verification' && !cardDoc?.sms_verified_at) {
+          setLatestCardStatus(null);
+        } else {
+          setLatestCardStatus(docStatus);
+        }
         setLatestCardSignedAt(cardDoc?.signed_at ?? null);
         try {
           setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload) : null);
         } catch {
           setQualificationCardSignedPayload(null);
         }
+        // Zapisz osobno payload z podpisanego SMS-em dokumentu (do trybu "Wersja zatwierdzona")
+        const verifiedDoc = cardDocs
+          .filter((d) => !!d.sms_verified_at && !!d.payload)
+          .sort((a, b) => (b.sms_verified_at || '').localeCompare(a.sms_verified_at || ''))[0];
+        try {
+          setVerifiedSignedPayload(verifiedDoc?.payload ? JSON.parse(verifiedDoc.payload) : null);
+        } catch {
+          setVerifiedSignedPayload(null);
+        }
       })
       .catch(() => {
         setQualificationCardSignedPayload(null);
+        setVerifiedSignedPayload(null);
         setLatestCardStatus(null);
         setLatestCardSignedAt(null);
       });
@@ -184,16 +228,32 @@ export default function QualificationCardPage() {
           cardDocs.find((d) => d.payload && activeStatuses.includes(d.status ?? '')) ??
           cardDocs.find((d) => d.payload) ??
           cardDocs[0];
-        setLatestCardStatus(cardDoc?.status ?? null);
+        // Status in_verification uznajemy tylko gdy SMS zweryfikowany (sms_verified_at).
+        // Bez tego karta bylaby oznaczona jako "podpisana" po samym wyslaniu kodu (przed wpisaniem).
+        const docStatus = cardDoc?.status ?? null;
+        if (docStatus === 'in_verification' && !cardDoc?.sms_verified_at) {
+          setLatestCardStatus(null);
+        } else {
+          setLatestCardStatus(docStatus);
+        }
         setLatestCardSignedAt(cardDoc?.signed_at ?? null);
         try {
           setQualificationCardSignedPayload(cardDoc?.payload ? JSON.parse(cardDoc.payload) : null);
         } catch {
           setQualificationCardSignedPayload(null);
         }
+        const verifiedDoc = cardDocs
+          .filter((d) => !!d.sms_verified_at && !!d.payload)
+          .sort((a, b) => (b.sms_verified_at || '').localeCompare(a.sms_verified_at || ''))[0];
+        try {
+          setVerifiedSignedPayload(verifiedDoc?.payload ? JSON.parse(verifiedDoc.payload) : null);
+        } catch {
+          setVerifiedSignedPayload(null);
+        }
       })
       .catch(() => {
         setQualificationCardSignedPayload(null);
+        setVerifiedSignedPayload(null);
         setLatestCardStatus(null);
         setLatestCardSignedAt(null);
       });
@@ -234,42 +294,72 @@ export default function QualificationCardPage() {
     ? mapReservationToQualificationForm(reservationData)
     : { reservationId: reservationId.startsWith('REZ-') ? reservationId : `REZ-2026-${reservationId}` };
 
-  const cardAlert =
-    latestCardStatus === 'requires_signature'
-      ? { type: 'red' as const, text: 'Karta wymaga podpisu' }
-      : latestCardStatus === 'in_verification'
-        ? { type: 'yellow' as const, text: 'Karta w trakcie weryfikacji' }
-        : latestCardStatus === 'accepted'
-          ? { type: 'green' as const, text: 'Karta zaakceptowana' }
-          : null;
+  // Alert karty — logika zalezy od trybu widoku
+  const getCardAlert = () => {
+    if (viewMode === 'zatwierdzona') {
+      return { color: 'bg-green-500', icon: 'check', text: 'Wersja zatwierdzona SMS-em', sub: 'Podgląd danych podpisanych przez opiekuna — tylko odczyt.' };
+    }
+    if (latestCardStatus === 'requires_signature') {
+      return { color: 'bg-orange-500', icon: 'warn', text: 'Karta wymaga podpisu', sub: 'Administrator wprowadził zmiany w karcie. Proszę zweryfikować dane i podpisać ponownie.' };
+    }
+    if (latestCardStatus === 'rejected') {
+      return { color: 'bg-red-500', icon: 'warn', text: 'Karta odrzucona', sub: 'Administrator odrzucił kartę. Proszę poprawić dane i podpisać ponownie.' };
+    }
+    if (latestCardStatus === 'accepted') {
+      return { color: 'bg-green-500', icon: 'check', text: 'Karta zaakceptowana', sub: 'Karta została zaakceptowana przez organizatora.' };
+    }
+    if (latestCardStatus === 'in_verification') {
+      return { color: 'bg-[#03adf0]', icon: 'info', text: 'Karta w trakcie weryfikacji', sub: 'Karta została podpisana i oczekuje na weryfikację przez organizatora.' };
+    }
+    return null;
+  };
+  const cardAlert = getCardAlert();
 
   return (
     <div className="min-h-screen bg-gray-50">
       {cardAlert && (
-        <div
-          className={`px-4 py-3 text-center font-medium ${
-            cardAlert.type === 'red'
-              ? 'bg-red-100 text-red-800 border-b border-red-200'
-              : cardAlert.type === 'yellow'
-                ? 'bg-amber-100 text-amber-800 border-b border-amber-200'
-                : 'bg-green-100 text-green-800 border-b border-green-200'
-          }`}
-        >
-          {cardAlert.text}
+        <div className="no-print max-w-[210mm] mx-auto px-4 pt-4">
+          <div className={`${cardAlert.color} p-3 rounded-xl`}>
+            <div className="flex items-center gap-3">
+              {cardAlert.icon === 'check' ? (
+                <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              ) : cardAlert.icon === 'info' ? (
+                <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              ) : (
+                <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">{cardAlert.text}</p>
+                <p className="text-xs text-white/80 mt-0.5">{cardAlert.sub}</p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       <QualificationForm
+        key={viewMode}
         reservationId={reservationData?.id}
         reservationData={qualificationData}
-        signedPayload={qualificationCardSignedPayload ?? undefined}
-        secondParentFromPayload={secondParentFromPayload}
-        formSnapshotFromDb={formSnapshotFromDb ?? undefined}
+        signedPayload={viewMode === 'zatwierdzona' ? verifiedSignedPayload ?? undefined : qualificationCardSignedPayload ?? undefined}
+        secondParentFromPayload={viewMode === 'zatwierdzona'
+          ? getSecondParentFromPayloadPage(verifiedSignedPayload)
+          : (getSecondParentFromPayloadPage(formSnapshotFromDb) ?? secondParentFromPayload)
+        }
+        formSnapshotFromDb={viewMode === 'zatwierdzona' ? undefined : formSnapshotFromDb ?? undefined}
+        printMode={false}
         onSaveSuccess={() => {
           refetchFormSnapshot();
           refetchSignedDocs();
+          refetchReservation();
         }}
-        latestCardStatusFromParent={latestCardStatus}
+        latestCardStatusFromParent={viewMode === 'zatwierdzona' ? 'accepted' : latestCardStatus}
         latestCardSignedAtFromParent={latestCardSignedAt}
+        viewMode={viewMode}
+        onViewModeChange={(mode) => {
+          setViewMode(mode);
+          if (typeof window !== 'undefined') window.history.replaceState(null, '', `${window.location.pathname}#wersja-${mode}`);
+        }}
+        hasVerifiedVersion={!!verifiedSignedPayload}
       />
     </div>
   );

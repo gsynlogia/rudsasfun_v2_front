@@ -8,7 +8,44 @@ import { ReservationPaymentHeaderProvider } from '@/contexts/ReservationPaymentH
 import Footer from '../Footer';
 import HeaderTop from '../HeaderTop';
 
+import { ChevronDown, ChevronUp } from 'lucide-react';
+
 import ProfileSidebar from './ProfileSidebar';
+
+function SystemAlertBanner() {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="mb-4 sm:mb-6">
+      <div className="bg-[#03adf0] p-3 sm:p-4 rounded-xl">
+        <div
+          className="flex items-center gap-3 cursor-pointer select-none"
+          onClick={() => setExpanded(e => !e)}
+        >
+          <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-white font-medium flex-1">
+            Pracujemy nad ulepszeniem systemu
+          </p>
+          {expanded
+            ? <ChevronUp className="w-4 h-4 text-white/80 flex-shrink-0" />
+            : <ChevronDown className="w-4 h-4 text-white/80 flex-shrink-0" />
+          }
+        </div>
+        {expanded && (
+          <div className="mt-3 pl-8 space-y-2">
+            <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
+              Aby był jeszcze lepszy, szybszy i wygodniejszy w obsłudze. W trakcie zmian mogą pojawić się drobne błędy — przepraszamy za ewentualne niedogodności.
+            </p>
+            <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
+              Aktualnie nie generujemy umów ani kart kwalifikacyjnych. Zgodnie z regulaminem, rezerwacja dokonana w Panelu Klienta stanowi umowę wstępną. Poinformujemy SMSem o gotowej umowie. Dziękujemy za cierpliwość.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface ProfileLayoutProps {
   children: ReactNode;
@@ -138,33 +175,8 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
 
           {/* Right Content Area - narrower to make room for wider sidebar */}
           <div className="flex-1 w-full lg:pl-6">
-            {/* System Update Alert */}
-            <div className="mb-4 sm:mb-6 relative">
-              {/* Main alert - simplified clipPath for mobile */}
-              <div
-                className="bg-red-600 p-4 sm:p-5 rounded-lg sm:rounded-none"
-                style={{ clipPath: isSmallScreen ? 'none' : 'polygon(0 0, calc(100% - 25px) 0, 100% 25px, 100% 100%, 25px 100%, 0 calc(100% - 25px))' }}
-              >
-                <div className="flex gap-3 sm:gap-4">
-                  <div className="flex-shrink-0">
-                    <svg className="w-5 h-5 sm:w-7 sm:h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm sm:text-base font-semibold text-white mb-1 sm:mb-2">
-                      Pracujemy nad ulepszeniem systemu
-                    </h4>
-                    <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
-                      Aby był jeszcze lepszy, szybszy i wygodniejszy w obsłudze. W trakcie zmian mogą pojawić się drobne błędy — przepraszamy za ewentualne niedogodności.
-                    </p>
-                    <p className="text-xs sm:text-sm text-white/90 leading-relaxed mt-2 sm:mt-3">
-                      Aktualnie nie generujemy umów ani kart kwalifikacyjnych. Zgodnie z regulaminem, rezerwacja dokonana w Panelu Klienta stanowi umowę wstępną. Poinformujemy SMSem o gotowej umowie. Dziękujemy za cierpliwość.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* System Update Alert — zwijany */}
+            <SystemAlertBanner />
             {children}
           </div>
         </div>

@@ -40,6 +40,70 @@ import type {
   SpeechRecognitionLike,
 } from './_reservation-detail/types';
 
+/** Wyciaga roznice miedzy podpisanym a draftem. Jezeli draft zaczyna sie od podpisanego — zwraca tylko nowa czesc. */
+function getDiffText(signed: string, draft: string): string {
+  if (!signed) return draft;
+  if (draft === signed) return '';
+  if (draft.startsWith(signed)) {
+    const diff = draft.slice(signed.length).replace(/^[,;\s]+/, '').trim();
+    return diff || draft;
+  }
+  return draft;
+}
+
+function UnsignedCardAlert({ sections, draftValues, signedValues }: {
+  sections: { health: boolean; info: boolean; accommodation: boolean };
+  draftValues: Record<string, string | undefined>;
+  signedValues: Record<string, string | undefined>;
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+  const changes: Array<{ label: string; value: string }> = [];
+  const cmp = (label: string, dKey: string) => {
+    const d = (draftValues[dKey] || '').trim();
+    const s = (signedValues[dKey] || '').trim();
+    if (d && d !== s) changes.push({ label, value: getDiffText(s, d) });
+  };
+  if (sections.health) {
+    cmp('Choroby przewlekłe', 'chronicDiseases');
+    cmp('Dysfunkcje', 'dysfunctions');
+    cmp('Problemy psychiatryczne', 'psychiatric');
+    cmp('Uwagi dodatkowe (zdrowie)', 'additionalNotes');
+  }
+  if (sections.info) cmp('Informacje dodatkowe uczestnika', 'additionalInfo');
+  if (sections.accommodation) cmp('Wniosek o zakwaterowanie', 'accommodation');
+  if (sections.guardians) {
+    cmp('Dane opiekunów (imiona)', 'parentNames');
+    cmp('Adresy opiekunów', 'parentAddress');
+    cmp('Telefony opiekunów', 'parentPhone');
+  }
+  if (changes.length === 0) return null;
+  return (
+    <div className="mx-3 mt-3 mb-1 bg-orange-50 border border-orange-300 rounded-lg p-3">
+      <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => setExpanded(e => !e)}>
+        <svg className="w-5 h-5 text-orange-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <p className="text-sm font-medium text-orange-800 flex-1">
+          Klient wprowadził niezatwierdzone zmiany w karcie kwalifikacyjnej ({changes.length})
+        </p>
+        <svg className={`w-4 h-4 text-orange-500 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+      {expanded && (
+        <div className="mt-2 pl-8 space-y-1">
+          {changes.map((c, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs text-orange-800">
+              <span className="text-orange-400 mt-0.5">&#8226;</span>
+              <span><span className="font-medium">{c.label}:</span> {c.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ReservationDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -137,6 +201,21 @@ export default function ReservationDetailPage() {
   const [latestSignedCard, setLatestSignedCard] = useState<{ id: number; status: string; client_message: string | null; reverted_after_approval?: number } | null>(null);
   const [qualificationCardSignedPayload, setQualificationCardSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [contractSignedPayload, setContractSignedPayload] = useState<Record<string, unknown> | null>(null);
+  // Niezatwierdzone zmiany w karcie kwalifikacyjnej (klient wypelnil ale nie podpisal SMS-em)
+  const [hasUnsignedCardChanges, setHasUnsignedCardChanges] = useState(false);
+  const [unsignedCardSections, setUnsignedCardSections] = useState<{ health: boolean; info: boolean; accommodation: boolean; guardians: boolean }>({ health: false, info: false, accommodation: false, guardians: false });
+  // Dane z niezatwierdzonego draftu karty — do wyswietlenia w nawiasie obok zatwierdzonych
+  // Wartosci z niezatwierdzonego draftu (do wyswietlenia na pomaranczowo)
+  const [unsignedDraftValues, setUnsignedDraftValues] = useState<{
+    chronicDiseases?: string; dysfunctions?: string; psychiatric?: string;
+    additionalNotes?: string; additionalInfo?: string; accommodation?: string;
+    parentNames?: string; parentAddress?: string; parentPhone?: string;
+  }>({});
+  // Wartosci zatwierdzone SMS-em (do porownania — co sie zmienilo)
+  const [signedValues, setSignedValues] = useState<{
+    chronicDiseases?: string; dysfunctions?: string; psychiatric?: string;
+    additionalNotes?: string; additionalInfo?: string; accommodation?: string;
+  }>({});
   const [contractArchiveVersions, setContractArchiveVersions] = useState<ContractArchiveVersionItem[]>([]);
   const [signedDocumentsList, setSignedDocumentsList] = useState<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; sms_verified_at?: string | null }>>([]);
   const [uploadingCard, setUploadingCard] = useState(false);
@@ -183,6 +262,9 @@ export default function ReservationDetailPage() {
   const [editingNoteContent, setEditingNoteContent] = useState('');
   const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
 
+  /** Modal potwierdzenia zmiany opiekunow — wymusza nowy snapshot + SMS */
+  const [guardianChangeConfirmOpen, setGuardianChangeConfirmOpen] = useState(false);
+  const [pendingGuardianSave, setPendingGuardianSave] = useState<(() => Promise<void>) | null>(null);
   /** Sekcja Opiekunowie (#dane): draft 1–2 opiekunów, edycja, zapis przez PATCH by-number/partial */
   interface GuardianEntry {
     firstName?: string;
@@ -224,6 +306,11 @@ export default function ReservationDetailPage() {
   const [savingHealth, setSavingHealth] = useState(false);
 
   const [activePanel, setActivePanel] = useState<PanelId>('platnosci');
+  // ID snapshotu do podgladu (z hash #dane#SNAP-{id})
+  const [previewSnapId, setPreviewSnapId] = useState<number | 'draft' | null>(null);
+  // Najnowszy form_snapshot z qualification_card_data (draft po "Zapisz zmiany")
+  const [latestFormSnapshot, setLatestFormSnapshot] = useState<Record<string, unknown> | null>(null);
+  const [latestFormSnapshotUpdatedAt, setLatestFormSnapshotUpdatedAt] = useState<string | null>(null);
   /** Przypomnij o podpisaniu (SMS / E-mail) – sekcja Dokumenty */
   const [remindSignSms, setRemindSignSms] = useState(false);
   const [remindSignEmail, setRemindSignEmail] = useState(true);
@@ -267,7 +354,11 @@ export default function ReservationDetailPage() {
   const setPanelFromHash = useCallback(() => {
     if (typeof window === 'undefined') return;
     const hash = window.location.hash.slice(1);
-    const parts = hash.split('/');
+    // Parsuj SNAP-{id} lub SNAP-draft z hasha
+    const snapDraftMatch = hash.match(/SNAP-draft/i);
+    const snapIdMatch = hash.match(/SNAP-(\d+)/i);
+    setPreviewSnapId(snapDraftMatch ? 'draft' : snapIdMatch ? parseInt(snapIdMatch[1], 10) : null);
+    const parts = hash.replace(/#?SNAP-\d+/i, '').split('/');
     const panelId = (parts[0] || '') as PanelId;
     const isPanelValid = RESERVATION_PANELS.some((p) => p.id === panelId);
     if (isPanelValid) {
@@ -996,6 +1087,171 @@ export default function ReservationDetailPage() {
         cardDocs[0];
       setLatestSignedContract(contractDoc ? { id: contractDoc.id, status: contractDoc.status, client_message: contractDoc.client_message } : null);
       setLatestSignedCard(cardDoc ? { id: cardDoc.id, status: cardDoc.status, client_message: cardDoc.client_message, reverted_after_approval: cardDoc.reverted_after_approval } : null);
+      // Otwórz podgląd snapshotu z hash (po odświeżeniu strony z #dane/SNAP-{id} lub SNAP-draft)
+      if (previewSnapId === 'draft' && latestFormSnapshot && reservation) {
+        openDocument(
+          <QualificationTemplateNew
+            reservationId={reservation.id}
+            reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
+            signedPayload={latestFormSnapshot as SignedQualificationPayload}
+            previewOnly={true}
+          />,
+          'Podgląd karty — Wersja robocza (najnowszy draft)',
+          () => { setPreviewSnapId(null); window.history.replaceState(null, '', `${window.location.pathname}#dane`); },
+        );
+      }
+      if (previewSnapId && previewSnapId !== 'draft') {
+        const snapDoc = signedDocs.find((d: { id: number }) => d.id === previewSnapId);
+        if (snapDoc?.payload && reservation) {
+          try {
+            const payload = JSON.parse(snapDoc.payload);
+            const isSmsVerified = !!snapDoc.sms_verified_at;
+            const badgeLabel = isSmsVerified ? 'Podpisana SMS' : (snapDoc.status === 'requires_signature' || snapDoc.status === 'in_verification') ? 'Wersja robocza' : 'Nieaktualna';
+            openDocument(
+              <QualificationTemplateNew
+                reservationId={reservation.id}
+                reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
+                signedPayload={payload}
+                previewOnly={true}
+              />,
+              `Podgląd karty — ${badgeLabel} (${new Date(snapDoc.created_at).toLocaleString('pl-PL')})`,
+              () => { setPreviewSnapId(null); window.history.replaceState(null, '', `${window.location.pathname}#dane`); },
+            );
+          } catch { /* */ }
+        }
+      }
+
+      // Sprawdz niezatwierdzone zmiany w karcie — porownanie pole po polu
+      // Niezatwierdzony: in_verification bez sms_verified_at LUB requires_signature
+      const unverifiedCard = cardDocs.find(d =>
+        ((d.status === 'in_verification' && !d.sms_verified_at) || d.status === 'requires_signature') && d.payload
+      );
+      const verifiedCard = cardDocs
+        .filter(d => !!d.sms_verified_at && !!d.payload)
+        .sort((a, b) => (b.sms_verified_at || '').localeCompare(a.sms_verified_at || ''))[0];
+      let qcdData: { form_snapshot?: string | null; updated_at?: string } | null = null;
+      try {
+        qcdData = await authenticatedApiCall<{ form_snapshot?: string | null; updated_at?: string }>(`/api/qualification-cards/${reservation.id}/data`);
+        // Zapisz form_snapshot do stanu — potrzebny do kafelka "Wersja robocza (draft)"
+        if (qcdData?.form_snapshot) {
+          try {
+            setLatestFormSnapshot(typeof qcdData.form_snapshot === 'string' ? JSON.parse(qcdData.form_snapshot) : qcdData.form_snapshot as Record<string, unknown>);
+            setLatestFormSnapshotUpdatedAt(qcdData.updated_at ?? null);
+          } catch { setLatestFormSnapshot(null); }
+        }
+      } catch { /* */ }
+
+      // Wybierz draft: niezweryfikowany doc > form_snapshot
+      let draftSnap: Record<string, unknown> | null = null;
+      if (unverifiedCard?.payload) {
+        try { draftSnap = JSON.parse(unverifiedCard.payload); } catch { /* */ }
+      } else if (qcdData?.form_snapshot) {
+        try { draftSnap = typeof qcdData.form_snapshot === 'string' ? JSON.parse(qcdData.form_snapshot) : qcdData.form_snapshot as Record<string, unknown>; } catch { /* */ }
+      }
+
+      if (draftSnap) {
+        // Dane bazowe: zweryfikowany snapshot lub rezerwacja
+        let baseHealthStr = '', baseInfoStr = '', baseAccStr = '';
+        if (verifiedCard?.payload) {
+          try {
+            const bp = JSON.parse(verifiedCard.payload);
+            const bs2 = (bp.sekcjaII_stanZdrowia || {});
+            baseHealthStr = [...(bs2.chorobyPrzewlekle || []), ...(bs2.dysfunkcje || []), ...(bs2.problemyPsychiatryczne || []), (bs2.dodatkoweInformacje || '').trim()].filter(Boolean).join(', ');
+            baseInfoStr = ((bp.sekcjaIII || {}).informacjeDodatkowe || '').trim();
+            baseAccStr = ((bp.sekcjaIV || {}).wniosekOZakwaterowanie || '').trim();
+          } catch { /* */ }
+        } else {
+          const hd = reservation.health_details as Record<string, string> | null;
+          const parts: string[] = [];
+          if (hd) { if (hd.chronicDiseases) parts.push(hd.chronicDiseases); if (hd.dysfunctions) parts.push(hd.dysfunctions); if (hd.psychiatric) parts.push(hd.psychiatric); }
+          if (reservation.additional_notes) parts.push(reservation.additional_notes);
+          baseHealthStr = parts.filter(Boolean).join(', ');
+          baseInfoStr = (reservation.participant_additional_info || '').trim();
+          baseAccStr = (reservation.accommodation_request || '').trim();
+        }
+        // Dane draftu
+        const ds2 = (draftSnap.sekcjaII_stanZdrowia || {}) as Record<string, unknown>;
+        const draftHealthStr = [...(Array.isArray(ds2.chorobyPrzewlekle) ? ds2.chorobyPrzewlekle : []), ...(Array.isArray(ds2.dysfunkcje) ? ds2.dysfunkcje : []), ...(Array.isArray(ds2.problemyPsychiatryczne) ? ds2.problemyPsychiatryczne : []), ((ds2.dodatkoweInformacje as string) || '').trim()].filter(Boolean).join(', ');
+        const draftInfoStr = (((draftSnap.sekcjaIII || {}) as Record<string, unknown>).informacjeDodatkowe as string || '').trim();
+        const draftAccStr = (((draftSnap.sekcjaIV || {}) as Record<string, unknown>).wniosekOZakwaterowanie as string || '').trim();
+
+        const healthDiff = draftHealthStr !== baseHealthStr;
+        const infoDiff = draftInfoStr !== baseInfoStr;
+        const accDiff = draftAccStr !== baseAccStr;
+
+        // Porownanie opiekunow: aktualne parents_data vs podpisany snapshot opiekunowie/drugiOpiekun
+        let guardiansDiff = false;
+        let draftParentNames = '', draftParentAddress = '', draftParentPhone = '';
+        if (reservation?.parents_data && Array.isArray(reservation.parents_data)) {
+          const rParents = reservation.parents_data as Array<Record<string, string>>;
+          draftParentNames = rParents.map(p => `${(p.firstName || '')} ${(p.lastName || '')}`.trim()).filter(Boolean).join(', ');
+          draftParentAddress = rParents.map(p => {
+            const street = (p.street || '').trim();
+            const postal = (p.postalCode || '').trim();
+            const city = (p.city || '').trim();
+            const postalCity = [postal, city].filter(Boolean).join(' ');
+            // Nie dołączaj kod+miasto jeśli ulica już je zawiera (unikaj duplikacji)
+            if (street && postalCity && street.includes(postalCity)) return street;
+            return [street, postalCity].filter(Boolean).join(', ');
+          }).filter(Boolean).join('; ');
+          draftParentPhone = rParents.map(p => (p.phoneNumber || p.phone || '').trim()).filter(Boolean).join(', ');
+        }
+        if (verifiedCard?.payload) {
+          try {
+            const vp = JSON.parse(verifiedCard.payload);
+            const vs1 = vp.sekcjaI || {};
+            const signedNames = vs1.opiekunowie?.imionaNazwiska || '';
+            const signedAddr = vs1.opiekunowie?.adres || '';
+            const signedPhone = vs1.opiekunowie?.telefon || '';
+            const sd = vs1.drugiOpiekun;
+            const signedFullNames = sd?.imieNazwisko && !signedNames.includes(sd.imieNazwisko) ? `${signedNames}, ${sd.imieNazwisko}` : signedNames;
+            const signedFullAddr = sd?.adres && !signedAddr.includes(sd.adres) ? `${signedAddr}; ${sd.adres}` : signedAddr;
+            const signedFullPhone = sd?.telefon && !signedPhone.includes(sd.telefon) ? `${signedPhone}, ${sd.telefon}` : signedPhone;
+            guardiansDiff = draftParentNames !== signedFullNames || draftParentAddress !== signedFullAddr || draftParentPhone !== signedFullPhone;
+          } catch { /* */ }
+        } else if (draftParentNames) {
+          guardiansDiff = true; // brak podpisu — wszystko niezatwierdzone
+        }
+
+        setHasUnsignedCardChanges(healthDiff || infoDiff || accDiff || guardiansDiff);
+        setUnsignedCardSections({ health: healthDiff, info: infoDiff, accommodation: accDiff, guardians: guardiansDiff });
+        // Zapamietaj szczegolowe wartosci draftu do wyswietlenia w nawiasach
+        const draftChronic = (Array.isArray(ds2.chorobyPrzewlekle) ? ds2.chorobyPrzewlekle : []).filter(Boolean).join(', ');
+        const draftDysf = (Array.isArray(ds2.dysfunkcje) ? ds2.dysfunkcje : []).filter(Boolean).join(', ');
+        const draftPsych = (Array.isArray(ds2.problemyPsychiatryczne) ? ds2.problemyPsychiatryczne : []).filter(Boolean).join(', ');
+        const draftNotes = ((ds2.dodatkoweInformacje as string) || '').trim();
+        setUnsignedDraftValues({
+          chronicDiseases: draftChronic || undefined,
+          dysfunctions: draftDysf || undefined,
+          psychiatric: draftPsych || undefined,
+          additionalNotes: draftNotes || undefined,
+          additionalInfo: draftInfoStr || undefined,
+          accommodation: draftAccStr || undefined,
+          parentNames: guardiansDiff ? draftParentNames : undefined,
+          parentAddress: guardiansDiff ? draftParentAddress : undefined,
+          parentPhone: guardiansDiff ? draftParentPhone : undefined,
+        });
+        // Zapamietaj wartosci zatwierdzone SMS-em (do porownania w polach)
+        if (verifiedCard?.payload) {
+          try {
+            const vp = JSON.parse(verifiedCard.payload);
+            const vs2 = vp.sekcjaII_stanZdrowia || {};
+            setSignedValues({
+              chronicDiseases: (Array.isArray(vs2.chorobyPrzewlekle) ? vs2.chorobyPrzewlekle : []).filter(Boolean).join(', ') || undefined,
+              dysfunctions: (Array.isArray(vs2.dysfunkcje) ? vs2.dysfunkcje : []).filter(Boolean).join(', ') || undefined,
+              psychiatric: (Array.isArray(vs2.problemyPsychiatryczne) ? vs2.problemyPsychiatryczne : []).filter(Boolean).join(', ') || undefined,
+              additionalNotes: ((vs2.dodatkoweInformacje as string) || '').trim() || undefined,
+              additionalInfo: (((vp.sekcjaIII || {}).informacjeDodatkowe as string) || '').trim() || undefined,
+              accommodation: (((vp.sekcjaIV || {}).wniosekOZakwaterowanie as string) || '').trim() || undefined,
+            });
+          } catch { setSignedValues({}); }
+        } else {
+          setSignedValues({}); // brak podpisu SMS — wszystko jest niezatwierdzone
+        }
+      } else {
+        setHasUnsignedCardChanges(false);
+        setUnsignedCardSections({ health: false, info: false, accommodation: false, guardians: false });
+      }
       try {
         setContractSignedPayload(contractDoc?.payload ? JSON.parse(contractDoc.payload) : null);
       } catch {
@@ -1796,12 +2052,82 @@ export default function ReservationDetailPage() {
         </div>
         <div className="space-y-2 min-w-0">
           <h4 className="text-xs font-semibold text-gray-600 uppercase">Karty kwalifikacyjne</h4>
-          {cardDocs.length === 0 ? (
-            <p className="text-sm text-gray-500 italic">Brak kart.</p>
-          ) : (() => {
-            // Aktualna karta = najnowsza podpisana SMS-em (sms_verified_at)
-            const currentCardId = cardDocs.find((d) => d.sms_verified_at && d.payload)?.id ?? null;
-            return cardDocs.map((doc, index) => renderDocTile(doc, index, doc.id === currentCardId));
+          {(() => {
+            // Dwa glowne kafelki: Wersja robocza (form_snapshot) i Podpisana SMS (najnowszy verified)
+            const verifiedDoc = cardDocs.find((d) => !!d.sms_verified_at && !!d.payload);
+            const tiles: React.ReactNode[] = [];
+
+            // 1. Wersja robocza (najnowszy draft z form_snapshot)
+            if (latestFormSnapshot) {
+              tiles.push(
+                <button
+                  key="draft"
+                  type="button"
+                  onClick={() => {
+                    if (!reservation) return;
+                    window.history.replaceState(null, '', `${window.location.pathname}#dane/SNAP-draft#ROBOCZA`);
+                    openDocument(
+                      <QualificationTemplateNew
+                        reservationId={reservation.id}
+                        reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
+                        signedPayload={latestFormSnapshot as SignedQualificationPayload}
+                        previewOnly={true}
+                      />,
+                      'Podgląd karty — Wersja robocza',
+                      () => { setPreviewSnapId(null); window.history.replaceState(null, '', `${window.location.pathname}#dane`); },
+                    );
+                  }}
+                  className="w-full text-left rounded border p-2 text-sm transition-colors cursor-pointer bg-orange-50 border-orange-200 text-orange-900 hover:bg-orange-100"
+                >
+                  <div className="font-medium">Karta kwalifikacyjna</div>
+                  <div className="flex justify-between gap-1 mt-1 text-xs opacity-90">
+                    <span>{latestFormSnapshotUpdatedAt ? new Date(latestFormSnapshotUpdatedAt).toLocaleString('pl-PL') : ''}</span>
+                    <span className="bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded text-xs font-medium">Wersja robocza</span>
+                  </div>
+                  <p className="text-xs mt-1 opacity-80">Najnowsze dane klienta (bez podpisu SMS)</p>
+                </button>
+              );
+            }
+
+            // 2. Podpisana SMS (najnowsza z sms_verified_at)
+            if (verifiedDoc) {
+              tiles.push(
+                <button
+                  key={`verified-${verifiedDoc.id}`}
+                  type="button"
+                  onClick={() => {
+                    if (!reservation) return;
+                    window.history.replaceState(null, '', `${window.location.pathname}#dane/SNAP-${verifiedDoc.id}#PODPISANA-SMS`);
+                    setPreviewSnapId(verifiedDoc.id);
+                    try {
+                      const payload = JSON.parse(verifiedDoc.payload!);
+                      openDocument(
+                        <QualificationTemplateNew
+                          reservationId={reservation.id}
+                          reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
+                          signedPayload={payload}
+                          previewOnly={true}
+                        />,
+                        `Podgląd karty — Podpisana SMS (${formatDateTime(verifiedDoc.created_at)})`,
+                        () => { setPreviewSnapId(null); window.history.replaceState(null, '', `${window.location.pathname}#dane`); },
+                      );
+                    } catch {
+                      showError?.('Nie udało się otworzyć podglądu.');
+                    }
+                  }}
+                  className="w-full text-left rounded border p-2 text-sm transition-colors cursor-pointer bg-green-100 border-green-300 text-green-900 hover:bg-green-200"
+                >
+                  <div className="font-medium">Karta kwalifikacyjna</div>
+                  <div className="flex justify-between gap-1 mt-1 text-xs opacity-90">
+                    <span>{formatDateTime(verifiedDoc.created_at)}</span>
+                    <span className="bg-green-200 text-green-800 px-1.5 py-0.5 rounded text-xs font-medium">Podpisana SMS</span>
+                  </div>
+                  <p className="text-xs mt-1 opacity-80">Dane potwierdzone podpisem SMS przez opiekuna</p>
+                </button>
+              );
+            }
+
+            return tiles.length > 0 ? tiles : <p className="text-sm text-gray-500 italic">Brak kart.</p>;
           })()}
         </div>
       </div>
@@ -2022,6 +2348,14 @@ export default function ReservationDetailPage() {
           <div className="p-4 flex-1 min-h-0 overflow-hidden lg:h-[calc(100vh-11rem)]">
             <div className="relative h-full min-h-0">
             <div className="flex flex-col h-full min-h-0 min-w-0 overflow-hidden rounded-none border border-gray-200 bg-white shadow-sm">
+              {/* Alert niezatwierdzonych zmian w karcie — widoczny nad zakladkami, rozwijany */}
+              {hasUnsignedCardChanges && (
+                <UnsignedCardAlert
+                  sections={unsignedCardSections}
+                  draftValues={unsignedDraftValues}
+                  signedValues={signedValues}
+                />
+              )}
               <nav
                 className="flex-shrink-0 flex flex-nowrap rounded-none border-b border-gray-200 bg-gray-50/80 overflow-x-auto"
                 role="tablist"
@@ -2802,7 +3136,15 @@ export default function ReservationDetailPage() {
             {activePanel === 'dane' && (
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-                <h2 className="text-sm font-semibold text-slate-700">Opiekunowie</h2>
+                <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                  Opiekunowie
+                  {unsignedCardSections.guardians && (
+                    <span className="relative group cursor-help">
+                      <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-orange-50 border border-orange-300 text-orange-800 text-xs rounded px-2 py-1 whitespace-nowrap z-50 shadow-md">Dane opiekunów różnią się od podpisanej wersji karty</span>
+                    </span>
+                  )}
+                </h2>
                 {guardiansDraft.length < 2 && (
                   <button
                     type="button"
@@ -2916,31 +3258,65 @@ export default function ReservationDetailPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={async () => {
+                              onClick={() => {
                                 if (!reservationNumber || savingGuardians) return;
-                                setSavingGuardians(true);
-                                try {
-                                  const payload = guardiansDraft.map((p) => ({
-                                    firstName: p.firstName ?? '',
-                                    lastName: p.lastName ?? '',
-                                    email: p.email ?? '',
-                                    phoneNumber: p.phoneNumber ?? '',
-                                    street: p.street ?? '',
-                                    city: p.city ?? '',
-                                    postalCode: p.postalCode ?? '',
-                                  }));
-                                  const updated = await authenticatedApiCall<ReservationDetails>(
-                                    `/api/reservations/by-number/${reservationNumber}/partial`,
-                                    { method: 'PATCH', body: JSON.stringify({ parents_data: payload }) },
-                                  );
-                                  setReservation((prev) => prev ? { ...prev, parents_data: updated.parents_data ?? [] } : null);
-                                  setEditingGuardianIndex(null);
-                                  showSuccess('Dane opiekunów zostały zapisane.');
-                                } catch {
-                                  showError('Nie udało się zapisać danych opiekunów.');
-                                } finally {
-                                  setSavingGuardians(false);
-                                }
+                                // Otworz modal potwierdzenia — zapis opiekunow wymusza nowy snapshot + SMS
+                                const doSave = async () => {
+                                  setSavingGuardians(true);
+                                  try {
+                                    const payload = guardiansDraft.map((p) => ({
+                                      firstName: p.firstName ?? '',
+                                      lastName: p.lastName ?? '',
+                                      email: p.email ?? '',
+                                      phoneNumber: p.phoneNumber ?? '',
+                                      street: p.street ?? '',
+                                      city: p.city ?? '',
+                                      postalCode: p.postalCode ?? '',
+                                    }));
+                                    // Zapis danych opiekunow
+                                    const updated = await authenticatedApiCall<ReservationDetails>(
+                                      `/api/reservations/by-number/${reservationNumber}/partial`,
+                                      { method: 'PATCH', body: JSON.stringify({ parents_data: payload }) },
+                                    );
+                                    setReservation((prev) => prev ? { ...prev, parents_data: updated.parents_data ?? [] } : null);
+                                    // Wymuszenie nowego snapshotu requires_signature + SMS przez admin-full
+                                    // Wstaw aktualne dane opiekunow do form_snapshot aby snapshot mial prawidlowe adresy
+                                    const parentNames = payload.map((p: Record<string, string>) => `${p.firstName} ${p.lastName}`.trim()).filter(Boolean).join(', ');
+                                    const parentAddresses = payload.map((p: Record<string, string>) => [(p.street || '').trim(), [(p.postalCode || '').trim(), (p.city || '').trim()].filter(Boolean).join(' ')].filter(Boolean).join(', ')).filter(Boolean).join('; ');
+                                    const parentPhones = payload.map((p: Record<string, string>) => (p.phoneNumber || '').trim()).filter(Boolean).join(', ');
+                                    try {
+                                      await authenticatedApiCall(
+                                        `/api/qualification-cards/by-number/${reservationNumber}/data/admin-full`,
+                                        { method: 'PATCH', body: JSON.stringify({
+                                          reservation_partial: {},
+                                          card_data: {
+                                            form_snapshot: {
+                                              sekcjaI: {
+                                                opiekunowie: {
+                                                  imionaNazwiska: parentNames,
+                                                  adres: parentAddresses,
+                                                  telefon: parentPhones,
+                                                },
+                                              },
+                                            },
+                                          },
+                                          sections_edited: ['Dane opiekunów'],
+                                        })},
+                                      );
+                                    } catch { /* brak karty — ok, nie wymuszamy snapshotu */ }
+                                    setEditingGuardianIndex(null);
+                                    showSuccess('Dane opiekunów zapisane. Klient został poinformowany SMS-em o konieczności ponownego podpisania karty.');
+                                    await refetchReservation();
+                                  } catch {
+                                    showError('Nie udało się zapisać danych opiekunów.');
+                                  } finally {
+                                    setSavingGuardians(false);
+                                    setGuardianChangeConfirmOpen(false);
+                                    setPendingGuardianSave(null);
+                                  }
+                                };
+                                setPendingGuardianSave(() => doSave);
+                                setGuardianChangeConfirmOpen(true);
                               }}
                               disabled={savingGuardians}
                               className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
@@ -4042,7 +4418,15 @@ export default function ReservationDetailPage() {
             {activePanel === 'zdrowie' && (
               <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-                  <h2 className="text-sm font-semibold text-slate-700">Zdrowie</h2>
+                  <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                    Zdrowie
+                    {unsignedCardSections.health && (
+                      <span className="relative group cursor-help">
+                        <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-orange-50 border border-orange-300 text-orange-800 text-xs rounded px-2 py-1 whitespace-nowrap z-50 shadow-md">Niezatwierdzona zmiana w karcie kwalifikacyjnej (brak podpisu SMS)</span>
+                      </span>
+                    )}
+                  </h2>
                   {!editingHealth && (
                     <button
                       type="button"
@@ -4148,7 +4532,12 @@ export default function ReservationDetailPage() {
                         </div>
                         {(reservation.health_questions.chronicDiseases === 'Tak' || reservation.health_questions.chronicDiseases === 'tak' || reservation.health_questions.chronicDiseases === true) &&
                           reservation.health_details?.chronicDiseases && (
-                          <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">{reservation.health_details.chronicDiseases}</p>
+                          <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                            {signedValues.chronicDiseases || reservation.health_details.chronicDiseases}
+                            {unsignedCardSections.health && unsignedDraftValues.chronicDiseases && unsignedDraftValues.chronicDiseases !== (signedValues.chronicDiseases || reservation.health_details.chronicDiseases) && (
+                              <span className="ml-1 text-orange-600 bg-orange-50 px-1 rounded">(niezatwierdzone: {getDiffText(signedValues.chronicDiseases || '', unsignedDraftValues.chronicDiseases || '')})</span>
+                            )}
+                          </p>
                         )}
                         <div className="flex justify-between">
                           <span className="text-xs text-gray-500">Dysfunkcje</span>
@@ -4158,7 +4547,12 @@ export default function ReservationDetailPage() {
                         </div>
                         {(reservation.health_questions.dysfunctions === 'Tak' || reservation.health_questions.dysfunctions === 'tak' || reservation.health_questions.dysfunctions === true) &&
                           reservation.health_details?.dysfunctions && (
-                          <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">{reservation.health_details.dysfunctions}</p>
+                          <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                            {signedValues.dysfunctions || reservation.health_details.dysfunctions}
+                            {unsignedCardSections.health && unsignedDraftValues.dysfunctions && unsignedDraftValues.dysfunctions !== (signedValues.dysfunctions || reservation.health_details.dysfunctions) && (
+                              <span className="ml-1 text-orange-600 bg-orange-50 px-1 rounded">(niezatwierdzone: {getDiffText(signedValues.dysfunctions || '', unsignedDraftValues.dysfunctions || '')})</span>
+                            )}
+                          </p>
                         )}
                         <div className="flex justify-between">
                           <span className="text-xs text-gray-500">Psychiatryczne</span>
@@ -4168,14 +4562,24 @@ export default function ReservationDetailPage() {
                         </div>
                         {(reservation.health_questions.psychiatric === 'Tak' || reservation.health_questions.psychiatric === 'tak' || reservation.health_questions.psychiatric === true) &&
                           reservation.health_details?.psychiatric && (
-                          <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">{reservation.health_details.psychiatric}</p>
+                          <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                            {signedValues.psychiatric || reservation.health_details.psychiatric}
+                            {unsignedCardSections.health && unsignedDraftValues.psychiatric && unsignedDraftValues.psychiatric !== (signedValues.psychiatric || reservation.health_details.psychiatric) && (
+                              <span className="ml-1 text-orange-600 bg-orange-50 px-1 rounded">(niezatwierdzone: {getDiffText(signedValues.psychiatric || '', unsignedDraftValues.psychiatric || '')})</span>
+                            )}
+                          </p>
                         )}
                       </>
                     )}
-                    {reservation.additional_notes && (
+                    {(reservation.additional_notes || unsignedDraftValues.additionalNotes) && (
                       <>
                         <div className="text-xs text-gray-500 mt-2">Uwagi dodatkowe</div>
-                        <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded whitespace-pre-wrap">{reservation.additional_notes}</p>
+                        <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded whitespace-pre-wrap">
+                          {signedValues.additionalNotes || reservation.additional_notes || ''}
+                          {unsignedCardSections.health && unsignedDraftValues.additionalNotes && unsignedDraftValues.additionalNotes !== (signedValues.additionalNotes || reservation.additional_notes || '') && (
+                            <span className="ml-1 text-orange-600 bg-orange-50 px-1 rounded">(niezatwierdzone: {getDiffText(signedValues.additionalNotes || '', unsignedDraftValues.additionalNotes || '')})</span>
+                          )}
+                        </p>
                       </>
                     )}
                   </div>
@@ -4188,7 +4592,15 @@ export default function ReservationDetailPage() {
             {activePanel === 'informacje' && (
             <React.Fragment>
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
-              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Informacje dodatkowe dotyczące uczestnika</h2>
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100 flex items-center gap-1.5">
+                Informacje dodatkowe dotyczące uczestnika
+                {unsignedCardSections.info && (
+                  <span className="relative group cursor-help">
+                    <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-orange-50 border border-orange-300 text-orange-800 text-xs rounded px-2 py-1 whitespace-nowrap z-50 shadow-md">Niezatwierdzona zmiana w karcie kwalifikacyjnej (brak podpisu SMS)</span>
+                  </span>
+                )}
+              </h2>
               <textarea
                 value={participantAdditionalInfo}
                 onChange={(e) => setParticipantAdditionalInfo(e.target.value)}
@@ -4196,6 +4608,9 @@ export default function ReservationDetailPage() {
                 className="w-full text-sm text-gray-900 border border-gray-300 rounded p-2 min-h-[80px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 rows={3}
               />
+              {unsignedDraftValues.additionalInfo && unsignedDraftValues.additionalInfo !== (reservation.participant_additional_info || '').trim() && (
+                <p className="text-xs text-orange-600 bg-orange-50 p-2 rounded mt-1">(niezatwierdzone: {getDiffText(signedValues.additionalInfo || '', unsignedDraftValues.additionalInfo || '')})</p>
+              )}
               <div className="mt-2">
                 <button
                   type="button"
@@ -4999,6 +5414,44 @@ export default function ReservationDetailPage() {
                 </div>
               </div>
             )}
+      {/* Modal potwierdzenia zmiany danych opiekunow */}
+      {guardianChangeConfirmOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <svg className="w-6 h-6 text-orange-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Potwierdzenie zmiany danych opiekuna</h3>
+                <p className="text-sm text-gray-600 mt-2">
+                  Zmiana danych opiekuna wymaga ponownego podpisania karty kwalifikacyjnej przez klienta.
+                </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Klient zostanie poinformowany SMS-em o konieczności ponownego podpisania karty.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => { setGuardianChangeConfirmOpen(false); setPendingGuardianSave(null); }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Anuluj
+              </button>
+              <button
+                type="button"
+                onClick={() => { if (pendingGuardianSave) pendingGuardianSave(); }}
+                disabled={savingGuardians}
+                className="px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded-lg hover:bg-orange-600 disabled:opacity-50"
+              >
+                {savingGuardians ? 'Zapisywanie...' : 'Zatwierdź i powiadom klienta'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </AdminLayout>
     </SectionGuard>
   );

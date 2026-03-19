@@ -8,6 +8,7 @@ import type { SignedQualificationPayload } from '@/lib/qualificationReservationM
 import { signedPayloadOverlayOnly, signedPayloadToFormState, getSecondParentFromPayload } from '@/lib/qualificationReservationMapping';
 import { authService } from '@/lib/services/AuthService';
 import { isValidPesel } from '@/lib/utils/pesel';
+import { useToast } from '@/components/ToastContainer';
 
 function HealthTagInput({
   tags,
@@ -49,6 +50,7 @@ function HealthTagInput({
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+        onBlur={addTag}
         placeholder={placeholder}
         className="input-line w-full border-0 p-0 focus:ring-0"
       />
@@ -101,9 +103,15 @@ interface QualificationFormProps {
   latestCardStatusFromParent?: string | null;
   /** Data podpisania dokumentu (signed_at z signed_documents). */
   latestCardSignedAtFromParent?: string | null;
+  /** Tryb widoku karty: robocza (draft) / zatwierdzona (podpisana SMS-em) */
+  viewMode?: 'robocza' | 'zatwierdzona';
+  /** Callback do przelaczenia trybu widoku */
+  onViewModeChange?: (mode: 'robocza' | 'zatwierdzona') => void;
+  /** Czy istnieje podpisana wersja (do disabled na przycisku) */
+  hasVerifiedVersion?: boolean;
 }
 
-export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, secondParentFromPayload, formSnapshotFromDb, printMode = false, onSaveSuccess, latestCardStatusFromParent, latestCardSignedAtFromParent }: QualificationFormProps) {
+export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, secondParentFromPayload, formSnapshotFromDb, printMode = false, onSaveSuccess, latestCardStatusFromParent, latestCardSignedAtFromParent, viewMode, onViewModeChange, hasVerifiedVersion }: QualificationFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
@@ -168,15 +176,16 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       ...prev,
       childPesel: reservationData.childPesel ?? prev.childPesel,
     }));
-    if (signedPayload) return;
+    if (signedPayload && !formSnapshotFromDb) return; // signedPayload bez draftu — nie nadpisuj opiekuna 2
     if (reservationData.secondParentName !== null && reservationData.secondParentName !== undefined) setSecondParentName(reservationData.secondParentName);
     if (reservationData.secondParentAddress !== null && reservationData.secondParentAddress !== undefined) setSecondParentAddress(reservationData.secondParentAddress);
     if (reservationData.secondParentPhone !== null && reservationData.secondParentPhone !== undefined) setSecondParentPhone(reservationData.secondParentPhone);
-  }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone, signedPayload]);
+  }, [reservationData?.childPesel, reservationData?.secondParentName, reservationData?.secondParentAddress, reservationData?.secondParentPhone, signedPayload, formSnapshotFromDb]);
 
-  /** Overlay z qualification_card_data.form_snapshot (draft) – przywraca zapisane zaznaczenia po F5. Pomijany, gdy jest signedPayload. */
+  // Kontrakt overlay klient: formSnapshotFromDb (draft po "Zapisz zmiany") > signedPayload > reservationData.
+  // formSnapshot jest NOWSZY niż signedPayload (aktualizowany przy każdym "Zapisz"), dlatego ma priorytet.
   useEffect(() => {
-    if (signedPayload) return;
+    if (!formSnapshotFromDb && signedPayload) return; // brak draftu — overlay z signedPayload (useEffect nizej)
     const snapshot = formSnapshotFromDb as SignedQualificationPayload | undefined;
     const overlay = signedPayloadOverlayOnly(snapshot ?? undefined);
     if (!overlay) return;
@@ -236,8 +245,10 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }
   }, [secondParentFromPayload]);
 
-  /** Overlay z signed_documents.payload: PESEL, drugi opiekun, szczepienia, upoważnienia, tagi zdrowia (spójność 3 widoków). */
+  /** Overlay z signed_documents.payload: PESEL, drugi opiekun, szczepienia, upoważnienia, tagi zdrowia.
+   *  Pomijany gdy formSnapshotFromDb istnieje — draft (po "Zapisz zmiany") jest nowszy i ma priorytet. */
   useEffect(() => {
+    if (formSnapshotFromDb) return; // Draft ma priorytet — overlay z formSnapshot juz ustawiony wyzej
     const overlay = signedPayloadOverlayOnly(signedPayload ?? undefined);
     if (!overlay) return;
     setAuthorizations(overlay.authorizations);
@@ -299,8 +310,8 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     }));
   }, [signedPayload, reservationData?.parentCount]);
 
-  /** Pola zawsze edytowalne (oprócz printMode). Po zmianie – pasek „Podpisz ponownie / Anuluj". */
-  const isEditable = !printMode;
+  /** Pola edytowalne — wylaczone w printMode i w trybie zatwierdzonej wersji (readonly). */
+  const isEditable = !printMode && viewMode !== 'zatwierdzona';
 
   // Pobierz status najnowszego podpisanego dokumentu (karta) – czy można podpisać ponownie (tylko gdy odrzucona)
   useEffect(() => {
@@ -312,10 +323,13 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ status: string }>) => {
+      .then((docs: Array<{ status: string; sms_verified_at?: string | null }>) => {
         const latest = docs[0];
-        if (latest && (latest.status === 'in_verification' || latest.status === 'accepted' || latest.status === 'rejected')) {
-          setLatestCardStatus(latest.status as 'in_verification' | 'accepted' | 'rejected');
+        if (latest && (latest.status === 'accepted' || latest.status === 'rejected')) {
+          setLatestCardStatus(latest.status as 'accepted' | 'rejected');
+        } else if (latest && latest.status === 'in_verification' && latest.sms_verified_at) {
+          // Tylko gdy SMS faktycznie zweryfikowany — bez sms_verified_at karta NIE jest podpisana
+          setLatestCardStatus('in_verification');
         } else {
           setLatestCardStatus(null);
         }
@@ -414,6 +428,17 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
     directorSignature: '',
     organizerSignature: '',
   });
+
+  // Wartosci z podpisanego SMS-em snapshotu — do podswietlania zmian na zolto w wersji roboczej
+  const signedS1 = signedPayload && viewMode === 'robocza' ? (signedPayload as Record<string, unknown>).sekcjaI as Record<string, unknown> | undefined : undefined;
+  const signedChildAddress = signedS1 ? ((signedS1.uczestnik as Record<string, unknown>)?.adres as string || '').trim() : undefined;
+  const signedParentNames = signedS1 ? ((signedS1.opiekunowie as Record<string, unknown>)?.imionaNazwiska as string || '').trim() : undefined;
+  const signedParentAddress = signedS1 ? ((signedS1.opiekunowie as Record<string, unknown>)?.adres as string || '').trim() : undefined;
+  const signedParentPhone = signedS1 ? ((signedS1.opiekunowie as Record<string, unknown>)?.telefon as string || '').trim() : undefined;
+  const diffChildAddress = signedChildAddress !== undefined && formData.childAddress !== signedChildAddress;
+  const diffParentNames = signedParentNames !== undefined && formData.parentNames !== signedParentNames;
+  const diffParentAddress = signedParentAddress !== undefined && formData.parentAddress !== signedParentAddress;
+  const diffParentPhone = signedParentPhone !== undefined && formData.parentPhone !== signedParentPhone;
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -641,8 +666,16 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
           brakPesel: fd.noPesel,
           rokUrodzeniaGdyBrakPesel: fd.noPeselYear || undefined,
         },
-        opiekunowie: { imionaNazwiska: fd.parentNames, adres: fd.parentAddress, telefon: fd.parentPhone },
-        drugiOpiekun: reservationData?.parentCount === 1 && !noSecondParent
+        opiekunowie: {
+          // Dolacz dane drugiego opiekuna do opiekunowie (pelna lista) niezaleznie od parentCount
+          imionaNazwiska: secondParentName.trim() && !fd.parentNames.includes(secondParentName.trim())
+            ? `${fd.parentNames}, ${secondParentName.trim()}` : fd.parentNames,
+          adres: secondParentAddress.trim() && !fd.parentAddress.includes(secondParentAddress.trim())
+            ? `${fd.parentAddress}; ${secondParentAddress.trim()}` : fd.parentAddress,
+          telefon: secondParentPhone.trim() && !fd.parentPhone.includes(secondParentPhone.trim())
+            ? `${fd.parentPhone}, ${secondParentPhone.trim()}` : fd.parentPhone,
+        },
+        drugiOpiekun: (!noSecondParent && secondParentName.trim())
           ? { imieNazwisko: secondParentName, adres: secondParentAddress, telefon: secondParentPhone }
           : null,
       },
@@ -783,24 +816,23 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
   }, [resendTimer]);
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
-  const [saveMessage, setSaveMessage] = useState('');
+  const { showSuccess: showToastSuccess, showError: showToastError } = useToast();
 
   const performSave = async () => {
     const reservationId = reservationData?.reservationId;
     if (!reservationId || !reservationId.startsWith('REZ-')) {
-      setSaveMessage('Brak numeru rezerwacji');
+      showToastError('Brak numeru rezerwacji');
       setSaveStatus('error');
       return;
     }
     const token = authService.getToken();
     if (!token) {
-      setSaveMessage('Zaloguj się ponownie');
+      showToastError('Zaloguj się ponownie');
       setSaveStatus('error');
       return;
     }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     setSaveStatus('loading');
-    setSaveMessage('');
     try {
       const health_questions = {
         chronicDiseases: healthChronicTags.length ? 'Tak' : 'Nie',
@@ -863,14 +895,11 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       }
       setSaveStatus('ok');
       savedStateRef.current = buildStateSnapshot();
-      const sourceMsg = signedPayload
-        ? 'Zapisano. Używane dane: rezerwacja i podpisany dokument (karta kwalifikacyjna).'
-        : 'Zapisano. Używane dane: rezerwacja.';
-      setSaveMessage(sourceMsg);
-      onSaveSuccess?.(sourceMsg);
+      showToastSuccess('Zmiany zostały zapisane');
+      onSaveSuccess?.('Zapisano');
     } catch (e) {
       setSaveStatus('error');
-      setSaveMessage(e instanceof Error ? e.message : 'Błąd zapisu');
+      showToastError(e instanceof Error ? e.message : 'Błąd zapisu');
     }
   };
 
@@ -880,28 +909,88 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
 
   return (
     <>
-      {/* Przycisk druku - ukryty przy druku i w printMode */}
+      {/* Pasek akcji — sticky na dole ekranu (desktop), ukryty przy druku */}
+      <div className="no-print fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.08)] hidden md:block">
+        <div className="max-w-[210mm] mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {!printMode && (
+              <button
+                type="button"
+                onClick={handleSaveChanges}
+                disabled={saveStatus === 'loading'}
+                className="flex items-center gap-2 bg-gray-600 text-white px-5 py-2.5 rounded-lg hover:bg-gray-700 transition text-sm font-medium disabled:opacity-50"
+              >
+                {saveStatus === 'loading' ? 'Zapisywanie...' : 'Zapisz zmiany'}
+              </button>
+            )}
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 bg-[#03adf0] text-white px-5 py-2.5 rounded-lg hover:bg-[#0299d6] transition text-sm font-medium"
+            >
+              <Printer className="w-4 h-4" />
+              Drukuj
+            </button>
+            {/* Przelaczanie wersji */}
+            {onViewModeChange && (
+              <div className="flex items-center gap-1 ml-3 border-l border-gray-300 pl-3">
+                <button
+                  type="button"
+                  onClick={() => onViewModeChange('robocza')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${viewMode === 'robocza' ? 'bg-orange-100 text-orange-800 border border-orange-300' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                  Wersja robocza
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onViewModeChange('zatwierdzona')}
+                  disabled={!hasVerifiedVersion}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${viewMode === 'zatwierdzona' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'} disabled:opacity-40 disabled:cursor-not-allowed`}
+                >
+                  Wersja zatwierdzona
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {/* Mobilny pasek — na górze */}
       {!printMode && (
-        <div className="no-print max-w-[210mm] mx-auto px-4 pt-4 flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={handleSaveChanges}
-            disabled={saveStatus === 'loading'}
-            className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition text-sm font-medium disabled:opacity-50"
-          >
-            {saveStatus === 'loading' ? 'Zapisywanie...' : 'Zapisz zmiany'}
-          </button>
+        <div className="no-print max-w-[210mm] mx-auto px-4 pt-4 flex flex-wrap items-center gap-2 md:hidden">
+          {viewMode !== 'zatwierdzona' && (
+            <button
+              type="button"
+              onClick={handleSaveChanges}
+              disabled={saveStatus === 'loading'}
+              className="flex items-center gap-2 bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-medium disabled:opacity-50"
+            >
+              {saveStatus === 'loading' ? 'Zapisywanie...' : 'Zapisz'}
+            </button>
+          )}
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 bg-[#03adf0] text-white px-4 py-2 rounded hover:bg-[#0299d6] transition text-sm font-medium"
+            className="flex items-center gap-2 bg-[#03adf0] text-white px-3 py-1.5 rounded text-xs font-medium"
           >
-            <Printer className="w-4 h-4" />
+            <Printer className="w-3.5 h-3.5" />
             Drukuj
           </button>
-          {saveMessage && (
-            <span className={`text-sm ${saveStatus === 'ok' ? 'text-green-600' : saveStatus === 'error' ? 'text-red-600' : ''}`}>
-              {saveMessage}
-            </span>
+          {onViewModeChange && (
+            <>
+              <button
+                type="button"
+                onClick={() => onViewModeChange('robocza')}
+                className={`px-2.5 py-1.5 rounded text-xs font-medium transition ${viewMode === 'robocza' ? 'bg-orange-100 text-orange-800 border border-orange-300' : 'bg-gray-100 text-gray-500'}`}
+              >
+                Robocza
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewModeChange('zatwierdzona')}
+                disabled={!hasVerifiedVersion}
+                className={`px-2.5 py-1.5 rounded text-xs font-medium transition ${viewMode === 'zatwierdzona' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-gray-100 text-gray-500'} disabled:opacity-40`}
+              >
+                Zatwierdzona
+              </button>
+            </>
           )}
         </div>
       )}
@@ -960,9 +1049,9 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 const birthYear = yearMatch ? parseInt(yearMatch[1], 10) : null;
                 const minYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear - 1 : null;
                 const maxYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear : null;
+                // Sam rocznik (np. "2012") traktujemy jako niewypelnione — dopiero pelna data YYYY-MM-DD jest wartoscia
                 const dobValue =
                   /^\d{4}-\d{2}-\d{2}$/.test(dobRaw) ? dobRaw
-                  : /^\d{4}$/.test(dobRaw) ? `${dobRaw}-01-01`
                   : '';
                 const minDate = minYear !== null && minYear !== undefined ? `${minYear}-01-01` : undefined;
                 const maxDate = maxYear !== null && maxYear !== undefined ? `${maxYear}-12-31` : undefined;
@@ -971,14 +1060,15 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     <input
                       type="date"
                       value={dobValue}
+                      onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
                       onChange={(e) => {
                         handleChange('childDOB', e.target.value);
                         setChildDOBError(null);
                       }}
                       min={minDate}
                       max={maxDate}
-                      readOnly={printMode}
-                      className={`input-line ${isEditable ? 'editable-field' : ''} ${childDOBError ? 'border-red-500' : ''}`}
+                      readOnly={printMode || viewMode === 'zatwierdzona'}
+                      className={`input-line ${isEditable ? 'editable-field' : ''} ${childDOBError ? 'border-red-500' : ''} ${!dobValue ? 'text-gray-400' : ''}`}
                       aria-invalid={!!childDOBError}
                     />
                     {childDOBError && (
@@ -1033,7 +1123,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     handleChange('noPesel', e.target.checked);
                     setNoPeselYearError(null);
                   }}
-                  disabled={printMode}
+                  disabled={printMode || viewMode === 'zatwierdzona'}
                 />
                 Dziecko nie posiada numeru PESEL
                 {formData.noPesel && !formData.vaccination.calendar && (
@@ -1044,7 +1134,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       handleChange('noPeselYear', e.target.value);
                       if (noPeselYearError) setNoPeselYearError(null);
                     }}
-                    readOnly={printMode}
+                    readOnly={printMode || viewMode === 'zatwierdzona'}
                     className={`input-inline ${isEditable ? 'editable-field' : ''} ${noPeselYearError ? 'border-red-500' : ''}`}
                     placeholder="rok"
                     aria-invalid={!!noPeselYearError}
@@ -1060,14 +1150,30 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
 
             <div className="field-group">
               <label>4) Adres zamieszkania uczestnika/dziecka</label>
-              <div className="readonly-field">{formData.childAddress}</div>
+              <input
+                type="text"
+                value={formData.childAddress}
+                onChange={(e) => handleChange('childAddress', e.target.value)}
+                readOnly={printMode || viewMode === 'zatwierdzona'}
+                className={`input-line ${isEditable ? 'editable-field' : ''}`}
+              />
             </div>
 
             <div id="parents-section" className="space-y-2">
               <div className="field-group">
                 <label>5) Imiona i nazwiska rodziców/opiekunów prawnych</label>
                 {(reservationData?.parentCount ?? 0) >= 2 ? (
-                  <div className="readonly-field">{formData.parentNames}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="readonly-field flex-1 min-w-0">{(reservationData?.parentNames || '').split(',')[0]?.trim()}</div>
+                    <input
+                      type="text"
+                      value={secondParentName}
+                      onChange={(e) => setSecondParentName(e.target.value)}
+                      readOnly={printMode || viewMode === 'zatwierdzona'}
+                      placeholder="Imię i nazwisko drugiego opiekuna"
+                      className={`input-line flex-1 min-w-[200px] ${isEditable ? 'editable-field' : ''}`}
+                    />
+                  </div>
                 ) : (reservationData?.parentCount ?? 0) === 1 ? (
                   <>
                     <div className="flex items-start gap-2 flex-wrap">
@@ -1085,7 +1191,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                               setSecondParentNameError(false);
                             }}
                             placeholder="Imię i nazwisko drugiego opiekuna"
-                            readOnly={printMode}
+                            readOnly={printMode || viewMode === 'zatwierdzona'}
                             className={`input-line flex-1 min-w-[200px] ${isEditable ? 'editable-field' : ''} ${secondParentNameError ? 'border-red-500' : ''}`}
                             aria-invalid={secondParentNameError}
                           />
@@ -1113,7 +1219,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         setSecondParentAddressError(false);
                         setSecondParentPhoneError(false);
                       }}
-                      disabled={printMode}
+                      disabled={printMode || viewMode === 'zatwierdzona'}
                     />
                     Brak drugiego rodzica/opiekuna prawnego
                   </label>
@@ -1123,7 +1229,17 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               <div className="field-group">
                 <label>6) Adresy zamieszkania rodziców/opiekunów prawnych</label>
                 {(reservationData?.parentCount ?? 0) >= 2 ? (
-                  <div className="readonly-field">{formData.parentAddress}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="readonly-field flex-1 min-w-0">{(reservationData?.parentAddress || '').split(';')[0]?.trim()}</div>
+                    <input
+                      type="text"
+                      value={secondParentAddress}
+                      onChange={(e) => setSecondParentAddress(e.target.value)}
+                      readOnly={printMode || viewMode === 'zatwierdzona'}
+                      placeholder="Adres drugiego opiekuna"
+                      className={`input-line flex-1 min-w-[200px] ${isEditable ? 'editable-field' : ''}`}
+                    />
+                  </div>
                 ) : (reservationData?.parentCount ?? 0) === 1 ? (
                   <>
                     <div className="flex items-start gap-2 flex-wrap">
@@ -1141,7 +1257,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                               setSecondParentAddressError(false);
                             }}
                             placeholder="Adres drugiego opiekuna"
-                            readOnly={printMode}
+                            readOnly={printMode || viewMode === 'zatwierdzona'}
                             className={`input-line flex-1 min-w-[200px] ${isEditable ? 'editable-field' : ''} ${secondParentAddressError ? 'border-red-500' : ''}`}
                             aria-invalid={secondParentAddressError}
                           />
@@ -1160,7 +1276,17 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               <div className="field-group">
                 <label>7) Telefony do rodziców/ opiekunów prawnych</label>
                 {(reservationData?.parentCount ?? 0) >= 2 ? (
-                  <div className="readonly-field">{formData.parentPhone}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="readonly-field flex-1 min-w-0">{(reservationData?.parentPhone || '').split(',')[0]?.trim()}</div>
+                    <input
+                      type="text"
+                      value={secondParentPhone}
+                      onChange={(e) => setSecondParentPhone(e.target.value)}
+                      readOnly={printMode || viewMode === 'zatwierdzona'}
+                      placeholder="Telefon drugiego opiekuna"
+                      className={`input-line flex-1 min-w-[200px] ${isEditable ? 'editable-field' : ''}`}
+                    />
+                  </div>
                 ) : (reservationData?.parentCount ?? 0) === 1 ? (
                   <>
                     <div className="flex items-start gap-2 flex-wrap">
@@ -1178,7 +1304,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                               setSecondParentPhoneError(false);
                             }}
                             placeholder="Telefon drugiego opiekuna"
-                            readOnly={printMode}
+                            readOnly={printMode || viewMode === 'zatwierdzona'}
                             className={`input-line flex-1 min-w-[160px] ${isEditable ? 'editable-field' : ''} ${secondParentPhoneError ? 'border-red-500' : ''}`}
                             aria-invalid={secondParentPhoneError}
                           />
@@ -1246,7 +1372,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 <textarea
                   value={healthAdditionalNotes}
                   onChange={(e) => setHealthAdditionalNotes(e.target.value)}
-                  readOnly={printMode}
+                  readOnly={printMode || viewMode === 'zatwierdzona'}
                   className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
                   rows={2}
                   placeholder="Pozostałe informacje (np. po przecinku)"
@@ -1295,7 +1421,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.calendar}
                   onChange={(e) => handleVaccinationChange('calendar', e.target.checked)}
-                  disabled={printMode}
+                  disabled={printMode || viewMode === 'zatwierdzona'}
                 />
                 Zgodnie z kalendarzem szczepień
               </label>
@@ -1305,7 +1431,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.tetanus}
                   onChange={(e) => handleVaccinationChange('tetanus', e.target.checked)}
-                  disabled={printMode}
+                  disabled={printMode || viewMode === 'zatwierdzona'}
                 />
                 Tężec
                 {formData.vaccination.tetanus && !formData.vaccination.calendar && (
@@ -1313,7 +1439,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     type="text"
                     value={formData.vaccination.tetanusYear}
                     onChange={(e) => handleVaccinationChange('tetanusYear', e.target.value)}
-                    readOnly={printMode}
+                    readOnly={printMode || viewMode === 'zatwierdzona'}
                     className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                     placeholder="rok"
                   />
@@ -1325,7 +1451,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.measles}
                   onChange={(e) => handleVaccinationChange('measles', e.target.checked)}
-                  disabled={printMode}
+                  disabled={printMode || viewMode === 'zatwierdzona'}
                 />
                 Dur
                 {formData.vaccination.measles && !formData.vaccination.calendar && (
@@ -1333,7 +1459,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     type="text"
                     value={formData.vaccination.measlesYear}
                     onChange={(e) => handleVaccinationChange('measlesYear', e.target.value)}
-                    readOnly={printMode}
+                    readOnly={printMode || viewMode === 'zatwierdzona'}
                     className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                     placeholder="rok"
                   />
@@ -1345,7 +1471,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.diphtheria}
                   onChange={(e) => handleVaccinationChange('diphtheria', e.target.checked)}
-                  disabled={printMode}
+                  disabled={printMode || viewMode === 'zatwierdzona'}
                 />
                 Błonica
                 {formData.vaccination.diphtheria && !formData.vaccination.calendar && (
@@ -1353,7 +1479,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     type="text"
                     value={formData.vaccination.diphtheriaYear}
                     onChange={(e) => handleVaccinationChange('diphtheriaYear', e.target.value)}
-                    readOnly={printMode}
+                    readOnly={printMode || viewMode === 'zatwierdzona'}
                     className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                     placeholder="rok"
                   />
@@ -1365,7 +1491,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.vaccination.other}
                   onChange={(e) => handleVaccinationChange('other', e.target.checked)}
-                  disabled={printMode}
+                  disabled={printMode || viewMode === 'zatwierdzona'}
                 />
                 Inne
                 {formData.vaccination.other && !formData.vaccination.calendar && (
@@ -1374,7 +1500,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       type="text"
                       value={formData.vaccination.otherDetails}
                       onChange={(e) => handleVaccinationChange('otherDetails', e.target.value)}
-                      readOnly={printMode}
+                      readOnly={printMode || viewMode === 'zatwierdzona'}
                       className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                       placeholder="podać jakie"
                     />
@@ -1382,7 +1508,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       type="text"
                       value={formData.vaccination.otherYear}
                       onChange={(e) => handleVaccinationChange('otherYear', e.target.value)}
-                      readOnly={printMode}
+                      readOnly={printMode || viewMode === 'zatwierdzona'}
                       className={`input-inline ${isEditable ? 'editable-field' : ''}`}
                       placeholder="rok"
                     />
@@ -1401,7 +1527,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <textarea
               value={formData.additionalInfo}
               onChange={(e) => handleChange('additionalInfo', e.target.value)}
-              readOnly={printMode}
+              readOnly={printMode || viewMode === 'zatwierdzona'}
               className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
               rows={2}
             />
@@ -1417,7 +1543,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
             <textarea
               value={formData.vaccineInfo}
               onChange={(e) => handleChange('vaccineInfo', e.target.value)}
-              readOnly={printMode}
+              readOnly={printMode || viewMode === 'zatwierdzona'}
               className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
               rows={2}
             />
@@ -1442,7 +1568,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       setShowRegulationError(false);
                     }
                   }}
-                  disabled={printMode}
+                  disabled={printMode || viewMode === 'zatwierdzona'}
                 />
                 Potwierdzam zapoznanie się z regulaminem
               </label>
@@ -1483,7 +1609,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     type="text"
                     value={auth.fullName}
                     onChange={(e) => handleAuthorizationChange(index, 'fullName', e.target.value)}
-                    readOnly={printMode}
+                    readOnly={printMode || viewMode === 'zatwierdzona'}
                     className={`input-inline-full ${isEditable ? 'editable-field' : ''}`}
                     placeholder="Jan Kowalski"
                   />
@@ -1496,7 +1622,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     <select
                       value={auth.documentType}
                       onChange={(e) => handleAuthorizationChange(index, 'documentType', e.target.value)}
-                      disabled={printMode}
+                      disabled={printMode || viewMode === 'zatwierdzona'}
                       className={`select-field ${isEditable ? 'editable-field' : ''}`}
                     >
                       <option value="dowód osobisty">Dowód osobisty</option>
@@ -1509,7 +1635,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       type="text"
                       value={auth.documentNumber}
                       onChange={(e) => handleAuthorizationChange(index, 'documentNumber', e.target.value)}
-                      readOnly={printMode}
+                      readOnly={printMode || viewMode === 'zatwierdzona'}
                       className={`input-line ${isEditable ? 'editable-field' : ''}`}
                       placeholder="ABC123456"
                     />
@@ -1526,7 +1652,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         type="checkbox"
                         checked={auth.canPickup}
                         onChange={(e) => handleAuthorizationChange(index, 'canPickup', e.target.checked)}
-                        disabled={printMode}
+                        disabled={printMode || viewMode === 'zatwierdzona'}
                       />
                       Do odbioru dziecka z obozu: ośrodka i/lub miejsca zbiórki transportu zbiorowego
                     </label>
@@ -1536,7 +1662,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         type="checkbox"
                         checked={auth.canTemporaryPickup}
                         onChange={(e) => handleAuthorizationChange(index, 'canTemporaryPickup', e.target.checked)}
-                        disabled={printMode}
+                        disabled={printMode || viewMode === 'zatwierdzona'}
                       />
                       Odwiedzin dziecka i/lub zabrania go poza teren ośrodka na określony czas, w trakcie trwania obozu
                     </label>
@@ -1556,7 +1682,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                       e.target.checked = false; // Reset checkbox
                     }
                   }}
-                  disabled={printMode}
+                  disabled={printMode || viewMode === 'zatwierdzona'}
                 />
                 <span className="simple-action-text">Upoważniam kolejną osobę</span>
               </label>
@@ -1569,7 +1695,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   type="checkbox"
                   checked={formData.independentReturn}
                   onChange={(e) => handleChange('independentReturn', e.target.checked)}
-                  disabled={printMode}
+                  disabled={printMode || viewMode === 'zatwierdzona'}
                 />
                 <span className="consent-text">Wyrażam zgodę na samodzielny powrót dziecka do domu z miejsca zbiórki transportu zbiorowego</span>
               </label>

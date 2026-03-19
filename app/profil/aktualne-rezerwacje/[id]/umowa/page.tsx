@@ -81,10 +81,14 @@ export default function ContractPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ payload?: string | null }>) => {
-        const latest = docs[0];
+      .then((docs: Array<{ payload?: string | null; status?: string; sms_verified_at?: string | null }>) => {
+        // Uzyj payloadu tylko z dokumentu ktory ma zweryfikowany SMS
+        // Bez tego umowa bylaby "podpisana" po samym wyslaniu kodu (przed wpisaniem)
+        const verified = docs.find(d => d.sms_verified_at && d.payload);
+        const latest = verified ?? docs.find(d => d.payload);
         try {
-          setContractSignedPayload(latest?.payload ? JSON.parse(latest.payload) : null);
+          // Payload z niezweryfikowanego dokumentu NIE jest traktowany jako podpisany
+          setContractSignedPayload(verified?.payload ? JSON.parse(verified.payload) : null);
         } catch {
           setContractSignedPayload(null);
         }
