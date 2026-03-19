@@ -347,7 +347,8 @@ export function mapReservationToQualificationForm(
     .join(', ') || (firstParent.firstName || firstParent.lastName ? `${firstParent.firstName || ''} ${firstParent.lastName || ''}`.trim() : '');
   // Adres opiekuna: ulica, kod pocztowy miasto (pelny adres z parents_data)
   const parentAddress = parents.map((p) => {
-    const parts = [(p.street || '').trim(), [(p.postalCode || '').trim(), (p.city || '').trim()].filter(Boolean).join(' ')].filter(Boolean);
+    const pr = p as Record<string, string>;
+    const parts = [(pr.street || '').trim(), [(pr.postalCode || '').trim(), (pr.city || '').trim()].filter(Boolean).join(' ')].filter(Boolean);
     return parts.join(', ');
   }).filter(Boolean).join('; ') || (firstParent.city || '');
   // Telefon opiekuna: prefix (phone) + numer (phoneNumber), deduplikacja

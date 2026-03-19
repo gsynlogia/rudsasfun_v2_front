@@ -52,7 +52,7 @@ function getDiffText(signed: string, draft: string): string {
 }
 
 function UnsignedCardAlert({ sections, draftValues, signedValues }: {
-  sections: { health: boolean; info: boolean; accommodation: boolean };
+  sections: { health: boolean; info: boolean; accommodation: boolean; guardians: boolean };
   draftValues: Record<string, string | undefined>;
   signedValues: Record<string, string | undefined>;
 }) {
