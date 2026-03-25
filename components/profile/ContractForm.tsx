@@ -50,6 +50,8 @@ interface ContractFormProps {
   printMode?: boolean;
   /** Tylko podgląd (np. krok 4 rezerwacji) – bez przycisku Drukuj i sekcji podpisu. */
   previewOnly?: boolean;
+  /** Callback po podpisaniu SMS — page.tsx refetchuje dane */
+  onSaveSuccess?: (message: string) => void;
 }
 
 type PrintErrorKey = 'reservationNumber' | 'contractDate' | 'parentName' | 'childName' | 'tournamentName' | 'tournamentDates';
@@ -96,7 +98,7 @@ function contractPayloadToFormOverlay(p: Record<string, unknown>): Partial<Contr
   };
 }
 
-export function ContractForm({ reservationId, reservationData, signedPayload, printMode = false, previewOnly = false }: ContractFormProps) {
+export function ContractForm({ reservationId, reservationData, signedPayload, printMode = false, previewOnly = false, onSaveSuccess }: ContractFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
@@ -390,6 +392,9 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
       setShowSignatureModal(false);
       setSignatureCode('');
       setCurrentDocumentId(null);
+      // Natychmiast zmień status UI + powiadom page.tsx o konieczności refetchu danych
+      setLatestContractStatus('in_verification');
+      onSaveSuccess?.('podpisano');
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Nieprawidłowy kod lub błąd weryfikacji.');
     }

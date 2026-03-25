@@ -126,6 +126,25 @@ export default function ContractPage() {
           reservationNumber: reservationId.startsWith('REZ-') ? reservationId : `REZ-2026-${reservationId}`,
         }}
         signedPayload={contractSignedPayload ?? undefined}
+        onSaveSuccess={() => {
+          // Refetch signed docs po podpisie SMS — aktualizuj payload i status
+          if (!reservationData?.id) return;
+          const token = authService.getToken();
+          if (!token) return;
+          fetch(`${API_URL}/api/signed-documents/reservation/${reservationData.id}?document_type=contract`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+            .then((res) => (res.ok ? res.json() : []))
+            .then((docs: Array<{ payload?: string | null; sms_verified_at?: string | null }>) => {
+              const verified = docs.find(d => d.sms_verified_at && d.payload);
+              try {
+                setContractSignedPayload(verified?.payload ? JSON.parse(verified.payload) : null);
+              } catch {
+                setContractSignedPayload(null);
+              }
+            })
+            .catch(() => setContractSignedPayload(null));
+        }}
       />
     </div>
   );

@@ -95,8 +95,17 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isPanelOpen, close]);
 
+  const isDev = process.env.NEXT_PUBLIC_APP_ENV !== 'production';
+
   return (
-    <div className="h-screen w-full bg-white flex">
+    <div className="h-screen w-full bg-white flex flex-col">
+      {/* Belka developerska */}
+      {isDev && (
+        <div className="bg-red-600 text-white text-center text-xs font-medium py-1 z-[60] flex-shrink-0">
+          Wersja developerska — dane testowe
+        </div>
+      )}
+      <div className="flex-1 flex overflow-hidden">
       {/* Sidebar with logo */}
       <AdminSidebar />
 
@@ -213,6 +222,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
             </div>
           </>
         ) : null}
+      </div>
       </div>
     </div>
   );

@@ -278,16 +278,9 @@ export default function ReservationPaymentsPage() {
   }, [reservationNumber]);
 
   const handleSyncPayments = async () => {
+    // Płatności online Tpay wycofane (2026-03-19) — synchronizacja nieaktywna
     setIsSyncing(true);
     try {
-      const pendingPayments = payments.filter(p => p.status === 'pending' && p.transaction_id);
-      for (const payment of pendingPayments) {
-        try {
-          await paymentService.syncPaymentStatus(payment.transaction_id);
-        } catch (err) {
-          console.warn(`Could not sync payment ${payment.transaction_id}:`, err);
-        }
-      }
       window.location.reload();
     } catch (err) {
       console.error('Error syncing payments:', err);

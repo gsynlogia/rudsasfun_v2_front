@@ -120,7 +120,7 @@ export default function SettingsPage() {
         {/* Online Payments Toggle - Only show on general settings page */}
         {pathname === '/admin-panel/settings' && (
           <>
-            <OnlinePaymentsToggle />
+            {/* Tpay wycofany (2026-03-19) — toggle płatności online usunięty */}
             <BankAccountSettings />
           </>
         )}

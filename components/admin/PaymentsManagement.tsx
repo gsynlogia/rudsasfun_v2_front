@@ -2693,20 +2693,7 @@ export default function PaymentsManagement() {
           r.payments.filter(p => p.status === 'pending' && p.transaction_id),
         );
         if (allPendingPayments.length > 0) {
-          console.log(`🔄 Synchronizacja ${allPendingPayments.length} płatności z API Tpay w tle...`);
-          Promise.allSettled(
-            allPendingPayments.map(async (payment) => {
-              try {
-                await paymentService.syncPaymentStatus(payment.transaction_id!);
-                return { success: true };
-              } catch {
-                return { success: false };
-              }
-            }),
-          ).then((results) => {
-            const successful = results.filter(r => r.status === 'fulfilled' && (r.value as any)?.success).length;
-            console.log(`✅ Zsynchronizowano ${successful} z ${allPendingPayments.length} płatności w tle`);
-          });
+          // Tpay wycofany (2026-03-19) — brak synchronizacji statusów online
         }
 
       } catch (err) {
@@ -3607,22 +3594,8 @@ export default function PaymentsManagement() {
         return;
       }
 
-      // Sync all pending payments
-      const syncPromises = pendingPayments.map(async (payment) => {
-        try {
-          console.log(`Synchronizacja płatności ${payment.transaction_id}...`);
-          const syncedPayment = await paymentService.syncPaymentStatus(payment.transaction_id);
-          console.log(`✅ Zsynchronizowano płatność ${payment.transaction_id} - status: ${syncedPayment.status}`);
-          return syncedPayment;
-        } catch (err) {
-          console.warn(`⚠️ Nie można zsynchronizować płatności ${payment.transaction_id}:`, err);
-          return null;
-        }
-      });
-
-      const syncedPayments = await Promise.allSettled(syncPromises);
-      const successful = syncedPayments.filter(p => p.status === 'fulfilled' && p.value !== null).length;
-      console.log(`✅ Zsynchronizowano ${successful} z ${pendingPayments.length} płatności`);
+      // Tpay wycofany (2026-03-19) — brak synchronizacji statusów online
+      const successful = 0;
 
       // Refresh current page data
       const { mappedReservations, pagination } = await fetchCurrentPageData();

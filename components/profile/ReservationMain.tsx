@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { useReservationPaymentHeader } from '@/contexts/ReservationPaymentHeaderContext';
 import { contractService } from '@/lib/services/ContractService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
-import { paymentService, PaymentResponse, CreatePaymentRequest } from '@/lib/services/PaymentService';
+import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 import { AlertTriangle } from 'lucide-react';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { authService } from '@/lib/services/AuthService';
@@ -70,7 +70,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const [_loadingCard, _setLoadingCard] = useState(false);
   const [_downloadingContract, _setDownloadingContract] = useState(false);
   const [_downloadingCard, _setDownloadingCard] = useState(false);
-  const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
+  // Tpay wycofany (2026-03-19) — płatności online na stałe wyłączone
+  const [onlinePaymentsEnabled] = useState<boolean>(false);
   const [bankAccount, setBankAccount] = useState<any>(null);
   const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
   const [protections, setProtections] = useState<Map<number, { name: string; price: number }>>(new Map());
@@ -458,37 +459,24 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     return `${formatDate(start)} – ${formatDate(end)}`;
   };
 
-  // Load online payments status and bank account data
+  // Tpay wycofany (2026-03-19) — ładujemy tylko dane konta bankowego (przelew ręczny)
   useEffect(() => {
-    const loadOnlinePaymentsStatus = async () => {
+    const loadBankAccount = async () => {
       try {
         setLoadingOnlinePaymentsStatus(true);
         const API_BASE_URL = getApiBaseUrlRuntime();
-        const response = await fetch(`${API_BASE_URL}/api/system-settings/online-payments/status`);
-        if (response.ok) {
-          const data = await response.json();
-          setOnlinePaymentsEnabled(data.enabled);
-
-          // If online payments are disabled, load bank account data
-          if (!data.enabled) {
-            try {
-              const bankResponse = await fetch(`${API_BASE_URL}/api/bank-accounts/active`);
-              if (bankResponse.ok) {
-                const bankData = await bankResponse.json();
-                setBankAccount(bankData);
-              }
-            } catch (err) {
-              console.error('Error loading bank account:', err);
-            }
-          }
+        const bankResponse = await fetch(`${API_BASE_URL}/api/bank-accounts/active`);
+        if (bankResponse.ok) {
+          const bankData = await bankResponse.json();
+          setBankAccount(bankData);
         }
       } catch (err) {
-        console.error('Error loading online payments status:', err);
+        console.error('Error loading bank account:', err);
       } finally {
         setLoadingOnlinePaymentsStatus(false);
       }
     };
-    loadOnlinePaymentsStatus();
+    loadBankAccount();
   }, []);
 
   // Load protection prices from API
@@ -1650,7 +1638,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                           }
 
                           // Prepare payment request
-                          const paymentRequest: CreatePaymentRequest = {
+                          const paymentRequest: any = { // Tpay wycofany
                             amount: paymentAmount,
                             description: `Rezerwacja obozu #${reservation.id} - ${installmentDesc}`,
                             order_id: orderId,

@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 
 import UniversalModal from '@/components/admin/UniversalModal';
 import { useReservation } from '@/context/ReservationContext';
-import { paymentService, type CreatePaymentRequest } from '@/lib/services/PaymentService';
+import { paymentService } from '@/lib/services/PaymentService';
 import { reservationService, ReservationService } from '@/lib/services/ReservationService';
 import type { StepComponentProps, ReservationItem } from '@/types/reservation';
 import {
@@ -75,7 +75,8 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const [showPaymentLaterModal, setShowPaymentLaterModal] = useState(false);
   const [createdReservationId, setCreatedReservationId] = useState<number | null>(null);
   const [_paymentInstallments, _setPaymentInstallments] = useState<'full' | '2' | '3'>('full');
-  const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
+  // Tpay wycofany (2026-03-19) — płatności online na stałe wyłączone
+  const [onlinePaymentsEnabled] = useState<boolean>(false);
   const [_loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
   const [step1Diet, setStep1Diet] = useState<{ id: number; name: string; price: number } | null>(null);
 
@@ -91,55 +92,10 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     );
   };
 
-  // Load online payments status on mount
+  // Tpay wycofany (2026-03-19) — płatności online wyłączone, domyślnie przelew
   useEffect(() => {
-    const loadOnlinePaymentsStatus = async () => {
-      try {
-        setLoadingOnlinePaymentsStatus(true);
-        const API_BASE_URL = getApiBaseUrlRuntime();
-        const response = await fetch(`${API_BASE_URL}/api/system-settings/online-payments/status`);
-        if (response.ok) {
-          const data = await response.json();
-          setOnlinePaymentsEnabled(data.enabled);
-
-          // If online payments are disabled, automatically select transfer
-          // If enabled, check if we have saved data with 'online', otherwise keep 'transfer'
-          if (!data.enabled) {
-            setFormData(prev => ({
-              ...prev,
-              paymentMethod: 'transfer',
-            }));
-          } else {
-            // If online payments are enabled, check saved data or default to 'online'
-            const savedData = loadStep5FormData();
-            if (savedData && savedData.paymentMethod === 'online') {
-              setFormData(prev => ({
-                ...prev,
-                paymentMethod: 'online',
-              }));
-            } else if (!savedData) {
-              // No saved data, default to 'online' when enabled
-              setFormData(prev => ({
-                ...prev,
-                paymentMethod: 'online',
-              }));
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error loading online payments status:', err);
-        // Default to transfer if error occurs (safer option)
-        setOnlinePaymentsEnabled(false);
-        setFormData(prev => ({
-          ...prev,
-          paymentMethod: 'transfer',
-        }));
-      } finally {
-        setLoadingOnlinePaymentsStatus(false);
-      }
-    };
-
-    loadOnlinePaymentsStatus();
+    setFormData(prev => ({ ...prev, paymentMethod: 'transfer' }));
+    setLoadingOnlinePaymentsStatus(false);
   }, []);
 
   // Fetch sources from API
@@ -673,7 +629,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
       const orderId = `RES-${reservationResponse.id}`;
 
       // Prepare payment request
-      const paymentRequest: CreatePaymentRequest = {
+      const paymentRequest: any = { // Tpay wycofany
         amount: paymentAmount,
         description: `Rezerwacja obozu #${reservationResponse.id} - ${formData.paymentAmount === 'full' ? 'Pełna wpłata' : 'Zaliczka'}`,
         order_id: orderId,
@@ -1427,9 +1383,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
                 ? 'Tworzenie rezerwacji...'
                 : isProcessingPayment
                   ? 'Przetwarzanie płatności...'
-                  : formData.paymentMethod === 'transfer'
-                    ? 'Przejdź dalej'
-                    : 'Zapłać teraz'}
+                  : 'Potwierdzam i opłacam'}
             </button>
           </div>
         </section>

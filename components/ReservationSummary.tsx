@@ -439,7 +439,7 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
         onClick={handleNextClick}
         className="hidden lg:flex w-full bg-[#03adf0] text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium hover:bg-[#0288c7] transition-colors items-center justify-center gap-2 text-sm sm:text-base"
       >
-        {currentStep === TOTAL_STEPS ? 'Zapłać teraz' : 'przejdź dalej'}
+        {currentStep === TOTAL_STEPS ? 'Potwierdzam i opłacam' : 'przejdź dalej'}
         {currentStep !== TOTAL_STEPS && (
           <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

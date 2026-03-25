@@ -798,8 +798,11 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       setShowSignatureModal(false);
       setSignatureCode('');
       setCurrentDocumentId(null);
-      // Zaktualizuj savedState — bieżący stan jest teraz „zapisany"
       savedStateRef.current = buildStateSnapshot();
+      // Natychmiast zmień status UI + powiadom page.tsx o konieczności refetchu danych
+      setLatestCardStatus('in_verification');
+      onSaveSuccess?.('podpisano');
+      showToastSuccess('Karta kwalifikacyjna podpisana');
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Nieprawidłowy kod lub błąd weryfikacji.');
     }

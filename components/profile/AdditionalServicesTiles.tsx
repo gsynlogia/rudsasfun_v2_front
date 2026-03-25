@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { useToast } from '@/components/ToastContainer';
 import { authService } from '@/lib/services/AuthService';
-import { paymentService, CreatePaymentRequest } from '@/lib/services/PaymentService';
+import { paymentService } from '@/lib/services/PaymentService';
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
 import { API_BASE_URL, getStaticAssetUrl, getApiBaseUrlRuntime } from '@/utils/api-config';
 
@@ -55,28 +55,9 @@ export default function AdditionalServicesTiles({
   const [loadingBlinkConfig, setLoadingBlinkConfig] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [processingServiceId, setProcessingServiceId] = useState<string | null>(null);
-  const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState<boolean>(true);
-  const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
-
-  // Fetch online payments status
-  useEffect(() => {
-    const loadOnlinePaymentsStatus = async () => {
-      try {
-        setLoadingOnlinePaymentsStatus(true);
-        const API_BASE_URL_RUNTIME = getApiBaseUrlRuntime();
-        const response = await fetch(`${API_BASE_URL_RUNTIME}/api/system-settings/online-payments/status`);
-        if (response.ok) {
-          const data = await response.json();
-          setOnlinePaymentsEnabled(data.enabled);
-        }
-      } catch (err) {
-        console.error('Error loading online payments status:', err);
-      } finally {
-        setLoadingOnlinePaymentsStatus(false);
-      }
-    };
-    loadOnlinePaymentsStatus();
-  }, []);
+  // Tpay wycofany (2026-03-19) — płatności online na stałe wyłączone
+  const [onlinePaymentsEnabled] = useState<boolean>(false);
+  const [loadingOnlinePaymentsStatus] = useState(false);
 
   // Fetch addons and protections from API
   useEffect(() => {
@@ -300,7 +281,7 @@ export default function AdditionalServicesTiles({
       const orderId = `${servicePrefix}-${reservation.id}-${Date.now()}`;
 
       // Prepare payment request
-      const paymentRequest: CreatePaymentRequest = {
+      const paymentRequest: any = { // Tpay wycofany
         amount: price,
         description: `${serviceName} - Rezerwacja #${reservation.id}`,
         order_id: orderId,
