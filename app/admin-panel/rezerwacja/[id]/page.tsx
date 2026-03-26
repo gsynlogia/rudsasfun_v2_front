@@ -1043,7 +1043,9 @@ export default function ReservationDetailPage() {
       return_type: reservation.return_type ?? 'wlasny',
       return_city: reservation.return_city ?? null,
       return_transport_city_id: r.return_transport_city_id ?? null,
-      transport_different_cities: reservation.transport_different_cities ?? false,
+      transport_different_cities: reservation.transport_different_cities ?? (
+        (reservation.departure_city && reservation.return_city && reservation.departure_city !== reservation.return_city) ? true : false
+      ),
     });
   }, [
     reservation?.id,
@@ -2414,6 +2416,10 @@ export default function ReservationDetailPage() {
                   <span className="text-sm text-gray-900">{reservation.property_city || <MissingInfo field="property_city" />}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-xs text-gray-500">Tag</span>
+                  <span className="text-sm text-gray-900 font-medium">{reservation.property_tag || <MissingInfo field="property_tag" />}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-xs text-gray-500">Okres</span>
                   <span className="text-sm text-gray-900">{reservation.property_period || <MissingInfo field="property_period" />}</span>
                 </div>
@@ -2908,9 +2914,9 @@ export default function ReservationDetailPage() {
                         </p>
                       </div>
                     </div>
-                    {!latestSignedCard && (
+                    {(
                       <div className="flex items-center gap-2 flex-wrap border border-gray-200 rounded-none px-3 py-2 bg-gray-50">
-                        <span className="text-xs font-medium text-gray-700">Przypomnij o podpisaniu karty:</span>
+                        <span className="text-xs font-medium text-gray-700">{latestSignedCard ? 'Wyślij wiadomość do klienta:' : 'Przypomnij o podpisaniu karty:'}</span>
                         <label className="flex items-center gap-1.5 text-sm cursor-pointer">
                           <input type="checkbox" checked={remindCardSms} onChange={(e) => setRemindCardSms(e.target.checked)} className="rounded border-gray-300" />
                           SMS

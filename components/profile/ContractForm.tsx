@@ -967,10 +967,9 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
         .page {
           width: 210mm;
           min-height: 297mm;
-          max-height: 297mm;
           padding: 12mm 12mm;
           box-sizing: border-box;
-          overflow: hidden;
+          overflow: visible;
           position: relative;
           font-size: 9pt;
           line-height: 1.3;
@@ -1235,7 +1234,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
           margin-top: 1rem;
           padding-top: 0.75rem;
           border-top: 2px solid #e0e0e0;
-          overflow: hidden;
+          overflow: visible;
         }
 
         .signature-row-single {

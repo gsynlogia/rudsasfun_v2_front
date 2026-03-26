@@ -752,9 +752,9 @@ export function AuthorizationForm({ reservationData, printMode = false }: Author
         .consent-box {
           margin: 1rem 0;
           padding: 0.75rem;
-          background: #fff5f5;
+          background: #f0f7ff;
           border-radius: 4px;
-          border: 1.5px solid #ffb3b3;
+          border: 1.5px solid #b3d4ff;
         }
 
         .consent-label {

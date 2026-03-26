@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 
 import { useToast } from '@/components/ToastContainer';
 import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
+import DateRangeCalendar from '@/components/admin/DateRangeCalendar';
 import { getExportSheetName } from '@/lib/exportExcelUtils';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
@@ -26,6 +27,7 @@ interface SearchFilters {
   campName: string;
   dateFrom: string;
   dateTo: string;
+  dateExcluded: string;
 }
 
 /**
@@ -1301,6 +1303,15 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const { showInfo, showSuccess, showError } = useToast();
   const { openDocument, close: closeRightPanel } = useAdminRightPanel();
   const [reservations, setReservations] = useState<ReservationPayment[]>([]);
+  // Duplikaty — imiona uczestników które wystąpiły więcej niż raz
+  const duplicateNames = useMemo(() => {
+    const counts = new Map<string, number>();
+    reservations.forEach(r => {
+      const name = (r.participantName || '').trim().toLowerCase();
+      if (name && name !== 'brak danych') counts.set(name, (counts.get(name) || 0) + 1);
+    });
+    return new Set([...counts.entries()].filter(([, c]) => c > 1).map(([name]) => name));
+  }, [reservations]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -1332,6 +1343,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     campName: searchParams?.get('camp') || '',
     dateFrom: searchParams?.get('date_from') || '',
     dateTo: searchParams?.get('date_to') || '',
+    dateExcluded: searchParams?.get('date_excluded') || '',
   }), [searchParams]);
 
   // Filter state - local inputs
@@ -1383,6 +1395,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         campName: campFromUrl,
         dateFrom: dateFromUrl,
         dateTo: dateToUrl,
+        dateExcluded: searchParams?.get('date_excluded') || '',
       };
       setFilters(urlFilters);
       setAppliedFilters(urlFilters);
@@ -1509,6 +1522,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     if (newFilters.campName) params.set('camp', newFilters.campName);
     if (newFilters.dateFrom) params.set('date_from', newFilters.dateFrom);
     if (newFilters.dateTo) params.set('date_to', newFilters.dateTo);
+    if (newFilters.dateExcluded) params.set('date_excluded', newFilters.dateExcluded);
 
     if (page > 1) params.set('page', page.toString());
     if (archive && archive !== 'active') params.set('archive', archive);
@@ -1585,9 +1599,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       campName: '',
       dateFrom: '',
       dateTo: '',
+      dateExcluded: '',
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
+    setCreatedAtExcludedDates(new Set());
     filtersRef.current = emptyFilters;
     setCurrentPage(1);
   }, []);
@@ -1800,6 +1816,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const [columnHeaderFilterInput, setColumnHeaderFilterInput] = useState<Record<string, string>>({});
   const [createdAtModalRangeDraft, setCreatedAtModalRangeDraft] = useState<{ from: string; to: string }>({ from: '', to: '' });
   const [createdAtHeaderRangeDraft, setCreatedAtHeaderRangeDraft] = useState<{ from: string; to: string }>({ from: '', to: '' });
+  const [createdAtExcludedDates, setCreatedAtExcludedDates] = useState<Set<string>>(new Set());
   // Która kolumna ma otwarty popover z powiększonym inputem (klik w pole pod ikoną filtra)
   const [expandedFilterInputColumn, setExpandedFilterInputColumn] = useState<string | null>(null);
   const headerFilterThRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
@@ -1893,7 +1910,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     return isNaN(parsed) ? null : parsed;
   };
 
-  const applyCreatedAtRangeFilter = useCallback((from: string, to: string) => {
+  const applyCreatedAtRangeFilter = useCallback((from: string, to: string, excluded?: Set<string>) => {
     let dateFrom = (from || '').trim();
     let dateTo = (to || '').trim();
     if (dateFrom && dateTo && dateFrom > dateTo) {
@@ -1903,6 +1920,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       ...filtersRef.current,
       dateFrom,
       dateTo,
+      dateExcluded: excluded ? [...excluded].join(',') : '',
     };
     setFilters(next);
     setAppliedFilters(next);
@@ -2178,14 +2196,14 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         case 'qualificationCardStatus':
           value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
             : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
-            : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje'
-            : '-';
+            : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje na weryfikację'
+            : 'Oczekuje na klienta';
           break;
         case 'contractStatus':
           value = reservation.contractStatus === 'approved' ? 'Zatwierdzona'
             : reservation.contractStatus === 'rejected' ? 'Odrzucona'
-            : reservation.contractStatus === 'pending' ? 'Oczekuje'
-            : '-';
+            : reservation.contractStatus === 'pending' ? 'Oczekuje na weryfikację'
+            : 'Oczekuje na klienta';
           break;
         case 'status':
           // Use payment status from database (already mapped to Polish in getPaymentStatusDisplay)
@@ -2682,8 +2700,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
   // Export to Excel (CSV format compatible with Excel)
   const handleExportToExcel = async () => {
-    // Get visible columns in order
-    const visibleCols = columnConfig.filter(col => col.visible);
+    // Get visible columns + always include essential columns (phone, email)
+    const essentialKeys = new Set(['guardianPhone', 'guardianEmail', 'participantName', 'reservationName']);
+    const visibleCols = columnConfig.filter(col => col.visible || essentialKeys.has(col.key));
 
     if (visibleCols.length === 0) {
       showError('Brak widocznych kolumn do eksportu');
@@ -2728,6 +2747,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       }
       if (appliedFilters.dateTo) {
         params.set('date_to', appliedFilters.dateTo);
+      }
+      if (appliedFilters.dateExcluded) {
+        params.set('date_excluded', appliedFilters.dateExcluded);
       }
 
       // Add archive filter
@@ -2807,8 +2829,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         const guardianName = firstParent
           ? `${firstParent.firstName || ''} ${firstParent.lastName || ''}`.trim()
           : '';
-        const guardianPhone = firstParent?.phoneNumber || '';
-        const guardianEmail = item.invoice_email || '';
+        const phonePrefix = (firstParent as any)?.phone || '';
+        const phoneNumber = firstParent?.phoneNumber || (firstParent as any)?.phone_number || '';
+        const guardianPhone = phoneNumber ? `${phonePrefix} ${phoneNumber}`.trim() : '';
+        const guardianEmail = firstParent?.email || item.invoice_email || '';
 
         // Check for addons (hasOaza, hasTarcza, etc.) based on selected_protection and selected_addons
         // Get protection names from protectionsMap for hasOaza/hasTarcza
@@ -2982,14 +3006,14 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             case 'qualificationCardStatus':
               value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
                 : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
-                : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje'
-                : '';
+                : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje na weryfikację'
+                : 'Oczekuje na klienta';
               break;
             case 'contractStatus':
               value = reservation.contractStatus === 'approved' ? 'Zatwierdzona'
                 : reservation.contractStatus === 'rejected' ? 'Odrzucona'
-                : reservation.contractStatus === 'pending' ? 'Oczekuje'
-                : '';
+                : reservation.contractStatus === 'pending' ? 'Oczekuje na weryfikację'
+                : 'Oczekuje na klienta';
               break;
             case 'status':
               const statusMapExport: Record<string, string> = {
@@ -3796,13 +3820,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       case 'qualificationCardStatus':
         return reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
           : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
-          : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje'
-          : '-';
+          : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje na weryfikację'
+          : 'Oczekuje na klienta';
       case 'contractStatus':
         return reservation.contractStatus === 'approved' ? 'Zatwierdzona'
           : reservation.contractStatus === 'rejected' ? 'Odrzucona'
-          : reservation.contractStatus === 'pending' ? 'Oczekuje'
-          : '-';
+          : reservation.contractStatus === 'pending' ? 'Oczekuje na weryfikację'
+          : 'Oczekuje na klienta';
       case 'status':
         // Use payment status from database (mapped to Polish for display)
         const statusMapCell: Record<string, string> = {
@@ -5035,7 +5059,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       <div className="bg-white shadow mt-2">
         <div
           ref={tableScrollContainerRef}
-          className="overflow-x-auto table-scroll-no-bar payments-table-scroll"
+          className="overflow-x-auto table-scroll-no-bar"
           onScroll={syncTableScrollToBar}
         >
           <table ref={tableElementRef} className="min-w-full divide-y divide-gray-200">
@@ -5199,9 +5223,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                               </td>
                             );
                           } else if (columnKey === 'participantName') {
+                            const isDuplicate = duplicateNames.has((reservation.participantName || '').trim().toLowerCase());
                             return (
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
-                                <span className="text-sm text-gray-900">
+                                <span className={`text-sm ${isDuplicate ? 'bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded font-medium' : 'text-gray-900'}`} title={isDuplicate ? 'Uczestnik z więcej niż jedną rezerwacją' : undefined}>
                                   {reservation.participantName}
                                 </span>
                               </td>
@@ -5461,10 +5486,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                                   </span>
                                 ) : reservation.qualificationCardStatus === 'pending' ? (
                                   <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
-                                    Oczekuje
+                                    Oczekuje na weryfikację
                                   </span>
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-500">
+                                    Oczekuje na klienta
+                                  </span>
                                 )}
                               </td>
                             );
@@ -5481,10 +5508,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                                   </span>
                                 ) : reservation.contractStatus === 'pending' ? (
                                   <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
-                                    Oczekuje
+                                    Oczekuje na weryfikację
                                   </span>
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-500">
+                                    Oczekuje na klienta
+                                  </span>
                                 )}
                               </td>
                             );
@@ -6248,7 +6277,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         ref={horizontalScrollBarRef}
         className="flex-shrink-0 overflow-x-auto border-t border-gray-200 bg-gray-50 payments-table-scroll"
         onScroll={syncBarScrollToTable}
-        style={{ height: 14, minHeight: 14, overflowY: 'hidden' }}
+        style={{ height: 18, minHeight: 18, overflowY: 'hidden' }}
       >
         <div style={{ width: tableScrollWidth, height: 1 }} aria-hidden />
       </div>
@@ -6345,52 +6374,23 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             </div>
 
             {openFilterColumn === 'createdAt' && (
-              <div className="mb-3 p-3 border border-gray-200 bg-gray-50">
-                <div className="text-xs font-medium text-gray-700 mb-2">Zakres dat rezerwacji</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Od</label>
-                    <input
-                      type="date"
-                      value={createdAtModalRangeDraft.from}
-                      onChange={(e) => setCreatedAtModalRangeDraft(prev => ({ ...prev, from: e.target.value }))}
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#03adf0]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Do</label>
-                    <input
-                      type="date"
-                      value={createdAtModalRangeDraft.to}
-                      onChange={(e) => setCreatedAtModalRangeDraft(prev => ({ ...prev, to: e.target.value }))}
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#03adf0]"
-                    />
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreatedAtModalRangeDraft({ from: '', to: '' });
-                      applyCreatedAtRangeFilter('', '');
-                    }}
-                    className="px-3 py-1.5 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200"
-                  >
-                    Wyczyść zakres
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyCreatedAtRangeFilter(createdAtModalRangeDraft.from, createdAtModalRangeDraft.to)}
-                    className="px-3 py-1.5 text-xs text-white bg-[#03adf0] hover:bg-[#0288c7]"
-                  >
-                    Zastosuj zakres
-                  </button>
-                </div>
-              </div>
+              <DateRangeCalendar
+                rangeFrom={createdAtModalRangeDraft.from}
+                rangeTo={createdAtModalRangeDraft.to}
+                excludedDates={createdAtExcludedDates}
+                onRangeChange={(from, to) => setCreatedAtModalRangeDraft({ from, to })}
+                onExcludedChange={setCreatedAtExcludedDates}
+                onApply={() => applyCreatedAtRangeFilter(createdAtModalRangeDraft.from, createdAtModalRangeDraft.to, createdAtExcludedDates)}
+                onClear={() => {
+                  setCreatedAtModalRangeDraft({ from: '', to: '' });
+                  setCreatedAtExcludedDates(new Set());
+                  applyCreatedAtRangeFilter('', '');
+                }}
+              />
             )}
 
-            {/* Values list - fixed height, load more on scroll */}
-            <div className="border border-gray-200" style={{ borderRadius: 0 }}>
+            {/* Values list - fixed height, load more on scroll (hidden for createdAt — uses calendar) */}
+            <div className={`border border-gray-200 ${openFilterColumn === 'createdAt' ? 'hidden' : ''}`} style={{ borderRadius: 0 }}>
               <div
                 ref={filterModalScrollRef}
                 className="h-[320px] overflow-y-auto"

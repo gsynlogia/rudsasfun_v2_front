@@ -897,8 +897,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
   // Map status
   const statusMap: Record<string, string> = {
-    'pending': 'Zarezerwowana',
-    'confirmed': 'Potwierdzona',
+    'pending': 'Zarezerwowana — oczekuje na dokumenty',
+    'confirmed': 'Potwierdzona — dokumenty zatwierdzone',
     'cancelled': 'Anulowana',
     'completed': 'Zakończona',
   };

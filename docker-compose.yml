@@ -1,0 +1,17 @@
+services:
+  frontend:
+    build: .
+    container_name: radsasfun-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mapowanie kodu — zmiany wykrywane automatycznie (next dev)
+      - .:/app
+      # Nie nadpisuj node_modules z hosta (użyj tych z kontenera)
+      - /app/node_modules
+      - /app/.next
+    env_file:
+      - .env
+    environment:
+      - WATCHPACK_POLLING=true
+    restart: unless-stopped

@@ -1011,6 +1011,14 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
 
           <h1 className="main-title">KARTA KWALIFIKACYJNA UCZESTNIKA WYPOCZYNKU LATO 2026</h1>
 
+          {!printMode && viewMode !== 'zatwierdzona' && (
+            <div className="no-print" style={{ background: '#f0f7ff', border: '1px solid #b3d4ff', borderRadius: '6px', padding: '0.8rem 1.2rem', marginBottom: '0.5rem' }}>
+              <p style={{ fontSize: '10pt', fontWeight: 600, color: '#0052a3', margin: 0 }}>
+                Sprawdź i wypełnij brakujące informacje, a następnie podpisz kartę kwalifikacyjną.
+              </p>
+            </div>
+          )}
+
           <div className="notice">
             Jest to dokument urzędowy i należy go wypełnić skrupulatnie, zgodnie z prawdą. Brak podpisu lub niewypełnienie karty kwalifikacyjnej może spowodować
             niedopuszczenie dziecka do zajęć, a nawet odesłanie z obozu na koszt rodziców (opiekunów) z przyczyn niezawinionych przez Organizatora.
@@ -1799,6 +1807,15 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               );
             })()}
           </section>
+
+          {/* Komunikat po podpisaniu — widoczny gdy dokument zatwierdzony */}
+          {viewMode === 'zatwierdzona' && effectiveLatestCardStatus === 'accepted' && (
+            <div className="no-print" style={{ marginTop: '1.5rem', padding: '1rem 1.5rem', background: '#d4edda', borderRadius: '6px', textAlign: 'center' }}>
+              <p style={{ fontSize: '10pt', fontWeight: 600, color: '#155724', margin: 0 }}>
+                Karta kwalifikacyjna została podpisana i zatwierdzona. Możesz ją wydrukować dla siebie.
+              </p>
+            </div>
+          )}
 
           {/* Część Organizatora */}
           <section className="section organizer-section">

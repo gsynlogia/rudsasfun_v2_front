@@ -37,9 +37,6 @@ function SystemAlertBanner() {
             <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
               Aby był jeszcze lepszy, szybszy i wygodniejszy w obsłudze. W trakcie zmian mogą pojawić się drobne błędy — przepraszamy za ewentualne niedogodności.
             </p>
-            <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
-              Aktualnie nie generujemy umów ani kart kwalifikacyjnych. Zgodnie z regulaminem, rezerwacja dokonana w Panelu Klienta stanowi umowę wstępną. Poinformujemy SMSem o gotowej umowie. Dziękujemy za cierpliwość.
-            </p>
           </div>
         )}
       </div>
