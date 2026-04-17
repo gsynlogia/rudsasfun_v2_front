@@ -29,6 +29,7 @@ import DashedLine from '../DashedLine';
 
 
 import AdditionalServicesTiles from './AdditionalServicesTiles';
+import PromotionV2Snapshot from './PromotionV2Snapshot';
 
 /** Linki do Map Google dla nazw ośrodków (otwierane w nowej karcie) */
 const CENTER_MAP_LINKS: Record<string, string> = {
@@ -1110,44 +1111,50 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
               <div className="text-xs sm:text-sm text-gray-700">{dietDisplay}</div>
             </div>
             <div>
-              <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Promocja</h5>
-              <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-gray-700">
-                <span>{promotion}</span>
-                {reservation.promotion_price !== null && reservation.promotion_price !== undefined && (
-                  <span>{reservation.promotion_price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł</span>
-                )}
-              </div>
+              {/* §16.B1 — Snapshot v2 (promocja + kod rabatowy); komponent sam ukrywa się gdy rezerwacja to legacy */}
+              <PromotionV2Snapshot reservationId={reservation.id} authToken={authService.getToken()} />
+              {/* Stary kafel „Promocja" — renderowany TYLKO dla rezerwacji legacy (mają selected_promotion lub promotion_name);
+                  nagłówek §14.13: „Promocje i Rabaty". */}
               {hasPromotion && (
-                <div className="mt-2">
-                  {hasJustificationData(reservation.promotion_justification) ? (
-                    <div className="space-y-1 text-xs sm:text-sm text-gray-700">
-                      {formatJustification(reservation.promotion_justification).map((line, idx) => (
-                        <div key={idx}>{line}</div>
-                      ))}
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const type = getPromotionType(reservation.promotion_name || reservation.selected_promotion || '');
-                        if (type === 'first_minute' && (!justificationDraft.reason || justificationDraft.reason.trim() === '')) {
-                          setJustificationDraft({
-                            ...justificationDraft,
-                            reason: 'Promocja - First Minute',
-                          });
-                        } else {
-                          setJustificationDraft(reservation.promotion_justification || {});
-                        }
-                        setJustificationError(null);
-                        setShowJustificationModal(true);
-                      }}
-                      className="text-xs px-3 py-1 bg-[#03adf0] text-white rounded hover:bg-[#0288c7] transition-colors"
-                      disabled={savingJustification}
-                    >
-                      Dodaj uzasadnienie
-                    </button>
-                  )}
-                </div>
+                <>
+                  <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Promocje i Rabaty</h5>
+                  <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-gray-700">
+                    <span>{promotion}</span>
+                    {reservation.promotion_price !== null && reservation.promotion_price !== undefined && (
+                      <span>{reservation.promotion_price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł</span>
+                    )}
+                  </div>
+                  <div className="mt-2">
+                    {hasJustificationData(reservation.promotion_justification) ? (
+                      <div className="space-y-1 text-xs sm:text-sm text-gray-700">
+                        {formatJustification(reservation.promotion_justification).map((line, idx) => (
+                          <div key={idx}>{line}</div>
+                        ))}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const type = getPromotionType(reservation.promotion_name || reservation.selected_promotion || '');
+                          if (type === 'first_minute' && (!justificationDraft.reason || justificationDraft.reason.trim() === '')) {
+                            setJustificationDraft({
+                              ...justificationDraft,
+                              reason: 'Promocja - First Minute',
+                            });
+                          } else {
+                            setJustificationDraft(reservation.promotion_justification || {});
+                          }
+                          setJustificationError(null);
+                          setShowJustificationModal(true);
+                        }}
+                        className="text-xs px-3 py-1 bg-[#03adf0] text-white rounded hover:bg-[#0288c7] transition-colors"
+                        disabled={savingJustification}
+                      >
+                        Dodaj uzasadnienie
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
