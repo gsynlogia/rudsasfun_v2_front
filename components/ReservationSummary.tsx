@@ -220,17 +220,26 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
         {/* Additional items (diet, accommodation, etc.) */}
         {additionalItems.length > 0 && (
           <div className="w-full mb-2">
-            {additionalItems.map((item: ReservationItem) => (
-              <div
-                key={item.id}
-                className="text-sm text-gray-600 mb-1 flex items-center justify-between w-full"
-              >
-                <span>{item.name}</span>
-                <span className="font-medium">
-                  {item.price > 0 ? '+' : ''}{item.price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
-                </span>
-              </div>
-            ))}
+            {additionalItems.map((item: ReservationItem) => {
+              // §14.8 + makieta 14.56.23: promocja i kod rabatowy w osobnym zielonym wierszu
+              const isPromoRow = item.type === 'promotion' || item.type === 'promo_code';
+              const notReducing = isPromoRow && item.metadata?.doesNotReducePrice;
+              return (
+                <div
+                  key={item.id}
+                  className={`text-sm mb-1 flex items-center justify-between w-full ${isPromoRow ? 'text-green-600 font-medium' : 'text-gray-600'}`}
+                >
+                  <span>{item.name}</span>
+                  <span className={isPromoRow ? 'font-semibold' : 'font-medium'}>
+                    {notReducing ? (
+                      <span className="text-xs text-gray-500">(nie obniża ceny)</span>
+                    ) : (
+                      <>{item.price > 0 ? '+' : ''}{item.price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł</>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -292,8 +301,9 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                   return true;
                 })
                 .map((item: ReservationItem) => {
-                  // For promotions that don't reduce price, show original price but don't add to total
-                  const isPromotionNotReducingPrice = item.type === 'promotion' && item.metadata?.doesNotReducePrice;
+                  // For promotions / promo_codes that don't reduce price (bon/atrakcja/gadżet), show info instead of price
+                  const isPromoRow = item.type === 'promotion' || item.type === 'promo_code';
+                  const isPromotionNotReducingPrice = isPromoRow && item.metadata?.doesNotReducePrice;
                   const displayPrice = isPromotionNotReducingPrice && item.metadata?.originalPrice !== undefined
                     ? item.metadata.originalPrice
                     : item.price;
@@ -301,10 +311,10 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                   return (
                     <div
                       key={item.id}
-                      className="text-xs sm:text-sm text-gray-600 flex items-center justify-between"
+                      className={`text-xs sm:text-sm flex items-center justify-between ${isPromoRow ? 'text-green-600' : 'text-gray-600'}`}
                     >
-                      <span>{item.name}</span>
-                      <span className="font-medium text-gray-900">
+                      <span className={isPromoRow ? 'font-medium' : ''}>{item.name}</span>
+                      <span className={`font-medium ${isPromoRow ? 'text-green-700' : 'text-gray-900'}`}>
                         {isPromotionNotReducingPrice ? (
                           <span className="text-gray-500">
                             {displayPrice > 0 ? '+' : ''}{displayPrice.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
