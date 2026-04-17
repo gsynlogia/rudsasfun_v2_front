@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import AdminPromoCodeOverridePanel from '@/components/admin/AdminPromoCodeOverridePanel';
 import { ContractEditPanel } from '@/components/admin/ContractEditPanel';
 import { QualificationTemplateNew } from '@/components/admin/QualificationTemplateNew';
 import { ReservationDetailRightSidebar, RIGHT_SIDEBAR_WIDTH } from '@/components/admin/ReservationDetailRightSidebar';
@@ -3595,6 +3596,13 @@ export default function ReservationDetailPage() {
             {/* §16.C1 — Snapshot v2 (promocja + kod rabatowy + custom_values); sam ukrywa się dla legacy */}
             <div className="mb-4">
               <PromotionV2Snapshot reservationId={reservation.id} authToken={authService.getToken()} />
+            </div>
+            {/* §16.C2 — Override kodu per rezerwacja (admin wpisuje kod za klienta / nadpisuje kwotę) */}
+            <div className="mb-4">
+              <AdminPromoCodeOverridePanel
+                reservationId={reservation.id}
+                onSaved={refetchReservation}
+              />
             </div>
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
               {/* §14.13 nagłówek: „Promocje i Rabaty" */}
