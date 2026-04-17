@@ -173,6 +173,26 @@ export default function PromotionsAndRabatySection({ propertyId, userEmail, init
   const promotionDiscount = selectedPromo ? (selectedPromo.applied_discount ?? selectedPromo.kwota7 ?? 0) : 0;
   const codeDiscount = codeResult?.discount || 0;
 
+  // P0-4: wystaw globalny walidator — Step2.validateStep2 używa go, żeby zablokować
+  // przejście gdy promocja wymaga uzasadnienia a wymagane pola są puste.
+  useEffect(() => {
+    const isValid = (): boolean => {
+      if (!selectedPromo) return true;
+      if (!selectedPromo.wymaga_uzasadnienia) return true;
+      const requiredFields = (selectedPromo.custom_fields || []).filter((f) => f.required);
+      return requiredFields.every((f) => {
+        const v = customValues[f.label];
+        if (f.field_type === 'checkbox') return v === true;
+        if (v === undefined || v === null) return false;
+        return typeof v === 'string' ? v.trim().length > 0 : true;
+      });
+    };
+    (window as any).validatePromotionsAndRabaty = isValid;
+    return () => {
+      delete (window as any).validatePromotionsAndRabaty;
+    };
+  }, [selectedPromo, customValues]);
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">Promocje i Rabaty</h3>

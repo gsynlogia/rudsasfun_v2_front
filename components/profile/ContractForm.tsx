@@ -122,7 +122,14 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
         const res = await fetch(`${API}/api/v2/reservations/${reservationId}/promotion-v2`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
-        if (!res.ok) return;
+        // P1-6: 404 = legacy rezerwacja bez snapshotu, cisza OK. Inne błędy (500/sieć/auth) logujemy,
+        // żeby problem nie pozostał niewidoczny.
+        if (!res.ok) {
+          if (res.status !== 404) {
+            console.warn(`[ContractForm] Nie udało się pobrać snapshotu rabatu (${res.status}) dla rezerwacji ${reservationId}`);
+          }
+          return;
+        }
         const snap: {
           promo_code_snapshot?: { kod?: string; kategoria?: string; opis?: string; applied_discount?: number } | null;
           applied_promo_code_discount?: number;
@@ -162,8 +169,9 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
         } else {
           setRabatRow({ label: `Kod rabatowy ${code.kod}`, amount: applied > 0 ? -applied : null });
         }
-      } catch {
-        // brak snapshotu / rezerwacja legacy — nic nie renderujemy
+      } catch (err) {
+        // P1-6: sieć/parse error (non-HTTP) — loguj, żeby nie zniknął w ciszy
+        console.warn(`[ContractForm] Błąd fetch snapshotu rabatu dla rezerwacji ${reservationId}:`, err);
       }
     })();
     return () => { cancelled = true; };

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 
 import type { StepComponentProps } from '@/types/reservation';
 import { useReservation } from '@/context/ReservationContext';
-import { loadStep2FormData, saveStep2FormData, loadStep3FormData } from '@/utils/sessionStorage';
+import { loadStep1FormData, loadStep2FormData, saveStep2FormData, loadStep3FormData } from '@/utils/sessionStorage';
 
 import DashedLine from './DashedLine';
 import AddonsSection from './step2/AddonsSection';
@@ -39,8 +39,13 @@ export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabl
     return null;
   }, [pathname]);
 
-  // userEmail z zapisanego Step 3 (jeśli klient wrócił z dalszego kroku)
+  // P1-4: userEmail najpierw ze Step 1 (opiekun1 — e-mail wpisany już w kroku 1),
+  // fallback na Step 3 (privateData). Bez tego per-email usage check nie działa
+  // gdy klient pierwszy raz wchodzi na Step 2 (Step 3 jeszcze pusty).
   const userEmail = useMemo<string | null>(() => {
+    const step1 = loadStep1FormData();
+    const firstParentEmail = step1?.parents?.[0]?.email;
+    if (firstParentEmail && firstParentEmail.trim()) return firstParentEmail.trim();
     const step3 = loadStep3FormData();
     if (step3?.privateData?.email) return step3.privateData.email;
     return null;
@@ -119,8 +124,12 @@ export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabl
     const validateSource = (window as any).validateSourceSection;
     const sourceValid = validateSource ? validateSource() : false;
 
-    // Promocje/kody v2 — sekcja sama waliduje przez disabled buttony; brak globalnego blocker'a
-    return transportValid && sourceValid;
+    // P0-4: walidacja Promocji i Rabatów — wymagane custom_fields (imię rodzeństwa,
+    // deklaracja "Obozy na maxa" itd.) muszą być wypełnione, inaczej blokada przejścia dalej.
+    const validatePromotions = (window as any).validatePromotionsAndRabaty;
+    const promotionsValid = validatePromotions ? validatePromotions() : true;
+
+    return transportValid && sourceValid && promotionsValid;
   }, []);
 
   // Expose combined validation function

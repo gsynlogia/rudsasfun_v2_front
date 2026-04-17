@@ -55,6 +55,14 @@ export default function AdminPromoCodeOverridePanel({ reservationId, onSaved }: 
   }, [reservationId]);
 
   const handleSave = async () => {
+    // P0-2: walidacja przed wysyłką — kwota musi być >= 0 i liczbowa
+    if (discount.trim()) {
+      const n = parseFloat(discount);
+      if (Number.isNaN(n) || n < 0) {
+        setMessage({ type: 'err', text: 'Kwota rabatu musi być liczbą ≥ 0.' });
+        return;
+      }
+    }
     setSaving(true);
     setMessage(null);
     try {

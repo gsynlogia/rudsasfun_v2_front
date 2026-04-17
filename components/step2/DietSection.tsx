@@ -183,6 +183,11 @@ export default function DietSection() {
         : (savedData?.selectedProtection ? [savedData.selectedProtection] : []),
       selectedPromotion: savedData?.selectedPromotion || '',
       promotionJustification: savedData?.promotionJustification || {}, // Preserve promotion justification
+      // P1-2: zachowaj wybór promocji/kodu v2, inaczej zmiana diety kasuje rabat w sessionStorage
+      promotionV2Id: savedData?.promotionV2Id ?? null,
+      promotionV2CustomValues: savedData?.promotionV2CustomValues ?? null,
+      promoCodeId: savedData?.promoCodeId ?? null,
+      promoCodeResult: savedData?.promoCodeResult ?? null,
       transportData: savedData?.transportData || {
         departureType: '',
         departureCity: '',
