@@ -182,7 +182,23 @@ export interface Step2FormData {
   selectedProtection: string[]; // Array of protection IDs (can select multiple)
   selectedProtectionIds?: number[]; // Array of protection IDs (numeric, for ProtectionsSection)
   selectedPromotion: string;
-  promotionJustification?: Record<string, any>; // Justification data for promotion
+  promotionJustification?: Record<string, any>; // Justification data for promotion (legacy)
+  // === Promocje V2 (task 0002 §16.A3) ===
+  promotionV2Id?: number | null;
+  promotionV2CustomValues?: Record<string, string | number | boolean> | null;
+  promoCodeId?: number | null;
+  promoCodeResult?: {
+    valid: boolean;
+    type: 'prawidlowy' | 'nieprawidlowy' | 'nie_laczy_z_promocja';
+    kod: string;
+    kategoria?: 'obniza_cene' | 'nie_obniza_ceny' | 'atrakcja' | 'gadzet';
+    opis?: string;
+    discount?: number;
+    promocja_mode?: 'laczy' | 'nie_laczy' | 'obniza_promocje_50';
+    message: string;
+    message_color: 'green' | 'red';
+    promo_code_id?: number;
+  } | null;
   transportData: {
     departureType: string;
     departureCity: string;
