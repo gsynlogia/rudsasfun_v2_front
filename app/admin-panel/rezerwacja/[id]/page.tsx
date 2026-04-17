@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import AdminCreateAnnexButton from '@/components/admin/AdminCreateAnnexButton';
 import AdminPromoCodeOverridePanel from '@/components/admin/AdminPromoCodeOverridePanel';
 import { ContractEditPanel } from '@/components/admin/ContractEditPanel';
 import { QualificationTemplateNew } from '@/components/admin/QualificationTemplateNew';
@@ -3602,6 +3603,14 @@ export default function ReservationDetailPage() {
               <AdminPromoCodeOverridePanel
                 reservationId={reservation.id}
                 onSaved={refetchReservation}
+              />
+            </div>
+            {/* §16.C3 — Utwórz aneks promocyjny (widoczny tylko gdy umowa podpisana); HTML+email, bez SMS, bez PDF */}
+            <div className="mb-4">
+              <AdminCreateAnnexButton
+                reservationId={reservation.id}
+                contractStatus={reservation.contract_status}
+                onCreated={refetchReservation}
               />
             </div>
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
