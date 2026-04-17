@@ -55,14 +55,16 @@ export default function PromotionsAndRabatySection({ propertyId, userEmail, init
     (async () => {
       setLoadingPromos(true);
       try {
-        const res = await fetch(`${API}/api/v2/promotions/available/list`);
+        // §16.A6 — property_id pozwala backendowi wyliczyć applied_discount zgodne z days_count turnusu
+        const url = `${API}/api/v2/promotions/available/list${propertyId ? `?property_id=${propertyId}` : ''}`;
+        const res = await fetch(url);
         const data = await res.json();
         setPromotions(Array.isArray(data) ? data : []);
       } finally {
         setLoadingPromos(false);
       }
     })();
-  }, []);
+  }, [propertyId]);
 
   // Auto-fill kod z query param ?promo_code=X (Faza 7e — auto-fill link)
   useEffect(() => {
@@ -78,13 +80,16 @@ export default function PromotionsAndRabatySection({ propertyId, userEmail, init
 
   useEffect(() => {
     const promo = promotions.find((p) => p.id === selectedPromotionId) || null;
+    // §16.A6 — preferuj applied_discount (zgodne z days_count turnusu) z backendu,
+    // fallback do kwota7 gdy lista pobrana bez property_id (np. w teście)
+    const discount = promo ? (promo.applied_discount ?? promo.kwota7 ?? 0) : 0;
     onChange({
       promotion_v2_id: selectedPromotionId,
       promotion_v2_custom_values: Object.keys(customValues).length > 0 ? customValues : null,
       promo_code_id: codeResult?.promo_code_id ?? null,
       promo_code_result: codeResult,
       promotion_v2_name: promo?.nazwa ?? null,
-      promotion_v2_discount: promo ? (promo.kwota7 || 0) : 0,  // TODO §16.A6 — days_count aware
+      promotion_v2_discount: discount,
     });
   }, [selectedPromotionId, customValues, codeResult, onChange, promotions]);
 
@@ -164,7 +169,8 @@ export default function PromotionsAndRabatySection({ propertyId, userEmail, init
     setPendingKod(null);
   };
 
-  const promotionDiscount = selectedPromo ? (selectedPromo.kwota7 || 0) : 0;  // uproszczenie — szczegóły dni turnusu w sidebarze
+  // §16.A6 — applied_discount z backendu (per days_count); fallback kwota7 tylko gdy lista bez property_id
+  const promotionDiscount = selectedPromo ? (selectedPromo.applied_discount ?? selectedPromo.kwota7 ?? 0) : 0;
   const codeDiscount = codeResult?.discount || 0;
 
   return (
@@ -183,11 +189,15 @@ export default function PromotionsAndRabatySection({ propertyId, userEmail, init
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-[#00adee]"
             >
               <option value="">Brak promocji</option>
-              {promotions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nazwa} {p.kwota7 ? `-${p.kwota7} zł (7d)` : ''}
-                </option>
-              ))}
+              {promotions.map((p) => {
+                // §16.A6 — etykieta opcji używa applied_discount (dla bieżącego turnusu) jeśli dostępne
+                const kwota = p.applied_discount ?? p.kwota7;
+                return (
+                  <option key={p.id} value={p.id}>
+                    {p.nazwa}{kwota ? ` -${kwota} zł` : ''}
+                  </option>
+                );
+              })}
             </select>
             <p className="text-xs text-gray-500 mt-2">Promocje nie łączą się. Możesz wybrać tylko jedną promocję.</p>
           </div>

@@ -30,6 +30,8 @@ export interface PromotionV2 {
   data_wygasniecia?: string | null;
   godzina_wygasniecia?: string | null;
   custom_fields: PromotionV2CustomField[];
+  // §16.A6 — wypełniane tylko w `/available/list?property_id=X` (kwota dla konkretnego turnusu)
+  applied_discount?: number | null;
 }
 
 export interface PromoCodeTargets {
