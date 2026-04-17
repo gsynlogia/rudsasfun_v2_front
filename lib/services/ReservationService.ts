@@ -56,7 +56,11 @@ export interface CreateReservationRequest {
     selectedAddons?: string[];
     selectedProtection?: string[]; // Array of protection IDs
     selectedPromotion?: string;
-    promotionJustification?: Record<string, any>; // Uzasadnienie wyboru promocji
+    promotionJustification?: Record<string, any>; // Uzasadnienie wyboru promocji (legacy)
+    // === Promocje V2 (task 0002 §16.A4) ===
+    promotionV2Id?: number | null;
+    promotionV2CustomValues?: Record<string, string | number | boolean> | null;
+    promoCodeId?: number | null;
     transportData: {
       departureType: 'zbiorowy' | 'wlasny';
       departureCity?: string;
@@ -535,6 +539,9 @@ class ReservationService {
         selectedProtection: step2Data.selectedProtection,
         selectedPromotion: step2Data.selectedPromotion,
         promotionJustification: step2Data.promotionJustification,
+        promotionV2Id: step2Data.promotionV2Id ?? null,
+        promotionV2CustomValues: step2Data.promotionV2CustomValues ?? null,
+        promoCodeId: step2Data.promoCodeId ?? null,
         transportData: {
           departureType: step2Data.transportData.departureType as 'zbiorowy' | 'wlasny',
           departureCity: step2Data.transportData.departureCity,

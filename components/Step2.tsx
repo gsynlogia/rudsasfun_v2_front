@@ -4,6 +4,7 @@ import { useEffect, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 
 import type { StepComponentProps } from '@/types/reservation';
+import { useReservation } from '@/context/ReservationContext';
 import { loadStep2FormData, saveStep2FormData, loadStep3FormData } from '@/utils/sessionStorage';
 
 import DashedLine from './DashedLine';
@@ -19,6 +20,7 @@ import TransportSection from './step2/TransportSection';
  */
 export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabled: _disabled = false }: StepComponentProps) {
   const pathname = usePathname();
+  const { addReservationItem, removeReservationItemsByType } = useReservation();
 
   // propertyId wyciągany z URL: /camps/{campId}/edition/{editionId}/property/{propertyId}/step/2
   const propertyId = useMemo<number | null>(() => {
@@ -56,7 +58,8 @@ export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabl
     };
   }, []);
 
-  // Persystencja wyboru promocji/kodu v2 do sessionStorage po zmianie w komponencie
+  // Persystencja wyboru promocji/kodu v2 + aktualizacja sidebar "Twoja rezerwacja".
+  // Tylko `obniza_cene` kod wpływa cenowo; bon/atrakcja/gadżet są wyświetlane bez wpływu na total.
   const handlePromotionsChange = useCallback((sel: PromotionAndCodeSelection) => {
     const current = loadStep2FormData();
     const base = current || {
@@ -79,7 +82,32 @@ export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabl
       promoCodeId: sel.promo_code_id,
       promoCodeResult: sel.promo_code_result,
     });
-  }, []);
+
+    // Sidebar "Twoja rezerwacja" — promocja
+    if (sel.promotion_v2_id && sel.promotion_v2_name) {
+      addReservationItem({
+        name: `Promocja "${sel.promotion_v2_name}"`,
+        price: -(sel.promotion_v2_discount || 0),
+        type: 'promotion',
+      }, `promotion-v2-${sel.promotion_v2_id}`);
+    } else {
+      removeReservationItemsByType('promotion');
+    }
+
+    // Sidebar "Twoja rezerwacja" — kod rabatowy
+    const r = sel.promo_code_result;
+    if (r && r.valid && r.promo_code_id) {
+      const discount = r.kategoria === 'obniza_cene' ? (r.discount || 0) : 0;
+      addReservationItem({
+        name: `Kod rabatowy ${r.kod}`,
+        price: -discount,
+        type: 'promo_code',
+        metadata: r.kategoria !== 'obniza_cene' ? { doesNotReducePrice: true } : undefined,
+      }, `promo-code-${r.promo_code_id}`);
+    } else {
+      removeReservationItemsByType('promo_code');
+    }
+  }, [addReservationItem, removeReservationItemsByType]);
 
   // Combined validation function for Step2 (Transport + Source + Promotions)
   const validateStep2 = useCallback((): boolean => {

@@ -22,6 +22,10 @@ export interface PromotionAndCodeSelection {
   promotion_v2_custom_values: Record<string, string | number | boolean> | null;
   promo_code_id: number | null;
   promo_code_result: ValidationResponse | null;
+  // Uproszczone pola do wyświetlenia w sidebar "Twoja rezerwacja" (task 0002 §16.A4).
+  // Wyliczenie kwota7/kwota10 zgodne z days_count turnusu w §16.A6.
+  promotion_v2_name: string | null;
+  promotion_v2_discount: number;
 }
 
 interface Props {
@@ -73,13 +77,16 @@ export default function PromotionsAndRabatySection({ propertyId, userEmail, init
   }, []);
 
   useEffect(() => {
+    const promo = promotions.find((p) => p.id === selectedPromotionId) || null;
     onChange({
       promotion_v2_id: selectedPromotionId,
       promotion_v2_custom_values: Object.keys(customValues).length > 0 ? customValues : null,
       promo_code_id: codeResult?.promo_code_id ?? null,
       promo_code_result: codeResult,
+      promotion_v2_name: promo?.nazwa ?? null,
+      promotion_v2_discount: promo ? (promo.kwota7 || 0) : 0,  // TODO §16.A6 — days_count aware
     });
-  }, [selectedPromotionId, customValues, codeResult, onChange]);
+  }, [selectedPromotionId, customValues, codeResult, onChange, promotions]);
 
   const selectedPromo = promotions.find((p) => p.id === selectedPromotionId);
 
