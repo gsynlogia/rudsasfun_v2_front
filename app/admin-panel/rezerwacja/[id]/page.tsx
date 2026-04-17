@@ -11,8 +11,10 @@ import { ReservationDetailRightSidebar, RIGHT_SIDEBAR_WIDTH } from '@/components
 import SectionGuard from '@/components/admin/SectionGuard';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { ContractForm } from '@/components/profile/ContractForm';
+import PromotionV2Snapshot from '@/components/profile/PromotionV2Snapshot';
 import { useToast } from '@/components/ToastContainer';
 import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
+import { authService } from '@/lib/services/AuthService';
 import type { ReservationData } from '@/lib/contractReservationMapping';
 import { mapReservationToContractForm } from '@/lib/contractReservationMapping';
 import { mapReservationToQualificationForm, type SignedQualificationPayload } from '@/lib/qualificationReservationMapping';
@@ -3590,8 +3592,13 @@ export default function ReservationDetailPage() {
 
             {activePanel === 'promocje-transport' && (
             <>
+            {/* §16.C1 — Snapshot v2 (promocja + kod rabatowy + custom_values); sam ukrywa się dla legacy */}
+            <div className="mb-4">
+              <PromotionV2Snapshot reservationId={reservation.id} authToken={authService.getToken()} />
+            </div>
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
-              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Promocje</h2>
+              {/* §14.13 nagłówek: „Promocje i Rabaty" */}
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Promocje i Rabaty</h2>
               <div className="space-y-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   <label className="text-sm font-medium text-gray-700">Promocja:</label>
