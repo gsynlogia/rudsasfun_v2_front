@@ -678,41 +678,88 @@ export default function Downloads() {
                           const annexes = annexesByReservation.get(reservationId) || [];
                           const pendingAnnexes = annexes.filter((a) => a.status === 'pending_signing');
                           if (pendingAnnexes.length === 0) return null;
+                          // §16.D2 — aneksy promocyjne (change_type='promotion') akceptowane linkiem/przyciskiem (BEZ SMS)
+                          const pendingPromotion = pendingAnnexes.filter((a) => a.change_type === 'promotion');
+                          const pendingOther = pendingAnnexes.filter((a) => a.change_type !== 'promotion');
                           return (
-                            <div className="mb-4">
-                              <h4 className="text-sm font-semibold text-gray-800 mb-2">Aneksy do umowy – do podpisania</h4>
-                              <ul className="space-y-2 mb-3">
-                                {pendingAnnexes.map((a) => (
-                                  <li key={a.id} className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 rounded p-2 text-sm">
-                                    <span className="flex-1 text-gray-800">{a.description}</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => { setCancelAnnexId(a.id); setCancelAnnexReason(''); }}
-                                      className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs font-medium"
-                                    >
-                                      Anuluj
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  try {
-                                    const res = await authenticatedApiCall<{ document_id: number }>(
-                                      '/api/annexes/request-batch-sign',
-                                      { method: 'POST', body: JSON.stringify({ reservation_id: reservationId, annex_ids: pendingAnnexes.map((a) => a.id) }) },
-                                    );
-                                    setBatchSignDocId(res.document_id);
-                                    setBatchSignCode('');
-                                  } catch (e) {
-                                    alert(e instanceof Error ? e.message : 'Błąd wysyłki kodu SMS');
-                                  }
-                                }}
-                                className="px-3 py-2 bg-[#03adf0] text-white text-sm rounded hover:bg-[#0288c7]"
-                              >
-                                Podpisz wszystkie dokumenty (1 SMS)
-                              </button>
+                            <div className="mb-4 space-y-4">
+                              {pendingPromotion.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Aneksy promocyjne – do akceptacji</h4>
+                                  <ul className="space-y-2">
+                                    {pendingPromotion.map((a) => (
+                                      <li key={a.id} className="flex items-center justify-between gap-2 bg-blue-50 border border-blue-200 rounded p-2 text-sm">
+                                        <span className="flex-1 text-gray-800">{a.description}</span>
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            try {
+                                              await authenticatedApiCall(`/api/annexes/${a.id}/accept-email`, { method: 'POST' });
+                                              setAnnexesByReservation((prev) => {
+                                                const next = new Map(prev);
+                                                const list = (next.get(reservationId) || []).map((x) =>
+                                                  x.id === a.id ? { ...x, status: 'signed', signed_at: new Date().toISOString() } : x,
+                                                );
+                                                next.set(reservationId, list);
+                                                return next;
+                                              });
+                                            } catch (e) {
+                                              alert(e instanceof Error ? e.message : 'Błąd akceptacji aneksu');
+                                            }
+                                          }}
+                                          className="px-3 py-1 bg-[#03adf0] text-white rounded text-xs font-medium hover:bg-[#0288c7]"
+                                        >
+                                          Akceptuję zmianę
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => { setCancelAnnexId(a.id); setCancelAnnexReason(''); }}
+                                          className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs font-medium"
+                                        >
+                                          Anuluj
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {pendingOther.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Aneksy do umowy – do podpisania</h4>
+                                  <ul className="space-y-2 mb-3">
+                                    {pendingOther.map((a) => (
+                                      <li key={a.id} className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 rounded p-2 text-sm">
+                                        <span className="flex-1 text-gray-800">{a.description}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => { setCancelAnnexId(a.id); setCancelAnnexReason(''); }}
+                                          className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs font-medium"
+                                        >
+                                          Anuluj
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        const res = await authenticatedApiCall<{ document_id: number }>(
+                                          '/api/annexes/request-batch-sign',
+                                          { method: 'POST', body: JSON.stringify({ reservation_id: reservationId, annex_ids: pendingOther.map((a) => a.id) }) },
+                                        );
+                                        setBatchSignDocId(res.document_id);
+                                        setBatchSignCode('');
+                                      } catch (e) {
+                                        alert(e instanceof Error ? e.message : 'Błąd wysyłki kodu SMS');
+                                      }
+                                    }}
+                                    className="px-3 py-2 bg-[#03adf0] text-white text-sm rounded hover:bg-[#0288c7]"
+                                  >
+                                    Podpisz wszystkie dokumenty (1 SMS)
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
