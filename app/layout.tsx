@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { headers } from 'next/headers';
 
 import DevBanner from '@/components/DevBanner';
 import MaintenancePage from '@/components/MaintenancePage';
@@ -9,6 +10,19 @@ import { ReservationProvider } from '@/context/ReservationContext';
 import { getGtmId, isGtmEnabled } from '@/utils/gtm-config';
 
 import './globals.css';
+
+const PROD_HOSTS = new Set([
+  'rezerwacja.radsas-fun.pl',
+  'www.radsas-fun.pl',
+  'radsas-fun.pl',
+  'rejestracja.radsasfun.system-app.pl',
+]);
+
+function isProdHost(host: string | null): boolean {
+  if (!host) return false;
+  const hostname = host.split(':')[0].toLowerCase();
+  return PROD_HOSTS.has(hostname);
+}
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -25,14 +39,16 @@ export const metadata: Metadata = {
   description: 'System rezerwacji obozów i wycieczek RADSASfun',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   // Check if portal is offline for maintenance
   const isOffPortal = process.env.NEXT_PUBLIC_OFF_PORTAL === 'true';
-  const gtmEnabled = isGtmEnabled();
+  // GTM (i wstrzykiwany przez nie Cookiebot) — tylko na produkcyjnych domenach
+  const host = (await headers()).get('host');
+  const gtmEnabled = isProdHost(host) && isGtmEnabled();
   const gtmId = getGtmId();
 
   return (
