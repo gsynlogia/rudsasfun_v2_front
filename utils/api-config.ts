@@ -93,7 +93,10 @@ export function getApiBaseUrlRuntime(): string {
  */
 export const API_BASE_URL = typeof window !== 'undefined'
   ? getApiBaseUrl() // Client-side: calculate at runtime (will detect Vercel and use production)
-  : (process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl'); // Server-side: use env var or production default
+  // Server-side (SSR): preferuj INTERNAL_API_URL (dla Docker: http://backend:8000) —
+  // w kontenerze localhost to sam kontener, więc musimy iść przez nazwę usługi z docker-compose.
+  // Fallback na NEXT_PUBLIC_API_URL dla dev bez Dockera / prod.
+  : (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl');
 
 /**
  * Get full URL for static assets (icons, images, etc.)

@@ -13,10 +13,20 @@ interface Props {
   onSaved: () => void;
 }
 
+interface DateRangeOption {
+  start_date: string;  // "YYYY-MM-DD"
+  end_date: string;
+  property_ids: number[];  // wszystkie turnusy z tymi datami (różne ośrodki)
+}
+
 interface TargetOptions {
-  camps: { id: number; name: string }[];
-  properties: { id: number; camp_id: number; label: string; tag: string | null }[];
-  tags: string[];
+  // Ośrodki = distinct CampProperty.city (np. BEAVER/LIMBA/SAWA). Temat obozu jest w `tags`.
+  centers: string[];
+  // Terminy = unikalne zakresy dat (tygodnie wakacji). Każdy z listą property_ids,
+  // które admin zapisze przy wyborze. Zmiana dat turnusu → endpoint zwraca nowe date_ranges.
+  date_ranges: DateRangeOption[];
+  // camp_names: nazwy tematów obozów (Camp.name) — Akrobatyka, Minecraft, Survival itd.
+  camp_names: string[];
   emails: string[];
 }
 
@@ -32,12 +42,12 @@ export default function PromoCodeFormModal({ code, onClose, onSaved }: Props) {
   const [dataWygasniecia, setDataWygasniecia] = useState('');
   const [godzinaWygasniecia, setGodzinaWygasniecia] = useState('23:59');
   const [promocjaMode, setPromocjaMode] = useState<PromoCode['promocja_mode']>('laczy');
-  const [targets, setTargets] = useState<PromoCodeTargets>({ camp_ids: [], property_ids: [], tag_values: [], emails: [] });
+  const [targets, setTargets] = useState<PromoCodeTargets>({ center_names: [], property_ids: [], camp_names: [], emails: [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [options, setOptions] = useState<TargetOptions | null>(null);
-  const [openModal, setOpenModal] = useState<null | 'camps' | 'properties' | 'tags' | 'emails'>(null);
+  const [openModal, setOpenModal] = useState<null | 'centers' | 'date_ranges' | 'camp_names' | 'emails'>(null);
 
   useEffect(() => {
     if (code) {
@@ -61,7 +71,7 @@ export default function PromoCodeFormModal({ code, onClose, onSaved }: Props) {
         const data = await authenticatedApiCall<TargetOptions>('/api/v2/promo-codes/targets/options');
         setOptions(data);
       } catch {
-        setOptions({ camps: [], properties: [], tags: [], emails: [] });
+        setOptions({ centers: [], date_ranges: [], camp_names: [], emails: [] });
       }
     })();
   }, []);
@@ -96,30 +106,50 @@ export default function PromoCodeFormModal({ code, onClose, onSaved }: Props) {
     }
   };
 
-  const campOptions: MultiSelectOption[] = (options?.camps || []).map((c) => ({ value: c.id, label: c.name }));
-  const propertyOptions: MultiSelectOption[] = (options?.properties || []).map((p) => ({
-    value: p.id,
-    label: p.label,
-    meta: p.tag ? `Temat: ${p.tag}` : undefined,
+  const centerOptions: MultiSelectOption[] = (options?.centers || []).map((c) => ({ value: c, label: c }));
+  // Terminy: value = "start_date|end_date" (string klucza), label = "start – end"
+  const dateRangeOptions: MultiSelectOption[] = (options?.date_ranges || []).map((dr) => ({
+    value: `${dr.start_date}|${dr.end_date}`,
+    label: `${dr.start_date} – ${dr.end_date}`,
   }));
-  const tagOptions: MultiSelectOption[] = (options?.tags || []).map((t) => ({ value: t, label: t }));
+  const campNameOptions: MultiSelectOption[] = (options?.camp_names || []).map((n) => ({ value: n, label: n }));
   const emailOptions: MultiSelectOption[] = (options?.emails || []).map((e) => ({ value: e, label: e }));
 
+  // Terminy: które zakresy dat są aktualnie zaznaczone (na podstawie property_ids).
+  // Zakres uznajemy za zaznaczony jeśli CHOĆ JEDNO property_id z tego zakresu jest w targets.
+  const selectedDateRangeKeys: string[] = (options?.date_ranges || [])
+    .filter((dr) => dr.property_ids.some((pid) => targets.property_ids.includes(pid)))
+    .map((dr) => `${dr.start_date}|${dr.end_date}`);
+
+  const applyDateRangeSelection = (selectedKeys: (string | number)[]) => {
+    // Mapuj wybrane klucze dat → unia property_ids z odpowiadających date_ranges.
+    const keysSet = new Set(selectedKeys.map(String));
+    const newPropertyIds: number[] = [];
+    (options?.date_ranges || []).forEach((dr) => {
+      if (keysSet.has(`${dr.start_date}|${dr.end_date}`)) {
+        newPropertyIds.push(...dr.property_ids);
+      }
+    });
+    setTargets({ ...targets, property_ids: Array.from(new Set(newPropertyIds)) });
+  };
+
   // Pokazuj wybrane jako "chipsy" pod przyciskiem
-  const renderChips = (kind: 'camps' | 'properties' | 'tags' | 'emails') => {
+  const renderChips = (kind: 'centers' | 'date_ranges' | 'camp_names' | 'emails') => {
     const items: { value: string | number; label: string }[] = [];
-    if (kind === 'camps') {
-      targets.camp_ids.forEach((id) => {
-        const c = options?.camps.find((x) => x.id === id);
-        items.push({ value: id, label: c ? c.name : `#${id}` });
+    if (kind === 'centers') {
+      targets.center_names.forEach((name) => items.push({ value: name, label: name }));
+    } else if (kind === 'date_ranges') {
+      // Grupuj property_ids po zakresie dat; pokazuj jeden chip per zakres.
+      (options?.date_ranges || []).forEach((dr) => {
+        if (dr.property_ids.some((pid) => targets.property_ids.includes(pid))) {
+          items.push({
+            value: `${dr.start_date}|${dr.end_date}`,
+            label: `${dr.start_date} – ${dr.end_date}`,
+          });
+        }
       });
-    } else if (kind === 'properties') {
-      targets.property_ids.forEach((id) => {
-        const p = options?.properties.find((x) => x.id === id);
-        items.push({ value: id, label: p ? p.label : `#${id}` });
-      });
-    } else if (kind === 'tags') {
-      targets.tag_values.forEach((v) => items.push({ value: v, label: v }));
+    } else if (kind === 'camp_names') {
+      targets.camp_names.forEach((v) => items.push({ value: v, label: v }));
     } else {
       targets.emails.forEach((e) => items.push({ value: e, label: e }));
     }
@@ -131,9 +161,16 @@ export default function PromoCodeFormModal({ code, onClose, onSaved }: Props) {
             {it.label}
             <button
               onClick={() => {
-                if (kind === 'camps') setTargets({ ...targets, camp_ids: targets.camp_ids.filter((x) => x !== it.value) });
-                else if (kind === 'properties') setTargets({ ...targets, property_ids: targets.property_ids.filter((x) => x !== it.value) });
-                else if (kind === 'tags') setTargets({ ...targets, tag_values: targets.tag_values.filter((x) => x !== it.value) });
+                if (kind === 'centers') setTargets({ ...targets, center_names: targets.center_names.filter((x) => x !== it.value) });
+                else if (kind === 'date_ranges') {
+                  // Usuń wszystkie property_ids należące do tego zakresu dat.
+                  const dr = (options?.date_ranges || []).find((d) => `${d.start_date}|${d.end_date}` === it.value);
+                  if (dr) {
+                    const remove = new Set(dr.property_ids);
+                    setTargets({ ...targets, property_ids: targets.property_ids.filter((pid) => !remove.has(pid)) });
+                  }
+                }
+                else if (kind === 'camp_names') setTargets({ ...targets, camp_names: targets.camp_names.filter((x) => x !== it.value) });
                 else setTargets({ ...targets, emails: targets.emails.filter((x) => x !== it.value) });
               }}
             >
@@ -147,8 +184,8 @@ export default function PromoCodeFormModal({ code, onClose, onSaved }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-        <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div onClick={(e) => e.stopPropagation()} className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
           <div className="sticky top-0 bg-green-50 border-b-2 border-green-600 px-6 py-4 flex items-center justify-between z-10">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               {isEdit ? <><Save className="w-5 h-5 text-green-600" /> Edytuj kod rabatowy</> : <><Plus className="w-5 h-5 text-green-600" /> Dodaj nowy kod rabatowy</>}
@@ -233,34 +270,35 @@ export default function PromoCodeFormModal({ code, onClose, onSaved }: Props) {
             {/* === 4 przyciski targetowania === */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Ograniczenia do ośrodków</label>
-              <button type="button" onClick={() => setOpenModal('camps')}
+              <button type="button" onClick={() => setOpenModal('centers')}
                 className="w-full mt-1 px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" /> Wybierz ośrodki
               </button>
-              {renderChips('camps')}
+              {renderChips('centers')}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Ograniczenia do terminów</label>
-              <button type="button" onClick={() => setOpenModal('properties')}
+              <button type="button" onClick={() => setOpenModal('date_ranges')}
                 className="w-full mt-1 px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" /> Wybierz terminy
               </button>
-              {renderChips('properties')}
+              {renderChips('date_ranges')}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Ograniczenia do tematów</label>
-              <button type="button" onClick={() => setOpenModal('tags')}
+              <button type="button" onClick={() => setOpenModal('camp_names')}
                 className="w-full mt-1 px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" /> Wybierz tematy
               </button>
-              {renderChips('tags')}
+              {renderChips('camp_names')}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Ograniczenia do użytkowników (email)</label>
-              <button type="button" onClick={() => setOpenModal('emails')}
-                className="w-full mt-1 px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center justify-center gap-2">
+              <button type="button" disabled
+                className="w-full mt-1 px-4 py-2.5 bg-gray-300 text-gray-500 rounded-md text-sm font-medium flex items-center justify-center gap-2 cursor-not-allowed">
                 <Plus className="w-4 h-4" /> Wybierz użytkowników
               </button>
+              <p className="text-xs text-gray-400 mt-1">Funkcja niedostępna</p>
               {renderChips('emails')}
             </div>
 
@@ -276,22 +314,22 @@ export default function PromoCodeFormModal({ code, onClose, onSaved }: Props) {
         </div>
       </div>
 
-      {openModal === 'camps' && (
-        <MultiSelectModal title="Wybierz ośrodki" options={campOptions} selected={targets.camp_ids}
+      {openModal === 'centers' && (
+        <MultiSelectModal title="Wybierz ośrodki" options={centerOptions} selected={targets.center_names}
           onClose={() => setOpenModal(null)}
-          onSave={(sel) => { setTargets({ ...targets, camp_ids: sel.map((v) => Number(v)) }); setOpenModal(null); }}
+          onSave={(sel) => { setTargets({ ...targets, center_names: sel.map((v) => String(v)) }); setOpenModal(null); }}
           searchPlaceholder="Szukaj ośrodka…" />
       )}
-      {openModal === 'properties' && (
-        <MultiSelectModal title="Wybierz terminy (turnusy)" options={propertyOptions} selected={targets.property_ids}
+      {openModal === 'date_ranges' && (
+        <MultiSelectModal title="Wybierz terminy" options={dateRangeOptions} selected={selectedDateRangeKeys}
           onClose={() => setOpenModal(null)}
-          onSave={(sel) => { setTargets({ ...targets, property_ids: sel.map((v) => Number(v)) }); setOpenModal(null); }}
-          searchPlaceholder="Szukaj po mieście, okresie, temacie…" />
+          onSave={(sel) => { applyDateRangeSelection(sel); setOpenModal(null); }}
+          searchPlaceholder="Szukaj po dacie…" />
       )}
-      {openModal === 'tags' && (
-        <MultiSelectModal title="Wybierz tematy" options={tagOptions} selected={targets.tag_values}
+      {openModal === 'camp_names' && (
+        <MultiSelectModal title="Wybierz tematy" options={campNameOptions} selected={targets.camp_names}
           onClose={() => setOpenModal(null)}
-          onSave={(sel) => { setTargets({ ...targets, tag_values: sel.map((v) => String(v)) }); setOpenModal(null); }}
+          onSave={(sel) => { setTargets({ ...targets, camp_names: sel.map((v) => String(v)) }); setOpenModal(null); }}
           allowManualAdd searchPlaceholder="Szukaj tematu…" />
       )}
       {openModal === 'emails' && (

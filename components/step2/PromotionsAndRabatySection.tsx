@@ -46,7 +46,9 @@ export default function PromotionsAndRabatySection({ propertyId, userEmail, init
     (initial?.promotion_v2_custom_values as Record<string, string | number | boolean>) || {}
   );
 
-  const [kodInput, setKodInput] = useState('');
+  // kodInput hydratowany z zapisanego codeResult, żeby po odświeżeniu strony pole
+  // nie było puste gdy kod jest aktywny (przycisk "Usuń kod" pokazuje disabled input).
+  const [kodInput, setKodInput] = useState(initial?.promo_code_result?.kod ?? '');
   const [codeResult, setCodeResult] = useState<ValidationResponse | null>(initial?.promo_code_result ?? null);
   const [pendingKod, setPendingKod] = useState<ValidationResponse | null>(null);
   const [validating, setValidating] = useState(false);

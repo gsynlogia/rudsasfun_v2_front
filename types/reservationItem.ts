@@ -6,5 +6,7 @@ export interface ReservationItem {
   metadata?: {
     originalPrice?: number;
     doesNotReducePrice?: boolean;
+    // Dodatkowy opis pod nazwą (mniejszą czcionką) — np. „−50% przez kod LATO_TEST_2026"
+    subtitle?: string;
   };
 }

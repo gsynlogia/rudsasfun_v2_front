@@ -6,6 +6,7 @@ import { Plus, Tag, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight } fro
 import { authenticatedApiCall } from '@/utils/api-auth';
 import PromotionV2FormModal from './PromotionV2FormModal';
 import PromoCodeFormModal from './PromoCodeFormModal';
+import UniversalModal from './UniversalModal';
 
 export interface PromotionV2CustomField {
   id?: number;
@@ -35,9 +36,13 @@ export interface PromotionV2 {
 }
 
 export interface PromoCodeTargets {
-  camp_ids: number[];
+  // center_names = fizyczne ośrodki (BEAVER/LIMBA/SAWA) z CampProperty.city.
+  center_names: string[];
+  // property_ids = konkretne turnusy (FK do camp_properties). W UI grupowane po datach —
+  // admin wybiera zakres dat → frontend wysyła wszystkie property_ids z tą datą.
   property_ids: number[];
-  tag_values: string[];
+  // camp_names = temat obozu (Camp.name: Akrobatyka, Minecraft, Survival itd.)
+  camp_names: string[];
   emails: string[];
 }
 
@@ -81,6 +86,13 @@ export default function PromotionsV2Dashboard() {
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [editingCode, setEditingCode] = useState<PromoCode | null>(null);
   const [expandedCodeId, setExpandedCodeId] = useState<number | null>(null);
+  // Modal potwierdzenia usunięcia (zamiast natywnego window.confirm)
+  const [deleteTarget, setDeleteTarget] = useState<
+    | { type: 'promotion'; id: number; name: string }
+    | { type: 'code'; id: number; kod: string }
+    | null
+  >(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -113,16 +125,6 @@ export default function PromotionsV2Dashboard() {
     }
   };
 
-  const deletePromotion = async (id: number) => {
-    if (!confirm('Usunąć promocję? Jeśli była używana w rezerwacjach, zamiast usunięcia ukryj ją.')) return;
-    try {
-      await authenticatedApiCall(`/api/v2/promotions/${id}`, { method: 'DELETE' });
-      await load();
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Błąd');
-    }
-  };
-
   const toggleCodeStatus = async (id: number) => {
     try {
       await authenticatedApiCall(`/api/v2/promo-codes/${id}/status`, { method: 'PATCH' });
@@ -132,13 +134,20 @@ export default function PromotionsV2Dashboard() {
     }
   };
 
-  const deleteCode = async (id: number) => {
-    if (!confirm('Usunąć kod? Jeśli był używany w rezerwacjach, zamiast usunięcia dezaktywuj go.')) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await authenticatedApiCall(`/api/v2/promo-codes/${id}`, { method: 'DELETE' });
+      const url = deleteTarget.type === 'promotion'
+        ? `/api/v2/promotions/${deleteTarget.id}`
+        : `/api/v2/promo-codes/${deleteTarget.id}`;
+      await authenticatedApiCall(url, { method: 'DELETE' });
+      setDeleteTarget(null);
       await load();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Błąd');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -201,7 +210,7 @@ export default function PromotionsV2Dashboard() {
                         {p.status === 'aktywna' ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                       </button>
                       <button onClick={() => { setEditingPromotion(p); setPromotionModalOpen(true); }} className="p-2 text-[#00adee] hover:bg-blue-50 rounded"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => deletePromotion(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => setDeleteTarget({ type: 'promotion', id: p.id, name: p.nazwa })} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
                 </div>
@@ -261,22 +270,22 @@ export default function PromotionsV2Dashboard() {
                           {c.status === 'aktywny' ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </button>
                         <button onClick={() => { setEditingCode(c); setCodeModalOpen(true); }} className="p-2 text-green-600 hover:bg-green-50 rounded"><Pencil className="w-4 h-4" /></button>
-                        <button onClick={() => deleteCode(c.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => setDeleteTarget({ type: 'code', id: c.id, kod: c.kod })} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </div>
                     {expanded && (
                       <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-3 text-xs">
                         <div>
                           <span className="font-semibold text-gray-600">Ośrodki:</span>
-                          <div className="mt-1">{c.targets.camp_ids.length === 0 ? <span className="text-gray-400">Wszystkie</span> : c.targets.camp_ids.map((id) => <span key={id} className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded mr-1">#{id}</span>)}</div>
+                          <div className="mt-1">{c.targets.center_names.length === 0 ? <span className="text-gray-400">Wszystkie</span> : c.targets.center_names.map((name) => <span key={name} className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded mr-1">{name}</span>)}</div>
                         </div>
                         <div>
-                          <span className="font-semibold text-gray-600">Turnusy:</span>
-                          <div className="mt-1">{c.targets.property_ids.length === 0 ? <span className="text-gray-400">Wszystkie</span> : c.targets.property_ids.map((id) => <span key={id} className="inline-block px-2 py-0.5 bg-green-100 text-green-700 rounded mr-1">#{id}</span>)}</div>
+                          <span className="font-semibold text-gray-600">Terminy:</span>
+                          <div className="mt-1">{c.targets.property_ids.length === 0 ? <span className="text-gray-400">Wszystkie</span> : <span className="text-gray-600">{c.targets.property_ids.length} turnus{c.targets.property_ids.length === 1 ? '' : 'y'}</span>}</div>
                         </div>
                         <div>
-                          <span className="font-semibold text-gray-600">Tematy (tagi):</span>
-                          <div className="mt-1">{c.targets.tag_values.length === 0 ? <span className="text-gray-400">Wszystkie</span> : c.targets.tag_values.map((t) => <span key={t} className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 rounded mr-1">{t}</span>)}</div>
+                          <span className="font-semibold text-gray-600">Tematy:</span>
+                          <div className="mt-1">{c.targets.camp_names.length === 0 ? <span className="text-gray-400">Wszystkie</span> : c.targets.camp_names.map((t) => <span key={t} className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 rounded mr-1">{t}</span>)}</div>
                         </div>
                         <div>
                           <span className="font-semibold text-gray-600">Użytkownicy:</span>
@@ -306,6 +315,53 @@ export default function PromotionsV2Dashboard() {
           onSaved={async () => { setCodeModalOpen(false); await load(); }}
         />
       )}
+
+      {/* Modal potwierdzenia usunięcia promocji/kodu */}
+      <UniversalModal
+        isOpen={!!deleteTarget}
+        title={deleteTarget?.type === 'promotion' ? 'Usuń promocję' : 'Usuń kod rabatowy'}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        maxWidth="md"
+      >
+        <div className="p-6 space-y-4">
+          {deleteTarget?.type === 'promotion' ? (
+            <>
+              <p className="text-gray-700">
+                Czy na pewno chcesz usunąć promocję <strong>„{deleteTarget.name}"</strong>?
+              </p>
+              <p className="text-sm text-gray-500">
+                Jeśli promocja była używana w rezerwacjach, zamiast usunięcia rozważ jej ukrycie (ikona oka).
+              </p>
+            </>
+          ) : deleteTarget?.type === 'code' ? (
+            <>
+              <p className="text-gray-700">
+                Czy na pewno chcesz usunąć kod rabatowy <strong className="font-mono">„{deleteTarget.kod}"</strong>?
+              </p>
+              <p className="text-sm text-gray-500">
+                Jeśli kod był używany w rezerwacjach, zamiast usunięcia rozważ jego dezaktywację.
+              </p>
+            </>
+          ) : null}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+              className="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-medium disabled:opacity-50"
+            >
+              Anuluj
+            </button>
+            <button
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" /> {deleting ? 'Usuwanie…' : 'Usuń'}
+            </button>
+          </div>
+        </div>
+      </UniversalModal>
     </div>
   );
 }

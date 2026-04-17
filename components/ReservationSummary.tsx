@@ -224,13 +224,19 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
               // §14.8 + makieta 14.56.23: promocja i kod rabatowy w osobnym zielonym wierszu
               const isPromoRow = item.type === 'promotion' || item.type === 'promo_code';
               const notReducing = isPromoRow && item.metadata?.doesNotReducePrice;
+              const subtitle = item.metadata?.subtitle;
               return (
                 <div
                   key={item.id}
-                  className={`text-sm mb-1 flex items-center justify-between w-full ${isPromoRow ? 'text-green-600 font-medium' : 'text-gray-600'}`}
+                  className={`text-sm mb-1 flex items-start justify-between w-full gap-2 ${isPromoRow ? 'text-green-600 font-medium' : 'text-gray-600'}`}
                 >
-                  <span>{item.name}</span>
-                  <span className={isPromoRow ? 'font-semibold' : 'font-medium'}>
+                  <span className="flex-1 min-w-0">
+                    <span className="block">{item.name}</span>
+                    {subtitle && (
+                      <span className="block text-xs text-green-700/70 font-normal mt-0.5">{subtitle}</span>
+                    )}
+                  </span>
+                  <span className={`whitespace-nowrap ${isPromoRow ? 'font-semibold' : 'font-medium'}`}>
                     {notReducing ? (
                       <span className="text-xs text-gray-500">(nie obniża ceny)</span>
                     ) : (
@@ -308,13 +314,19 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
                     ? item.metadata.originalPrice
                     : item.price;
 
+                  const subtitle = item.metadata?.subtitle;
                   return (
                     <div
                       key={item.id}
-                      className={`text-xs sm:text-sm flex items-center justify-between ${isPromoRow ? 'text-green-600' : 'text-gray-600'}`}
+                      className={`text-xs sm:text-sm flex items-start justify-between gap-2 ${isPromoRow ? 'text-green-600' : 'text-gray-600'}`}
                     >
-                      <span className={isPromoRow ? 'font-medium' : ''}>{item.name}</span>
-                      <span className={`font-medium ${isPromoRow ? 'text-green-700' : 'text-gray-900'}`}>
+                      <span className={`flex-1 min-w-0 ${isPromoRow ? 'font-medium' : ''}`}>
+                        <span className="block">{item.name}</span>
+                        {subtitle && (
+                          <span className="block text-xs text-green-700/70 font-normal mt-0.5">{subtitle}</span>
+                        )}
+                      </span>
+                      <span className={`font-medium whitespace-nowrap ${isPromoRow ? 'text-green-700' : 'text-gray-900'}`}>
                         {isPromotionNotReducingPrice ? (
                           <span className="text-gray-500">
                             {displayPrice > 0 ? '+' : ''}{displayPrice.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł

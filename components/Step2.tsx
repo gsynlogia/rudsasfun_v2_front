@@ -88,19 +88,30 @@ export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabl
       promoCodeResult: sel.promo_code_result,
     });
 
-    // Sidebar "Twoja rezerwacja" — promocja
+    // Sidebar "Twoja rezerwacja" — promocja (z obcięciem o 50% gdy aktywny kod 'obniza_promocje_50')
+    const r = sel.promo_code_result;
+    const codeHalvesPromo = !!r && r.valid && !!r.promo_code_id
+      && r.promocja_mode === 'obniza_promocje_50'
+      && r.kategoria === 'obniza_cene';
     if (sel.promotion_v2_id && sel.promotion_v2_name) {
+      const fullDiscount = sel.promotion_v2_discount || 0;
+      // Sama formuła co backend `apply_promo_code_to_reservation`: round(original / 2.0, 2)
+      const effectiveDiscount = codeHalvesPromo
+        ? Math.round((fullDiscount / 2) * 100) / 100
+        : fullDiscount;
       addReservationItem({
         name: `Promocja "${sel.promotion_v2_name}"`,
-        price: -(sel.promotion_v2_discount || 0),
+        price: -effectiveDiscount,
         type: 'promotion',
+        metadata: codeHalvesPromo
+          ? { subtitle: `−50% przez kod ${r!.kod}` }
+          : undefined,
       }, `promotion-v2-${sel.promotion_v2_id}`);
     } else {
       removeReservationItemsByType('promotion');
     }
 
     // Sidebar "Twoja rezerwacja" — kod rabatowy
-    const r = sel.promo_code_result;
     if (r && r.valid && r.promo_code_id) {
       const discount = r.kategoria === 'obniza_cene' ? (r.discount || 0) : 0;
       addReservationItem({

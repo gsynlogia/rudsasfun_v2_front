@@ -10,6 +10,7 @@ import { authService } from '@/lib/services/AuthService';
 import type { LayoutProps, StepNumber, ReservationCamp } from '@/types/reservation';
 import { formatDateRange } from '@/utils/api';
 import { logGtmEvent, buildStepEventData } from '@/utils/gtm-logger';
+import { firstUnfilledStepBefore } from '@/utils/stepGuards';
 
 import Footer from './Footer';
 import HeaderSecondary from './HeaderSecondary';
@@ -70,6 +71,21 @@ export default function LayoutClient({
 useEffect(() => {
   setCurrentStep(currentStep);
 }, [currentStep, setCurrentStep]);
+
+// Guard: jeśli user ręcznie zmienił URL na /step/N bez wypełnienia poprzednich kroków,
+// cofnij go do pierwszego niewypełnionego. Admin nie podlega (może testować dowolnie).
+useEffect(() => {
+  if (isAdmin || checkingAdmin) return;
+  if (currentStep <= 1) return;
+  const missing = firstUnfilledStepBefore(currentStep);
+  if (missing === null) return;
+  const parts = safePathname.split('/').filter(Boolean);
+  const campIdx = parts.indexOf('camps');
+  if (campIdx === -1 || campIdx + 3 >= parts.length) return;
+  const campId = parts[campIdx + 1];
+  const editionId = parts[campIdx + 3];
+  router.replace(`/camps/${campId}/edition/${editionId}/step/${missing}`);
+}, [currentStep, isAdmin, checkingAdmin, safePathname, router]);
 
 const lastLoggedStepRef = useRef<number | null>(null);
 

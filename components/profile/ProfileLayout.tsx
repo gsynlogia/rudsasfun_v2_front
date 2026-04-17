@@ -83,12 +83,7 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
   return (
     <ReservationPaymentHeaderProvider initialTotalPrice={null}>
       <div className="min-h-screen w-full flex flex-col" style={{ overflow: 'visible', position: 'relative' }}>
-        {/* Belka developerska */}
-        {process.env.NEXT_PUBLIC_APP_ENV !== 'production' && (
-          <div className="bg-red-600 text-white text-center text-xs font-medium py-1 z-50">
-            Wersja developerska — dane testowe
-          </div>
-        )}
+        {/* Belka developerska przeniesiona do app/layout.tsx (DevBanner) — renderowana globalnie. */}
         <HeaderTop />
 
       {/* Mobile Bottom Navigation Bar */}

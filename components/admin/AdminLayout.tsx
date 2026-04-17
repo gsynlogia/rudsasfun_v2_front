@@ -95,16 +95,13 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isPanelOpen, close]);
 
-  const isDev = process.env.NEXT_PUBLIC_APP_ENV !== 'production';
+  // Belka developerska ("Wersja developerska — dane testowe") przeniesiona do root layoutu
+  // (components/DevBanner.tsx), renderowana raz w app/layout.tsx. Tutaj nie duplikujemy.
 
   return (
-    <div className="h-screen w-full bg-white flex flex-col">
-      {/* Belka developerska */}
-      {isDev && (
-        <div className="bg-red-600 text-white text-center text-xs font-medium py-1 z-[60] flex-shrink-0">
-          Wersja developerska — dane testowe
-        </div>
-      )}
+    // `min-h-screen` zamiast `h-screen` — DevBanner + TestBanner są ponad (root layout),
+    // więc h-screen=100vh powodowałoby overflow (treść za długa o wysokość banerów).
+    <div className="min-h-screen w-full bg-white flex flex-col">
       <div className="flex-1 flex overflow-hidden">
       {/* Sidebar with logo */}
       <AdminSidebar />

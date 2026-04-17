@@ -86,8 +86,8 @@ export default function PromotionV2FormModal({ promotion, onClose, onSaved }: Pr
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="sticky top-0 bg-blue-50 border-b-2 border-[#00adee] px-6 py-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-800">{isEdit ? 'Edytuj promocję' : 'Dodaj nową promocję'}</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>

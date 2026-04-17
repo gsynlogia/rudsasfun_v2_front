@@ -13,9 +13,10 @@ import { getApiBaseUrl } from './api-config';
 
 export type { CampProperty, Camp, CampWithProperty, ApiErrorResponse };
 
-// Use NEXT_PUBLIC_ prefix for client-side, or direct URL for server-side
-// For server-side, we need to check environment differently
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || getApiBaseUrl();
+// Server-side fetch: preferuj INTERNAL_API_URL (Docker network: http://backend:8000),
+// fallback NEXT_PUBLIC_API_URL. W kontenerze `localhost` to sam kontener frontendu,
+// więc bez INTERNAL_API_URL SSR nie połączy się z backendem.
+const API_BASE_URL = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || getApiBaseUrl();
 
 /**
  * Get camp edition by camp ID and edition ID
