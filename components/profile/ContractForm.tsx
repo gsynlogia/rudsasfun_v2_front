@@ -108,6 +108,67 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
   const [latestContractStatus, setLatestContractStatus] = useState<'in_verification' | 'accepted' | 'rejected' | null>(null);
   const [latestContractSignedAt, setLatestContractSignedAt] = useState<string | null>(null);
 
+  // §16.D1 — wiersz „Rabat:" pod „Promocje:" w sekcji kosztów umowy.
+  // `label` to tekst wyświetlany, `amount` to kwota w PLN lub null dla bon/atrakcja/gadżet (nie obniża ceny).
+  const [rabatRow, setRabatRow] = useState<{ label: string; amount: number | null } | null>(null);
+
+  useEffect(() => {
+    if (!reservationId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = authService.getToken();
+        const API = process.env.NEXT_PUBLIC_API_URL || '';
+        const res = await fetch(`${API}/api/v2/reservations/${reservationId}/promotion-v2`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) return;
+        const snap: {
+          promo_code_snapshot?: { kod?: string; kategoria?: string; opis?: string; applied_discount?: number } | null;
+          applied_promo_code_discount?: number;
+          admin_promo_code_override?: string | null;
+          admin_code_discount_override?: number | null;
+        } = await res.json();
+
+        if (cancelled) return;
+
+        const code = snap.promo_code_snapshot;
+        const override = snap.admin_promo_code_override;
+        const overrideAmount = snap.admin_code_discount_override;
+
+        // Override admin ma pierwszeństwo
+        if (override || (overrideAmount !== null && overrideAmount !== undefined)) {
+          const amount = overrideAmount !== null && overrideAmount !== undefined ? overrideAmount : 0;
+          setRabatRow({
+            label: override ? `Kod rabatowy ${override}` : 'Rabat admina',
+            amount: amount > 0 ? -amount : null,
+          });
+          return;
+        }
+
+        if (!code || !code.kod) {
+          setRabatRow(null);
+          return;
+        }
+        const applied = snap.applied_promo_code_discount || 0;
+        if (code.kategoria === 'obniza_cene') {
+          setRabatRow({ label: `Kod rabatowy ${code.kod}`, amount: applied > 0 ? -applied : null });
+        } else if (code.kategoria === 'nie_obniza_ceny') {
+          setRabatRow({ label: `Kod rabatowy ${code.kod}: ${code.opis || 'bon'}`, amount: null });
+        } else if (code.kategoria === 'atrakcja') {
+          setRabatRow({ label: `Kod rabatowy ${code.kod}: darmowa atrakcja — ${code.opis || ''}`.trim(), amount: null });
+        } else if (code.kategoria === 'gadzet') {
+          setRabatRow({ label: `Kod rabatowy ${code.kod}: darmowy gadżet — ${code.opis || ''}`.trim(), amount: null });
+        } else {
+          setRabatRow({ label: `Kod rabatowy ${code.kod}`, amount: applied > 0 ? -applied : null });
+        }
+      } catch {
+        // brak snapshotu / rezerwacja legacy — nic nie renderujemy
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [reservationId]);
+
   // Automatyczny druk w trybie printMode
   useEffect(() => {
     if (printMode) {
@@ -616,6 +677,18 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
                 <div className="field-value">{formData.promotions}</div>
                 <span>zł</span>
               </div>
+
+              {/* §16.D1 — wiersz „Rabat:" (kod rabatowy v2 / override admina). Bon/atrakcja/gadżet: bez kwoty. */}
+              {rabatRow && (
+                <div className="payment-item promocja">
+                  <label>Rabat:</label>
+                  <div className="field-value">
+                    {rabatRow.label}
+                    {rabatRow.amount !== null && ` ${rabatRow.amount.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  </div>
+                  {rabatRow.amount !== null ? <span>zł</span> : <span className="info-only">(nie obniża ceny)</span>}
+                </div>
+              )}
 
             </div>
 
