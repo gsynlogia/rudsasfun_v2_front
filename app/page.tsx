@@ -44,8 +44,10 @@ async function fetchCamps(): Promise<Camp[]> {
     process.env.NEXT_PUBLIC_API_URL ||
     'http://localhost:8000';
   try {
+    // Cache 60s (revalidate in background) — lista obozów rzadko się zmienia,
+    // a ten fetch dominuje TTFB strony /. Dla testów i tak akceptowalne 1-min opóźnienie.
     const r = await fetch(`${base.replace(/\/$/, '')}/api/camps/?for_reservation=1&limit=200`, {
-      cache: 'no-store',
+      next: { revalidate: 60 },
     });
     if (!r.ok) return [];
     const data = await r.json();
