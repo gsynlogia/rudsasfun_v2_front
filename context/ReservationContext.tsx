@@ -68,12 +68,17 @@ export function ReservationProvider({ children }: ReservationProviderProps) {
         return prev;
       }
 
-      // If customId is provided, check if item with that ID already exists
+      // If customId is provided and item with that ID exists → REPLACE (update price/name/metadata).
+      // Wczesniej był tu wczesny return prev → przy zmianach typu „kod obniża promocję o 50%"
+      // sidebar nie aktualizował kwoty (Promocja zostawała -100 zł zamiast -50 zł), bo
+      // addon-style anti-duplicate guard blokował ponowne dodanie z tym samym customId.
       if (customId) {
         const existingItemIndex = prev.items.findIndex((i: ReservationItem) => i.id === customId);
         if (existingItemIndex !== -1) {
-          // Item already exists with this ID, don't add duplicate
-          return prev;
+          const newItems = [...prev.items];
+          newItems[existingItemIndex] = { ...item, id: customId };
+          const totalPrice = newItems.reduce((sum: number, it: ReservationItem) => sum + it.price, 0);
+          return { ...prev, items: newItems, totalPrice };
         }
       }
 
