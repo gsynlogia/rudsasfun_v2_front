@@ -37,7 +37,6 @@ import type {
   Addon,
   Protection,
   Promotion,
-  PromotionOption,
   Diet,
   ReservationNote,
   SpeechRecognitionResultEventLike,
@@ -136,12 +135,8 @@ export default function ReservationDetailPage() {
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);
   const [_addons, setAddons] = useState<Map<number, Addon>>(new Map());
   const [_protections, setProtections] = useState<Map<number, Protection>>(new Map());
-  const [promotions, setPromotions] = useState<Map<number, Promotion>>(new Map());
-  const [promotionOptions, setPromotionOptions] = useState<PromotionOption[]>([]);
+  const [_promotions, setPromotions] = useState<Map<number, Promotion>>(new Map());
   const [promotionDraftId, setPromotionDraftId] = useState<number | null>(null);
-  const [pendingPromotionId, setPendingPromotionId] = useState<number | null>(null);
-  const [showPromotionModal, setShowPromotionModal] = useState(false);
-  const [savingPromotion, setSavingPromotion] = useState(false);
   const [_diets, setDiets] = useState<Map<number, Diet>>(new Map());
   const [transportCities, setTransportCities] = useState<Array<{ id: number; city: string; departure_price: number | null; return_price: number | null }>>([]);
   // Dostępne opcje dla turnusu (do wyświetlania nawet gdy rezerwacja nie ma wybranych)
@@ -248,7 +243,6 @@ export default function ReservationDetailPage() {
   const [profileLinkUrl, setProfileLinkUrl] = useState('');
   const [profileLinkUserEmail, setProfileLinkUserEmail] = useState<string | null>(null);
   const [profileLinkModalOpen, setProfileLinkModalOpen] = useState(false);
-  const [editingJustification, setEditingJustification] = useState(false);
   const [justificationDraft, setJustificationDraft] = useState<Record<string, any>>({});
   const [savingJustification, setSavingJustification] = useState(false);
   const [justificationError, setJustificationError] = useState<string | null>(null);
@@ -719,29 +713,20 @@ export default function ReservationDetailPage() {
             const turnusPromotions = await authenticatedApiCall<any[]>(
               `/api/camps/${reservationData.camp_id}/properties/${reservationData.property_id}/promotions`,
             );
-            const options: PromotionOption[] = [];
             const map = new Map<number, Promotion>();
             for (const p of turnusPromotions) {
               const relationId = p.relation_id ?? p.id;
               if (!relationId) continue;
               const price = typeof p.price === 'number' ? p.price : 0;
-              const option: PromotionOption = {
-                relationId,
-                name: p.name || `Promocja #${relationId}`,
-                price,
-                doesNotReducePrice: !!p.does_not_reduce_price,
-              };
-              options.push(option);
               map.set(relationId, {
                 id: relationId,
-                name: option.name,
-                price: option.price,
-                does_not_reduce_price: option.doesNotReducePrice,
+                name: p.name || `Promocja #${relationId}`,
+                price,
+                does_not_reduce_price: !!p.does_not_reduce_price,
                 relation_id: relationId,
               });
             }
-            setPromotionOptions(options);
-            if (options.length > 0) {
+            if (map.size > 0) {
               setPromotions(map);
             }
           } catch (turnusPromoError) {
@@ -1617,65 +1602,6 @@ export default function ReservationDetailPage() {
 
   const currentPromotionId = promotionDraftId;
 
-  const openPromotionModal = (relationId: number | null) => {
-    setPendingPromotionId(relationId);
-    setShowPromotionModal(true);
-  };
-
-  const handlePromotionSelect = (value: string) => {
-    if (value === '') {
-      openPromotionModal(null);
-      return;
-    }
-    const parsed = parseInt(value, 10);
-    if (Number.isNaN(parsed)) {
-      return;
-    }
-    openPromotionModal(parsed);
-  };
-
-  const handleConfirmPromotion = async () => {
-    if (!reservation) {
-      setShowPromotionModal(false);
-      return;
-    }
-    setSavingPromotion(true);
-    try {
-      const response = await authenticatedApiCall<ReservationDetails>(
-        `/api/reservations/${reservation.id}/promotion`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            selected_promotion: pendingPromotionId,
-            promotion_justification: reservation.promotion_justification ?? null,
-          }),
-        },
-      );
-      setReservation(response);
-      const updatedPromotionId = response.selected_promotion
-        ? parseInt(String(response.selected_promotion), 10)
-        : null;
-      setPromotionDraftId(
-        updatedPromotionId !== null && !Number.isNaN(updatedPromotionId) ? updatedPromotionId : null,
-      );
-      setShowPromotionModal(false);
-      setPendingPromotionId(null);
-    } catch (err) {
-      console.error('Błąd aktualizacji promocji', err);
-      setError('Nie udało się zaktualizować promocji. Spróbuj ponownie.');
-    } finally {
-      setSavingPromotion(false);
-    }
-  };
-
-  const handleCancelPromotion = () => {
-    setPendingPromotionId(null);
-    setShowPromotionModal(false);
-  };
-
   // Funkcje pomocnicze dla edycji uzasadnienia promocji
   const getPromotionType = (promotionName?: string | null): string => {
     if (!promotionName) return 'other';
@@ -1709,32 +1635,6 @@ export default function ReservationDetailPage() {
         (Array.isArray(val) ? val.length > 0 : true),
       ),
     );
-  };
-
-  const formatJustificationForDisplay = (just: any): string => {
-    if (!just || typeof just !== 'object') return '';
-    const parts: string[] = [];
-    if (just.card_number) parts.push(`Numer karty dużej rodziny: ${just.card_number}`);
-    if (just.sibling_first_name || just.sibling_last_name) {
-      const siblingName = [just.sibling_first_name, just.sibling_last_name].filter(Boolean).join(' ');
-      if (siblingName) parts.push(`Rodzeństwo: ${siblingName}`);
-    }
-    if (just.first_camp_date) parts.push(`Data pierwszego obozu: ${just.first_camp_date}`);
-    if (just.first_camp_name) parts.push(`Nazwa pierwszego obozu: ${just.first_camp_name}`);
-    if (just.reason) parts.push(`Powód wyboru promocji: ${just.reason}`);
-    if (just.years) {
-      const yearsStr = Array.isArray(just.years) ? just.years.join(', ') : String(just.years);
-      if (yearsStr) parts.push(`Lata uczestnictwa: ${yearsStr}`);
-    }
-    const knownFields = ['card_number', 'sibling_first_name', 'sibling_last_name', 'first_camp_date', 'first_camp_name', 'reason', 'years'];
-    const otherFields = Object.keys(just).filter((key) => !knownFields.includes(key));
-    otherFields.forEach((key) => {
-      const value = just[key];
-      if (value !== null && value !== undefined && value !== '') {
-        parts.push(`${key}: ${String(value)}`);
-      }
-    });
-    return parts.join('\n');
   };
 
   const validateJustificationDraft = (): boolean => {
@@ -3613,436 +3513,6 @@ export default function ReservationDetailPage() {
                 onCreated={refetchReservation}
               />
             </div>
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
-              {/* §14.13 nagłówek: „Promocje i Rabaty" */}
-              <h2 className="text-sm font-semibold text-slate-700 mb-3 pb-2 border-b border-gray-100">Promocje i Rabaty</h2>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <label className="text-sm font-medium text-gray-700">Promocja:</label>
-                  <div className="flex items-center gap-2">
-                    <select
-                      className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-                      value={currentPromotionId ?? ''}
-                      onChange={(e) => handlePromotionSelect(e.target.value)}
-                    >
-                      <option value="">Brak promocji</option>
-                      {promotionOptions.map((option) => (
-                        <option key={option.relationId} value={option.relationId}>
-                          {option.name} — {formatCurrency(option.price)}
-                          {option.doesNotReducePrice ? ' (nie obniża ceny)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                    {currentPromotionId !== null && (
-                      <button
-                        type="button"
-                        onClick={() => openPromotionModal(null)}
-                        className="p-2 rounded-md border border-gray-300 hover:bg-gray-100 transition-colors"
-                        aria-label="Usuń promocję"
-                      >
-                        <X className="h-4 w-4 text-gray-700" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {currentPromotionId !== null && (() => {
-                  const promotion = promotions.get(currentPromotionId);
-                  if (promotion) {
-                    return (
-                      <div>
-                        <p className="text-sm text-gray-900">{promotion.name}</p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Cena: {formatCurrency(promotion.price)}
-                          {promotion.does_not_reduce_price ? ' (promocja informacyjna – nie obniża ceny)' : ''}
-                        </p>
-                      </div>
-                    );
-                  }
-                  // Fallback: użyj promotion_name z API (dla nieaktywnych promocji)
-                  if (reservation.promotion_name) {
-                    return (
-                      <div>
-                        <p className="text-sm text-gray-900 flex items-center justify-between gap-2">
-                          <span>{reservation.promotion_name}</span>
-                          {reservation.promotion_price !== null && reservation.promotion_price !== undefined && (
-                            <span className="text-gray-700">{formatCurrency(reservation.promotion_price)}</span>
-                          )}
-                        </p>
-                        <p className="text-sm text-gray-500 mt-1 italic">
-                          (promocja nieaktywna - dane historyczne)
-                        </p>
-                      </div>
-                    );
-                  }
-                  return (
-                    <p className="text-sm text-gray-900">
-                      <MissingInfo field={`promocja ID: ${reservation.selected_promotion}`} />
-                    </p>
-                  );
-                })()}
-
-                {/* Gdy wybrano "Brak promocji", ale rezerwacja miała promocję – pokaż dane historyczne i uzasadnienie */}
-                {currentPromotionId === null && (reservation.promotion_name || reservation.selected_promotion) && (
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-900 font-medium">
-                      {reservation.promotion_name || `Promocja #${reservation.selected_promotion}`}
-                    </p>
-                    {reservation.promotion_price !== null && reservation.promotion_price !== undefined && (
-                      <p className="text-sm text-gray-600">
-                        Cena: {formatCurrency(reservation.promotion_price)}
-                      </p>
-                    )}
-                    <p className="text-sm text-gray-500 italic">
-                      (promocja nieaktywna - dane historyczne)
-                    </p>
-                    {hasJustificationData(reservation.promotion_justification) && (
-                      <div className="mt-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Uzasadnienie:</label>
-                        <pre className="text-sm text-gray-900 bg-gray-50 p-3 rounded mt-1 whitespace-pre-wrap border border-gray-100">
-                          {formatJustificationForDisplay(reservation.promotion_justification)}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {currentPromotionId !== null && (
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-sm font-medium text-gray-700">Uzasadnienie:</label>
-                      {!editingJustification && (
-                        <button
-                          onClick={() => {
-                            setJustificationDraft(getJustificationForCurrentPromotion());
-                            setEditingJustification(true);
-                            setJustificationError(null);
-                          }}
-                          className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium text-[#03adf0] hover:text-[#0288c7] hover:bg-gray-100 cursor-pointer"
-                        >
-                          Edytuj
-                        </button>
-                      )}
-                    </div>
-                    {editingJustification ? (
-                      <div className="mt-2 space-y-3">
-                        {(() => {
-                          const promotionName = reservation.promotion_name || reservation.selected_promotion || '';
-                          const type = getPromotionType(promotionName);
-
-                          if (!requiresJustification(promotionName)) {
-                            return (
-                              <div className="space-y-2">
-                                <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                                  Uzasadnienie (krótki opis) *
-                                </label>
-                                <textarea
-                                  value={justificationDraft.reason || ''}
-                                  onChange={(e) => setJustificationDraft({
-                                    ...justificationDraft,
-                                    reason: e.target.value,
-                                  })}
-                                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                                  placeholder="Wpisz krótkie uzasadnienie"
-                                  rows={3}
-                                />
-                              </div>
-                            );
-                          }
-
-                          if (type === 'duza_rodzina') {
-                            return (
-                              <div className="space-y-2">
-                                <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                                  Numer karty dużej rodziny *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={justificationDraft.card_number || ''}
-                                  onChange={(e) => setJustificationDraft({
-                                    ...justificationDraft,
-                                    card_number: e.target.value,
-                                  })}
-                                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                                  placeholder="Wpisz numer karty"
-                                />
-                              </div>
-                            );
-                          }
-
-                          if (type === 'rodzenstwo_razem') {
-                            return (
-                              <div className="space-y-3">
-                                <div className="space-y-2">
-                                  <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                                    Imię rodzeństwa *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={justificationDraft.sibling_first_name || ''}
-                                    onChange={(e) => setJustificationDraft({
-                                      ...justificationDraft,
-                                      sibling_first_name: e.target.value,
-                                    })}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                                    placeholder="Wpisz imię rodzeństwa"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                                    Nazwisko rodzeństwa *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={justificationDraft.sibling_last_name || ''}
-                                    onChange={(e) => setJustificationDraft({
-                                      ...justificationDraft,
-                                      sibling_last_name: e.target.value,
-                                    })}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                                    placeholder="Wpisz nazwisko rodzeństwa"
-                                  />
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          if (type === 'obozy_na_maxa') {
-                            return (
-                              <div className="space-y-3">
-                                <div className="space-y-2">
-                                  <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                                    Data pierwszego obozu
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={justificationDraft.first_camp_date || ''}
-                                    onChange={(e) => setJustificationDraft({
-                                      ...justificationDraft,
-                                      first_camp_date: e.target.value,
-                                    })}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                                    placeholder="DD.MM.RRRR"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                                    Nazwa pierwszego obozu
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={justificationDraft.first_camp_name || ''}
-                                    onChange={(e) => setJustificationDraft({
-                                      ...justificationDraft,
-                                      first_camp_name: e.target.value,
-                                    })}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                                    placeholder="Podaj nazwę obozu"
-                                  />
-                                </div>
-                                <p className="text-[11px] text-gray-500">
-                                  Wystarczy wypełnić datę lub nazwę pierwszego obozu.
-                                </p>
-                              </div>
-                            );
-                          }
-
-                          if (type === 'first_minute') {
-                            return (
-                              <div className="space-y-2">
-                                <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                                  Powód wyboru promocji First Minute *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={justificationDraft.reason || ''}
-                                  onChange={(e) => setJustificationDraft({
-                                    ...justificationDraft,
-                                    reason: e.target.value,
-                                  })}
-                                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                                  placeholder="Napisz krótki powód"
-                                />
-                              </div>
-                            );
-                          }
-
-                          if (type === 'bonowych') {
-                            return (
-                              <div className="space-y-2">
-                                <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                                  Lata uczestnictwa *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={Array.isArray(justificationDraft.years) ? justificationDraft.years.join(', ') : (justificationDraft.years || '')}
-                                  onChange={(e) => setJustificationDraft({
-                                    ...justificationDraft,
-                                    years: e.target.value,
-                                  })}
-                                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                                  placeholder="Np. 2022, 2023"
-                                />
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div className="space-y-2">
-                              <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                                Uzasadnienie *
-                              </label>
-                              <textarea
-                                value={justificationDraft.reason || ''}
-                                onChange={(e) => setJustificationDraft({
-                                  ...justificationDraft,
-                                  reason: e.target.value,
-                                })}
-                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
-                                placeholder="Wpisz uzasadnienie"
-                                rows={3}
-                              />
-                            </div>
-                          );
-                        })()}
-                        {justificationError && (
-                          <div className="text-xs sm:text-sm text-red-600">{justificationError}</div>
-                        )}
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setJustificationError(null);
-                              const valid = validateJustificationDraft();
-                              if (!valid) return;
-
-                              try {
-                                setSavingJustification(true);
-                                // Filtrujemy uzasadnienie - zapisujemy tylko pola potrzebne dla obecnej promocji
-                                const filteredJustification = filterJustificationForSave(justificationDraft);
-                                const response = await authenticatedApiCall<ReservationDetails>(
-                                  `/api/reservations/${reservation.id}/promotion-justification/admin`,
-                                  {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({ promotion_justification: filteredJustification }),
-                                  },
-                                );
-                                setReservation((prev) => (prev && response ? { ...prev, ...response } : response));
-                                setEditingJustification(false);
-                              } catch (err: any) {
-                                setJustificationError(err?.message || 'Nie udało się zapisać uzasadnienia.');
-                              } finally {
-                                setSavingJustification(false);
-                              }
-                            }}
-                            disabled={savingJustification}
-                            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-60 cursor-pointer"
-                          >
-                            {savingJustification ? 'Zapisywanie...' : 'Zapisz'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingJustification(false);
-                              setJustificationDraft(getJustificationForCurrentPromotion());
-                              setJustificationError(null);
-                            }}
-                            disabled={savingJustification}
-                            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium border border-gray-300 hover:bg-gray-100 disabled:opacity-60 cursor-pointer"
-                          >
-                            Anuluj
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      (() => {
-                        const justification = reservation.promotion_justification;
-                        const hasJustification = hasJustificationData(justification);
-
-                        if (!hasJustification) {
-                          return (
-                            <p className="text-sm text-gray-500 italic mt-1">
-                              Klient nie dodał uzasadnienia promocji
-                            </p>
-                          );
-                        }
-
-                        // Format justification in a readable way
-                        const formatJustification = (just: any): string => {
-                          const parts: string[] = [];
-
-                          if (just.card_number) {
-                            parts.push(`Numer karty dużej rodziny: ${just.card_number}`);
-                          }
-
-                          if (just.sibling_first_name || just.sibling_last_name) {
-                            const siblingName = [just.sibling_first_name, just.sibling_last_name]
-                              .filter(Boolean)
-                              .join(' ');
-                            if (siblingName) {
-                              parts.push(`Rodzeństwo: ${siblingName}`);
-                            }
-                          }
-
-                          if (just.first_camp_date) {
-                            parts.push(`Data pierwszego obozu: ${just.first_camp_date}`);
-                          }
-
-                          if (just.first_camp_name) {
-                            parts.push(`Nazwa pierwszego obozu: ${just.first_camp_name}`);
-                          }
-
-                          if (just.reason) {
-                            parts.push(`Powód wyboru promocji: ${just.reason}`);
-                          }
-
-                          if (just.years) {
-                            const yearsStr = Array.isArray(just.years)
-                              ? just.years.join(', ')
-                              : String(just.years);
-                            if (yearsStr) {
-                              parts.push(`Lata uczestnictwa: ${yearsStr}`);
-                            }
-                          }
-
-                          // If there are other fields not covered above, show them
-                          const knownFields = ['card_number', 'sibling_first_name', 'sibling_last_name',
-                            'first_camp_date', 'first_camp_name', 'reason', 'years'];
-                          const otherFields = Object.keys(just).filter(key => !knownFields.includes(key));
-                          otherFields.forEach(key => {
-                            const value = just[key];
-                            if (value !== null && value !== undefined && value !== '') {
-                              parts.push(`${key}: ${String(value)}`);
-                            }
-                          });
-
-                          return parts.length > 0 ? parts.join('\n') : '';
-                        };
-
-                        const formattedText = formatJustification(justification);
-
-                        if (!formattedText) {
-                          return (
-                            <p className="text-sm text-gray-500 italic mt-1">
-                              Klient nie dodał uzasadnienia promocji
-                            </p>
-                          );
-                        }
-
-                        return (
-                          <pre className="text-sm text-gray-900 bg-gray-50 p-3 rounded mt-1 whitespace-pre-wrap">
-                            {formattedText}
-                          </pre>
-                        );
-                      })()
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
 
             <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
@@ -4849,36 +4319,6 @@ export default function ReservationDetailPage() {
             getContent={rightSidebarGetContent}
             suggestedTab={activePanel === 'dokumenty' ? 'documents' : undefined}
           />
-            <UniversalModal
-              isOpen={showPromotionModal}
-              onClose={handleCancelPromotion}
-              title="Potwierdź zmianę promocji"
-              maxWidth="md"
-            >
-              <div className="space-y-4">
-                <p className="text-sm text-gray-700">
-                  Czy na pewno chcesz zapisać zmianę promocji? Cena rezerwacji zostanie zaktualizowana zgodnie z wybraną promocją.
-                </p>
-                <div className="flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={handleCancelPromotion}
-                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 cursor-pointer"
-                  >
-                    Wróć
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConfirmPromotion}
-                    disabled={savingPromotion}
-                    className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-none text-sm font-medium bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    {savingPromotion ? 'Zapisywanie...' : 'Zapisz'}
-                  </button>
-                </div>
-              </div>
-            </UniversalModal>
-
             {/* Modal archiwizacji rezerwacji */}
             <UniversalModal
               isOpen={showDeleteModal}
