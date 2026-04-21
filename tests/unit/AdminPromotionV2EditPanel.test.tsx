@@ -41,8 +41,8 @@ function mockFetch(responses: Record<string, any>) {
 describe('AdminPromotionV2EditPanel', () => {
   beforeEach(() => {
     (global as any).fetch = mockFetch({
-      'GET /api/promotions-v2/': PROMOTIONS_FIXTURE,
-      'GET /api/promo-codes/': CODES_FIXTURE,
+      'GET /api/v2/promotions/': PROMOTIONS_FIXTURE,
+      'GET /api/v2/promo-codes/': CODES_FIXTURE,
     });
   });
 
@@ -75,10 +75,10 @@ describe('AdminPromotionV2EditPanel', () => {
       if (method === 'PATCH' && url.includes('/api/v2/reservations/1234/promotion-v2')) {
         return patchMock(url, init);
       }
-      if (url === '/api/promotions-v2/') {
+      if (url === '/api/v2/promotions/') {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(PROMOTIONS_FIXTURE) } as Response);
       }
-      if (url === '/api/promo-codes/') {
+      if (url === '/api/v2/promo-codes/') {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CODES_FIXTURE) } as Response);
       }
       return Promise.reject(new Error(`Unexpected ${method} ${url}`));
@@ -123,10 +123,10 @@ describe('AdminPromotionV2EditPanel', () => {
           json: () => Promise.resolve({ detail: 'Konflikt promocji i kodu' }),
         } as Response);
       }
-      if (url === '/api/promotions-v2/') {
+      if (url === '/api/v2/promotions/') {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(PROMOTIONS_FIXTURE) } as Response);
       }
-      if (url === '/api/promo-codes/') {
+      if (url === '/api/v2/promo-codes/') {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CODES_FIXTURE) } as Response);
       }
       return Promise.reject(new Error(`Unexpected ${method} ${url}`));

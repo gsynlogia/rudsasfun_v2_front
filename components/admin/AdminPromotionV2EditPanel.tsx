@@ -58,8 +58,8 @@ export default function AdminPromotionV2EditPanel({
       try {
         setLoading(true);
         const [resPromos, resCodes] = await Promise.all([
-          fetch(`${API}/api/promotions-v2/`, { headers: authHeader }),
-          fetch(`${API}/api/promo-codes/`, { headers: authHeader }),
+          fetch(`${API}/api/v2/promotions/`, { headers: authHeader }),
+          fetch(`${API}/api/v2/promo-codes/`, { headers: authHeader }),
         ]);
         if (!resPromos.ok) throw new Error(`Promocje: ${resPromos.status}`);
         if (!resCodes.ok) throw new Error(`Kody: ${resCodes.status}`);
