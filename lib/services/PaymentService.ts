@@ -49,7 +49,10 @@ class PaymentService {
       }
 
       const baseUrl = API_BASE_URL.replace(/\/$/, '');
-      const url = `${baseUrl}/api/payments?skip=${skip}&limit=${limit}`;
+      // Trailing slash — router FastAPI registred at `/` so bez slash FastAPI robi 307 redirect,
+      // w którym Location header ma http:// (backend nie zna X-Forwarded-Proto za nginx proxy).
+      // Efekt: Mixed Content w browserze. Slash tu eliminuje redirect.
+      const url = `${baseUrl}/api/payments/?skip=${skip}&limit=${limit}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
