@@ -151,7 +151,7 @@ export default function AdminPromotionV2EditPanel({
 
       <div className="space-y-4">
         <label className="block">
-          <span className="text-sm font-medium text-gray-700">Promocja</span>
+          <span className="block text-sm font-medium text-gray-700 mb-1">Promocja</span>
           <select
             aria-label="Promocja"
             value={promotionId ?? ''}
@@ -159,7 +159,7 @@ export default function AdminPromotionV2EditPanel({
               setPromotionId(e.target.value ? parseInt(e.target.value, 10) : null);
               setCustomValues({});
             }}
-            className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#00adee] focus:ring-2 focus:ring-[#00adee]/20"
           >
             <option value="">— brak —</option>
             {promotions.map((p) => (
@@ -169,10 +169,10 @@ export default function AdminPromotionV2EditPanel({
         </label>
 
         {selectedPromo?.wymaga_uzasadnienia && (selectedPromo.custom_fields || []).length > 0 && (
-          <div className="border border-yellow-200 rounded-md p-3 bg-yellow-50 space-y-3">
+          <div className="bg-blue-50 p-4 rounded-lg border border-[#00adee]/20 space-y-3">
             {(selectedPromo.custom_fields || []).map((f) => (
               <label key={f.id || f.label} className="block">
-                <span className="text-xs font-medium text-gray-700">
+                <span className="block text-xs font-medium text-gray-700 mb-1">
                   {f.label}{f.required && <span className="text-red-500"> *</span>}
                 </span>
                 {f.field_type === 'checkbox' ? (
@@ -180,7 +180,7 @@ export default function AdminPromotionV2EditPanel({
                     type="checkbox"
                     checked={!!customValues[f.label]}
                     onChange={(e) => setCustomValues({ ...customValues, [f.label]: e.target.checked })}
-                    className="mt-1"
+                    className="w-4 h-4 text-[#00adee] border-gray-300 rounded"
                   />
                 ) : (
                   <input
@@ -188,7 +188,7 @@ export default function AdminPromotionV2EditPanel({
                     value={String(customValues[f.label] ?? '')}
                     onChange={(e) => setCustomValues({ ...customValues, [f.label]: e.target.value })}
                     placeholder={f.placeholder || ''}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#00adee]"
                   />
                 )}
               </label>
@@ -197,15 +197,15 @@ export default function AdminPromotionV2EditPanel({
         )}
 
         <label className="block">
-          <span className="text-sm font-medium text-gray-700">Kod rabatowy</span>
+          <span className="block text-sm font-medium text-gray-700 mb-1">Kod rabatowy</span>
           <input
             aria-label="Kod rabatowy"
             list={`admin-promo-codes-${reservationId}`}
             value={codeInput}
             onChange={(e) => setCodeInput(e.target.value)}
-            placeholder="— brak / wpisz lub wybierz —"
+            placeholder="— brak / wpisz lub wybierz z listy —"
             autoComplete="off"
-            className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono focus:outline-none focus:border-green-600"
           />
           <datalist id={`admin-promo-codes-${reservationId}`}>
             {codes.filter((c) => c.status === 'aktywny').map((c) => (
@@ -214,19 +214,19 @@ export default function AdminPromotionV2EditPanel({
               </option>
             ))}
           </datalist>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 mt-1 italic">
             Pole puste = brak kodu. Wpisuj, żeby filtrować listę aktywnych kodów.
           </p>
         </label>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-xs mt-2 text-red-600">{error}</p>}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 pt-2">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 bg-[#03adf0] text-white rounded-md text-sm font-medium hover:bg-[#0288c7] disabled:opacity-50"
+            className="px-4 py-2 bg-[#00adee] text-white rounded-md hover:bg-[#0099d6] text-sm font-medium flex items-center gap-2 disabled:opacity-50"
           >
             {saving ? 'Zapisywanie…' : 'Zapisz zmianę'}
           </button>
@@ -235,9 +235,11 @@ export default function AdminPromotionV2EditPanel({
             onClick={() => {
               setPromotionId(null);
               setPromoCodeId(null);
+              setCodeInput('');
               setCustomValues({});
+              setError(null);
             }}
-            className="px-4 py-2 bg-white text-gray-700 rounded-md text-sm border border-gray-300 hover:bg-gray-50"
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium"
           >
             Wyczyść wybór
           </button>
