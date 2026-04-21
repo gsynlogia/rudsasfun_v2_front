@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { PromotionV2, PromoCode } from '@/components/admin/PromotionsV2Dashboard';
+import { computeConflictModalLabels } from './promotionConflictLabels';
 
 interface ValidationResponse {
   valid: boolean;
@@ -171,9 +172,16 @@ export default function PromotionsAndRabatySection({ propertyId, userEmail, init
     setPendingKod(null);
   };
 
-  // §16.A6 — applied_discount z backendu (per days_count); fallback kwota7 tylko gdy lista bez property_id
-  const promotionDiscount = selectedPromo ? (selectedPromo.applied_discount ?? selectedPromo.kwota7 ?? 0) : 0;
-  const codeDiscount = codeResult?.discount || 0;
+  // Karta 002 — etykiety modala konfliktu liczone z helpera (pokrytego testami jednostkowymi).
+  // Rozwiązuje dwa scenariusze: user wpisał kod przed wyborem promocji (pendingPromotionId fallback)
+  // oraz kody kategorii != obniza_cene (bon/atrakcja/gadżet) — opis zamiast „-0 zł".
+  const { promotionLabel: conflictPromotionLabel, codeLabel: conflictCodeLabel } = computeConflictModalLabels({
+    selectedPromotionId,
+    pendingPromotionId,
+    promotions,
+    pendingKod,
+    codeResult,
+  });
 
   // P0-4: wystaw globalny walidator — Step2.validateStep2 używa go, żeby zablokować
   // przejście gdy promocja wymaga uzasadnienia a wymagane pola są puste.
@@ -303,10 +311,10 @@ export default function PromotionsAndRabatySection({ propertyId, userEmail, init
             <p className="text-center text-gray-600 mb-8 text-sm">Wybierz korzystniejszą dla siebie opcję:</p>
             <div className="space-y-3">
               <button onClick={() => resolveConflict('promotion')} className="w-full py-3 px-6 bg-gradient-to-r from-[#00adee] to-[#0099d6] text-white rounded-xl font-bold shadow-lg hover:scale-[1.02] transition">
-                ✓ Wybieram PROMOCJĘ -{promotionDiscount} zł
+                {conflictPromotionLabel}
               </button>
               <button onClick={() => resolveConflict('code')} className="w-full py-3 px-6 bg-white text-gray-800 border-2 border-[#00adee] rounded-xl font-bold shadow hover:scale-[1.02] transition">
-                🏷 Wybieram KOD RABATOWY -{codeDiscount} zł
+                {conflictCodeLabel}
               </button>
             </div>
           </div>
