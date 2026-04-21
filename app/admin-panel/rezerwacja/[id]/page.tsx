@@ -161,6 +161,10 @@ export default function ReservationDetailPage() {
   /** Lokalny stan źródła (tylko UI). Zapis do API wyłącznie po kliku „Zapisz”. */
   const [sourceDraft, setSourceDraft] = useState<{ selected_source: string; source_inne_text: string | null }>({ selected_source: '', source_inne_text: null });
   const [savingTransport, setSavingTransport] = useState(false);
+  // Counter inkrementowany po zapisie w panelach promocji/kodu/override — użyty jako `key`
+  // na PromotionV2Snapshot, wymusza re-mount komponentu (świeży fetch bez page reload).
+  const [promotionSnapshotVersion, setPromotionSnapshotVersion] = useState(0);
+  const bumpPromotionSnapshot = useCallback(() => setPromotionSnapshotVersion((v) => v + 1), []);
   /** Lokalny stan transportu (tylko UI). Zapis do API wyłącznie po kliku „Zapisz”. */
   const [transportDraft, setTransportDraft] = useState<{
     departure_type: string;
@@ -3495,23 +3499,29 @@ export default function ReservationDetailPage() {
 
             {activePanel === 'promocje-transport' && (
             <>
-            {/* §16.C1 — Snapshot v2 (promocja + kod rabatowy + custom_values); sam ukrywa się dla legacy */}
+            {/* §16.C1 — Snapshot v2 (promocja + kod rabatowy + custom_values); sam ukrywa się dla legacy.
+                key zawiera `promotionSnapshotVersion` — po każdym zapisie w panelach promocyjnych
+                bump counter → komponent re-mount → świeży fetch snapshotu bez reload strony. */}
             <div className="mb-4">
-              <PromotionV2Snapshot reservationId={reservation.id} authToken={authService.getToken()} />
+              <PromotionV2Snapshot
+                key={`promotion-snapshot-${promotionSnapshotVersion}`}
+                reservationId={reservation.id}
+                authToken={authService.getToken()}
+              />
             </div>
             {/* Karta 001 — edycja promocji/kodu (PATCH /api/v2/reservations/{id}/promotion-v2); aneks powstaje automatycznie */}
             <div className="mb-4">
               <AdminPromotionV2EditPanel
                 reservationId={reservation.id}
                 authToken={authService.getToken()}
-                onSaved={refetchReservation}
+                onSaved={() => { bumpPromotionSnapshot(); refetchReservation(); }}
               />
             </div>
             {/* §16.C2 — Override kodu per rezerwacja (admin wpisuje kod za klienta / nadpisuje kwotę) */}
             <div className="mb-4">
               <AdminPromoCodeOverridePanel
                 reservationId={reservation.id}
-                onSaved={refetchReservation}
+                onSaved={() => { bumpPromotionSnapshot(); refetchReservation(); }}
               />
             </div>
             {/* §16.C3 — Utwórz aneks promocyjny (widoczny tylko gdy umowa podpisana); HTML+email, bez SMS, bez PDF */}

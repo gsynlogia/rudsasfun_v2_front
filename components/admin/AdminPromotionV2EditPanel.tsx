@@ -10,6 +10,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 
+import { useToast } from '@/components/ToastContainer';
+
 interface PromotionV2 {
   id: number;
   nazwa: string;
@@ -52,6 +54,7 @@ export default function AdminPromotionV2EditPanel({
 
   const API = process.env.NEXT_PUBLIC_API_URL || '';
   const authHeader: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +119,7 @@ export default function AdminPromotionV2EditPanel({
     const codeResolve = resolveCodeIdFromInput();
     if (codeResolve.error) {
       setError(codeResolve.error);
+      showError(codeResolve.error);
       return;
     }
     setSaving(true);
@@ -135,9 +139,12 @@ export default function AdminPromotionV2EditPanel({
         throw new Error(data.detail || `Błąd zapisu (${res.status})`);
       }
       setCurrentPromoCodeId(codeResolve.id);
+      showSuccess('Zmiana promocji/kodu zapisana');
       onSaved?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nie udało się zapisać zmiany');
+      const msg = err instanceof Error ? err.message : 'Nie udało się zapisać zmiany';
+      setError(msg);
+      showError(msg);
     } finally {
       setSaving(false);
     }

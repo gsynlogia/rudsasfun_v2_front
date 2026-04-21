@@ -14,6 +14,20 @@ import '@testing-library/jest-dom';
 
 import AdminPromotionV2EditPanel from '@/components/admin/AdminPromotionV2EditPanel';
 
+// Mock toast context — rejestruje wywołania, żebyśmy mogli asertować że toast
+// jest wywoływany przy sukcesie/błędzie zapisu.
+const mockShowSuccess = jest.fn();
+const mockShowError = jest.fn();
+jest.mock('@/components/ToastContainer', () => ({
+  useToast: () => ({
+    showSuccess: mockShowSuccess,
+    showError: mockShowError,
+    showToast: jest.fn(),
+    showWarning: jest.fn(),
+    showInfo: jest.fn(),
+  }),
+}));
+
 const PROMOTIONS_FIXTURE = [
   { id: 1, nazwa: 'Rodzeństwo razem', kwota7: 50, kwota10: 70, wymaga_uzasadnienia: false, custom_fields: [] },
   { id: 2, nazwa: 'Duża rodzina', kwota7: 100, kwota10: 150, wymaga_uzasadnienia: false, custom_fields: [] },
@@ -62,6 +76,8 @@ describe('AdminPromotionV2EditPanel', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockShowSuccess.mockClear();
+    mockShowError.mockClear();
   });
 
   it('renders promotion select and code select after loading lists', async () => {
@@ -125,6 +141,8 @@ describe('AdminPromotionV2EditPanel', () => {
     expect(body.promotion_v2_id).toBe(1);
     expect(body.promo_code_id).toBe(11);
     expect(onSaved).toHaveBeenCalled();
+    // Po sukcesie — toast success
+    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalled());
   });
 
   it('pre-fills form with current promotion and code from snapshot', async () => {
@@ -273,5 +291,7 @@ describe('AdminPromotionV2EditPanel', () => {
     await waitFor(() => {
       expect(screen.getByText(/Konflikt promocji i kodu/)).toBeInTheDocument();
     });
+    // Po błędzie — toast error
+    expect(mockShowError).toHaveBeenCalled();
   });
 });
