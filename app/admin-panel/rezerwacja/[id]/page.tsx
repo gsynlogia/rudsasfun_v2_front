@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import AdminCreateAnnexButton from '@/components/admin/AdminCreateAnnexButton';
+import AdminPromotionV2EditPanel from '@/components/admin/AdminPromotionV2EditPanel';
 import AdminPromoCodeOverridePanel from '@/components/admin/AdminPromoCodeOverridePanel';
 import { ContractEditPanel } from '@/components/admin/ContractEditPanel';
 import { QualificationTemplateNew } from '@/components/admin/QualificationTemplateNew';
@@ -3497,6 +3498,16 @@ export default function ReservationDetailPage() {
             {/* §16.C1 — Snapshot v2 (promocja + kod rabatowy + custom_values); sam ukrywa się dla legacy */}
             <div className="mb-4">
               <PromotionV2Snapshot reservationId={reservation.id} authToken={authService.getToken()} />
+            </div>
+            {/* Karta 001 — edycja promocji/kodu (PATCH /api/v2/reservations/{id}/promotion-v2); aneks powstaje automatycznie */}
+            <div className="mb-4">
+              <AdminPromotionV2EditPanel
+                reservationId={reservation.id}
+                authToken={authService.getToken()}
+                currentPromotionId={reservation.promotion_v2_id ?? null}
+                currentPromoCodeId={reservation.promo_code_id ?? null}
+                onSaved={refetchReservation}
+              />
             </div>
             {/* §16.C2 — Override kodu per rezerwacja (admin wpisuje kod za klienta / nadpisuje kwotę) */}
             <div className="mb-4">

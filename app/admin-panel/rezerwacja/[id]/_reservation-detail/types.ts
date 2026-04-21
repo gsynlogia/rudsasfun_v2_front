@@ -92,6 +92,14 @@ export interface ReservationDetails {
   is_archived?: boolean;
   archived_at?: string | null;
   archive_id?: number | null;
+  /** Promocje V2 (system §16.A-I). Opcjonalne — dla rezerwacji legacy będą null. */
+  promotion_v2_id?: number | null;
+  promo_code_id?: number | null;
+  applied_promotion_discount?: number | null;
+  applied_promo_code_discount?: number | null;
+  admin_promo_code_override?: string | null;
+  admin_code_discount_override?: number | null;
+  promotion_system_version?: string | null;
 }
 
 export interface Addon { id: number; name: string; price: number; }
