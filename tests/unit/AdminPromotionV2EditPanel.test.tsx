@@ -24,6 +24,19 @@ const CODES_FIXTURE = [
   { id: 11, kod: '2KOTY', kategoria: 'gadzet', kwota7: 0, kwota10: 0, promocja_mode: 'laczy', status: 'aktywny' },
 ];
 
+const SNAPSHOT_EMPTY = {
+  promotion_system_version: 'legacy',
+  promotion_v2_id: null,
+  promotion_v2_snapshot: null,
+  promo_code_id: null,
+  promo_code_snapshot: null,
+  applied_promotion_discount: 0,
+  applied_promo_code_discount: 0,
+  total_price: 3000,
+  admin_promo_code_override: null,
+  admin_code_discount_override: null,
+};
+
 function mockFetch(responses: Record<string, any>) {
   return jest.fn((url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET';
@@ -43,6 +56,7 @@ describe('AdminPromotionV2EditPanel', () => {
     (global as any).fetch = mockFetch({
       'GET /api/v2/promotions/': PROMOTIONS_FIXTURE,
       'GET /api/v2/promo-codes/': CODES_FIXTURE,
+      'GET /api/v2/reservations/1234/promotion-v2': SNAPSHOT_EMPTY,
     });
   });
 
@@ -55,8 +69,6 @@ describe('AdminPromotionV2EditPanel', () => {
       <AdminPromotionV2EditPanel
         reservationId={1234}
         authToken="fake-token"
-        currentPromotionId={null}
-        currentPromoCodeId={null}
       />,
     );
     await waitFor(() => {
@@ -81,6 +93,9 @@ describe('AdminPromotionV2EditPanel', () => {
       if (url === '/api/v2/promo-codes/') {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CODES_FIXTURE) } as Response);
       }
+      if (url.includes('/api/v2/reservations/1234/promotion-v2') && method === 'GET') {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(SNAPSHOT_EMPTY) } as Response);
+      }
       return Promise.reject(new Error(`Unexpected ${method} ${url}`));
     });
 
@@ -89,8 +104,6 @@ describe('AdminPromotionV2EditPanel', () => {
       <AdminPromotionV2EditPanel
         reservationId={1234}
         authToken="fake-token"
-        currentPromotionId={null}
-        currentPromoCodeId={null}
         onSaved={onSaved}
       />,
     );
@@ -114,6 +127,37 @@ describe('AdminPromotionV2EditPanel', () => {
     expect(onSaved).toHaveBeenCalled();
   });
 
+  it('pre-fills form with current promotion and code from snapshot', async () => {
+    const SNAPSHOT_WITH_DATA = {
+      ...SNAPSHOT_EMPTY,
+      promotion_v2_id: 2,
+      promo_code_id: 10,
+      applied_promotion_discount: 100,
+      applied_promo_code_discount: 20,
+      total_price: 2880,
+    };
+    (global as any).fetch = mockFetch({
+      'GET /api/v2/promotions/': PROMOTIONS_FIXTURE,
+      'GET /api/v2/promo-codes/': CODES_FIXTURE,
+      'GET /api/v2/reservations/1234/promotion-v2': SNAPSHOT_WITH_DATA,
+    });
+
+    render(
+      <AdminPromotionV2EditPanel
+        reservationId={1234}
+        authToken="fake-token"
+      />,
+    );
+
+    // Wait for fetches and prefill
+    await waitFor(() => {
+      const promoSelect = screen.getByRole('combobox', { name: /promocja/i }) as HTMLSelectElement;
+      expect(promoSelect.value).toBe('2'); // Duża rodzina (id=2 z fixture)
+    });
+    const codeInput = screen.getByLabelText(/kod rabatowy/i) as HTMLInputElement;
+    expect(codeInput.value).toBe('LATO2026');
+  });
+
   it('rejects save when typed code does not match any known code', async () => {
     const patchMock = jest.fn();
     (global as any).fetch = jest.fn((url: string, init?: RequestInit) => {
@@ -127,6 +171,9 @@ describe('AdminPromotionV2EditPanel', () => {
       if (url === '/api/v2/promo-codes/') {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CODES_FIXTURE) } as Response);
       }
+      if (url.includes('/api/v2/reservations/1234/promotion-v2') && method === 'GET') {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(SNAPSHOT_EMPTY) } as Response);
+      }
       return Promise.reject(new Error(`Unexpected ${method} ${url}`));
     });
 
@@ -134,8 +181,6 @@ describe('AdminPromotionV2EditPanel', () => {
       <AdminPromotionV2EditPanel
         reservationId={1234}
         authToken="fake-token"
-        currentPromotionId={null}
-        currentPromoCodeId={null}
       />,
     );
     await waitFor(() => expect(screen.getByLabelText(/kod rabatowy/i)).toBeInTheDocument());
@@ -166,6 +211,9 @@ describe('AdminPromotionV2EditPanel', () => {
       if (url === '/api/v2/promo-codes/') {
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CODES_FIXTURE) } as Response);
       }
+      if (url.includes('/api/v2/reservations/1234/promotion-v2') && method === 'GET') {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(SNAPSHOT_EMPTY) } as Response);
+      }
       return Promise.reject(new Error(`Unexpected ${method} ${url}`));
     });
 
@@ -173,8 +221,6 @@ describe('AdminPromotionV2EditPanel', () => {
       <AdminPromotionV2EditPanel
         reservationId={1234}
         authToken="fake-token"
-        currentPromotionId={null}
-        currentPromoCodeId={null}
       />,
     );
     await waitFor(() => expect(screen.getByRole('combobox', { name: /promocja/i })).toBeInTheDocument());

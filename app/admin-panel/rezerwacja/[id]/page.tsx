@@ -3504,8 +3504,6 @@ export default function ReservationDetailPage() {
               <AdminPromotionV2EditPanel
                 reservationId={reservation.id}
                 authToken={authService.getToken()}
-                currentPromotionId={reservation.promotion_v2_id ?? null}
-                currentPromoCodeId={reservation.promo_code_id ?? null}
                 onSaved={refetchReservation}
               />
             </div>

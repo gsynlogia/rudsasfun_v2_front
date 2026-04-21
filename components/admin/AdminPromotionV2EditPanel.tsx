@@ -32,19 +32,18 @@ interface PromoCodeLite {
 interface Props {
   reservationId: number;
   authToken: string | null;
-  currentPromotionId: number | null;
-  currentPromoCodeId: number | null;
   onSaved?: () => void;
 }
 
 export default function AdminPromotionV2EditPanel({
-  reservationId, authToken, currentPromotionId, currentPromoCodeId, onSaved,
+  reservationId, authToken, onSaved,
 }: Props) {
   const [promotions, setPromotions] = useState<PromotionV2[]>([]);
   const [codes, setCodes] = useState<PromoCodeLite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [promotionId, setPromotionId] = useState<number | null>(currentPromotionId);
-  const [promoCodeId, setPromoCodeId] = useState<number | null>(currentPromoCodeId);
+  const [promotionId, setPromotionId] = useState<number | null>(null);
+  // Aktualny kod rabatowy przypisany do rezerwacji (odczytany ze snapshotu). Nieużywany przy zapisie — handleSave resolves id ze `codeInput`.
+  const [, setCurrentPromoCodeId] = useState<number | null>(null);
   // Tekst wpisany / wybrany w polu kodu (datalist). Pusty = brak kodu. Nieznany = walidacja przy zapisie.
   const [codeInput, setCodeInput] = useState<string>('');
   const [customValues, setCustomValues] = useState<Record<string, any>>({});
@@ -59,16 +58,32 @@ export default function AdminPromotionV2EditPanel({
     (async () => {
       try {
         setLoading(true);
-        const [resPromos, resCodes] = await Promise.all([
+        // Równolegle: listy słownikowe + snapshot bieżącego stanu rezerwacji.
+        const [resPromos, resCodes, resSnap] = await Promise.all([
           fetch(`${API}/api/v2/promotions/`, { headers: authHeader }),
           fetch(`${API}/api/v2/promo-codes/`, { headers: authHeader }),
+          fetch(`${API}/api/v2/reservations/${reservationId}/promotion-v2`, { headers: authHeader }),
         ]);
         if (!resPromos.ok) throw new Error(`Promocje: ${resPromos.status}`);
         if (!resCodes.ok) throw new Error(`Kody: ${resCodes.status}`);
         const [listPromos, listCodes] = await Promise.all([resPromos.json(), resCodes.json()]);
+        const snap = resSnap.ok ? await resSnap.json() : null;
         if (cancelled) return;
         setPromotions(Array.isArray(listPromos) ? listPromos : []);
         setCodes(Array.isArray(listCodes) ? listCodes : []);
+        if (snap) {
+          setPromotionId(snap.promotion_v2_id ?? null);
+          setCurrentPromoCodeId(snap.promo_code_id ?? null);
+          // kod — preferuj snapshot.promo_code_snapshot.kod (mamy kod bez potrzeby dopasowania do listy),
+          // fallback do dopasowania po id w liście kodów.
+          const snapKod = snap.promo_code_snapshot?.kod;
+          if (snapKod) {
+            setCodeInput(snapKod);
+          } else if (snap.promo_code_id) {
+            const match = (Array.isArray(listCodes) ? listCodes : []).find((c: PromoCodeLite) => c.id === snap.promo_code_id);
+            if (match) setCodeInput(match.kod);
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Nie udało się pobrać listy promocji/kodów');
@@ -77,15 +92,7 @@ export default function AdminPromotionV2EditPanel({
       }
     })();
     return () => { cancelled = true; };
-  }, [API, authToken]);
-
-  // Inicjalizacja pola kodu po załadowaniu listy kodów (jeśli rezerwacja już ma kod, pokaż go).
-  useEffect(() => {
-    if (currentPromoCodeId && codes.length > 0) {
-      const match = codes.find((c) => c.id === currentPromoCodeId);
-      if (match) setCodeInput(match.kod);
-    }
-  }, [currentPromoCodeId, codes]);
+  }, [API, authToken, reservationId]);
 
   const selectedPromo = useMemo(
     () => promotions.find((p) => p.id === promotionId) || null,
@@ -123,7 +130,7 @@ export default function AdminPromotionV2EditPanel({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || `Błąd zapisu (${res.status})`);
       }
-      setPromoCodeId(codeResolve.id);
+      setCurrentPromoCodeId(codeResolve.id);
       onSaved?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nie udało się zapisać zmiany');
@@ -234,7 +241,7 @@ export default function AdminPromotionV2EditPanel({
             type="button"
             onClick={() => {
               setPromotionId(null);
-              setPromoCodeId(null);
+              setCurrentPromoCodeId(null);
               setCodeInput('');
               setCustomValues({});
               setError(null);
