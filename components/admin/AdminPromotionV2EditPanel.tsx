@@ -74,6 +74,10 @@ export default function AdminPromotionV2EditPanel({
         if (snap) {
           setPromotionId(snap.promotion_v2_id ?? null);
           setCurrentPromoCodeId(snap.promo_code_id ?? null);
+          // Custom values (np. checkbox „Deklaracja dwóch obozów") zapisane przy promocji wymagającej uzasadnienia.
+          if (snap.promotion_v2_custom_values && typeof snap.promotion_v2_custom_values === 'object') {
+            setCustomValues(snap.promotion_v2_custom_values);
+          }
           // kod — preferuj snapshot.promo_code_snapshot.kod (mamy kod bez potrzeby dopasowania do listy),
           // fallback do dopasowania po id w liście kodów.
           const snapKod = snap.promo_code_snapshot?.kod;

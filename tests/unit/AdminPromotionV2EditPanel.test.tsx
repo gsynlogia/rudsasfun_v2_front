@@ -158,6 +158,47 @@ describe('AdminPromotionV2EditPanel', () => {
     expect(codeInput.value).toBe('LATO2026');
   });
 
+  it('pre-fills customValues from snapshot (promotion_v2_custom_values)', async () => {
+    const PROMOTION_WITH_CHECKBOX = [
+      {
+        id: 3,
+        nazwa: 'Obozy na maxa',
+        kwota7: 50,
+        kwota10: 100,
+        wymaga_uzasadnienia: true,
+        custom_fields: [
+          { id: 10, label: 'Deklaracja dwóch obozów', field_type: 'checkbox', required: true },
+        ],
+      },
+    ];
+    const SNAPSHOT_WITH_CUSTOM = {
+      ...SNAPSHOT_EMPTY,
+      promotion_v2_id: 3,
+      promotion_v2_custom_values: { 'Deklaracja dwóch obozów': true },
+      applied_promotion_discount: 50,
+      total_price: 2950,
+    };
+    (global as any).fetch = mockFetch({
+      'GET /api/v2/promotions/': PROMOTION_WITH_CHECKBOX,
+      'GET /api/v2/promo-codes/': CODES_FIXTURE,
+      'GET /api/v2/reservations/1234/promotion-v2': SNAPSHOT_WITH_CUSTOM,
+    });
+
+    render(
+      <AdminPromotionV2EditPanel
+        reservationId={1234}
+        authToken="fake-token"
+      />,
+    );
+
+    // Poczekaj aż zostanie załadowana promocja i custom fields się renderują
+    await waitFor(() => {
+      expect(screen.getByText(/Deklaracja dwóch obozów/)).toBeInTheDocument();
+    });
+    const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+  });
+
   it('rejects save when typed code does not match any known code', async () => {
     const patchMock = jest.fn();
     (global as any).fetch = jest.fn((url: string, init?: RequestInit) => {
