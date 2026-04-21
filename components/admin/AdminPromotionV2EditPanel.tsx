@@ -45,6 +45,8 @@ export default function AdminPromotionV2EditPanel({
   const [loading, setLoading] = useState(true);
   const [promotionId, setPromotionId] = useState<number | null>(currentPromotionId);
   const [promoCodeId, setPromoCodeId] = useState<number | null>(currentPromoCodeId);
+  // Tekst wpisany / wybrany w polu kodu (datalist). Pusty = brak kodu. Nieznany = walidacja przy zapisie.
+  const [codeInput, setCodeInput] = useState<string>('');
   const [customValues, setCustomValues] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,12 +79,34 @@ export default function AdminPromotionV2EditPanel({
     return () => { cancelled = true; };
   }, [API, authToken]);
 
+  // Inicjalizacja pola kodu po załadowaniu listy kodów (jeśli rezerwacja już ma kod, pokaż go).
+  useEffect(() => {
+    if (currentPromoCodeId && codes.length > 0) {
+      const match = codes.find((c) => c.id === currentPromoCodeId);
+      if (match) setCodeInput(match.kod);
+    }
+  }, [currentPromoCodeId, codes]);
+
   const selectedPromo = useMemo(
     () => promotions.find((p) => p.id === promotionId) || null,
     [promotions, promotionId],
   );
 
+  // Walidacja pola kodu: pusty = brak kodu (OK); wpisany tekst musi pasować do znanego kodu (case-insensitive).
+  const resolveCodeIdFromInput = (): { id: number | null; error: string | null } => {
+    const trimmed = codeInput.trim();
+    if (!trimmed) return { id: null, error: null };
+    const match = codes.find((c) => c.kod.toLowerCase() === trimmed.toLowerCase());
+    if (!match) return { id: null, error: `Nieznany kod rabatowy: "${trimmed}"` };
+    return { id: match.id, error: null };
+  };
+
   const handleSave = async () => {
+    const codeResolve = resolveCodeIdFromInput();
+    if (codeResolve.error) {
+      setError(codeResolve.error);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -91,7 +115,7 @@ export default function AdminPromotionV2EditPanel({
         headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify({
           promotion_v2_id: promotionId,
-          promo_code_id: promoCodeId,
+          promo_code_id: codeResolve.id,
           custom_values: Object.keys(customValues).length > 0 ? customValues : null,
         }),
       });
@@ -99,6 +123,7 @@ export default function AdminPromotionV2EditPanel({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || `Błąd zapisu (${res.status})`);
       }
+      setPromoCodeId(codeResolve.id);
       onSaved?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nie udało się zapisać zmiany');
@@ -173,19 +198,25 @@ export default function AdminPromotionV2EditPanel({
 
         <label className="block">
           <span className="text-sm font-medium text-gray-700">Kod rabatowy</span>
-          <select
+          <input
             aria-label="Kod rabatowy"
-            value={promoCodeId ?? ''}
-            onChange={(e) => setPromoCodeId(e.target.value ? parseInt(e.target.value, 10) : null)}
-            className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-          >
-            <option value="">— brak —</option>
+            list={`admin-promo-codes-${reservationId}`}
+            value={codeInput}
+            onChange={(e) => setCodeInput(e.target.value)}
+            placeholder="— brak / wpisz lub wybierz —"
+            autoComplete="off"
+            className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"
+          />
+          <datalist id={`admin-promo-codes-${reservationId}`}>
             {codes.filter((c) => c.status === 'aktywny').map((c) => (
-              <option key={c.id} value={c.id}>
+              <option key={c.id} value={c.kod}>
                 {c.kod} [{c.kategoria}]
               </option>
             ))}
-          </select>
+          </datalist>
+          <p className="text-xs text-gray-500 mt-1">
+            Pole puste = brak kodu. Wpisuj, żeby filtrować listę aktywnych kodów.
+          </p>
         </label>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

@@ -99,8 +99,9 @@ describe('AdminPromotionV2EditPanel', () => {
     const promoSelect = screen.getByRole('combobox', { name: /promocja/i }) as HTMLSelectElement;
     fireEvent.change(promoSelect, { target: { value: '1' } });
 
-    const codeSelect = screen.getByRole('combobox', { name: /kod rabatowy/i }) as HTMLSelectElement;
-    fireEvent.change(codeSelect, { target: { value: '11' } }); // kategoria=gadzet (laczy) → brak konfliktu
+    // Input kodu rabatowego z autocomplete (datalist) — użytkownik wpisuje lub wybiera
+    const codeInput = screen.getByLabelText(/kod rabatowy/i) as HTMLInputElement;
+    fireEvent.change(codeInput, { target: { value: '2KOTY' } }); // kategoria=gadzet (laczy) → brak konfliktu
 
     fireEvent.click(screen.getByRole('button', { name: /zapisz zmianę/i }));
 
@@ -111,6 +112,42 @@ describe('AdminPromotionV2EditPanel', () => {
     expect(body.promotion_v2_id).toBe(1);
     expect(body.promo_code_id).toBe(11);
     expect(onSaved).toHaveBeenCalled();
+  });
+
+  it('rejects save when typed code does not match any known code', async () => {
+    const patchMock = jest.fn();
+    (global as any).fetch = jest.fn((url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'PATCH') {
+        return patchMock(url, init);
+      }
+      if (url === '/api/v2/promotions/') {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(PROMOTIONS_FIXTURE) } as Response);
+      }
+      if (url === '/api/v2/promo-codes/') {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CODES_FIXTURE) } as Response);
+      }
+      return Promise.reject(new Error(`Unexpected ${method} ${url}`));
+    });
+
+    render(
+      <AdminPromotionV2EditPanel
+        reservationId={1234}
+        authToken="fake-token"
+        currentPromotionId={null}
+        currentPromoCodeId={null}
+      />,
+    );
+    await waitFor(() => expect(screen.getByLabelText(/kod rabatowy/i)).toBeInTheDocument());
+
+    const codeInput = screen.getByLabelText(/kod rabatowy/i) as HTMLInputElement;
+    fireEvent.change(codeInput, { target: { value: 'FAKE_CODE_XYZ' } });
+    fireEvent.click(screen.getByRole('button', { name: /zapisz zmianę/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Nieznany kod rabatowy/i)).toBeInTheDocument();
+    });
+    expect(patchMock).not.toHaveBeenCalled();
   });
 
   it('shows error message when save fails', async () => {
