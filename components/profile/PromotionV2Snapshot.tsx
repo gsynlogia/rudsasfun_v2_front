@@ -113,10 +113,8 @@ export default function PromotionV2Snapshot({ reservationId, authToken }: Props)
               </div>
               {code.opis && <p className="text-sm text-gray-600 mt-1">{code.opis}</p>}
             </div>
-            {code.kategoria === 'obniza_cene' ? (
+            {code.kategoria === 'obniza_cene' && (
               <p className="text-lg font-bold text-green-600 whitespace-nowrap">-{snapshot.applied_promo_code_discount.toFixed(2)} zł</p>
-            ) : (
-              <p className="text-sm text-gray-500 whitespace-nowrap italic">świadczenie niecenowe</p>
             )}
           </div>
         </div>
