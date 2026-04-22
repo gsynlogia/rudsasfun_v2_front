@@ -84,6 +84,10 @@ export interface ContractFormData {
   returnPlace: string;
   promotions: string;
   invoice: string;
+  /** Karta Trello 003 — wiersz „Rabat:" w umowie. Używane przez Step 4 podgląd
+   * (przed zapisem rezerwacji) gdy ContractForm nie ma reservationId i nie może
+   * fetchnąć snapshotu. Warunkowy render w ContractForm ukryje wiersz gdy null/undefined. */
+  rabat?: { label: string; amount: number | null };
 }
 
 const formatDate = (dateStr: string) => {

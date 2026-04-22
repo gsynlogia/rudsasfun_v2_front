@@ -44,6 +44,9 @@ interface ContractFormProps {
     returnPlace?: string;
     invoice?: string;
     promotions?: string;
+    /** Karta Trello 003 — wiersz „Rabat:" dla trybu preview (Step 4 bez reservationId).
+     * Gdy reservationId jest podany, priorytet ma fetch z API `/promotion-v2`. */
+    rabat?: { label: string; amount: number | null };
   };
   /** Payload z signed_documents (umowa). Gdy podany – dane formularza z payloadu; gdy brak – z rezerwacji (obecne zachowanie). */
   signedPayload?: Record<string, unknown> | null;
@@ -113,7 +116,15 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
   const [rabatRow, setRabatRow] = useState<{ label: string; amount: number | null } | null>(null);
 
   useEffect(() => {
-    if (!reservationId) return;
+    // Karta Trello 003 — tryb preview (Step 4, brak reservationId): rabat przychodzi
+    // z reservationData.rabat (zbudowany w buildContractPreviewFromSteps z sessionStorage).
+    // Warunkowy render {rabatRow && ...} poniżej sam ukryje wiersz gdy undefined.
+    if (!reservationId) {
+      if (reservationData?.rabat) {
+        setRabatRow(reservationData.rabat);
+      }
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {

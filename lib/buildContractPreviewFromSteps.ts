@@ -87,6 +87,30 @@ export function buildContractFormDataFromSteps(
     ? `${promotionItem.name} ${formatAmount(promotionItem.price)}`
     : '';
 
+  // Karta Trello 003 — buduj pole `rabat` z step2.promoCodeResult (sessionStorage).
+  // ContractForm w trybie podglądu (bez reservationId) nie fetchuje snapshotu z API,
+  // więc rabat musi przyjść wprost z danych już zebranych w Step 2. Logika identyczna
+  // jak w ContractForm.tsx:142-171 (dla kategorii kodu).
+  const buildRabat = (): { label: string; amount: number | null } | undefined => {
+    const r = step2?.promoCodeResult;
+    if (!r || !r.valid || !r.kod) return undefined;
+    const applied = r.discount ?? 0;
+    if (r.kategoria === 'obniza_cene') {
+      return { label: `Kod rabatowy ${r.kod}`, amount: applied > 0 ? -applied : null };
+    }
+    if (r.kategoria === 'nie_obniza_ceny') {
+      return { label: `Kod rabatowy ${r.kod}: ${r.opis || 'bon'}`, amount: null };
+    }
+    if (r.kategoria === 'atrakcja') {
+      return { label: `Kod rabatowy ${r.kod}: darmowa atrakcja — ${r.opis || ''}`.trim(), amount: null };
+    }
+    if (r.kategoria === 'gadzet') {
+      return { label: `Kod rabatowy ${r.kod}: darmowy gadżet — ${r.opis || ''}`.trim(), amount: null };
+    }
+    return { label: `Kod rabatowy ${r.kod}`, amount: applied > 0 ? -applied : null };
+  };
+  const rabat = buildRabat();
+
   const mapInvoice = () => {
     if (!step3?.wantsInvoice) return 'Brak faktury';
     if (step3.deliveryType === 'paper') return 'Papierowa + 30,00';
@@ -133,5 +157,6 @@ export function buildContractFormDataFromSteps(
     returnPlace: transportFrom,
     promotions,
     invoice: mapInvoice(),
+    rabat,
   };
 }
