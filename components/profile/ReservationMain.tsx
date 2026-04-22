@@ -23,6 +23,7 @@ function getDiffText(signed: string, draft: string): string {
   return draft;
 }
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
+import { buildPromoCodeCostRow, PromotionV2Snapshot as PromotionV2SnapshotData } from '@/lib/buildPromoCodeCostRow';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 import DashedLine from '../DashedLine';
@@ -76,6 +77,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   const [bankAccount, setBankAccount] = useState<any>(null);
   const [loadingOnlinePaymentsStatus, setLoadingOnlinePaymentsStatus] = useState(true);
   const [protections, setProtections] = useState<Map<number, { name: string; price: number }>>(new Map());
+  const [promoV2Snapshot, setPromoV2Snapshot] = useState<PromotionV2SnapshotData | null>(null);
   // Niezatwierdzone zmiany w karcie kwalifikacyjnej (draft vs podpisane SMS-em)
   // Niezatwierdzone zmiany w karcie kwalifikacyjnej — per-sekcja (widoczne na profilu) + lista wszystkich zmian
   const [unsignedCardChanges, setUnsignedCardChanges] = useState<{
@@ -93,6 +95,26 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
     // Pelna lista niezatwierdzonych zmian (nazwaPolska -> wartoscDraftu) do alertu rozwijanego
     allChanges: Array<{ label: string; value: string }>;
   }>({ accommodation: false, health: false, additionalInfo: false, draftValues: {}, signedValues: {}, allChanges: [] });
+
+  useEffect(() => {
+    if (!reservation?.id) return;
+    const token = authService.getToken();
+    const apiUrl = getApiBaseUrlRuntime();
+    let cancelled = false;
+    fetch(`${apiUrl}/api/v2/reservations/${reservation.id}/promotion-v2`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled) setPromoV2Snapshot(data);
+      })
+      .catch(() => {
+        if (!cancelled) setPromoV2Snapshot(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reservation?.id]);
 
   useEffect(() => {
     if (!reservation?.id) return;
@@ -1317,8 +1339,9 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
               reservation.protection_prices;
             const hasTransport = reservation.transport_price != null && reservation.transport_price > 0;
             const hasPromotion = reservation.promotion_name != null && reservation.promotion_name !== '';
+            const promoCodeRow = buildPromoCodeCostRow(promoV2Snapshot);
             const showBreakdown =
-              hasBase || hasDiet || hasAddons || hasProtection || hasTransport || hasPromotion;
+              hasBase || hasDiet || hasAddons || hasProtection || hasTransport || hasPromotion || !!promoCodeRow;
 
             if (!showBreakdown) return null;
 
@@ -1379,6 +1402,9 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
               } else {
                 rows.push({ label: reservation.promotion_name!, infoOnly: true });
               }
+            }
+            if (promoCodeRow) {
+              rows.push(promoCodeRow);
             }
 
             return (
