@@ -50,6 +50,9 @@ export default async function RootLayout({
   const host = (await headers()).get('host');
   const gtmEnabled = isProdHost(host) && isGtmEnabled();
   const gtmId = getGtmId();
+  // DevBanner — widoczny na każdym nie-prod hoście (dev synlogia.dev, localhost).
+  // Hostname-based (runtime, SSR), bo NEXT_PUBLIC_* env są zapiekane do bundla build-time.
+  const isDev = !isProdHost(host);
 
   return (
     <html lang="en">
@@ -94,7 +97,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         ) : (
           <ReservationProvider>
             <ToastProvider>
-              <DevBanner />
+              <DevBanner isDev={isDev} />
               <TestBanner />
               {children}
             </ToastProvider>
