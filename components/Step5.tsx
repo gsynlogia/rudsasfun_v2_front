@@ -18,6 +18,7 @@ import {
 } from '@/types/stepData';
 import { getApiBaseUrlRuntime, API_BASE_URL } from '@/utils/api-config';
 import { logGtmEvent, buildStepEventData } from '@/utils/gtm-logger';
+import { buildStep5PromotionLabel, buildStep5PromoCodeLabel } from '@/lib/step5Labels';
 import {
   saveStep5FormData,
   loadStep5FormData,
@@ -447,29 +448,15 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
     return [];
   };
 
-  // Get promotion label
-  const getPromotionLabel = (): string => {
-    if (!step2Data.selectedPromotion) return '';
+  // Get promotion label — priorytet: reservation.items (V2 + legacy) > legacy hardcoded mapa.
+  // Karta Trello 008: dla rezerwacji V2 bez `selectedPromotion` (legacy pole) wcześniej zwracało
+  // '' i body Step 5 pokazywało „Nie wybrano" mimo że sidebar miał poprawną promocję.
+  const getPromotionLabel = (): string =>
+    buildStep5PromotionLabel(reservation.items, step2Data.selectedPromotion);
 
-    // Get promotion item from reservation
-    const promotionItem = reservation.items.find((item: ReservationItem) => item.type === 'promotion');
-    if (promotionItem) {
-      return promotionItem.name;
-    }
-
-    // Fallback to default values
-    const promotions: Record<string, { name: string; price: number }> = {
-      'rodzenstwo': { name: 'Rodzeństwo razem', price: -50 },
-      'wczesna': { name: 'Wczesna rezerwacja', price: -100 },
-      'grupa': { name: 'Grupa 5+ osób', price: -75 },
-    };
-
-    const promotion = promotions[step2Data.selectedPromotion];
-    if (promotion) {
-      return promotion.name;
-    }
-    return '';
-  };
+  // Karta Trello 008: drugi wiersz w sekcji „Promocje" — kod rabatowy V2 z opisem.
+  const getPromoCodeLabel = (): string | null =>
+    buildStep5PromoCodeLabel(step2Data.promoCodeResult ?? null);
 
   // Get invoice delivery label
   const getInvoiceDeliveryLabel = (): string => {
@@ -991,8 +978,9 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
               <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
                 Promocje
               </h3>
-              <div className="text-xs sm:text-sm text-gray-700">
-                {getPromotionLabel() || 'Nie wybrano'}
+              <div className="text-xs sm:text-sm text-gray-700 space-y-1">
+                <div>{getPromotionLabel() || (!getPromoCodeLabel() ? 'Nie wybrano' : '')}</div>
+                {getPromoCodeLabel() && <div>{getPromoCodeLabel()}</div>}
               </div>
             </div>
           </div>
