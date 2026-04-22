@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 
 import { authService } from '@/lib/services/AuthService';
+import { buildContractPromotionRow } from '@/lib/buildContractPromotionRow';
 
 interface ContractFormProps {
   /** Id rezerwacji (number) – do zapisu w signed_documents */
@@ -114,6 +115,9 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
   // §16.D1 — wiersz „Rabat:" pod „Promocje:" w sekcji kosztów umowy.
   // `label` to tekst wyświetlany, `amount` to kwota w PLN lub null dla bon/atrakcja/gadżet (nie obniża ceny).
   const [rabatRow, setRabatRow] = useState<{ label: string; amount: number | null } | null>(null);
+  // Karta Trello 004 — wiersz „Promocje:" dla rezerwacji V2. Legacy fallback (formData.promotions)
+  // jest używany gdy ten state = null (rezerwacja bez V2 albo promocja_v2_id = null).
+  const [promotionRow, setPromotionRow] = useState<{ name: string; amount: number | null } | null>(null);
 
   useEffect(() => {
     // Karta Trello 003 — tryb preview (Step 4, brak reservationId): rabat przychodzi
@@ -142,6 +146,9 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
           return;
         }
         const snap: {
+          promotion_v2_id?: number | null;
+          promotion_v2_snapshot?: { nazwa?: string; opis?: string; applied_discount?: number; reduced_by_code_50pct?: boolean } | null;
+          applied_promotion_discount?: number;
           promo_code_snapshot?: { kod?: string; kategoria?: string; opis?: string; applied_discount?: number } | null;
           applied_promo_code_discount?: number;
           admin_promo_code_override?: string | null;
@@ -149,6 +156,15 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
         } = await res.json();
 
         if (cancelled) return;
+
+        // Karta 004 — wiersz „Promocje:" z promotion_v2_snapshot (overwriting legacy formData.promotions).
+        setPromotionRow(
+          buildContractPromotionRow({
+            promotion_v2_id: snap.promotion_v2_id ?? null,
+            promotion_v2_snapshot: snap.promotion_v2_snapshot ?? null,
+            applied_promotion_discount: snap.applied_promotion_discount ?? 0,
+          }),
+        );
 
         const code = snap.promo_code_snapshot;
         const override = snap.admin_promo_code_override;
@@ -693,8 +709,20 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
 
                 <div className="payment-item promocja">
                 <label>Promocje:</label>
-                <div className="field-value">{formData.promotions}</div>
-                <span>zł</span>
+                <div className="field-value">
+                  {promotionRow
+                    ? `${promotionRow.name}${
+                        promotionRow.amount !== null
+                          ? ` ${promotionRow.amount.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : ''
+                      }`
+                    : formData.promotions}
+                </div>
+                {promotionRow && promotionRow.amount === null ? (
+                  <span className="info-only">(nie obniża ceny)</span>
+                ) : (
+                  <span>zł</span>
+                )}
               </div>
 
               {/* §16.D1 — wiersz „Rabat:" (kod rabatowy v2 / override admina). Bon/atrakcja/gadżet: bez kwoty. */}
