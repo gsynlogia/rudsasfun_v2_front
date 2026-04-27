@@ -6,7 +6,7 @@ import { computeConflictModalLabels } from './promotionConflictLabels';
 
 interface ValidationResponse {
   valid: boolean;
-  type: 'prawidlowy' | 'nieprawidlowy' | 'nie_laczy_z_promocja';
+  type: 'prawidlowy' | 'nieprawidlowy' | 'nieaktywny' | 'nie_laczy_z_promocja';
   kod: string;
   kategoria?: PromoCode['kategoria'];
   opis?: string;

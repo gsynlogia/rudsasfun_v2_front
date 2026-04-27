@@ -976,7 +976,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
             {/* Right: Promotions */}
             <div>
               <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
-                Promocje
+                Promocje i Rabaty
               </h3>
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 <div>{getPromotionLabel() || (!getPromoCodeLabel() ? 'Nie wybrano' : '')}</div>
@@ -1371,7 +1371,7 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
                 ? 'Tworzenie rezerwacji...'
                 : isProcessingPayment
                   ? 'Przetwarzanie płatności...'
-                  : 'Potwierdzam i opłacam'}
+                  : 'Potwierdzam rezerwację'}
             </button>
           </div>
         </section>

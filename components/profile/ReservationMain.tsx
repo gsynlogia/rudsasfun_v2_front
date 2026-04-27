@@ -24,6 +24,7 @@ function getDiffText(signed: string, draft: string): string {
 }
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
 import { buildPromoCodeCostRow, PromotionV2Snapshot as PromotionV2SnapshotData } from '@/lib/buildPromoCodeCostRow';
+import { buildPromotionV2CostRow } from '@/lib/buildPromotionV2CostRow';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 import DashedLine from '../DashedLine';
@@ -1338,10 +1339,11 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
               reservation.protection_names &&
               reservation.protection_prices;
             const hasTransport = reservation.transport_price != null && reservation.transport_price > 0;
-            const hasPromotion = reservation.promotion_name != null && reservation.promotion_name !== '';
+            const hasLegacyPromotion = reservation.promotion_name != null && reservation.promotion_name !== '';
+            const promotionV2Row = buildPromotionV2CostRow(promoV2Snapshot);
             const promoCodeRow = buildPromoCodeCostRow(promoV2Snapshot);
             const showBreakdown =
-              hasBase || hasDiet || hasAddons || hasProtection || hasTransport || hasPromotion || !!promoCodeRow;
+              hasBase || hasDiet || hasAddons || hasProtection || hasTransport || hasLegacyPromotion || !!promotionV2Row || !!promoCodeRow;
 
             if (!showBreakdown) return null;
 
@@ -1388,7 +1390,9 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                 amount: reservation.transport_price!,
               });
             }
-            if (hasPromotion) {
+            if (promotionV2Row) {
+              rows.push(promotionV2Row);
+            } else if (hasLegacyPromotion) {
               if (reservation.promotion_does_not_reduce_price) {
                 rows.push({
                   label: `${reservation.promotion_name} – nie obniża ceny`,
