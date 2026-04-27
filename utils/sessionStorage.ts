@@ -189,7 +189,7 @@ export interface Step2FormData {
   promoCodeId?: number | null;
   promoCodeResult?: {
     valid: boolean;
-    type: 'prawidlowy' | 'nieprawidlowy' | 'nie_laczy_z_promocja';
+    type: 'prawidlowy' | 'nieprawidlowy' | 'nieaktywny' | 'nie_laczy_z_promocja';
     kod: string;
     kategoria?: 'obniza_cene' | 'nie_obniza_ceny' | 'atrakcja' | 'gadzet';
     opis?: string;
