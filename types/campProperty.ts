@@ -15,6 +15,10 @@ export interface CampProperty {
   registered_count?: number;
   is_full?: boolean;
   is_ended?: boolean;
+  visible_in_reservation?: boolean;
+  hide_promotions_section?: boolean;
+  hide_addons_section?: boolean;
+  hide_protections_section?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
 }

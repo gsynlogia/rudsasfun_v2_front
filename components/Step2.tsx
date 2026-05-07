@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 import type { StepComponentProps } from '@/types/reservation';
 import { useReservation } from '@/context/ReservationContext';
+import { API_BASE_URL } from '@/utils/api-config';
 import { loadStep1FormData, loadStep2FormData, saveStep2FormData, loadStep3FormData } from '@/utils/sessionStorage';
 
 import DashedLine from './DashedLine';
@@ -13,6 +14,12 @@ import PromotionsAndRabatySection, { type PromotionAndCodeSelection } from './st
 import ProtectionSection from './step2/ProtectionSection';
 import SourceSection from './step2/SourceSection';
 import TransportSection from './step2/TransportSection';
+
+interface SectionVisibilityFlags {
+  hide_promotions_section: boolean;
+  hide_addons_section: boolean;
+  hide_protections_section: boolean;
+}
 
 /**
  * Step2 Component - Reservation Details
@@ -38,6 +45,50 @@ export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabl
     }
     return null;
   }, [pathname]);
+
+  // campId też z URL: /camps/{campId}/...
+  const campId = useMemo<number | null>(() => {
+    const parts = (pathname || '').split('/');
+    const idx = parts.indexOf('camps');
+    if (idx !== -1 && idx + 1 < parts.length) {
+      const v = parseInt(parts[idx + 1], 10);
+      return Number.isFinite(v) ? v : null;
+    }
+    return null;
+  }, [pathname]);
+
+  // Flagi ukrycia sekcji (ustawione per turnus przez admina w panelu).
+  // Domyślnie wszystkie false — gdy fetch nie zwróci property (np. propertyId/campId
+  // brakuje w URL), zachowujemy zachowanie zgodne wstecz (sekcje widoczne).
+  const [sectionFlags, setSectionFlags] = useState<SectionVisibilityFlags>({
+    hide_promotions_section: false,
+    hide_addons_section: false,
+    hide_protections_section: false,
+  });
+
+  useEffect(() => {
+    if (campId === null || propertyId === null) return;
+    let aborted = false;
+    fetch(`${API_BASE_URL}/api/camps/${campId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (aborted || !data) return;
+        const props = (data?.properties || []) as Array<{ id: number; hide_promotions_section?: boolean; hide_addons_section?: boolean; hide_protections_section?: boolean }>;
+        const prop = props.find((p) => p.id === propertyId);
+        if (!prop) return;
+        setSectionFlags({
+          hide_promotions_section: Boolean(prop.hide_promotions_section),
+          hide_addons_section: Boolean(prop.hide_addons_section),
+          hide_protections_section: Boolean(prop.hide_protections_section),
+        });
+      })
+      .catch(() => {
+        // Cicha porażka — zostają domyślne (sekcje widoczne).
+      });
+    return () => {
+      aborted = true;
+    };
+  }, [campId, propertyId]);
 
   // P1-4: userEmail najpierw ze Step 1 (opiekun1 — e-mail wpisany już w kroku 1),
   // fallback na Step 3 (privateData). Bez tego per-email usage check nie działa
@@ -154,24 +205,34 @@ export default function Step2({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Addons Section - Only description and info block from database */}
-      <AddonsSection />
-      <DashedLine />
-
-      {/* Protection Section */}
-      <ProtectionSection />
-      <DashedLine />
-
-      {/* Promocje i Rabaty (promocje v2 + kody rabatowe) */}
-      {propertyId !== null && (
-        <PromotionsAndRabatySection
-          propertyId={propertyId}
-          userEmail={userEmail}
-          initial={initialSelection}
-          onChange={handlePromotionsChange}
-        />
+      {/* Addons Section - ukryta gdy admin zaznaczył hide_addons_section dla turnusu */}
+      {!sectionFlags.hide_addons_section && (
+        <>
+          <AddonsSection />
+          <DashedLine />
+        </>
       )}
-      <DashedLine />
+
+      {/* Protection Section - ukryta gdy admin zaznaczył hide_protections_section */}
+      {!sectionFlags.hide_protections_section && (
+        <>
+          <ProtectionSection />
+          <DashedLine />
+        </>
+      )}
+
+      {/* Promocje i Rabaty - ukryte gdy admin zaznaczył hide_promotions_section */}
+      {propertyId !== null && !sectionFlags.hide_promotions_section && (
+        <>
+          <PromotionsAndRabatySection
+            propertyId={propertyId}
+            userEmail={userEmail}
+            initial={initialSelection}
+            onChange={handlePromotionsChange}
+          />
+          <DashedLine />
+        </>
+      )}
 
       {/* Transport Section */}
       <TransportSection />

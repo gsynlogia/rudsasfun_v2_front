@@ -31,6 +31,9 @@ export default function CampPropertyForm({
   const [useDefaultDiet, setUseDefaultDiet] = useState<boolean>(false);
   const [basePrice, setBasePrice] = useState<number>(2200);
   const [tag, setTag] = useState<string>('');
+  const [hidePromotions, setHidePromotions] = useState<boolean>(false);
+  const [hideAddons, setHideAddons] = useState<boolean>(false);
+  const [hideProtections, setHideProtections] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +61,9 @@ export default function CampPropertyForm({
       setUseDefaultDiet(property.use_default_diet !== undefined ? property.use_default_diet : false);
       setBasePrice(property.base_price || 2200);
       setTag(property.tag || '');
+      setHidePromotions(Boolean((property as { hide_promotions_section?: boolean }).hide_promotions_section));
+      setHideAddons(Boolean((property as { hide_addons_section?: boolean }).hide_addons_section));
+      setHideProtections(Boolean((property as { hide_protections_section?: boolean }).hide_protections_section));
     }
   }, [property]);
 
@@ -105,6 +111,9 @@ export default function CampPropertyForm({
             use_default_diet: useDefaultDiet,
             base_price: basePrice,
             tag: tag.trim() || null,
+            hide_promotions_section: hidePromotions,
+            hide_addons_section: hideAddons,
+            hide_protections_section: hideProtections,
           })
         : JSON.stringify({
             camp_id: campId,
@@ -116,6 +125,9 @@ export default function CampPropertyForm({
             use_default_diet: useDefaultDiet,
             base_price: basePrice,
             tag: tag.trim() || null,
+            hide_promotions_section: hidePromotions,
+            hide_addons_section: hideAddons,
+            hide_protections_section: hideProtections,
           });
 
       const response = await fetch(url, {
@@ -299,6 +311,53 @@ export default function CampPropertyForm({
           <p className="mt-1 text-xs text-gray-500 ml-6">
             Jeśli zaznaczone, turnus będzie używał domyślnych diet z systemu. Jeśli odznaczone, możesz dodać indywidualne diety dla tego turnusu.
           </p>
+        </div>
+
+        <div className="border-t border-gray-200 pt-4 mt-2">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">
+            Ukryj sekcje w procesie rezerwacji (Step 2)
+          </h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Zaznacz, jeśli ten turnus nie ma korzystać z danej kategorii. Sekcja zniknie z procesu rezerwacji a backend nie zwróci żadnych pozycji.
+          </p>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hidePromotions}
+                onChange={(e) => setHidePromotions(e.target.checked)}
+                className="w-4 h-4 text-[#03adf0] border-gray-300 rounded focus:ring-[#03adf0]"
+                disabled={loading}
+              />
+              <span className="text-sm text-gray-700">
+                Ukryj sekcję <strong>Promocje i Rabaty</strong>
+              </span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hideAddons}
+                onChange={(e) => setHideAddons(e.target.checked)}
+                className="w-4 h-4 text-[#03adf0] border-gray-300 rounded focus:ring-[#03adf0]"
+                disabled={loading}
+              />
+              <span className="text-sm text-gray-700">
+                Ukryj sekcję <strong>Atrakcje dodatkowe</strong>
+              </span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hideProtections}
+                onChange={(e) => setHideProtections(e.target.checked)}
+                className="w-4 h-4 text-[#03adf0] border-gray-300 rounded focus:ring-[#03adf0]"
+                disabled={loading}
+              />
+              <span className="text-sm text-gray-700">
+                Ukryj sekcję <strong>Ochrony</strong>
+              </span>
+            </label>
+          </div>
         </div>
 
         {startDate && endDate && (
