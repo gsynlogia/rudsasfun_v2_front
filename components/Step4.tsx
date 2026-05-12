@@ -287,7 +287,7 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
                     consentErrors.consent1 ? 'text-red-600' : 'text-gray-700'
                   }`}
                 >
-                  Zapoznałem się z{' '}
+                  Zapoznałem/am się z{' '}
                   {getDocumentUrl('Regulamin portalu') || getDocumentUrl('portal_regulation') ? (
                     <a
                       href="#"
@@ -314,10 +314,10 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
                         if (doc) handleDocumentDownload(doc.name);
                       }}
                     >
-                      Polityką prywatności
+                      Polityką Prywatności
                     </a>
                   ) : (
-                    <span className="text-gray-500">Polityką prywatności</span>
+                    <span className="text-gray-500">Polityką Prywatności</span>
                   )}{' '}
                   i akceptuję ich postanowienia.
                   <span className="text-red-500 ml-1">*</span>
@@ -347,7 +347,7 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
                     consentErrors.consent2 ? 'text-red-600' : 'text-gray-700'
                   }`}
                 >
-                  Zapoznałem się z{' '}
+                  Zapoznałem/am się z{' '}
                   {getDocumentUrl('Warunki uczestnictwa') || getDocumentUrl('tourist_events_regulations') ? (
                     <a
                       href="#"
@@ -358,10 +358,10 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
                         if (doc) handleDocumentDownload(doc.name);
                       }}
                     >
-                      Warunkami uczestnictwa
+                      Warunkami uczestnictwa w Imprezach Turystycznych organizowanych przez Radsas Fun sp. z o.o.
                     </a>
                   ) : (
-                    <span className="text-gray-500">Warunkami uczestnictwa</span>
+                    <span className="text-gray-500">Warunkami uczestnictwa w Imprezach Turystycznych organizowanych przez Radsas Fun sp. z o.o.</span>
                   )}{' '}
                   i akceptuję ich postanowienia.
                   <span className="text-red-500 ml-1">*</span>
@@ -391,7 +391,7 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
                     consentErrors.consent3 ? 'text-red-600' : 'text-gray-700'
                   }`}
                 >
-                  Zgoda na zdjęcia i ich udostępnianie - obecne i dodawane zgody do opracowania przez Zamawiającego.
+                  Wyrażam zgodę na FOTORELACJĘ, czyli utrwalanie oraz wykorzystywanie wizerunku Uczestnika w relacjach z przebiegu Imprez Turystycznych oraz w materiałach promocyjnych, reklamowych i marketingowych Radsas Fun sp. z o.o., publikowanych m.in. na stronie internetowej Organizatora oraz w mediach społecznościowych. Brak wyrażenia zgody spowoduje, że Uczestnik nie będzie uwieczniany na zdjęciach i nagraniach przygotowywanych przez Organizatora.
                   <span className="text-red-500 ml-1">*</span>
                 </label>
                 {consentErrors.consent3 && (
@@ -419,7 +419,7 @@ export default function Step4({ onNext: _onNext, onPrevious: _onPrevious, disabl
                     consentErrors.consent4 ? 'text-red-600' : 'text-gray-700'
                   }`}
                 >
-                  Radsas Fun w ramach ceny odprowadza składkę w kwocie 2,00 PLN na rzecz Turystycznego Funduszu Gwarancyjnego oraz 2 PLN na rzecz Ubezpieczeniowego Funduszu Gwarancyjnego zgodnie z ustawą.
+                  Przyjmuję do wiadomości, że cena Imprezy Turystycznej obejmuje składki na Turystyczny Fundusz Gwarancyjny oraz Turystyczny Fundusz Pomocowy zgodnie z obowiązującymi przepisami prawa.
                   <span className="text-red-500 ml-1">*</span>
                 </label>
                 {consentErrors.consent4 && (

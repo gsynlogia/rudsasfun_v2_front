@@ -4308,19 +4308,19 @@ export default function ReservationDetailPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className={`w-3 h-3 rounded-full ${reservation.consent1 ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className="text-xs text-gray-600">Regulamin i polityka prywatności</span>
+                  <span className="text-xs text-gray-600">Regulamin i Polityka Prywatności</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`w-3 h-3 rounded-full ${reservation.consent2 ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className="text-xs text-gray-600">Warunki uczestnictwa</span>
+                  <span className="text-xs text-gray-600">Warunki uczestnictwa w Imprezach Turystycznych</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`w-3 h-3 rounded-full ${reservation.consent3 ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className="text-xs text-gray-600">Zdjęcia i ich udostępnianie</span>
+                  <span className="text-xs text-gray-600">Fotorelacja</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`w-3 h-3 rounded-full ${reservation.consent4 ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  <span className="text-xs text-gray-600">Składki na fundusze gwarancyjne</span>
+                  <span className="text-xs text-gray-600">Składki TFG i TFP</span>
                 </div>
               </div>
             </div>

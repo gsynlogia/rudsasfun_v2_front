@@ -125,7 +125,7 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
                 className="w-4 h-4 mt-1 flex-shrink-0"
               />
               <span className="text-sm text-gray-700">
-                Zapoznałem się z{' '}
+                Zapoznałem/am się z{' '}
                 {getDocumentUrl('Regulamin portalu') ? (
                   <a
                     href="#"
@@ -150,10 +150,10 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
                     }}
                     className="text-[#03adf0] underline hover:text-[#0288c7]"
                   >
-                    Polityką prywatności
+                    Polityką Prywatności
                   </a>
                 ) : (
-                  <span className="text-gray-500">Polityką prywatności</span>
+                  <span className="text-gray-500">Polityką Prywatności</span>
                 )}{' '}
                 i akceptuję ich postanowienia. *
               </span>
@@ -170,7 +170,7 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
                 className="w-4 h-4 mt-1 flex-shrink-0"
               />
               <span className="text-sm text-gray-700">
-                Zapoznałem się z{' '}
+                Zapoznałem/am się z{' '}
                 {getDocumentUrl('Warunki uczestnictwa') ? (
                   <a
                     href="#"
@@ -180,12 +180,12 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
                     }}
                     className="text-[#03adf0] underline hover:text-[#0288c7]"
                   >
-                    Warunkami uczestnictwa
+                    Warunkami uczestnictwa w Imprezach Turystycznych organizowanych przez Radsas Fun sp. z o.o.
                   </a>
                 ) : (
-                  <span className="text-gray-500">Warunkami uczestnictwa</span>
+                  <span className="text-gray-500">Warunkami uczestnictwa w Imprezach Turystycznych organizowanych przez Radsas Fun sp. z o.o.</span>
                 )}{' '}
-                i akceptuję je. *
+                i akceptuję ich postanowienia. *
               </span>
             </label>
           </div>
@@ -200,7 +200,7 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
                 className="w-4 h-4 mt-1 flex-shrink-0"
               />
               <span className="text-sm text-gray-700">
-                Wyrażam zgodę na wykonywanie i udostępnianie zdjęć oraz filmów z udziałem uczestnika. *
+                Wyrażam zgodę na FOTORELACJĘ, czyli utrwalanie oraz wykorzystywanie wizerunku Uczestnika w relacjach z przebiegu Imprez Turystycznych oraz w materiałach promocyjnych, reklamowych i marketingowych Radsas Fun sp. z o.o., publikowanych m.in. na stronie internetowej Organizatora oraz w mediach społecznościowych. Brak wyrażenia zgody spowoduje, że Uczestnik nie będzie uwieczniany na zdjęciach i nagraniach przygotowywanych przez Organizatora.
               </span>
             </label>
           </div>
@@ -215,7 +215,7 @@ export default function EditReservationStep4({ data, onChange }: EditReservation
                 className="w-4 h-4 mt-1 flex-shrink-0"
               />
               <span className="text-sm text-gray-700">
-                Zapoznałem się z informacją o składkach na fundusze gwarancyjne i akceptuję je. *
+                Przyjmuję do wiadomości, że cena Imprezy Turystycznej obejmuje składki na Turystyczny Fundusz Gwarancyjny oraz Turystyczny Fundusz Pomocowy zgodnie z obowiązującymi przepisami prawa. *
               </span>
             </label>
           </div>
