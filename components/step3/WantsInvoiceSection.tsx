@@ -11,7 +11,10 @@ import { loadStep3FormData, saveStep3FormData } from '@/utils/sessionStorage';
  * If Yes, then InvoiceTypeSection will be shown
  */
 export default function WantsInvoiceSection() {
-  const [wantsInvoice, setWantsInvoice] = useState<boolean>(false);
+  const [wantsInvoice, setWantsInvoice] = useState<boolean>(() => {
+    const saved = loadStep3FormData();
+    return saved?.wantsInvoice ?? false;
+  });
 
   // Load data from sessionStorage on mount
   useEffect(() => {

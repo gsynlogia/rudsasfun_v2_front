@@ -33,12 +33,11 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
   });
 
   // Company fields
-  const [companyData, setCompanyData] = useState({
-    companyName: '',
-    nip: '',
-    street: '',
-    postalCode: '',
-    city: '',
+  const [companyData, setCompanyData] = useState(() => {
+    const saved = loadStep3FormData();
+    return saved?.companyData && Object.values(saved.companyData).some(v => v && String(v).trim() !== '')
+      ? saved.companyData
+      : { companyName: '', nip: '', street: '', postalCode: '', city: '' };
   });
 
   // Validation errors
@@ -127,6 +126,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
   useEffect(() => {
     const savedData = loadStep3FormData() || {} as any;
     const formData = {
+      ...savedData,
       invoiceType,
       privateData: invoiceType === 'private' ? privateData : (savedData.privateData || privateData),
       companyData: invoiceType === 'company' ? companyData : (savedData.companyData || companyData),

@@ -10,7 +10,10 @@ import { loadStep3FormData, saveStep3FormData } from '@/utils/sessionStorage';
  * Displays invoice type selection (Private person vs Company)
  */
 export default function InvoiceTypeSection() {
-  const [invoiceType, setInvoiceType] = useState<'private' | 'company'>('private');
+  const [invoiceType, setInvoiceType] = useState<'private' | 'company'>(() => {
+    const saved = loadStep3FormData();
+    return saved?.invoiceType ?? 'private';
+  });
 
   // Load data from sessionStorage on mount and whenever component is visible
   useEffect(() => {
