@@ -328,6 +328,8 @@ export default function ReservationDetailPage() {
   /** Po zaakceptowaniu/odrzuceniu karty – powiadom klienta */
   const [notifyCardEmail, setNotifyCardEmail] = useState(true);
   const [notifyCardSms, setNotifyCardSms] = useState(false);
+  /** Przypomnij o podpisaniu obu dokumentów (umowa + karta) – jeden klik wysyła SMS i e-mail */
+  const [remindBothLoading, setRemindBothLoading] = useState(false);
   /** Aneksy do umowy (admin – lista + Anuluj) */
   interface AnnexItem {
     id: number;
@@ -474,6 +476,32 @@ export default function ReservationDetailPage() {
       setRemindCardLoading(false);
     }
   }, [reservationNumber, reservation?.id, remindCardSms, remindCardEmail, showSuccess, showError]);
+
+  const handleRemindBoth = useCallback(async () => {
+    if (!reservationNumber) return;
+    setRemindBothLoading(true);
+    try {
+      const res = await authenticatedApiCall<{ ok: boolean; sent_sms: boolean; sent_email: boolean; errors?: string[] }>(
+        `/api/reservations/by-number/${reservationNumber}/remind-sign`,
+        { method: 'POST', body: JSON.stringify({ send_sms: true, send_email: true, document_type: 'both' }) },
+      );
+      if (res.ok) {
+        const parts: string[] = [];
+        if (res.sent_sms) parts.push('SMS');
+        if (res.sent_email) parts.push('e-mail');
+        showSuccess(parts.length ? `Przypomnienie wysłane (${parts.join(', ')}).` : 'Wysłano.');
+        if (reservation?.id) {
+          const data = await authenticatedApiCall<ReservationEventItem[]>(`/api/reservations/${reservation.id}/system-events`);
+          setReservationEvents(Array.isArray(data) ? data : []);
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Błąd wysyłki przypomnienia';
+      showError(msg);
+    } finally {
+      setRemindBothLoading(false);
+    }
+  }, [reservationNumber, reservation?.id, showSuccess, showError]);
 
   /** Otwarcie panelu „Edytuj umowę” po odświeżeniu, gdy w adresie jest #dokumenty/umowa-edycja */
   useEffect(() => {
@@ -2496,6 +2524,16 @@ export default function ReservationDetailPage() {
               <div className="flex gap-4 min-h-0 flex-1 overflow-hidden">
                 <div className="flex-1 min-w-0 overflow-y-auto min-h-0">
               <div className="space-y-4">
+                {/* Przypomnij o podpisaniu umowy i karty kwalifikacyjnej (jeden klik → SMS + e-mail) */}
+                <button
+                  type="button"
+                  disabled={remindBothLoading}
+                  onClick={handleRemindBoth}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-none bg-slate-700 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {remindBothLoading ? 'Wysyłanie…' : 'Przypomnij o podpisaniu umowy i karty kwalifikacyjnej'}
+                  <span className="text-xs text-slate-300">▪ SMS ▪ e-mail</span>
+                </button>
                 {/* Umowa */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
