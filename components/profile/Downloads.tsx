@@ -9,6 +9,8 @@ import { qualificationCardService } from '@/lib/services/QualificationCardServic
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
+// Bug Trello vS5tDGy3 TD-022 2026-05-25: aneks promocyjny widoczny dla klienta w /profil/do-pobrania
+import AneksPreview from '@/components/admin/AneksPreview';
 
 interface AnnexItem {
   id: number;
@@ -67,10 +69,12 @@ export default function Downloads() {
   const [cancelAnnexReason, setCancelAnnexReason] = useState('');
   const [cancelAnnexLoading, setCancelAnnexLoading] = useState(false);
   const [refreshAnnexes, setRefreshAnnexes] = useState(0);
-  /** Lista signed-documents per rezerwacja (pełna historia wersji – Umowy | Karty) */
+  /** Lista signed-documents per rezerwacja (pełna historia wersji – Umowy | Karty | Aneksy) */
   const [signedDocsByReservation, setSignedDocsByReservation] = useState<Record<number, SignedDocItem[]>>({});
   /** Mapowanie id rezerwacji → numer (REZ-YYYY-NNN) do hash w URL (#/REZ-2026-445) */
   const [reservationNumberById, setReservationNumberById] = useState<Record<number, string>>({});
+  /** Bug Trello vS5tDGy3 TD-022 — modal podglądu aneksu (klik kafelka w sekcji Aneksy) */
+  const [previewAnnex, setPreviewAnnex] = useState<{ doc: SignedDocItem; reservationNumber: string } | null>(null);
 
   // Load user's contracts from backend
   useEffect(() => {
@@ -866,6 +870,10 @@ export default function Downloads() {
                           if (list.length === 0) return null;
                           const contractDocs = list.filter((d) => d.document_type === 'contract');
                           const cardDocs = list.filter((d) => d.document_type === 'qualification_card');
+                          // Bug vS5tDGy3 TD-022 2026-05-25 — aneksy promocyjne (sortowane od najnowszego)
+                          const annexDocs = list
+                            .filter((d) => d.document_type === 'annex_promotion')
+                            .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
                           const formatDate = (s: string) => {
                             try {
                               const d = new Date(s);
@@ -901,10 +909,27 @@ export default function Downloads() {
                               </Link>
                             );
                           };
+                          // Bug vS5tDGy3 TD-022 — render kafelka aneksu (fioletowy, klik otwiera modal AneksPreview)
+                          const renderAnnexTile = (doc: SignedDocItem) => (
+                            <button
+                              key={doc.id}
+                              type="button"
+                              onClick={() => setPreviewAnnex({
+                                doc,
+                                reservationNumber: reservationNumberById[reservationId] || `REZ-${reservationId}`,
+                              })}
+                              className="w-full block rounded-lg p-3 border text-left transition-colors bg-purple-50 border-purple-300 text-purple-900 hover:bg-purple-100 cursor-pointer"
+                            >
+                              <div className="text-xs font-medium text-gray-500">{formatDate(doc.created_at)}</div>
+                              <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-purple-200 text-purple-800">
+                                Aneks promocyjny
+                              </span>
+                            </button>
+                          );
                           return (
                             <div className="mb-4 mt-4">
                               <h4 className="text-sm font-semibold text-gray-800 mb-2">Wersje dokumentów z bazy</h4>
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-3 gap-4">
                                 <div>
                                   <div className="text-xs font-semibold text-gray-600 mb-2">Umowy</div>
                                   <div className="space-y-2">
@@ -917,6 +942,13 @@ export default function Downloads() {
                                   <div className="space-y-2">
                                     {cardDocs.map((doc, idx) => renderDocTile(doc, idx, 'qualification_card'))}
                                     {cardDocs.length === 0 && <span className="text-xs text-gray-400">Brak</span>}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-xs font-semibold text-gray-600 mb-2">Aneksy</div>
+                                  <div className="space-y-2">
+                                    {annexDocs.map((doc) => renderAnnexTile(doc))}
+                                    {annexDocs.length === 0 && <span className="text-xs text-gray-400">Brak</span>}
                                   </div>
                                 </div>
                               </div>
@@ -1029,6 +1061,33 @@ export default function Downloads() {
                 {cancelAnnexLoading ? 'Zapisywanie...' : 'Anuluj aneks'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bug Trello vS5tDGy3 TD-022 2026-05-25 — modal AneksPreview dla klienta (klik fioletowego kafelka) */}
+      {previewAnnex && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setPreviewAnnex(null); }}
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-purple-50 border-b-2 border-purple-300 px-6 py-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-purple-900">Podgląd aneksu</h3>
+              <button
+                type="button"
+                onClick={() => setPreviewAnnex(null)}
+                className="text-purple-700 hover:text-purple-900 text-2xl leading-none"
+                aria-label="Zamknij"
+              >
+                ×
+              </button>
+            </div>
+            <AneksPreview
+              payloadJson={previewAnnex.doc.payload ?? null}
+              reservationNumber={previewAnnex.reservationNumber}
+              signedAt={previewAnnex.doc.created_at}
+            />
           </div>
         </div>
       )}
