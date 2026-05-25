@@ -1,28 +1,16 @@
 /**
  * Funkcje formatujące dla strony szczegółów rezerwacji.
+ *
+ * TD-027: formatDateTime przeniesione do lib/utils/dateFormatters.ts (formatDateTimeNumeric).
+ * Re-eksport zachowuje istniejący import path dla wstecznej kompatybilności (eliminacja
+ * 3 duplikatów logiki formatDateTime w AneksPreview, DocumentVersionsList, formatters.ts).
  */
+export { formatDateTimeNumeric as formatDateTime } from '@/lib/utils/dateFormatters';
 
 export function formatDate(dateString: string | null | undefined): string {
   if (!dateString) return 'Brak danych';
   try {
     return new Date(dateString).toLocaleDateString('pl-PL');
-  } catch {
-    return 'Brak danych';
-  }
-}
-
-export function formatDateTime(dateString: string | null | undefined): string {
-  if (!dateString) return 'Brak danych';
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleString('pl-PL', {
-      timeZone: 'Europe/Warsaw',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   } catch {
     return 'Brak danych';
   }

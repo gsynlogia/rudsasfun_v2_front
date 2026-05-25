@@ -17,6 +17,7 @@
  * - Klauzulę "Pozostałe postanowienia bez zmian"
  */
 import { FileText, ArrowDown, ArrowUp, Minus, AlertCircle } from 'lucide-react';
+import { formatDateTimeLong } from '@/lib/utils/dateFormatters';
 
 interface ChangeBlock {
   field: string;
@@ -56,14 +57,9 @@ interface Props {
   signedAt?: string | null;
 }
 
-function formatDateTime(iso?: string | null): string {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString('pl-PL', { dateStyle: 'long', timeStyle: 'short' });
-  } catch {
-    return iso;
-  }
-}
+// TD-027: formatDateTime ekstrakcja do lib/utils/dateFormatters.ts (formatDateTimeLong).
+// Re-eksportujemy lokalnie pod stara nazwa zeby uniknac touchu callsite'ow w pliku.
+const formatDateTime = formatDateTimeLong;
 
 function formatPLN(value: number | null | undefined): string {
   if (typeof value !== 'number') return '—';
