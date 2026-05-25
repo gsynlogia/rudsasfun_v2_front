@@ -67,6 +67,12 @@ function mockFetch(responses: Record<string, any>) {
 
 describe('AdminPromotionV2EditPanel', () => {
   beforeEach(() => {
+    // TD-038 fix: komponent uzywa `process.env.NEXT_PUBLIC_API_URL || ''` jako prefix
+    // (AdminPromotionV2EditPanel.tsx:82). Test runner ma env var ustawiony na
+    // 'http://localhost:8000' (Next.js dev env), wiec komponent wola
+    // 'http://localhost:8000/api/v2/promotions/' ktore nie matchuje mock keys.
+    // Zerowanie env var w beforeEach zmusza komponent do uzywania path-only URLs.
+    process.env.NEXT_PUBLIC_API_URL = '';
     (global as any).fetch = mockFetch({
       'GET /api/v2/promotions/': PROMOTIONS_FIXTURE,
       'GET /api/v2/promo-codes/': CODES_FIXTURE,

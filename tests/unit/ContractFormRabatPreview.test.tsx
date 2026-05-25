@@ -23,6 +23,18 @@ jest.mock('@/lib/services/AuthService', () => ({
   authService: { getToken: () => null },
 }));
 
+// TD-039 fix: ContractForm używa useToast() — bez mocka rzuca "useToast must be used
+// within ToastProvider". Stub żeby test mógł renderować komponent bez ToastProvider wrapper.
+jest.mock('@/components/ToastContainer', () => ({
+  useToast: () => ({
+    showSuccess: jest.fn(),
+    showError: jest.fn(),
+    showToast: jest.fn(),
+    showWarning: jest.fn(),
+    showInfo: jest.fn(),
+  }),
+}));
+
 const BASE_RESERVATION_DATA = {
   reservationNumber: 'W trakcie nadawania',
   tournamentName: 'Test Camp',
