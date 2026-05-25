@@ -901,6 +901,14 @@ export default function Downloads() {
                                 }`}
                               >
                                 <div className="text-xs font-medium text-gray-500">{formatDate(doc.created_at)}</div>
+                                {/* TD-036: dla najnowszej umowy (idx=0) gdy status='in_verification' (niepodpisana
+                                    lub po supersede TD-023) — badge "Bieżąca (w weryfikacji)" zeby klient wiedzial
+                                    ze umowa jest nowa ale jeszcze niezaakceptowana. Gdy 'accepted' (zielony) — brak badge. */}
+                                {isCurrent && doc.status === 'in_verification' && (
+                                  <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                                    Bieżąca (w weryfikacji)
+                                  </span>
+                                )}
                                 {!isCurrent && (
                                   <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
                                     Dokument nieważny
@@ -929,7 +937,8 @@ export default function Downloads() {
                           return (
                             <div className="mb-4 mt-4">
                               <h4 className="text-sm font-semibold text-gray-800 mb-2">Wersje dokumentów z bazy</h4>
-                              <div className="grid grid-cols-3 gap-4">
+                              {/* TD-032: mobile <768px = 1 kolumna (kafelki pełnoszerokie), md+ = 3 kolumny obok siebie */}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                   <div className="text-xs font-semibold text-gray-600 mb-2">Umowy</div>
                                   <div className="space-y-2">
