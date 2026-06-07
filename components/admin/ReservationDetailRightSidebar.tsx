@@ -1,15 +1,22 @@
 'use client';
 
+// DEPRECATED 2026-05-24 REZ-1828: Archive ikona była używana TYLKO dla tab 'documents' (ukryty w UI, patrz nizej).
+// TODO TD-011: usunąć import gdy fizycznie skasujemy obsługę tab 'documents'.
 import { MessageSquare, Activity, Archive } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'admin_reservation_right_tab';
+// 2026-05-24 REZ-1828: 'documents' DEPRECATED — zastąpiony przez DocumentVersionsList
+// w panelu Dokumenty (page.tsx). Tab ukryty z UI ale typ + obsługa zostają (per TD-011)
+// do czasu fizycznego usunięcia po sprawdzeniu czy nieużywany.
 export type ReservationRightTabId = 'notes' | 'events' | 'documents';
 
 const TABS: { id: ReservationRightTabId; icon: typeof MessageSquare; label: string }[] = [
   { id: 'notes', icon: MessageSquare, label: 'Notatki wewnętrzne' },
   { id: 'events', icon: Activity, label: 'Zdarzenia klienta' },
-  { id: 'documents', icon: Archive, label: 'Wersje dokumentów z bazy' },
+  // DEPRECATED 2026-05-24 REZ-1828: tab "Wersje dokumentów z bazy" zastąpiony przez DocumentVersionsList.
+  // TODO TD-011: sprawdzić czy faktycznie nieużywany (suggestedTab, deep linki #dokumenty) i usunąć w osobnej sesji.
+  // { id: 'documents', icon: Archive, label: 'Wersje dokumentów z bazy' },
 ];
 
 export const RIGHT_SIDEBAR_WIDTH = 320;
@@ -22,14 +29,23 @@ interface ReservationDetailRightSidebarProps {
 }
 
 function getStoredTab(): ReservationRightTabId {
-  if (typeof window === 'undefined') return 'notes';
+  // 2026-05-24 REZ-1828: domyślnie 'events' (były wcześniej 'notes'). User explicit:
+  // Zdarzenia mają być domyślnie zaznaczone gdy localStorage pusty. Tab 'documents'
+  // ukryty z UI (DEPRECATED, patrz wyżej TABS) ale dalej akceptowany z localStorage
+  // do czasu pełnego usunięcia per TD-011 — uzytkownicy z wcześniejszą sesją wracają na notes/events.
+  if (typeof window === 'undefined') return 'events';
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    if (v === 'notes' || v === 'events' || v === 'documents') return v;
+    if (v === 'notes' || v === 'events') return v;
+    // Migracja: jeśli ktoś miał zapisane 'documents' w localStorage — przełącz na 'events'
+    if (v === 'documents') {
+      try { localStorage.setItem(STORAGE_KEY, 'events'); } catch { /* ignore */ }
+      return 'events';
+    }
   } catch {
     /* ignore */
   }
-  return 'notes';
+  return 'events';
 }
 
 function setStoredTab(tab: ReservationRightTabId) {

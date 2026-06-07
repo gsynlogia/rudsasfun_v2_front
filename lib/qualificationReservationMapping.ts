@@ -405,7 +405,11 @@ export function mapReservationToQualificationForm(
     campLocation: campLocation || undefined,
     campDates: campDates || undefined,
     childName: childName || undefined,
-    childDOB: data.participant_age || undefined,
+    // Bug 003 fix (2026-05-31): `participant_age` to ROK URODZENIA (np. "2011"), NIE data.
+    // Wcześniej wpisywane jako `childDOB` → frontend datepicker formatował "2011" → "01.01.2011",
+    // klient zostawiał auto-fill, backend zapisywał, renderer pokazywał "01.01.[rok]".
+    // Fix: NIE auto-fillujemy childDOB. Klient sam wpisze (lub backend wyliczy z PESEL przy renderze).
+    childDOB: undefined,
     // Adres uczestnika — bierzemy miasto z rezerwacji (participant_city). Pelny adres moze byc w snapshocie.
     childAddress: data.participant_city || undefined,
     parentNames: parentNames || undefined,

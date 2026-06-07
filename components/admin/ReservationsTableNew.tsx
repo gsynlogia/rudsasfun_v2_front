@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { useToast } from '@/components/ToastContainer';
 import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
 import DateRangeCalendar from '@/components/admin/DateRangeCalendar';
+import DocumentStatusBadge, { getDocumentStatusVisual, DocumentStatus } from '@/components/admin/DocumentStatusBadge';
 import { getExportSheetName } from '@/lib/exportExcelUtils';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
@@ -142,12 +143,42 @@ interface BackendReservationWithPayments {
   // Archive info
   is_archived?: boolean;
   archived_at?: string | null;
+  // Excel-only extras (zwracane tylko gdy include_extras=true)
+  accommodation_request?: string | null;
+  participant_additional_info?: string | null;
+  additional_notes?: string | null;
+  consent1?: boolean;
+  consent2?: boolean;
+  consent3?: boolean;
+  consent4?: boolean;
+  promo_code_kod?: string | null;
+  // ETAP 2: zdrowie + faktura + dieta
+  diet_name?: string | null;
+  health_chronic_diseases?: boolean;
+  health_chronic_diseases_info?: string | null;
+  health_dysfunctions?: boolean;
+  health_dysfunctions_info?: string | null;
+  health_psychiatric?: boolean;
+  health_psychiatric_info?: string | null;
+  wants_invoice?: boolean;
+  invoice_type?: string | null;
+  invoice_first_name?: string | null;
+  invoice_last_name?: string | null;
+  invoice_company_name?: string | null;
+  invoice_street?: string | null;
+  invoice_city?: string | null;
+  invoice_postal_code?: string | null;
+  invoice_nip?: string | null;
+  invoice_issued?: boolean;
 }
 
 interface PaginatedPaymentsResponse {
   items: BackendReservationWithPayments[];
   pagination: PaginationInfo;
   filter_options?: FilterOptions;
+  // Trello #251: nazwiska uczestników będące duplikatami w CAŁYM przefiltrowanym widoku
+  // (globalnie, nie tylko bieżąca strona) — znormalizowane lower(trim(first+' '+last)).
+  duplicate_participant_names?: string[];
 }
 
 import PaymentConfirmationModal from './PaymentConfirmationModal';
@@ -1303,6 +1334,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const { showInfo, showSuccess, showError } = useToast();
   const { openDocument, close: closeRightPanel } = useAdminRightPanel();
   const [reservations, setReservations] = useState<ReservationPayment[]>([]);
+  // Trello #251: duplikaty liczone GLOBALNIE przez backend (cały przefiltrowany widok, nie tylko
+  // bieżąca strona). Front robi unię z lokalnym liczeniem strony — fallback bez regresji gdyby
+  // backend nie zwrócił listy (np. widok archiwalny liczony lokalnie jak dotąd).
+  const [backendDuplicateNames, setBackendDuplicateNames] = useState<Set<string>>(new Set());
   // Duplikaty — imiona uczestników które wystąpiły więcej niż raz
   const duplicateNames = useMemo(() => {
     const counts = new Map<string, number>();
@@ -1310,8 +1345,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       const name = (r.participantName || '').trim().toLowerCase();
       if (name && name !== 'brak danych') counts.set(name, (counts.get(name) || 0) + 1);
     });
-    return new Set([...counts.entries()].filter(([, c]) => c > 1).map(([name]) => name));
-  }, [reservations]);
+    const pageLocal = [...counts.entries()].filter(([, c]) => c > 1).map(([name]) => name);
+    return new Set<string>([...pageLocal, ...backendDuplicateNames]);
+  }, [reservations, backendDuplicateNames]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -1675,6 +1711,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     visible: boolean;
     filters?: string[]; // Selected filter values (include)
     exclude?: string[]; // "All except" mode: values to exclude
+    // Bug #2 fix (2026-05-31): gdy true, frontend wysyła do backendu __ALL__ sentinel
+    // zamiast pełnej listy wartości (URL truncation safety dla 2000+ unikalnych).
+    // Ustawiane w handleSelectAllFilterValuesFromDb; resetowane w handleToggleFilterValue
+    // i każdym miejscu które modyfikuje col.filters manualnie.
+    allFromDbSelected?: boolean;
   }
 
   // Definicje i kolejność kolumn tabeli rezerwacji – wyłącznie poniższe 34 kolumny.
@@ -1926,6 +1967,23 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     setAppliedFilters(next);
     filtersRef.current = next;
     setDateFilterMode(dateFrom && dateTo && dateFrom === dateTo ? 'single' : 'range');
+    // Bug 002 follow-up (2026-05-31): wybór range w kalendarzu MUSI wyczyścić listę
+    // konkretnych dat (filter_createdAt) — inaczej oba filtry AND-ują się i dają 0
+    // gdy zakres jest w przyszłości a lista w przeszłości (zgłoszenie usera).
+    setColumnConfig(prev => {
+      const updated = prev.map(c => c.key === 'createdAt' ? { ...c, filters: [], exclude: undefined } : c);
+      // Sync appliedColumnFilters/exclude żeby kolejny build URL nie wyciągnął starych dat
+      const filtersForApi: Record<string, string[]> = {};
+      const excludeForApi: Record<string, string[]> = {};
+      updated.forEach(col => {
+        if (col.exclude && col.exclude.length > 0) excludeForApi[col.key] = col.exclude;
+        else if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.allFromDbSelected ? ['__ALL__'] : col.filters;
+      });
+      setAppliedColumnFilters(JSON.stringify(filtersForApi));
+      setAppliedColumnFiltersExclude(JSON.stringify(excludeForApi));
+      saveColumnPreferences(updated);
+      return updated;
+    });
     setCurrentPage(1);
   }, []);
 
@@ -2194,16 +2252,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           value = reservation.hasTermy ? 'Tak' : 'Nie';
           break;
         case 'qualificationCardStatus':
-          value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
-            : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
-            : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje na weryfikację'
-            : 'Oczekuje na klienta';
+          value = getDocumentStatusVisual(reservation.qualificationCardStatus as DocumentStatus).label;
           break;
         case 'contractStatus':
-          value = reservation.contractStatus === 'approved' ? 'Zatwierdzona'
-            : reservation.contractStatus === 'rejected' ? 'Odrzucona'
-            : reservation.contractStatus === 'pending' ? 'Oczekuje na weryfikację'
-            : 'Oczekuje na klienta';
+          value = getDocumentStatusVisual(reservation.contractStatus as DocumentStatus).label;
           break;
         case 'status':
           // Use payment status from database (already mapped to Polish in getPaymentStatusDisplay)
@@ -2239,24 +2291,32 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const isChecked = exclude.length > 0 ? !exclude.includes(value) : filters.includes(value);
 
     let updated: ColumnConfig[];
+    // Bug #2 fix (2026-05-31): manual toggle → wyłącz allFromDbSelected (user już nie "wszystkie z bazy")
     if (exclude.length > 0) {
-      // Already in "all except" mode
+      // Already in "all except" mode. isChecked === !exclude.includes(value) (linia 2288).
+      // Klik na checked (= nie w exclude) → user chce wykluczyć → DODAJ do exclude.
+      // Klik na unchecked (= w exclude) → user chce przywrócić → USUŃ z exclude.
+      // Bug fix (2026-05-31): poprzednia logika miała odwrócone branche — drugi exclude nie działał.
       if (isChecked) {
-        updated = columnConfig.map(c => c.key === columnKey ? { ...c, exclude: exclude.filter(x => x !== value) } : c);
+        updated = columnConfig.map(c => c.key === columnKey ? { ...c, exclude: [...exclude, value], allFromDbSelected: false } : c);
       } else {
-        updated = columnConfig.map(c => c.key === columnKey ? { ...c, exclude: [...exclude, value] } : c);
+        updated = columnConfig.map(c => c.key === columnKey ? { ...c, exclude: exclude.filter(x => x !== value), allFromDbSelected: false } : c);
       }
     } else {
       if (isChecked) {
         const newFilters = filters.filter(f => f !== value);
-        const switchingToExclude = filters.length === displayed.length && filters.length > 0;
+        // Bug #2 follow-up (2026-05-31): gdy user wybrał "Zaznacz wszystkie z bazy" (allFromDbSelected=true),
+        // PIERWSZE odznaczenie przełącza na "all except" mode (exclude: [value], filters: []).
+        // Bez tego — odznaczenie buduje rosnącą CSV-listę (2155, 2154, ...) → URL truncation → drugi klik nie działa.
+        // Warunek `filters.length === displayed.length` nie wystarcza bo modal pokazuje subset (np. 100 z 2156).
+        const switchingToExclude = col?.allFromDbSelected === true || (filters.length === displayed.length && filters.length > 0);
         if (switchingToExclude) {
-          updated = columnConfig.map(c => c.key === columnKey ? { ...c, filters: [], exclude: [value] } : c);
+          updated = columnConfig.map(c => c.key === columnKey ? { ...c, filters: [], exclude: [value], allFromDbSelected: false } : c);
         } else {
-          updated = columnConfig.map(c => c.key === columnKey ? { ...c, filters: newFilters } : c);
+          updated = columnConfig.map(c => c.key === columnKey ? { ...c, filters: newFilters, allFromDbSelected: false } : c);
         }
       } else {
-        updated = columnConfig.map(c => c.key === columnKey ? { ...c, filters: [...filters, value] } : c);
+        updated = columnConfig.map(c => c.key === columnKey ? { ...c, filters: [...filters, value], allFromDbSelected: false } : c);
       }
     }
     setColumnConfig(updated);
@@ -2268,7 +2328,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       if (c.exclude && c.exclude.length > 0) {
         excludeForApi[c.key] = c.exclude;
       } else if (c.filters && c.filters.length > 0) {
-        filtersForApi[c.key] = c.filters;
+        // Bug #2 fix: __ALL__ sentinel gdy aktywny tryb "wszystkie z bazy"
+        filtersForApi[c.key] = c.allFromDbSelected ? ['__ALL__'] : c.filters;
       }
     });
     setAppliedColumnFilters(JSON.stringify(filtersForApi));
@@ -2291,7 +2352,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const excludeForApi: Record<string, string[]> = {};
     updated.forEach(col => {
       if (col.exclude && col.exclude.length > 0) excludeForApi[col.key] = col.exclude;
-      else if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.filters;
+      else if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.allFromDbSelected ? ['__ALL__'] : col.filters;
     });
     setAppliedColumnFilters(JSON.stringify(filtersForApi));
     setAppliedColumnFiltersExclude(JSON.stringify(excludeForApi));
@@ -2419,7 +2480,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     if (!openFilterColumn) return;
     setIsFilterSearching(true);
     try {
+      // Bug 002 follow-up (2026-05-31): dedup defensywny (case-insensitive). Backend powinien
+      // zwracać unikalne wartości, ale przy paginacji bez stable ORDER BY (lub przy race condition
+      // między batchami) ta sama wartość może się powtórzyć w 2 batchach → React duplicate key warning.
       const allResults: string[] = [];
+      const seen = new Set<string>();
       let offset = 0;
       const limit = 100;
       let hasMore = true;
@@ -2429,19 +2494,36 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`,
         );
         const chunk = response.results || [];
-        allResults.push(...chunk);
+        for (const v of chunk) {
+          const key = (v ?? '').trim().toLowerCase();
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            allResults.push(v);
+          }
+        }
         hasMore = response.has_more ?? false;
         offset += chunk.length;
         if (chunk.length < limit) break;
       }
       const updated = columnConfig.map(col => {
         if (col.key === openFilterColumn) {
-          return { ...col, filters: allResults, exclude: undefined };
+          // Bug #2 fix (2026-05-31): allFromDbSelected=true → query buildery wyślą __ALL__ sentinel
+          return { ...col, filters: allResults, exclude: undefined, allFromDbSelected: true };
         }
         return col;
       });
       setColumnConfig(updated);
       saveColumnPreferences(updated);
+      // Bug 002 follow-up (2026-05-31): dla createdAt — wybranie listy dat MUSI wyczyścić range
+      // (dateFrom/dateTo), inaczej AND-ują się i dają 0. Symetrycznie do applyCreatedAtRangeFilter.
+      if (openFilterColumn === 'createdAt') {
+        const nextFilters = { ...filtersRef.current, dateFrom: '', dateTo: '', dateExcluded: '' };
+        setFilters(nextFilters);
+        setAppliedFilters(nextFilters);
+        filtersRef.current = nextFilters;
+        setCreatedAtModalRangeDraft({ from: '', to: '' });
+        setCreatedAtHeaderRangeDraft({ from: '', to: '' });
+      }
       setFrozenFilterOptions(allResults.length > 0 ? allResults : frozenFilterOptions);
       setFilterModalHasMore(false);
       setFilterModalOffset(allResults.length);
@@ -2451,7 +2533,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         if (col.exclude && col.exclude.length > 0) {
           excludeForApi[col.key] = col.exclude;
         } else if (col.filters && col.filters.length > 0) {
-          filtersForApi[col.key] = col.filters;
+          // Bug #2 fix (2026-05-31): __ALL__ sentinel zamiast pełnej CSV gdy "Zaznacz wszystkie z bazy"
+          filtersForApi[col.key] = col.allFromDbSelected ? ['__ALL__'] : col.filters;
         }
       });
       setAppliedColumnFilters(JSON.stringify(filtersForApi));
@@ -2510,7 +2593,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         );
         const filtersForApi: Record<string, string[]> = {};
         updated.forEach(col => {
-          if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.filters;
+          if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.allFromDbSelected ? ['__ALL__'] : col.filters;
         });
         setAppliedColumnFilters(JSON.stringify(filtersForApi));
         setCurrentPage(1);
@@ -2531,7 +2614,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         );
         const filtersForApi: Record<string, string[]> = {};
         updated.forEach(col => {
-          if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.filters;
+          if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.allFromDbSelected ? ['__ALL__'] : col.filters;
         });
         setAppliedColumnFilters(JSON.stringify(filtersForApi));
         setCurrentPage(1);
@@ -2592,7 +2675,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     if (displayed.length === 0) return;
     const updated = columnConfig.map(col => {
       if (col.key === openFilterColumn) {
-        return { ...col, filters: [...displayed] };
+        // Bug #2 fix (2026-05-31): "Zaznacz wszystkie z widoku" != "Zaznacz wszystkie z bazy"
+        // — wyłącz allFromDbSelected (lista jest podzbiorem wyświetlanego, nie pełną bazą).
+        return { ...col, filters: [...displayed], allFromDbSelected: false };
       }
       return col;
     });
@@ -2601,7 +2686,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const filtersForApi: Record<string, string[]> = {};
     updated.forEach(col => {
       if (col.filters && col.filters.length > 0) {
-        filtersForApi[col.key] = col.filters;
+        filtersForApi[col.key] = col.allFromDbSelected ? ['__ALL__'] : col.filters;
       }
     });
     setAppliedColumnFilters(JSON.stringify(filtersForApi));
@@ -2631,7 +2716,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const excludeForApi: Record<string, string[]> = {};
     updated.forEach(col => {
       if (col.exclude && col.exclude.length > 0) excludeForApi[col.key] = col.exclude;
-      else if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.filters;
+      else if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.allFromDbSelected ? ['__ALL__'] : col.filters;
     });
     setAppliedColumnFilters(JSON.stringify(filtersForApi));
     setAppliedColumnFiltersExclude(JSON.stringify(excludeForApi));
@@ -2725,6 +2810,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       const params = new URLSearchParams();
       params.set('page', '1');
       params.set('limit', '50000'); // Large limit to get all filtered data
+      params.set('include_extras', 'true'); // Excel-only: backend zwraca consent1-4, accommodation_request, participant_additional_info, promo_code_kod
 
       // Add search filters
       if (appliedFilters.search.trim()) {
@@ -2839,8 +2925,14 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         const selectedProtections = item.selected_protection
           ? (Array.isArray(item.selected_protection) ? item.selected_protection : [item.selected_protection])
           : [];
+        // BUG 2 fix: ID protekcji bywa zapisany jako "protection-N" (z prefixem). parseInt("protection-1") = NaN -> protectionsMap.get(NaN) = undefined -> hasOaza/hasTarcza zawsze false. Strip prefixu przed parseInt.
         const protectionNamesArr = selectedProtections
-          .map(p => protectionsMap.get(typeof p === 'number' ? p : parseInt(String(p)))?.name || '')
+          .map(p => {
+            if (typeof p === 'number') return protectionsMap.get(p)?.name || '';
+            const stripped = String(p).replace(/^protection-/, '');
+            const parsed = parseInt(stripped);
+            return Number.isNaN(parsed) ? '' : (protectionsMap.get(parsed)?.name || '');
+          })
           .filter(Boolean);
         const protectionNamesStr = protectionNamesArr.join(', ');
         const protNamesLower = protectionNamesStr.toLowerCase();
@@ -2875,6 +2967,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           payment1: sortedPayments[0] ? { amount: sortedPayments[0].paid_amount || sortedPayments[0].amount, date: sortedPayments[0].created_at?.split('T')[0] } : null,
           payment2: sortedPayments[1] ? { amount: sortedPayments[1].paid_amount || sortedPayments[1].amount, date: sortedPayments[1].created_at?.split('T')[0] } : null,
           payment3: sortedPayments[2] ? { amount: sortedPayments[2].paid_amount || sortedPayments[2].amount, date: sortedPayments[2].created_at?.split('T')[0] } : null,
+          payment4: sortedPayments[3] ? { amount: sortedPayments[3].paid_amount || sortedPayments[3].amount, date: sortedPayments[3].created_at?.split('T')[0] } : null,
+          payment5: sortedPayments[4] ? { amount: sortedPayments[4].paid_amount || sortedPayments[4].amount, date: sortedPayments[4].created_at?.split('T')[0] } : null,
+          payment6: sortedPayments[5] ? { amount: sortedPayments[5].paid_amount || sortedPayments[5].amount, date: sortedPayments[5].created_at?.split('T')[0] } : null,
+          payment7: sortedPayments[6] ? { amount: sortedPayments[6].paid_amount || sortedPayments[6].amount, date: sortedPayments[6].created_at?.split('T')[0] } : null,
           participantAge: item.participant_age?.toString() || '',
           participantCity: item.participant_city || '',
           guardianName,
@@ -2899,6 +2995,32 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           paymentStatus: item.payment_status || 'unpaid',
           protectionNames: protectionNamesStr,
           depositAmount: item.deposit_amount || 0,
+          // Excel-only extras (z backend gdy include_extras=true)
+          kodRabatowy: item.promo_code_kod || '',
+          accommodationRequest: item.accommodation_request || '',
+          participantAdditionalInfo: item.participant_additional_info || '',
+          consent1: !!item.consent1,
+          consent2: !!item.consent2,
+          consent3: !!item.consent3,
+          consent4: !!item.consent4,
+          // ETAP 2: 19 dodatkowych kolumn (Joanna's filtrowanie SZYMON.xlsx)
+          dietName: item.diet_name || '',
+          healthChronicDiseases: !!item.health_chronic_diseases,
+          healthChronicDiseasesInfo: item.health_chronic_diseases_info || '',
+          healthDysfunctions: !!item.health_dysfunctions,
+          healthDysfunctionsInfo: item.health_dysfunctions_info || '',
+          healthPsychiatric: !!item.health_psychiatric,
+          healthPsychiatricInfo: item.health_psychiatric_info || '',
+          healthOther: item.additional_notes || '',
+          wantsInvoice: !!item.wants_invoice,
+          invoiceName: item.invoice_type === 'company'
+            ? (item.invoice_company_name || '')
+            : `${item.invoice_first_name || ''} ${item.invoice_last_name || ''}`.trim(),
+          invoiceEmail: item.invoice_email || '',
+          invoiceStreet: item.invoice_street || '',
+          invoiceCodeCity: [item.invoice_postal_code || '', item.invoice_city || ''].filter(Boolean).join(' '),
+          invoiceNip: item.invoice_nip || '',
+          invoiceIssued: !!item.invoice_issued,
         };
       });
 
@@ -3004,16 +3126,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               value = reservation.hasTermy ? 'Tak' : 'Nie';
               break;
             case 'qualificationCardStatus':
-              value = reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
-                : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
-                : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje na weryfikację'
-                : 'Oczekuje na klienta';
+              // Bug Ani 2026-06-01: helper obsługuje też signed_pending_admin (podpisana SMS, czeka admin).
+              value = getDocumentStatusVisual(reservation.qualificationCardStatus as DocumentStatus).label;
               break;
             case 'contractStatus':
-              value = reservation.contractStatus === 'approved' ? 'Zatwierdzona'
-                : reservation.contractStatus === 'rejected' ? 'Odrzucona'
-                : reservation.contractStatus === 'pending' ? 'Oczekuje na weryfikację'
-                : 'Oczekuje na klienta';
+              value = getDocumentStatusVisual(reservation.contractStatus as DocumentStatus).label;
               break;
             case 'status':
               const statusMapExport: Record<string, string> = {
@@ -3035,15 +3152,87 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         });
       });
 
+      // EXCEL-ONLY COLUMNS — dodatkowe kolumny tylko w pliku .xlsx, NIE w Panelu admina.
+      // Każda zawiera dane już zwracane przez backend (gdy include_extras=true) lub wyliczalne na froncie.
+      // Joanna prosi w xlsx (filtrowanie SZYMON.xlsx) — tutaj kolumny które:
+      //   - mają dane w bazie (zero zmian schemy DB)
+      //   - nie wymagają decyzji biznesowych
+      //   - nie mają ryzyka RODO (psychiatryka/PESEL pominięte do osobnej decyzji)
+      type ExportRow = (typeof exportData)[number];
+      type AmountKey = 'payment4Amount' | 'payment5Amount' | 'payment6Amount' | 'payment7Amount';
+      // 30 Excel-only kolumn — 11 z ETAP 1 (wpłaty 4-5, kod, info, zakwat, zgody) + 19 z ETAP 2 (wpłaty 6-7, dieta, zdrowie, faktura)
+      // Pełna lista 64 kolumn Joanny: 34 panel + 30 excel-only = 64.
+      const EXCEL_ONLY_COLUMNS: Array<{ header: string; amountKey?: AmountKey; getValue: (r: ExportRow) => string | number }> = [
+        // Wpłaty 4-5 (z ETAP 1)
+        { header: 'Wpłata 4', amountKey: 'payment4Amount', getValue: r => r.payment4?.amount ?? '' },
+        { header: 'Data wpłaty 4', getValue: r => r.payment4?.date || '' },
+        { header: 'Wpłata 5', amountKey: 'payment5Amount', getValue: r => r.payment5?.amount ?? '' },
+        { header: 'Data wpłaty 5', getValue: r => r.payment5?.date || '' },
+        // Wpłaty 6-7 (ETAP 2)
+        { header: 'Wpłata 6', amountKey: 'payment6Amount', getValue: r => r.payment6?.amount ?? '' },
+        { header: 'Data wpłaty 6', getValue: r => r.payment6?.date || '' },
+        { header: 'Wpłata 7', amountKey: 'payment7Amount', getValue: r => r.payment7?.amount ?? '' },
+        { header: 'Data wpłaty 7', getValue: r => r.payment7?.date || '' },
+        // Kod rabatowy + dane uczestnika (ETAP 1 + ETAP 2)
+        { header: 'Kod Rabatowy', getValue: r => r.kodRabatowy },
+        { header: 'dieta', getValue: r => r.dietName },
+        // Atrakcje dodatkowe (WhatsApp Joanna 2026-05-31 14:29) — pole brakowało w XLSX mimo że istnieje w panelu admina.
+        // Liczone w computeExportRow z protections/addons (linia 1066-1093).
+        { header: 'Oaza', getValue: r => r.hasOaza ? 'Tak' : 'Nie' },
+        { header: 'Tarcza', getValue: r => r.hasTarcza ? 'Tak' : 'Nie' },
+        { header: 'Quad', getValue: r => r.hasQuad ? 'Tak' : 'Nie' },
+        { header: 'Skuter', getValue: r => r.hasSkuter ? 'Tak' : 'Nie' },
+        { header: 'Energylandia', getValue: r => r.hasEnergylandia ? 'Tak' : 'Nie' },
+        { header: 'Termy', getValue: r => r.hasTermy ? 'Tak' : 'Nie' },
+        // Zdrowie (ETAP 2) — Joanna: #45-50 + #51
+        { header: 'Choroby przewlekłe', getValue: r => r.healthChronicDiseases ? 'Tak' : 'Nie' },
+        { header: 'info o chorobach przewlekłych', getValue: r => r.healthChronicDiseasesInfo },
+        { header: 'Dysfunkcje', getValue: r => r.healthDysfunctions ? 'Tak' : 'Nie' },
+        { header: 'info o dysfunkcjach', getValue: r => r.healthDysfunctionsInfo },
+        { header: 'Psychiatryczne', getValue: r => r.healthPsychiatric ? 'Tak' : 'Nie' },
+        { header: 'info o psychiatrycznych', getValue: r => r.healthPsychiatricInfo },
+        { header: 'Inne info o zdrowiu', getValue: r => r.healthOther },
+        // Info dodatkowe + zakwaterowanie (ETAP 1)
+        { header: 'Info.dod. Dot. Uczestnika', getValue: r => r.participantAdditionalInfo },
+        { header: 'Zakwaterowanie', getValue: r => r.accommodationRequest },
+        // Faktura (ETAP 2) — Joanna: #54-60
+        { header: 'faktura', getValue: r => r.wantsInvoice ? 'Tak' : 'Nie' },
+        { header: 'imię i nazwisko / nazwa (FV)', getValue: r => r.invoiceName },
+        { header: 'e-mail (FV)', getValue: r => r.invoiceEmail },
+        { header: 'ulica (FV)', getValue: r => r.invoiceStreet },
+        { header: 'kod i miasto (FV)', getValue: r => r.invoiceCodeCity },
+        { header: 'nip (FV)', getValue: r => r.invoiceNip },
+        { header: 'wystawiona', getValue: r => r.invoiceIssued ? 'Tak' : 'Nie' },
+        // Zgody (ETAP 1)
+        { header: 'zgoda 1', getValue: r => r.consent1 ? 'Tak' : 'Nie' },
+        { header: 'zgoda 2', getValue: r => r.consent2 ? 'Tak' : 'Nie' },
+        { header: 'zgoda 3', getValue: r => r.consent3 ? 'Tak' : 'Nie' },
+        { header: 'zgoda 4', getValue: r => r.consent4 ? 'Tak' : 'Nie' },
+      ];
+      const extraHeaders = EXCEL_ONLY_COLUMNS.map(c => c.header);
+      const extraRows: (string | number)[][] = exportData.map(r => EXCEL_ONLY_COLUMNS.map(c => c.getValue(r)));
+
       const sheetName = getExportSheetName(tableModule);
-      const aoa: (string | number)[][] = [headers, ...rows];
+      const aoa: (string | number)[][] = [
+        [...headers, ...extraHeaders],
+        ...rows.map((row, idx) => [...row, ...extraRows[idx]]),
+      ];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
 
       const numberFormat = useDot ? '0.00' : '0,00';
       const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      const visibleColsCount = visibleCols.length;
       for (let c = 0; c <= range.e.c; c++) {
-        const colKey = visibleCols[c]?.key;
-        if (colKey && amountColumnKeys.includes(colKey)) {
+        // Format liczbowy: oryginalne amountColumnKeys lub Excel-only payment4/payment5 amount
+        let isAmount = false;
+        if (c < visibleColsCount) {
+          const colKey = visibleCols[c]?.key;
+          if (colKey && amountColumnKeys.includes(colKey)) isAmount = true;
+        } else {
+          const extraCol = EXCEL_ONLY_COLUMNS[c - visibleColsCount];
+          if (extraCol?.amountKey) isAmount = true;
+        }
+        if (isAmount) {
           for (let r = 1; r <= range.e.r; r++) {
             const cellRef = XLSX.utils.encode_cell({ r, c });
             const cell = ws[cellRef];
@@ -3359,6 +3548,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         if (response.filter_options) {
           setFilterOptions(response.filter_options);
         }
+
+        // Trello #251: globalne duplikaty uczestników (cały widok, nie tylko strona)
+        setBackendDuplicateNames(new Set((response.duplicate_participant_names || []).map((n) => n.trim().toLowerCase())));
 
         // Convert backend payments to PaymentResponse format for mapReservationToPaymentFormat
         const convertBackendPayment = (bp: BackendPaymentData): PaymentResponse => ({
@@ -3818,15 +4010,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       case 'hasTermy':
         return reservation.hasTermy ? 'Tak' : 'Nie';
       case 'qualificationCardStatus':
-        return reservation.qualificationCardStatus === 'approved' ? 'Zatwierdzona'
-          : reservation.qualificationCardStatus === 'rejected' ? 'Odrzucona'
-          : reservation.qualificationCardStatus === 'pending' ? 'Oczekuje na weryfikację'
-          : 'Oczekuje na klienta';
+        return getDocumentStatusVisual(reservation.qualificationCardStatus as DocumentStatus).label;
       case 'contractStatus':
-        return reservation.contractStatus === 'approved' ? 'Zatwierdzona'
-          : reservation.contractStatus === 'rejected' ? 'Odrzucona'
-          : reservation.contractStatus === 'pending' ? 'Oczekuje na weryfikację'
-          : 'Oczekuje na klienta';
+        return getDocumentStatusVisual(reservation.contractStatus as DocumentStatus).label;
       case 'status':
         // Use payment status from database (mapped to Polish for display)
         const statusMapCell: Record<string, string> = {
@@ -5132,6 +5318,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               {paginatedReservations.length > 0 ? (
                 paginatedReservations.map((reservation, rowIndex) => {
                   const isExpanded = expandedRows.has(reservation.id);
+                  // Trello #251: cały wiersz duplikatu — lekko pomarańczowe tło + mocno pomarańczowe
+                  // teksty (badge'i z własnym bg-* pomijamy, żeby nie psuć ich kolorów statusu).
+                  const isRowDuplicate = duplicateNames.has((reservation.participantName || '').trim().toLowerCase());
                   const activeItemsForReservation = reservation.paymentDetails.items.filter(item => item.status !== 'canceled' && item.status !== 'returned');
                   const allPaid = activeItemsForReservation.length > 0 && activeItemsForReservation.every(item => item.status === 'paid');
                   const hasPartiallyPaid = activeItemsForReservation.some(item => item.status === 'partially_paid');
@@ -5151,7 +5340,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                   return (
                     <Fragment key={`reservation-row-${rowIndex}`}>
                       <tr
-                        className={`hover:bg-gray-50 transition-all duration-200 ${isExpanded ? 'bg-blue-50' : ''}`}
+                        className={`hover:bg-gray-50 transition-all duration-200 ${isExpanded ? 'bg-blue-50' : isRowDuplicate ? "bg-orange-50 [&_td]:text-orange-800 [&_span:not([class*='bg-'])]:text-orange-800" : ''}`}
                         onClick={(e) => {
                           const target = e.target as HTMLElement;
                           if (target.closest('button, a, input, select')) return;
@@ -5474,47 +5663,16 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                               </td>
                             );
                           } else if (columnKey === 'qualificationCardStatus') {
+                            // Ujednolicenie z DOKUMENTY (user 2026-06-01): ten sam DocumentStatusBadge.
                             return (
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
-                                {reservation.qualificationCardStatus === 'approved' ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">
-                                    Zatwierdzona
-                                  </span>
-                                ) : reservation.qualificationCardStatus === 'rejected' ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800">
-                                    Odrzucona
-                                  </span>
-                                ) : reservation.qualificationCardStatus === 'pending' ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
-                                    Oczekuje na weryfikację
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-500">
-                                    Oczekuje na klienta
-                                  </span>
-                                )}
+                                <DocumentStatusBadge status={reservation.qualificationCardStatus as DocumentStatus} />
                               </td>
                             );
                           } else if (columnKey === 'contractStatus') {
                             return (
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
-                                {reservation.contractStatus === 'approved' ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">
-                                    Zatwierdzona
-                                  </span>
-                                ) : reservation.contractStatus === 'rejected' ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800">
-                                    Odrzucona
-                                  </span>
-                                ) : reservation.contractStatus === 'pending' ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
-                                    Oczekuje na weryfikację
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-500">
-                                    Oczekuje na klienta
-                                  </span>
-                                )}
+                                <DocumentStatusBadge status={reservation.contractStatus as DocumentStatus} />
                               </td>
                             );
                           } else if (columnKey === 'status') {

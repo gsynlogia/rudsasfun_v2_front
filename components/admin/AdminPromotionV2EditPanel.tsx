@@ -1,16 +1,23 @@
 'use client';
 
 /**
- * AdminPromotionV2EditPanel (karta Trello 001) — panel admina pozwalający ustawić/zmienić/usunąć
- * promocję V2 i kod rabatowy w konkretnej rezerwacji przez PATCH /api/v2/reservations/{id}/promotion-v2.
+ * AdminPromotionV2EditPanel (karta Trello 001 + vS5tDGy3 + QMrhckg3) — panel admina pozwalający
+ * ustawić/zmienić/usunąć promocję V2 i kod rabatowy w konkretnej rezerwacji.
  *
- * Backend po zapisie automatycznie wystawi aneks (annex_service), jeśli umowa ma status 'accepted'
- * i snapshot przed/po się różnią — panel jedynie triggeruje zmianę; aneks + email informacyjny
- * powstają niezależnie.
+ * 3 tryby renderowania zależnie od `snap.legacy_kind`:
+ *  - brak legacy (v2 lub legacy bez selected_promotion) → standardowy panel V2 (selektor + input)
+ *  - legacy_kind='promotion' → banner NAD selektorem "Promocja: Duża Rodzina -100 zł (stary system)"
+ *  - legacy_kind='promo_code' → banner NAD inputem "Kod rabatowy: Bon Platynowy 160 zł (stary system)"
+ *  - legacy_kind='fm_deprecated' → banner NAD selektorem "First Minute (wycofana) -170 zł"
+ * W każdym trybie legacy: czerwony przycisk "Usuń starą promocję" (DELETE /legacy-promotion).
+ *
+ * Backend po zapisie automatycznie wystawi aneks (annex_service) jeśli umowa accepted + diff.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Trash2 } from 'lucide-react';
 
 import { useToast } from '@/components/ToastContainer';
+import LegacyPromotionBanner from '@/components/promotion/LegacyPromotionBanner';
 
 interface PromotionV2 {
   id: number;
@@ -37,6 +44,16 @@ interface Props {
   onSaved?: () => void;
 }
 
+// Bug vS5tDGy3 + QMrhckg3 — pola legacy zwracane przez backend /promotion-v2 endpoint.
+// Wypełniane przez resolve_legacy_promotion() gdy rezerwacja używa starego systemu.
+interface LegacyPromoInfo {
+  legacy_kind: 'promotion' | 'promo_code' | 'fm_deprecated' | null;
+  legacy_name: string | null;
+  legacy_amount: number | null;
+  legacy_v2_equivalent_id: number | null;
+  legacy_deprecated_reason: string | null;
+}
+
 export default function AdminPromotionV2EditPanel({
   reservationId, authToken, onSaved,
 }: Props) {
@@ -51,6 +68,16 @@ export default function AdminPromotionV2EditPanel({
   const [customValues, setCustomValues] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bug vS5tDGy3 — info o starej (legacy) promocji widoczne nad selektorem/inputem
+  const [legacyInfo, setLegacyInfo] = useState<LegacyPromoInfo>({
+    legacy_kind: null,
+    legacy_name: null,
+    legacy_amount: null,
+    legacy_v2_equivalent_id: null,
+    legacy_deprecated_reason: null,
+  });
+  const [confirmDeleteLegacy, setConfirmDeleteLegacy] = useState(false);
+  const [deletingLegacy, setDeletingLegacy] = useState(false);
 
   const API = process.env.NEXT_PUBLIC_API_URL || '';
   const authHeader: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
@@ -90,6 +117,14 @@ export default function AdminPromotionV2EditPanel({
             const match = (Array.isArray(listCodes) ? listCodes : []).find((c: PromoCodeLite) => c.id === snap.promo_code_id);
             if (match) setCodeInput(match.kod);
           }
+          // Bug vS5tDGy3 — info o legacy promocji do bannera
+          setLegacyInfo({
+            legacy_kind: snap.legacy_kind ?? null,
+            legacy_name: snap.legacy_name ?? null,
+            legacy_amount: snap.legacy_amount ?? null,
+            legacy_v2_equivalent_id: snap.legacy_v2_equivalent_id ?? null,
+            legacy_deprecated_reason: snap.legacy_deprecated_reason ?? null,
+          });
         }
       } catch (err) {
         if (cancelled) return;
@@ -150,6 +185,42 @@ export default function AdminPromotionV2EditPanel({
     }
   };
 
+  // Bug vS5tDGy3 — kasowanie legacy promocji przez DELETE /legacy-promotion.
+  // Backend: czysci selected_promotion=NULL, audit do system_events, recalc total_price, opcjonalny aneks.
+  // Po sukcesie: odśwież snapshot (legacyInfo wyzeruje się) + powiadom rodzica (refetch danych rezerwacji).
+  const handleDeleteLegacy = async () => {
+    setDeletingLegacy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/api/v2/reservations/${reservationId}/legacy-promotion`, {
+        method: 'DELETE',
+        headers: authHeader,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Błąd kasowania (${res.status})`);
+      }
+      const snap = await res.json();
+      // Wyzeruj legacy info — od tej chwili nie pokazujemy bannera
+      setLegacyInfo({
+        legacy_kind: snap.legacy_kind ?? null,
+        legacy_name: snap.legacy_name ?? null,
+        legacy_amount: snap.legacy_amount ?? null,
+        legacy_v2_equivalent_id: snap.legacy_v2_equivalent_id ?? null,
+        legacy_deprecated_reason: snap.legacy_deprecated_reason ?? null,
+      });
+      setConfirmDeleteLegacy(false);
+      showSuccess('Stara promocja została usunięta. Cena rezerwacji została przeliczona.');
+      onSaved?.();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Nie udało się skasować starej promocji';
+      setError(msg);
+      showError(msg);
+    } finally {
+      setDeletingLegacy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
@@ -168,6 +239,18 @@ export default function AdminPromotionV2EditPanel({
       </p>
 
       <div className="space-y-4">
+        {/* Bug vS5tDGy3 — banner legacy NAD selektorem (typu 'promotion' lub 'fm_deprecated') */}
+        {(legacyInfo.legacy_kind === 'promotion' || legacyInfo.legacy_kind === 'fm_deprecated') && (
+          <LegacyPromotionBanner
+            kind={legacyInfo.legacy_kind}
+            name={legacyInfo.legacy_name || ''}
+            amount={legacyInfo.legacy_amount}
+            deprecatedReason={legacyInfo.legacy_deprecated_reason}
+            onDeleteClick={() => setConfirmDeleteLegacy(true)}
+            deletingInProgress={deletingLegacy}
+          />
+        )}
+
         <label className="block">
           <span className="block text-sm font-medium text-gray-700 mb-1">Promocja</span>
           <select
@@ -212,6 +295,17 @@ export default function AdminPromotionV2EditPanel({
               </label>
             ))}
           </div>
+        )}
+
+        {/* Bug vS5tDGy3 — banner legacy NAD inputem (typu 'promo_code' = Bony) */}
+        {legacyInfo.legacy_kind === 'promo_code' && (
+          <LegacyPromotionBanner
+            kind="promo_code"
+            name={legacyInfo.legacy_name || ''}
+            amount={legacyInfo.legacy_amount}
+            onDeleteClick={() => setConfirmDeleteLegacy(true)}
+            deletingInProgress={deletingLegacy}
+          />
         )}
 
         <label className="block">
@@ -263,6 +357,55 @@ export default function AdminPromotionV2EditPanel({
           </button>
         </div>
       </div>
+
+      {/* Bug vS5tDGy3 — confirm modal dla kasowania legacy promocji/kodu */}
+      {confirmDeleteLegacy && (
+        <div
+          data-testid="confirm-delete-legacy-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmDeleteLegacy(false); }}
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900">Usunąć starą promocję?</h4>
+                <p className="text-sm text-gray-700 mt-2">
+                  Usuwasz: <span className="font-bold">{legacyInfo.legacy_name}</span>
+                  {legacyInfo.legacy_amount !== null && (
+                    <span className="ml-1">
+                      ({legacyInfo.legacy_amount >= 0 ? '+' : ''}{legacyInfo.legacy_amount.toFixed(2)} zł)
+                    </span>
+                  )}.
+                </p>
+                <ul className="text-xs text-gray-600 mt-3 space-y-1 list-disc pl-4">
+                  <li>Cena rezerwacji zostanie automatycznie przeliczona bez tej promocji.</li>
+                  <li>Akcja zostanie zapisana w historii (audit log).</li>
+                  <li>Jeśli umowa jest podpisana — wystawimy aneks i wyślemy informację do klienta.</li>
+                </ul>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteLegacy(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium"
+              >
+                Anuluj
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteLegacy}
+                disabled={deletingLegacy}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deletingLegacy ? 'Kasowanie…' : 'Tak, usuń'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

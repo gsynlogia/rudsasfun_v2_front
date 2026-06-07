@@ -99,9 +99,13 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
   // (components/DevBanner.tsx), renderowana raz w app/layout.tsx. Tutaj nie duplikujemy.
 
   return (
-    // `min-h-screen` zamiast `h-screen` — DevBanner + TestBanner są ponad (root layout),
-    // więc h-screen=100vh powodowałoby overflow (treść za długa o wysokość banerów).
-    <div className="min-h-screen w-full bg-white flex flex-col">
+    // 2026-05-31 (Cz. 6 fix): h-[calc(100dvh-24px)] zamiast min-h-screen.
+    // Powod: DevBanner (root layout) zajmuje 24px ponad, min-h-screen=100vh tworzyl scroll
+    // przegladarki (24px+100vh=924>900). Teraz cala wysokosc = viewport-banner, content wewnatrz
+    // scrolluje sam (main ma overflow-auto). Dla wszystkich widokow admin: zaden nie traci
+    // funkcjonalnosci bo main area i tak scrollowala wewnatrz. UWAGA: jesli wprowadzisz drugi
+    // banner (np. TestBanner), zwieksz odjemnik (np. -48px).
+    <div className="w-full bg-white flex flex-col" style={{ height: 'calc(100dvh - 24px)' }}>
       <div className="flex-1 flex overflow-hidden">
       {/* Sidebar with logo */}
       <AdminSidebar />

@@ -8,6 +8,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
 import { useToast } from '@/components/ToastContainer';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
+import { normalizeAmount } from '@/lib/utils/normalizeAmount';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
@@ -78,8 +79,9 @@ export default function EditPaymentPage() {
     if (!payment) return;
 
     const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      showError('Kwota musi być większa od 0');
+    // bug 4CAKxfov (2026-05-23): edycja — minus dozwolony jako zwrot.
+    if (isNaN(amountNum) || amountNum === 0) {
+      showError('Kwota musi być różna od 0 (użyj minus np. -500 dla zwrotu)');
       return;
     }
 
@@ -172,16 +174,18 @@ export default function EditPaymentPage() {
                   Kwota wpłacona <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   id="amount"
-                  step="0.01"
-                  min="0.01"
+                  /* bug 4CAKxfov Phase 3: text+inputMode=decimal zamiast type=number,
+                     żeby przejąć kontrolę nad parsowaniem (spacja, przecinek, kropka)
+                     przez normalizeAmount — patrz frontend/lib/utils/normalizeAmount.ts. */
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(e) => setAmount(normalizeAmount(e.target.value))}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                   style={{ borderRadius: 0 }}
-                  placeholder="0.00"
+                  placeholder="np. 500 lub -100,50 (zwrot)"
                 />
               </div>
 

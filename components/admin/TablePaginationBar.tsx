@@ -42,7 +42,7 @@ export default function TablePaginationBar({
 
   if (totalPages < 2) {
     return (
-      <div className="flex-shrink-0 px-4 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
+      <div className="flex-shrink-0 pl-4 pr-8 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
         <div className="text-sm text-gray-700">
           Wyświetlanie {from} - {to} z {total} {itemLabel}
         </div>
@@ -51,7 +51,7 @@ export default function TablePaginationBar({
   }
 
   return (
-    <div className="flex-shrink-0 px-4 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
+    <div className="flex-shrink-0 pl-4 pr-8 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
       <div className="text-sm text-gray-700">
         Wyświetlanie {from} - {to} z {total} {itemLabel}
       </div>

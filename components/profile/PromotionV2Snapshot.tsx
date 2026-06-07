@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Tag, Gift, Star } from 'lucide-react';
 
+import LegacyPromotionBanner from '@/components/promotion/LegacyPromotionBanner';
+
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface Snapshot {
@@ -26,6 +28,13 @@ interface Snapshot {
   applied_promotion_discount: number;
   applied_promo_code_discount: number;
   total_price: number;
+  // Bug Trello vS5tDGy3 — info o legacy promocji (gdy rezerwacja jest z systemu v1).
+  // Panel klienta pokazuje to READ-ONLY (bez przycisków akcji — kasowanie tylko z admin panel).
+  legacy_kind?: 'promotion' | 'promo_code' | 'fm_deprecated' | null;
+  legacy_name?: string | null;
+  legacy_amount?: number | null;
+  legacy_v2_equivalent_id?: number | null;
+  legacy_deprecated_reason?: string | null;
 }
 
 interface Props {
@@ -55,8 +64,12 @@ export default function PromotionV2Snapshot({ reservationId, authToken }: Props)
 
   if (loading) return null;
   if (!snapshot) return null;
-  // Legacy rezerwacje nie mają promotion_v2 — pokazujemy TYLKO gdy v2
-  if (snapshot.promotion_system_version !== 'v2' || (!snapshot.promotion_v2_id && !snapshot.promo_code_id)) return null;
+
+  // Bug Trello vS5tDGy3 — render legacy banner gdy rezerwacja v1.
+  // Jeśli oba światy puste (nie v2 i bez legacy) — nic nie renderujemy (jak dotychczas).
+  const hasV2 = snapshot.promotion_system_version === 'v2' && (snapshot.promotion_v2_id || snapshot.promo_code_id);
+  const hasLegacy = !!snapshot.legacy_kind;
+  if (!hasV2 && !hasLegacy) return null;
 
   const promo = snapshot.promotion_v2_snapshot;
   const code = snapshot.promo_code_snapshot;
@@ -79,6 +92,17 @@ export default function PromotionV2Snapshot({ reservationId, authToken }: Props)
       <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
         <Tag className="w-5 h-5 text-[#00adee]" /> Promocje i Rabaty
       </h3>
+
+      {/* Bug vS5tDGy3 — banner legacy READ-ONLY (panel klienta, bez akcji) */}
+      {hasLegacy && snapshot.legacy_kind && snapshot.legacy_name && (
+        <LegacyPromotionBanner
+          kind={snapshot.legacy_kind}
+          name={snapshot.legacy_name}
+          amount={snapshot.legacy_amount ?? null}
+          deprecatedReason={snapshot.legacy_deprecated_reason}
+          readOnly
+        />
+      )}
 
       {promo && snapshot.promotion_v2_id && (
         <div className="bg-white rounded-lg p-4 border border-blue-100">
@@ -120,10 +144,13 @@ export default function PromotionV2Snapshot({ reservationId, authToken }: Props)
         </div>
       )}
 
-      <div className="flex items-center justify-between pt-2 border-t border-blue-200">
-        <span className="text-sm font-medium text-gray-700">Razem po rabatach:</span>
-        <span className="text-xl font-bold text-gray-800">{snapshot.total_price.toFixed(2)} zł</span>
-      </div>
+      {/* Sekcja "Razem po rabatach" tylko gdy mamy v2 (dla legacy total_price w innej sekcji) */}
+      {hasV2 && (
+        <div className="flex items-center justify-between pt-2 border-t border-blue-200">
+          <span className="text-sm font-medium text-gray-700">Razem po rabatach:</span>
+          <span className="text-xl font-bold text-gray-800">{snapshot.total_price.toFixed(2)} zł</span>
+        </div>
+      )}
     </div>
   );
 }

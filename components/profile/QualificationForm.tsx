@@ -819,7 +819,19 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
   }, [resendTimer]);
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
-  const { showSuccess: showToastSuccess, showError: showToastError } = useToast();
+  const { showSuccess: showToastSuccess, showError: showToastError, showWarning: showToastWarning } = useToast();
+
+  // 2026-05-24 (REZ-1828 prewencja): toast warning gdy klient zamknie modal SMS bez wpisania kodu.
+  // Bez tego — payload karty zostaje w bazie, sms_verified_at=NULL, status=in_verification (sierota).
+  const closeSignatureModalWithWarning = () => {
+    if (currentDocumentId !== null && currentDocumentId !== undefined) {
+      showToastWarning(
+        'Karta kwalifikacyjna czeka na Twój kod SMS. Wpisz go w aplikacji aby dokończyć podpis — w przeciwnym razie karta pozostanie niepodpisana.',
+        8000,
+      );
+    }
+    setShowSignatureModal(false);
+  };
 
   const performSave = async () => {
     const reservationId = reservationData?.reservationId;
@@ -1883,7 +1895,7 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
 
       {/* Modal do potwierdzenia podpisu */}
       {showSignatureModal && (
-        <div className="modal-overlay no-print" onClick={() => setShowSignatureModal(false)}>
+        <div className="modal-overlay no-print" onClick={closeSignatureModalWithWarning}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">Potwierdzenie</h3>
             <p className="modal-text">
@@ -1903,7 +1915,7 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
             </div>
             <div className="modal-buttons">
               <button
-                onClick={() => setShowSignatureModal(false)}
+                onClick={closeSignatureModalWithWarning}
                 className="modal-button modal-button-cancel"
               >
                 Anuluj
@@ -2966,9 +2978,11 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
         .consent-box {
           margin-top: 0.5rem;
           padding: 0.5rem;
-          background: #fff5f5;
+          /* Bug #202: zmiana koloru z czerwonego (#fff5f5/#c00) na niebieski jak inne sekcje karty,
+             żeby nie wprowadzać klientów w błąd (Krzysztof 2026-03-27). */
+          background: #f8faff;
           border-radius: 3px;
-          border-left: 3px solid #c00;
+          border-left: 3px solid #0066cc;
         }
 
         .consent-label {

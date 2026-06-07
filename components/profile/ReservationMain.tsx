@@ -25,6 +25,7 @@ function getDiffText(signed: string, draft: string): string {
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
 import { buildPromoCodeCostRow, PromotionV2Snapshot as PromotionV2SnapshotData } from '@/lib/buildPromoCodeCostRow';
 import { buildPromotionV2CostRow } from '@/lib/buildPromotionV2CostRow';
+import { computeReservationStatusLabel } from '@/lib/utils/computeReservationStatusLabel';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 import DashedLine from '../DashedLine';
@@ -919,15 +920,15 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
   const healthInfoParts = buildHealthInfo();
 
-  // Map status
-  const statusMap: Record<string, string> = {
-    'pending': 'Zarezerwowana — oczekuje na dokumenty',
-    'confirmed': 'Potwierdzona — dokumenty zatwierdzone',
-    'cancelled': 'Anulowana',
-    'completed': 'Zakończona',
-  };
-  const status = statusMap[reservation.status] || reservation.status;
-  const statusColor = reservation.status === 'cancelled' ? 'red' : reservation.status === 'completed' ? 'gray' : 'green';
+  // Bug ESu7i2lt (Trello #209): badge teraz uwzglednia stan dokumentow
+  // (contract_status, qualification_card_status z API), bo reservation.status
+  // to snapshot przy tworzeniu (default 'pending') i nigdy nie aktualizuje sie
+  // po podpisie/zatwierdzeniu. Logika i mapowanie kolorow w helperze ponizej.
+  const { text: status, color: statusColor } = computeReservationStatusLabel({
+    status: reservation.status,
+    contract_status: reservation.contract_status,
+    qualification_card_status: reservation.qualification_card_status,
+  });
 
   return (
     <>
@@ -979,11 +980,13 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
           <span className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 ${
             statusColor === 'green' ? 'bg-green-50 text-green-700' :
             statusColor === 'red' ? 'bg-red-50 text-red-700' :
+            statusColor === 'yellow' ? 'bg-yellow-50 text-yellow-700' :
             'bg-gray-50 text-gray-700'
           } text-[10px] sm:text-xs font-medium rounded-full w-fit`}>
             <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
               statusColor === 'green' ? 'bg-green-500' :
               statusColor === 'red' ? 'bg-red-500' :
+              statusColor === 'yellow' ? 'bg-yellow-400' :
               'bg-gray-500'
             }`} />
             {status}

@@ -39,7 +39,7 @@ interface DocumentVersionsListProps {
  *
  * Sortowanie wg sortOrder 1→5 (najbardziej "ukończone" na górze, drafty/niepodpisane niżej).
  */
-type Variant = 'accepted' | 'signed_sms' | 'awaiting_client' | 'draft' | 'rejected' | 'annex';
+type Variant = 'accepted' | 'signed_sms' | 'awaiting_client' | 'draft' | 'rejected' | 'annex' | 'requires_signature' | 'superseded_signed' | 'superseded_unsigned';
 
 function classifyDoc(doc: SignedDoc): Variant | null {
   // Bug Trello vS5tDGy3 2026-05-25: aneksy promocyjne (annex_promotion) jako 6 wariant.
@@ -49,7 +49,14 @@ function classifyDoc(doc: SignedDoc): Variant | null {
   if (doc.status === 'in_verification') {
     return doc.sms_verified_at ? 'signed_sms' : 'awaiting_client';
   }
-  return null; // requires_signature / superseded / inne — pomijamy
+  // 2026-05-31 Bug 004 fix: pokazuj też requires_signature i superseded.
+  // 2026-05-31 Bug 005 fix: rozbij superseded na 2 warianty — admin musi wiedzieć
+  // czy historyczna wersja BYŁA podpisana SMS-em (jest dowodem) czy nie (tylko draft).
+  if (doc.status === 'requires_signature') return 'requires_signature';
+  if (doc.status === 'superseded') {
+    return doc.sms_verified_at ? 'superseded_signed' : 'superseded_unsigned';
+  }
+  return null;
 }
 
 const VARIANT_STYLE: Record<Variant, { tile: string; badge: string; label: string; sortOrder: number }> = {
@@ -89,6 +96,28 @@ const VARIANT_STYLE: Record<Variant, { tile: string; badge: string; label: strin
     badge: 'bg-purple-200 text-purple-800',
     label: 'Aneks promocyjny',
     sortOrder: 6,
+  },
+  // 2026-05-31 Bug 004 fix: requires_signature i superseded TERAZ widoczne w historii (wcześniej ukryte)
+  requires_signature: {
+    tile: 'bg-fuchsia-50 border-fuchsia-300 text-fuchsia-900 hover:bg-fuchsia-100',
+    badge: 'bg-fuchsia-200 text-fuchsia-800',
+    label: 'Wymaga ponownego podpisu',
+    sortOrder: 3,
+  },
+  // 2026-05-31 Bug 005 fix: rozróżnienie historycznych wersji superseded.
+  superseded_signed: {
+    // Była podpisana SMS-em + zaakceptowana — to historyczny DOWÓD (zielonkawy odcień + slate ramka)
+    tile: 'bg-emerald-50 border-slate-400 text-slate-800 hover:bg-emerald-100',
+    badge: 'bg-emerald-200 text-emerald-900',
+    label: '✓ Zastąpiona (była podpisana SMS)',
+    sortOrder: 7,
+  },
+  superseded_unsigned: {
+    // Nigdy nie była podpisana — szara, mniej istotna
+    tile: 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-slate-100 opacity-90',
+    badge: 'bg-slate-200 text-slate-700',
+    label: 'Zastąpiona (niepodpisana)',
+    sortOrder: 8,
   },
 };
 
@@ -193,7 +222,15 @@ export default function DocumentVersionsList({
     }));
 
   // "Wersja robocza" — tylko dla karty kwalifikacyjnej (umowa nie ma form_snapshot).
-  if (latestFormSnapshot) {
+  // 2026-05-31 Bug 005 fix: NIE dubluj kafelka draft gdy najnowszy signed_doc karty jest
+  // w stanie wymagającym podpisu/weryfikacji (in_verification / requires_signature) —
+  // form_snapshot to TA SAMA wersja co bieżący signed_doc (klient zmienił → powstał signed_doc + form_snapshot).
+  // Pokazuj draft TYLKO gdy nie ma signed_doc karty LUB najnowszy jest accepted/rejected
+  // (czyli draft to NOWA edycja po zakończeniu poprzedniej wersji).
+  const latestCardDoc = cards.sort((a, b) => b.id - a.id)[0];
+  const draftIsDuplicateOfLatestSigned = !!latestCardDoc
+    && (latestCardDoc.status === 'in_verification' || latestCardDoc.status === 'requires_signature');
+  if (latestFormSnapshot && !draftIsDuplicateOfLatestSigned) {
     cardTiles.push({
       key: 'k-draft',
       variant: 'draft',

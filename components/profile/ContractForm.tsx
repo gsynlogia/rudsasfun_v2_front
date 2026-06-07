@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 
 import { authService } from '@/lib/services/AuthService';
 import { buildContractPromotionRow } from '@/lib/buildContractPromotionRow';
+import { useToast } from '@/components/ToastContainer';
 
 interface ContractFormProps {
   /** Id rezerwacji (number) – do zapisu w signed_documents */
@@ -111,6 +112,19 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
   const [printErrors, setPrintErrors] = useState<Partial<Record<PrintErrorKey, boolean>>>({});
   const [latestContractStatus, setLatestContractStatus] = useState<'in_verification' | 'accepted' | 'rejected' | null>(null);
   const [latestContractSignedAt, setLatestContractSignedAt] = useState<string | null>(null);
+  const { showWarning: showToastWarning } = useToast();
+
+  // 2026-05-24 (REZ-1828 prewencja): toast warning gdy klient zamknie modal SMS bez wpisania kodu.
+  // Bez tego — payload umowy zostaje w bazie, sms_verified_at=NULL, status=in_verification (sierota).
+  const closeSignatureModalWithWarning = () => {
+    if (currentDocumentId !== null && currentDocumentId !== undefined) {
+      showToastWarning(
+        'Umowa czeka na Twój kod SMS. Wpisz go w aplikacji aby dokończyć podpis — w przeciwnym razie umowa pozostanie niepodpisana.',
+        8000,
+      );
+    }
+    setShowSignatureModal(false);
+  };
 
   // §16.D1 — wiersz „Rabat:" pod „Promocje:" w sekcji kosztów umowy.
   // `label` to tekst wyświetlany, `amount` to kwota w PLN lub null dla bon/atrakcja/gadżet (nie obniża ceny).
@@ -946,7 +960,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
 
       {/* Modal do potwierdzenia podpisu */}
       {showSignatureModal && (
-        <div className="modal-overlay no-print" onClick={() => setShowSignatureModal(false)}>
+        <div className="modal-overlay no-print" onClick={closeSignatureModalWithWarning}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">Potwierdzenie</h3>
             <p className="modal-text">
@@ -966,7 +980,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
             </div>
             <div className="modal-buttons">
               <button
-                onClick={() => setShowSignatureModal(false)}
+                onClick={closeSignatureModalWithWarning}
                 className="modal-button modal-button-cancel"
               >
                 Anuluj

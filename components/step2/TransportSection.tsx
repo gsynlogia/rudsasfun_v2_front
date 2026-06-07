@@ -503,7 +503,7 @@ export default function TransportSection() {
                   Przed wypełnieniem tego formularza sprawdź informacje transportowe.
                 </p>
                 <p className="text-xs sm:text-sm text-red-600">
-                  Przy zmianie po 7 dniach obowiązuje dopłata 30 zł.
+                  W przypadku zmiany transportu z własnego na zbiorowy na 6 lub mniej dni przed transportem, wystąpi dopłata 30 zł.
                 </p>
               </div>
             </div>

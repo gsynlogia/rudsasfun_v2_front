@@ -1,10 +1,11 @@
 'use client';
 
-import { Edit, X, FileText, Download, Upload, Trash2, User, CheckCircle2, CheckCircle, XCircle, SquarePen, Mic, Play } from 'lucide-react';
+import { Edit, X, FileText, Download, Upload, Trash2, User, CheckCircle2, CheckCircle, XCircle, SquarePen, Mic } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import DocumentStatusPanel from '@/components/admin/DocumentStatusPanel';
 import AdminCreateAnnexButton from '@/components/admin/AdminCreateAnnexButton';
 import AdminPromotionV2EditPanel from '@/components/admin/AdminPromotionV2EditPanel';
 import AdminPromoCodeOverridePanel from '@/components/admin/AdminPromoCodeOverridePanel';
@@ -14,6 +15,7 @@ import { ReservationDetailRightSidebar, RIGHT_SIDEBAR_WIDTH } from '@/components
 import SectionGuard from '@/components/admin/SectionGuard';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { ContractForm } from '@/components/profile/ContractForm';
+import { QualificationForm } from '@/components/profile/QualificationForm';
 import PromotionV2Snapshot from '@/components/profile/PromotionV2Snapshot';
 import { useToast } from '@/components/ToastContainer';
 import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
@@ -27,6 +29,11 @@ import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/Manu
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { isSmsValidationError } from '@/lib/utils/confirmForceAcceptIfNeeded';
+import ForceAcceptConfirmModal from '@/components/admin/ForceAcceptConfirmModal';
+import AdminVerifyCodeModal from '@/components/admin/AdminVerifyCodeModal';
+import DocumentVersionsList from '@/components/admin/DocumentVersionsList';
+import AneksPreview from '@/components/admin/AneksPreview';
 
 import { PaymentsPanel } from './_reservation-detail/components/PaymentsPanel';
 import { QualificationCardEditPanelLoader } from './_reservation-detail/components/QualificationCardEditPanelLoader';
@@ -42,6 +49,7 @@ import type {
   ReservationNote,
   SpeechRecognitionResultEventLike,
   SpeechRecognitionLike,
+  ReservationDetailsWithNumber,
 } from './_reservation-detail/types';
 
 /** Wyciaga roznice miedzy podpisanym a draftem. Jezeli draft zaczyna sie od podpisanego — zwraca tylko nowa czesc. */
@@ -134,6 +142,20 @@ export default function ReservationDetailPage() {
   });
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);
+  // 2026-05-24 REZ-1828: state dla modalu force-accept (zamiast window.confirm)
+  const [forceAcceptModal, setForceAcceptModal] = useState<{
+    isOpen: boolean;
+    documentType: 'qualification_card' | 'contract';
+    documentId: number;
+    notifyEmail: boolean;
+    notifySms: boolean;
+    isLoading: boolean;
+    // Stan dokumentu (do wyświetlenia w modalu — admin widzi CO akceptuje):
+    hasPayload: boolean;
+    createdAt?: string | null;
+    smsCode?: string | null;
+    smsVerifiedAt?: string | null;
+  } | null>(null);
   const [_addons, setAddons] = useState<Map<number, Addon>>(new Map());
   const [_protections, setProtections] = useState<Map<number, Protection>>(new Map());
   const [_promotions, setPromotions] = useState<Map<number, Promotion>>(new Map());
@@ -201,8 +223,14 @@ export default function ReservationDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [contractFiles, setContractFiles] = useState<any[]>([]);
   const [cardFiles, setCardFiles] = useState<any[]>([]);
-  const [latestSignedContract, setLatestSignedContract] = useState<{ id: number; status: string; client_message: string | null } | null>(null);
-  const [latestSignedCard, setLatestSignedCard] = useState<{ id: number; status: string; client_message: string | null; reverted_after_approval?: number } | null>(null);
+  const [latestSignedContract, setLatestSignedContract] = useState<{ id: number; status: string; client_message: string | null; sms_verified_at?: string | null; created_at?: string | null; sms_code?: string | null; has_payload?: boolean } | null>(null);
+  const [latestSignedCard, setLatestSignedCard] = useState<{ id: number; status: string; client_message: string | null; reverted_after_approval?: number; sms_verified_at?: string | null; created_at?: string | null; sms_code?: string | null; has_payload?: boolean } | null>(null);
+  // 2026-05-24 REZ-1828: modal weryfikacji kodu telefonicznie (admin wpisuje kod podyktowany przez klienta).
+  const [verifyCodeModal, setVerifyCodeModal] = useState<{ documentId: number; documentType: 'contract' | 'qualification_card' } | null>(null);
+  const [verifyCodeLoading, setVerifyCodeLoading] = useState(false);
+  const [verifyCodeError, setVerifyCodeError] = useState<string | null>(null);
+  const [resendSmsContractLoading, setResendSmsContractLoading] = useState(false);
+  const [resendSmsCardLoading, setResendSmsCardLoading] = useState(false);
   const [qualificationCardSignedPayload, setQualificationCardSignedPayload] = useState<Record<string, unknown> | null>(null);
   const [contractSignedPayload, setContractSignedPayload] = useState<Record<string, unknown> | null>(null);
   // Niezatwierdzone zmiany w karcie kwalifikacyjnej (klient wypelnil ale nie podpisal SMS-em)
@@ -221,7 +249,7 @@ export default function ReservationDetailPage() {
     additionalNotes?: string; additionalInfo?: string; accommodation?: string;
   }>({});
   const [contractArchiveVersions, setContractArchiveVersions] = useState<ContractArchiveVersionItem[]>([]);
-  const [signedDocumentsList, setSignedDocumentsList] = useState<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; sms_verified_at?: string | null }>>([]);
+  const [signedDocumentsList, setSignedDocumentsList] = useState<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; sms_verified_at?: string | null; sms_code?: string | null }>>([]);
   const [uploadingCard, setUploadingCard] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingReservation, setDeletingReservation] = useState(false);
@@ -305,6 +333,10 @@ export default function ReservationDetailPage() {
   const [savingParticipant, setSavingParticipant] = useState(false);
 
   const [editingHealth, setEditingHealth] = useState(false);
+  // 2026-05-24 REZ-646 ext: "Zapisz również na karcie kwalifikacyjnej" — checkbox + czerwony button + confirm modal
+  const [updateCardChecked, setUpdateCardChecked] = useState(false);
+  const [cardSaveModalOpen, setCardSaveModalOpen] = useState(false);
+  const [cardSaveReason, setCardSaveReason] = useState('');
   const [healthDraft, setHealthDraft] = useState<{ health_questions?: Record<string, unknown>; health_details?: Record<string, unknown>; additional_notes?: string }>({});
   const [savingHealth, setSavingHealth] = useState(false);
 
@@ -357,6 +389,9 @@ export default function ReservationDetailPage() {
   /** Sygnał do otwarcia panelu cichej korekty umowy (#dokumenty/umowa-edycja-change). */
   const [silentFixFromHash, setSilentFixFromHash] = useState<number | null>(null);
   const openedSilentFixFromHashRef = useRef(false);
+  /** 2026-05-24 REZ-646 ext: Sygnał do otwarcia edytora zdrowia gdy hash=#zdrowie_edycja. */
+  const [healthEditFromHash, setHealthEditFromHash] = useState(false);
+  const openedHealthEditFromHashRef = useRef(false);
 
   const setPanelFromHash = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -366,7 +401,15 @@ export default function ReservationDetailPage() {
     const snapIdMatch = hash.match(/SNAP-(\d+)/i);
     setPreviewSnapId(snapDraftMatch ? 'draft' : snapIdMatch ? parseInt(snapIdMatch[1], 10) : null);
     const parts = hash.replace(/#?SNAP-\d+/i, '').split('/');
-    const panelId = (parts[0] || '') as PanelId;
+    let panelId = (parts[0] || '') as PanelId;
+    // 2026-05-24 REZ-646 ext: alias zdrowie_edycja → zdrowie + flag żeby otworzyć edytor
+    let shouldOpenHealthEditor = false;
+    if (panelId === 'zdrowie_edycja' as PanelId) {
+      panelId = 'zdrowie' as PanelId;
+      shouldOpenHealthEditor = true;
+    }
+    setHealthEditFromHash(shouldOpenHealthEditor);
+    if (!shouldOpenHealthEditor) openedHealthEditFromHashRef.current = false;
     const isPanelValid = RESERVATION_PANELS.some((p) => p.id === panelId);
     if (isPanelValid) {
       setActivePanel(panelId);
@@ -606,6 +649,21 @@ export default function ReservationDetailPage() {
       },
     );
   }, [reservation, reservationNumber, cardEditFromHash, qualificationCardSignedPayload, openDocument, closeRightPanel, refetchReservation, showSuccess, showError]);
+
+  /** 2026-05-24 REZ-646 ext: auto-otwarcie edytora zdrowia gdy hash był #zdrowie_edycja
+   * (direct link lub odświeżenie strony z #zdrowie_edycja w URL). Po wczytaniu rezerwacji
+   * ustawia healthDraft + setEditingHealth(true). Ref żeby otworzyć tylko RAZ per wejście. */
+  useEffect(() => {
+    if (!reservation || !healthEditFromHash) return;
+    if (openedHealthEditFromHashRef.current) return;
+    openedHealthEditFromHashRef.current = true;
+    setHealthDraft({
+      health_questions: reservation.health_questions && typeof reservation.health_questions === 'object' ? { ...reservation.health_questions } : {},
+      health_details: reservation.health_details && typeof reservation.health_details === 'object' ? { ...reservation.health_details } : {},
+      additional_notes: reservation.additional_notes ?? '',
+    });
+    setEditingHealth(true);
+  }, [reservation, healthEditFromHash]);
 
   useEffect(() => {
     if (!reservation?.id) return;
@@ -1099,7 +1157,7 @@ export default function ReservationDetailPage() {
       setContractFiles(contractFilesData.filter(f => f.source === 'user'));
       const cardFilesData = await qualificationCardService.getQualificationCardFiles(reservation.id);
       setCardFiles(cardFilesData.filter(f => f.source === 'user'));
-      const signedDocs = await authenticatedApiCall<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; reverted_after_approval?: number; sms_verified_at?: string | null }>>(
+      const signedDocs = await authenticatedApiCall<Array<{ id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; reverted_after_approval?: number; sms_verified_at?: string | null; sms_code?: string | null }>>(
         `/api/signed-documents/reservation/${reservation.id}`,
       );
       setSignedDocumentsList(signedDocs);
@@ -1111,8 +1169,25 @@ export default function ReservationDetailPage() {
         cardDocs.find((d) => d.payload && activeStatuses.includes(d.status ?? '')) ??
         cardDocs.find((d) => d.payload) ??
         cardDocs[0];
-      setLatestSignedContract(contractDoc ? { id: contractDoc.id, status: contractDoc.status, client_message: contractDoc.client_message } : null);
-      setLatestSignedCard(cardDoc ? { id: cardDoc.id, status: cardDoc.status, client_message: cardDoc.client_message, reverted_after_approval: cardDoc.reverted_after_approval } : null);
+      setLatestSignedContract(contractDoc ? {
+        id: contractDoc.id,
+        status: contractDoc.status,
+        client_message: contractDoc.client_message,
+        sms_verified_at: contractDoc.sms_verified_at,
+        created_at: contractDoc.created_at,
+        sms_code: contractDoc.sms_code,
+        has_payload: !!(contractDoc.payload && contractDoc.payload.trim()),
+      } : null);
+      setLatestSignedCard(cardDoc ? {
+        id: cardDoc.id,
+        status: cardDoc.status,
+        client_message: cardDoc.client_message,
+        reverted_after_approval: cardDoc.reverted_after_approval,
+        sms_verified_at: cardDoc.sms_verified_at,
+        created_at: cardDoc.created_at,
+        sms_code: cardDoc.sms_code,
+        has_payload: !!(cardDoc.payload && cardDoc.payload.trim()),
+      } : null);
       // Otwórz podgląd snapshotu z hash (po odświeżeniu strony z #dane/SNAP-{id} lub SNAP-draft)
       if (previewSnapId === 'draft' && latestFormSnapshot && reservation) {
         openDocument(
@@ -1297,17 +1372,69 @@ export default function ReservationDetailPage() {
     loadDocuments();
   }, [loadDocuments]);
 
+  // 2026-05-24 REZ-1828 (final): 1-button flow — klik "Zweryfikuj kod telefonicznie"
+  // najpierw wysyła nowy SMS (request-sms-code generuje świeży kod, wysyła do klienta),
+  // a po SUKCESIE wysyłki otwiera modal z polem na kod. Loading state na buttonie
+  // ("Wysyłam SMS…") chroni przed pomyłkowym podwójnym kliknięciem i daje
+  // świadomy moment "wysyłamy SMS klientowi".
+  const handleAdminOpenVerifyWithSms = useCallback(async (documentId: number, documentType: 'contract' | 'qualification_card') => {
+    if (!reservation?.id) return;
+    const setLoading = documentType === 'contract' ? setResendSmsContractLoading : setResendSmsCardLoading;
+    setLoading(true);
+    try {
+      await authenticatedApiCall<{ document_id: number }>(
+        '/api/signed-documents/request-sms-code',
+        { method: 'POST', body: JSON.stringify({ reservation_id: reservation.id, document_type: documentType }) },
+      );
+      // SMS wysłany — otwórz modal na wpisanie kodu
+      setVerifyCodeError(null);
+      setVerifyCodeModal({ documentId, documentType });
+      await loadDocuments();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Błąd wysyłki kodu SMS';
+      showError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [reservation?.id, loadDocuments, showError]);
+
+  // 2026-05-24 REZ-1828: admin wpisuje kod podyktowany przez klienta telefonicznie.
+  // Backend porównuje (constant-time) z sms_code w bazie. Po sukcesie sms_verified_at =
+  // now() (jak gdyby klient sam wpisał) — status karty pozostaje in_verification do
+  // osobnego kliku "Zaakceptuj" przez admina.
+  const handleAdminSubmitVerifyCode = useCallback(async (code: string) => {
+    if (!verifyCodeModal) return;
+    setVerifyCodeLoading(true);
+    setVerifyCodeError(null);
+    try {
+      await authenticatedApiCall(
+        '/api/signed-documents/verify-sms-code',
+        { method: 'POST', body: JSON.stringify({ document_id: verifyCodeModal.documentId, code }) },
+      );
+      showSuccess('Kod prawidłowy — dokument został podpisany SMS-em.');
+      setVerifyCodeModal(null);
+      await loadDocuments();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Nieprawidłowy kod';
+      setVerifyCodeError(msg);
+    } finally {
+      setVerifyCodeLoading(false);
+    }
+  }, [verifyCodeModal, loadDocuments, showSuccess]);
+
   // Load payments data
-  // Skip for archived reservations - payments are in archive tables
   useEffect(() => {
     const loadPayments = async () => {
       if (!reservation) return;
 
-      // Skip loading payments for archived reservations
-      // They don't exist in the main tables anymore
+      // bug 4CAKxfov fix (2026-05-23): dla zarchiwizowanej rezerwacji czytamy historyczne
+      // wpłaty z reservation.payments / reservation.manual_payments (backend zwraca je
+      // teraz z archive_payments + archive_manual_payments w endpointcie by-number).
+      // Asia: "nie mogą znikać informacje o płatnościach".
       if (reservation.is_archived) {
-        setPayments([]);
-        setManualPayments([]);
+        const rArchived = reservation as unknown as { payments?: PaymentResponse[]; manual_payments?: ManualPaymentResponse[] };
+        setPayments(rArchived.payments || []);
+        setManualPayments(rArchived.manual_payments || []);
         return;
       }
 
@@ -1613,6 +1740,8 @@ export default function ReservationDetailPage() {
       qualification_card_edited_by_admin: 'Pracownik zaktualizował dane Karty Kwalifikacyjnej.',
       qualification_card_signed: 'Klient podpisał kartę kwalifikacyjną (SMS).',
       qualification_card_accepted: 'Pracownik zaakceptował kartę kwalifikacyjną.',
+      qualification_card_accepted_without_sms: 'Pracownik zaakceptował kartę kwalifikacyjną MIMO braku weryfikacji SMS przez klienta (force-accept).',
+      contract_accepted_without_sms: 'Pracownik zaakceptował umowę MIMO braku weryfikacji SMS przez klienta (force-accept).',
       qualification_card_rejected: 'Pracownik odrzucił kartę kwalifikacyjną.',
       qualification_card_updated_after_approval: 'Klient zmodyfikował kartę po zaakceptowaniu – wymagana ponowna weryfikacja.',
       protection_updated: 'Pracownik zaktualizował pakiety ochrony.',
@@ -1921,7 +2050,7 @@ export default function ReservationDetailPage() {
   const cardDocs = signedDocumentsList.filter((d) => d.document_type === 'qualification_card');
 
   const renderDocTile = (
-    doc: { id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; sms_verified_at?: string | null },
+    doc: { id: number; document_type: string; status: string; client_message: string | null; created_at: string; updated_at: string; payload?: string | null; sms_verified_at?: string | null; sms_code?: string | null },
     index: number,
     isCurrent: boolean,
   ) => {
@@ -1979,6 +2108,10 @@ export default function ReservationDetailPage() {
     );
   };
 
+  // DEPRECATED 2026-05-24 REZ-1828: cały komponent zastąpiony przez DocumentVersionsList
+  // w panelu Dokumenty. Tab 'documents' w global sidebar ukryty (patrz ReservationDetailRightSidebar
+  // i linia ~4697 suggestedTab=undefined). Kod pozostaje dla TD-011 — fizyczne usunięcie po
+  // sprawdzeniu czy faktycznie nieużywany (np. czy ktoś deep linkuje #dokumenty z aktywnym tabem).
   const rightSidebarDocumentsContent = (
     <div className="flex-1 overflow-y-auto min-h-0 p-3 bg-white">
       <h3 className="text-sm font-semibold text-slate-700 mb-2 pb-2 border-b border-gray-100 flex-shrink-0">Wersje dokumentów z bazy</h3>
@@ -1994,8 +2127,13 @@ export default function ReservationDetailPage() {
         <div className="space-y-2 min-w-0">
           <h4 className="text-xs font-semibold text-gray-600 uppercase">Karty kwalifikacyjne</h4>
           {(() => {
-            // Dwa glowne kafelki: Wersja robocza (form_snapshot) i Podpisana SMS (najnowszy verified)
+            // 3 typy kafelków: Wersja robocza (form_snapshot), Podpisana SMS (verified), W weryfikacji bez SMS (REZ-1828 fix 2026-05-24).
             const verifiedDoc = cardDocs.find((d) => !!d.sms_verified_at && !!d.payload);
+            // Nowy: karta wysłana do podpisu (payload zapisany) ale klient NIE wpisał SMS (sms_verified_at=NULL).
+            // Pokazujemy tylko gdy NIE ma już podpisanej SMS verified (żeby nie duplikować).
+            const unverifiedDoc = !verifiedDoc
+              ? cardDocs.find((d) => !!d.payload && !d.sms_verified_at && d.status === 'in_verification')
+              : null;
             const tiles: React.ReactNode[] = [];
 
             // 1. Wersja robocza (najnowszy draft z form_snapshot)
@@ -2064,6 +2202,44 @@ export default function ReservationDetailPage() {
                     <span className="bg-green-200 text-green-800 px-1.5 py-0.5 rounded text-xs font-medium">Podpisana SMS</span>
                   </div>
                   <p className="text-xs mt-1 opacity-80">Dane potwierdzone podpisem SMS przez opiekuna</p>
+                </button>
+              );
+            }
+
+            // 3. W weryfikacji bez SMS — karta wysłana do podpisu, klient nie wpisał kodu (REZ-1828)
+            if (unverifiedDoc) {
+              tiles.push(
+                <button
+                  key={`unverified-${unverifiedDoc.id}`}
+                  type="button"
+                  onClick={() => {
+                    if (!reservation) return;
+                    window.history.replaceState(null, '', `${window.location.pathname}#dane/SNAP-${unverifiedDoc.id}#W-WERYFIKACJI`);
+                    setPreviewSnapId(unverifiedDoc.id);
+                    try {
+                      const payload = JSON.parse(unverifiedDoc.payload!);
+                      openDocument(
+                        <QualificationTemplateNew
+                          reservationId={reservation.id}
+                          reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
+                          signedPayload={payload}
+                          previewOnly={true}
+                        />,
+                        `Podgląd karty — Wysłana do podpisu (${formatDateTime(unverifiedDoc.created_at)})`,
+                        () => { setPreviewSnapId(null); window.history.replaceState(null, '', `${window.location.pathname}#dane`); },
+                      );
+                    } catch {
+                      showError?.('Nie udało się otworzyć podglądu.');
+                    }
+                  }}
+                  className="w-full text-left rounded border p-2 text-sm transition-colors cursor-pointer bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100"
+                >
+                  <div className="font-medium">Karta kwalifikacyjna</div>
+                  <div className="flex justify-between gap-1 mt-1 text-xs opacity-90">
+                    <span>{formatDateTime(unverifiedDoc.created_at)}</span>
+                    <span className="bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded text-xs font-medium">W weryfikacji</span>
+                  </div>
+                  <p className="text-xs mt-1 opacity-80">Klient wysłał do podpisu — czeka na SMS (kod {unverifiedDoc.sms_code || '–'})</p>
                 </button>
               );
             }
@@ -2545,7 +2721,7 @@ export default function ReservationDetailPage() {
                     E-mail
                   </label>
                 </div>
-                {/* Umowa */}
+                {/* Umowa — UMOWY NIE RUSZAMY (user explicit 2026-05-31). DocumentStatusPanel TYLKO dla karty. */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
@@ -2562,6 +2738,34 @@ export default function ReservationDetailPage() {
                             reservation.contract_status || 'Brak'
                           )}
                         </p>
+                        {/* 2026-05-24 REZ-1828: badge szczegółowy dla umowy */}
+                        {latestSignedContract?.status === 'in_verification' && !latestSignedContract.sms_verified_at && (
+                          <div className="mt-1 text-xs text-gray-600 bg-amber-50 border border-amber-200 px-2 py-1 inline-block">
+                            {latestSignedContract.has_payload ? (
+                              <>
+                                <span className="text-emerald-700">✓</span> Klient wysłał do podpisu{latestSignedContract.created_at ? <> <strong>{new Date(latestSignedContract.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</strong></> : null}
+                                <span className="mx-2 text-gray-400">|</span>
+                                <span className="text-red-700">✗</span> SMS{latestSignedContract.sms_code ? <> <code className="bg-white px-1 border border-gray-300">{latestSignedContract.sms_code}</code></> : null} niezweryfikowany przez klienta
+                              </>
+                            ) : (
+                              <><span className="text-red-700">✗</span> Klient NIE wysłał umowy do podpisu (brak treści w systemie)</>
+                            )}
+                          </div>
+                        )}
+                        {/* 2026-05-24 REZ-1828 (final): 1 button — wysyła SMS + otwiera modal */}
+                        {latestSignedContract?.status === 'in_verification' && !latestSignedContract.sms_verified_at && latestSignedContract.has_payload && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={resendSmsContractLoading}
+                              onClick={() => handleAdminOpenVerifyWithSms(latestSignedContract.id, 'contract')}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-none bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Wyślij nowy SMS do klienta i wpisz kod podyktowany telefonicznie"
+                            >
+                              {resendSmsContractLoading ? 'Wysyłam SMS…' : 'Zweryfikuj kod telefonicznie'}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap items-center">
@@ -2698,6 +2902,22 @@ export default function ReservationDetailPage() {
                           </div>
                           <button
                             onClick={async () => {
+                              // 2026-05-24 REZ-1828: proaktywne sprawdzenie sms_verified_at dla umowy
+                              if (!latestSignedContract.sms_verified_at) {
+                                setForceAcceptModal({
+                                  isOpen: true,
+                                  documentType: 'contract',
+                                  documentId: latestSignedContract.id,
+                                  notifyEmail: notifyContractEmail,
+                                  notifySms: notifyContractSms,
+                                  isLoading: false,
+                                  hasPayload: !!latestSignedContract.has_payload,
+                                  createdAt: latestSignedContract.created_at,
+                                  smsCode: latestSignedContract.sms_code,
+                                  smsVerifiedAt: latestSignedContract.sms_verified_at,
+                                });
+                                return;
+                              }
                               try {
                                 await authenticatedApiCall(`/api/signed-documents/${latestSignedContract.id}`, {
                                   method: 'PATCH',
@@ -2709,7 +2929,23 @@ export default function ReservationDetailPage() {
                                 });
                                 window.location.reload();
                               } catch (e) {
-                                alert(e instanceof Error ? e.message : 'Błąd akceptacji');
+                                // Fallback gdyby backend mimo wszystko zwrócił 400 (race condition)
+                                if (isSmsValidationError(e)) {
+                                  setForceAcceptModal({
+                                    isOpen: true,
+                                    documentType: 'contract',
+                                    documentId: latestSignedContract.id,
+                                    notifyEmail: notifyContractEmail,
+                                    notifySms: notifyContractSms,
+                                    isLoading: false,
+                                    hasPayload: !!latestSignedContract.has_payload,
+                                    createdAt: latestSignedContract.created_at,
+                                    smsCode: latestSignedContract.sms_code,
+                                    smsVerifiedAt: latestSignedContract.sms_verified_at,
+                                  });
+                                } else if (e instanceof Error) {
+                                  alert(e.message);
+                                }
                               }
                             }}
                             disabled={latestSignedContract.status === 'accepted'}
@@ -2851,6 +3087,22 @@ export default function ReservationDetailPage() {
                       </div>
                     ) : null;
                   })()}
+                  {/* 2026-05-31 Bug 004 unified UX — spójny panel statusu w jednym miejscu dla wszystkich 7 stanów karty.
+                      previouslyAcceptedAt: data ostatniej historycznej akceptacji SMS (z superseded docs) — kontekst
+                      dla stanu requires_signature (admin wie że klient zmienił JUŻ ZAAKCEPTOWANĄ wersję). */}
+                  <DocumentStatusPanel
+                    kind="qualification_card"
+                    latestSignedDoc={latestSignedCard}
+                    hasFormSnapshot={!!latestFormSnapshot}
+                    formSnapshotUpdatedAt={latestFormSnapshotUpdatedAt}
+                    previouslyAcceptedAt={
+                      signedDocumentsList
+                        .filter(d => d.document_type === 'qualification_card' && d.id !== latestSignedCard?.id && (d.status === 'accepted' || d.status === 'superseded') && !!d.sms_verified_at)
+                        .map(d => d.sms_verified_at || null)
+                        .filter((x): x is string => !!x)
+                        .sort((a, b) => b.localeCompare(a))[0] ?? null
+                    }
+                  />
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <div>
@@ -2870,6 +3122,35 @@ export default function ReservationDetailPage() {
                             reservation.qualification_card_status || 'Brak'
                           )}
                         </p>
+                        {/* 2026-05-24 REZ-1828: badge szczegółowy — admin widzi DLACZEGO karta nie jest podpisana */}
+                        {latestSignedCard?.status === 'in_verification' && !latestSignedCard.sms_verified_at && (
+                          <div className="mt-1 text-xs text-gray-600 bg-amber-50 border border-amber-200 px-2 py-1 inline-block">
+                            {latestSignedCard.has_payload ? (
+                              <>
+                                <span className="text-emerald-700">✓</span> Klient wysłał do podpisu{latestSignedCard.created_at ? <> <strong>{new Date(latestSignedCard.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</strong></> : null}
+                                <span className="mx-2 text-gray-400">|</span>
+                                <span className="text-red-700">✗</span> SMS{latestSignedCard.sms_code ? <> <code className="bg-white px-1 border border-gray-300">{latestSignedCard.sms_code}</code></> : null} niezweryfikowany przez klienta
+                              </>
+                            ) : (
+                              <><span className="text-red-700">✗</span> Klient NIE wysłał karty do podpisu (brak treści w systemie)</>
+                            )}
+                          </div>
+                        )}
+                        {/* 2026-05-24 REZ-1828 (final): 1 button — wysyła SMS + otwiera modal (karta) */}
+                        {latestSignedCard?.status === 'in_verification' && !latestSignedCard.sms_verified_at && latestSignedCard.has_payload && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={resendSmsCardLoading}
+                              onClick={() => handleAdminOpenVerifyWithSms(latestSignedCard.id, 'qualification_card')}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-none bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Wyślij nowy SMS do klienta i wpisz kod podyktowany telefonicznie"
+                            >
+                              {resendSmsCardLoading ? 'Wysyłam SMS…' : 'Zweryfikuj kod telefonicznie'}
+                            </button>
+                          </div>
+                        )}
+                        {/* 2026-05-31 Bug 004 amber wstawka — wycofana. Zastąpiona unified DocumentStatusPanel wyżej. */}
                       </div>
                     </div>
                     {(
@@ -2932,11 +3213,15 @@ export default function ReservationDetailPage() {
                         onClick={() => {
                           if (!reservation) return;
                           openDocument(
-                            <QualificationTemplateNew
+                            // Bug #202: zamiana QualificationTemplateNew (admin) na QualificationForm (klient).
+                            // viewMode='zatwierdzona' = read-only (inputy disabled, jak printMode) ALE pozwala
+                            // useEffect fetchowi signed_documents zadziałać (printMode=true blokuje fetch linia 318,
+                            // przez co latestCardStatus zostaje null i sekcja signed_confirmation się nie renderuje).
+                            <QualificationForm
                               reservationId={reservation.id}
                               reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
                               signedPayload={qualificationCardSignedPayload ?? undefined}
-                              previewOnly={true}
+                              viewMode="zatwierdzona"
                             />,
                             'Podgląd karty kwalifikacyjnej',
                           );
@@ -2985,7 +3270,9 @@ export default function ReservationDetailPage() {
                     <span className="text-sm text-gray-700">
                       {latestSignedCard
                         ? `Podpisany dokument: ${latestSignedCard.status === 'accepted' ? 'Zaakceptowana' : latestSignedCard.status === 'rejected' ? `Odrzucona${latestSignedCard.client_message ? ` – ${latestSignedCard.client_message}` : ''}` : 'W trakcie weryfikacji'}`
-                        : 'Podpisany dokument: Brak podpisanego dokumentu do weryfikacji (po podpisie przez klienta pojawią się przyciski).'}
+                        : latestFormSnapshot
+                          ? 'Podpisany dokument: BRAK — klient wypełnił draft ale nie podpisał SMS-em. Wymagane przypomnienie o podpisaniu (przycisk po prawej).'
+                          : 'Podpisany dokument: Brak podpisanego dokumentu do weryfikacji (po podpisie przez klienta pojawią się przyciski).'}
                     </span>
                     {latestSignedCard && (
                       <div className="flex gap-2 flex-wrap items-center">
@@ -3005,11 +3292,12 @@ export default function ReservationDetailPage() {
                           onClick={() => {
                             if (!reservation) return;
                             openDocument(
-                              <QualificationTemplateNew
+                              // Bug #202: jw. — viewMode='zatwierdzona' żeby useEffect fetch zadziałał.
+                              <QualificationForm
                                 reservationId={reservation.id}
                                 reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
                                 signedPayload={qualificationCardSignedPayload ?? undefined}
-                                previewOnly={true}
+                                viewMode="zatwierdzona"
                               />,
                               'Podgląd karty kwalifikacyjnej',
                             );
@@ -3022,6 +3310,24 @@ export default function ReservationDetailPage() {
                         </button>
                         <button
                           onClick={async () => {
+                            // 2026-05-24 REZ-1828: proaktywne sprawdzenie sms_verified_at — jeśli brak SMS,
+                            // od razu pokazujemy modal (bez wysyłania PATCH-a który wie że padnie z 400).
+                            if (!latestSignedCard.sms_verified_at) {
+                              setForceAcceptModal({
+                                isOpen: true,
+                                documentType: 'qualification_card',
+                                documentId: latestSignedCard.id,
+                                notifyEmail: notifyCardEmail,
+                                notifySms: notifyCardSms,
+                                isLoading: false,
+                                hasPayload: !!latestSignedCard.has_payload,
+                                createdAt: latestSignedCard.created_at,
+                                smsCode: latestSignedCard.sms_code,
+                                smsVerifiedAt: latestSignedCard.sms_verified_at,
+                              });
+                              return;
+                            }
+                            // Klient wpisał SMS — normalna ścieżka accept
                             try {
                               await authenticatedApiCall(`/api/signed-documents/${latestSignedCard.id}`, {
                                 method: 'PATCH',
@@ -3033,7 +3339,23 @@ export default function ReservationDetailPage() {
                               });
                               window.location.reload();
                             } catch (e) {
-                              alert(e instanceof Error ? e.message : 'Błąd akceptacji');
+                              // Fallback: gdyby backend mimo wszystko zwrócił błąd SMS (np. race condition)
+                              if (isSmsValidationError(e)) {
+                                setForceAcceptModal({
+                                  isOpen: true,
+                                  documentType: 'qualification_card',
+                                  documentId: latestSignedCard.id,
+                                  notifyEmail: notifyCardEmail,
+                                  notifySms: notifyCardSms,
+                                  isLoading: false,
+                                  hasPayload: !!latestSignedCard.has_payload,
+                                  createdAt: latestSignedCard.created_at,
+                                  smsCode: latestSignedCard.sms_code,
+                                  smsVerifiedAt: latestSignedCard.sms_verified_at,
+                                });
+                              } else if (e instanceof Error) {
+                                alert(e.message);
+                              }
                             }
                           }}
                           disabled={latestSignedCard.status === 'accepted'}
@@ -3085,13 +3407,67 @@ export default function ReservationDetailPage() {
               </div>
                 </div>
                 <div className="w-80 xl:w-96 flex-shrink-0 flex flex-col min-h-0 border-l border-gray-200 pl-4">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-none bg-[#03adf0] text-white text-sm font-medium hover:bg-[#0288c7] transition-colors cursor-pointer"
-                  >
-                    <Play className="w-4 h-4 flex-shrink-0" />
-                    Graj
-                  </button>
+                  {/* 2026-05-24 REZ-1828: zastąpienie placeholderu "Graj" listą wersji dokumentów (5 wariantów kolorystycznych).
+                      Klik w kafelek otwiera ten sam modal podglądu co globalny widget (identyczna logika z renderDocTile). */}
+                  <DocumentVersionsList
+                    documents={signedDocumentsList}
+                    latestFormSnapshot={latestFormSnapshot}
+                    latestFormSnapshotUpdatedAt={latestFormSnapshotUpdatedAt}
+                    onPreview={(doc) => {
+                      if (!reservation) return;
+                      try {
+                        // Bug vS5tDGy3 2026-05-25: aneks promocyjny ma osobny komponent renderera
+                        if (doc.document_type === 'annex_promotion') {
+                          openDocument(
+                            <AneksPreview
+                              payloadJson={doc.payload ?? null}
+                              reservationNumber={(reservation as ReservationDetailsWithNumber).reservation_number}
+                              signedAt={doc.created_at}
+                            />,
+                            `Aneks promocyjny (${formatDateTime(doc.created_at)})`,
+                          );
+                          return;
+                        }
+                        const payload = doc.payload ? JSON.parse(doc.payload) : null;
+                        if (doc.document_type === 'contract') {
+                          openDocument(
+                            <ContractForm
+                              reservationData={mapReservationToContractForm(reservation as unknown as ReservationData)}
+                              signedPayload={payload ?? undefined}
+                              previewOnly={true}
+                            />,
+                            `Podgląd umowy (${formatDateTime(doc.created_at)})`,
+                          );
+                        } else {
+                          openDocument(
+                            <QualificationTemplateNew
+                              reservationId={reservation.id}
+                              reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
+                              signedPayload={payload ?? undefined}
+                              previewOnly={true}
+                            />,
+                            `Podgląd karty (${formatDateTime(doc.created_at)})`,
+                          );
+                        }
+                      } catch {
+                        showError?.('Nie udało się otworzyć podglądu dokumentu.');
+                      }
+                    }}
+                    onPreviewDraft={() => {
+                      if (!reservation || !latestFormSnapshot) return;
+                      window.history.replaceState(null, '', `${window.location.pathname}#dane/SNAP-draft#ROBOCZA`);
+                      openDocument(
+                        <QualificationTemplateNew
+                          reservationId={reservation.id}
+                          reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
+                          signedPayload={latestFormSnapshot as SignedQualificationPayload}
+                          previewOnly={true}
+                        />,
+                        'Podgląd karty — Wersja robocza',
+                        () => { setPreviewSnapId(null); window.history.replaceState(null, '', `${window.location.pathname}#dane`); },
+                      );
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -4005,6 +4381,8 @@ export default function ReservationDetailPage() {
                           additional_notes: reservation.additional_notes ?? '',
                         });
                         setEditingHealth(true);
+                        // 2026-05-24 REZ-646 ext: hash URL zmienia się na #zdrowie_edycja (zgodnie z user explicit)
+                        if (typeof window !== 'undefined') window.location.hash = 'zdrowie_edycja';
                       }}
                       className="inline-flex items-center gap-1.5 text-sm text-[#03adf0] hover:underline"
                     >
@@ -4051,8 +4429,40 @@ export default function ReservationDetailPage() {
                         rows={2}
                       />
                     </div>
+                    {/* 2026-05-24 REZ-646 ext: Zapisz również na karcie kwalifikacyjnej */}
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={updateCardChecked}
+                          onChange={(e) => setUpdateCardChecked(e.target.checked)}
+                          className="mt-0.5"
+                        />
+                        <span className="text-xs text-gray-700">
+                          <strong>Zapisz również na karcie kwalifikacyjnej</strong>
+                          <br />
+                          <span className="text-gray-500">⚠️ Modyfikuje podpisany dokument klienta. Stara wersja zostanie zarchiwizowana (audit log). Klient w panelu klienta zobaczy zmodyfikowaną kartę.</span>
+                        </span>
+                      </label>
+                      {updateCardChecked && (
+                        <button
+                          type="button"
+                          disabled={savingHealth}
+                          onClick={() => setCardSaveModalOpen(true)}
+                          className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                        >
+                          Zapisz na karcie kwalifikacyjnej
+                        </button>
+                      )}
+                    </div>
                     <div className="flex gap-2 mt-3">
-                      <button type="button" onClick={() => setEditingHealth(false)} className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-100">Anuluj</button>
+                      <button type="button" onClick={() => {
+                        setEditingHealth(false);
+                        setUpdateCardChecked(false);
+                        setCardSaveReason('');
+                        // 2026-05-24 REZ-646 ext: hash powrót na #zdrowie po Anuluj
+                        if (typeof window !== 'undefined') window.location.hash = 'zdrowie';
+                      }} className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-100">Anuluj</button>
                       <button
                         type="button"
                         disabled={savingHealth}
@@ -4060,8 +4470,19 @@ export default function ReservationDetailPage() {
                           if (!reservationNumber || savingHealth) return;
                           setSavingHealth(true);
                           try {
-                            const payload: { health_questions?: Record<string, unknown>; health_details?: Record<string, unknown>; additional_notes?: string | null } = {};
-                            if (healthDraft.health_questions !== undefined) payload.health_questions = healthDraft.health_questions;
+                            // 2026-05-24 REZ-646 ext (Bug podgląd): auto-sync health_questions z health_details na froncie
+                            // (analogicznie do QualificationForm.tsx linia 853 — klient). Edytor admin ma TYLKO textarea,
+                            // bez radio Tak/Nie, więc bez tej syncu wysyłalibyśmy stare health_questions z rezerwacji
+                            // → backend explicit-priority by je zachował → podgląd pokazałby "Nie" mimo wpisanych szczegółów.
+                            const hd = (healthDraft.health_details ?? {}) as Record<string, string>;
+                            const autoHQ = {
+                              chronicDiseases: (hd.chronicDiseases || '').trim() ? 'Tak' : 'Nie',
+                              dysfunctions: (hd.dysfunctions || '').trim() ? 'Tak' : 'Nie',
+                              psychiatric: (hd.psychiatric || '').trim() ? 'Tak' : 'Nie',
+                            };
+                            const payload: { health_questions?: Record<string, unknown>; health_details?: Record<string, unknown>; additional_notes?: string | null } = {
+                              health_questions: autoHQ,
+                            };
                             if (healthDraft.health_details !== undefined) payload.health_details = healthDraft.health_details;
                             if (healthDraft.additional_notes !== undefined) payload.additional_notes = healthDraft.additional_notes || null;
                             const updated = await authenticatedApiCall<ReservationDetails>(
@@ -4070,6 +4491,8 @@ export default function ReservationDetailPage() {
                             );
                             setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
                             setEditingHealth(false);
+                            // 2026-05-24 REZ-646 ext: hash powrót na #zdrowie po Zapisz
+                            if (typeof window !== 'undefined') window.location.hash = 'zdrowie';
                             showSuccess('Dane zdrowotne zostały zapisane.');
                             if (reservation?.id) {
                               authenticatedApiCall<ReservationEventItem[]>(`/api/reservations/${reservation.id}/system-events`)
@@ -4385,7 +4808,10 @@ export default function ReservationDetailPage() {
           </div>
           <ReservationDetailRightSidebar
             getContent={rightSidebarGetContent}
-            suggestedTab={activePanel === 'dokumenty' ? 'documents' : undefined}
+            // DEPRECATED 2026-05-24 REZ-1828: suggestedTab='documents' wyłączone — tab 'documents'
+            // ukryty z UI (zastąpiony DocumentVersionsList w panelu Dokumenty). Pozostaje undefined.
+            // TODO TD-011: po fizycznym usunięciu tabu 'documents' usunąć też ten prop.
+            suggestedTab={undefined}
           />
             {/* Modal archiwizacji rezerwacji */}
             <UniversalModal
@@ -4990,6 +5416,130 @@ export default function ReservationDetailPage() {
           </div>
         </div>
       )}
+      {/* 2026-05-24 REZ-1828: modal force-accept (zamiast natywnego window.confirm) */}
+      {forceAcceptModal && (
+        <ForceAcceptConfirmModal
+          isOpen={forceAcceptModal.isOpen}
+          documentType={forceAcceptModal.documentType}
+          hasPayload={forceAcceptModal.hasPayload}
+          createdAt={forceAcceptModal.createdAt}
+          smsCode={forceAcceptModal.smsCode}
+          smsVerifiedAt={forceAcceptModal.smsVerifiedAt}
+          isLoading={forceAcceptModal.isLoading}
+          onCancel={() => setForceAcceptModal(null)}
+          onConfirm={async (reason) => {
+            if (!forceAcceptModal) return;
+            setForceAcceptModal({ ...forceAcceptModal, isLoading: true });
+            try {
+              const body: Record<string, unknown> = {
+                status: 'accepted',
+                notify_email: forceAcceptModal.notifyEmail,
+                notify_sms: forceAcceptModal.notifySms,
+                force_accept_without_sms: true,
+              };
+              if (reason) {
+                body.accept_reason = reason; // 2026-05-24 REZ-1828: powód akceptacji manualnej → SystemEvent payload + client_message
+              }
+              await authenticatedApiCall(`/api/signed-documents/${forceAcceptModal.documentId}`, {
+                method: 'PATCH',
+                body: JSON.stringify(body),
+              });
+              window.location.reload();
+            } catch (e2) {
+              setForceAcceptModal(null);
+              alert(e2 instanceof Error ? e2.message : 'Błąd akceptacji (force)');
+            }
+          }}
+        />
+      )}
+      {/* 2026-05-24 REZ-646 ext: confirm modal "Zapisz na karcie kwalifikacyjnej" */}
+      {cardSaveModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded shadow-2xl max-w-md w-full p-6 animate-scaleIn">
+            <h3 className="text-lg font-bold text-red-700 flex items-center gap-2 mb-3">
+              ⚠️ Modyfikacja podpisanego dokumentu
+            </h3>
+            <p className="text-sm text-gray-700 mb-3">
+              Chcesz nadpisać dane medyczne w <strong>karcie kwalifikacyjnej podpisanej przez klienta</strong>?
+            </p>
+            <ul className="text-xs text-gray-600 list-disc pl-5 mb-3 space-y-1">
+              <li>Stara wersja zostanie zarchiwizowana (audit log)</li>
+              <li>Zostanie zapisana w historii rezerwacji z imieniem pracownika i datą</li>
+              <li>Klient w panelu klienta zobaczy nową wersję karty</li>
+              <li>Podpis SMS klienta pozostaje (sms_verified_at niezmieniony)</li>
+            </ul>
+            <label className="block text-xs text-gray-700 mb-1 font-medium">Powód modyfikacji (opcjonalny, dla audytu):</label>
+            <textarea
+              value={cardSaveReason}
+              onChange={(e) => setCardSaveReason(e.target.value)}
+              rows={2}
+              placeholder="np. telefoniczna informacja od matki klienta — choroba zdiagnozowana po podpisie karty"
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setCardSaveModalOpen(false)}
+                disabled={savingHealth}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={async () => {
+                  if (!reservationNumber || savingHealth) return;
+                  setSavingHealth(true);
+                  try {
+                    // 2026-05-24 REZ-646 ext: auto-sync health_questions z health_details (jak w przycisku Zapisz)
+                    const hd = (healthDraft.health_details ?? {}) as Record<string, string>;
+                    const autoHQ = {
+                      chronicDiseases: (hd.chronicDiseases || '').trim() ? 'Tak' : 'Nie',
+                      dysfunctions: (hd.dysfunctions || '').trim() ? 'Tak' : 'Nie',
+                      psychiatric: (hd.psychiatric || '').trim() ? 'Tak' : 'Nie',
+                    };
+                    const payload: Record<string, unknown> = { update_card: true, health_questions: autoHQ };
+                    if (healthDraft.health_details !== undefined) payload.health_details = healthDraft.health_details;
+                    if (healthDraft.additional_notes !== undefined) payload.additional_notes = healthDraft.additional_notes || null;
+                    if (cardSaveReason.trim()) payload.update_card_reason = cardSaveReason.trim();
+                    const updated = await authenticatedApiCall<ReservationDetails>(
+                      `/api/reservations/by-number/${reservationNumber}/admin/health`,
+                      { method: 'PATCH', body: JSON.stringify(payload) },
+                    );
+                    setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
+                    setEditingHealth(false);
+                    setUpdateCardChecked(false);
+                    setCardSaveReason('');
+                    setCardSaveModalOpen(false);
+                    if (typeof window !== 'undefined') window.location.hash = 'zdrowie';
+                    showSuccess('Dane zapisane w sekcji Zdrowie ORAZ na karcie kwalifikacyjnej. Stara wersja w audit log.');
+                    if (reservation?.id) {
+                      authenticatedApiCall<ReservationEventItem[]>(`/api/reservations/${reservation.id}/system-events`)
+                        .then((data) => setReservationEvents(Array.isArray(data) ? data : []))
+                        .catch(() => {});
+                    }
+                  } catch (e) {
+                    showError(e instanceof Error ? e.message : 'Nie udało się zapisać.');
+                  } finally {
+                    setSavingHealth(false);
+                  }
+                }}
+                disabled={savingHealth}
+                className="px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+              >
+                {savingHealth ? 'Zapisywanie…' : 'Potwierdź — zapisz na karcie'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 2026-05-24 REZ-1828: modal weryfikacji kodu telefonicznie (admin wpisuje kod podyktowany przez klienta) */}
+      <AdminVerifyCodeModal
+        isOpen={!!verifyCodeModal}
+        documentType={verifyCodeModal?.documentType ?? 'contract'}
+        isLoading={verifyCodeLoading}
+        errorMessage={verifyCodeError}
+        onCancel={() => { setVerifyCodeModal(null); setVerifyCodeError(null); }}
+        onSubmit={handleAdminSubmitVerifyCode}
+      />
       </AdminLayout>
     </SectionGuard>
   );
