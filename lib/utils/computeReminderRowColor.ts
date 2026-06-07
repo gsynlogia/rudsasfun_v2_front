@@ -16,7 +16,7 @@
  *  - niepoprawna data → 'none' (defensywnie)
  */
 
-export type ReminderChannel = 'email' | 'sms' | 'both' | 'failed';
+export type ReminderChannel = 'email' | 'sms' | 'both' | 'failed' | 'phone_call';
 export type ReminderColorVariant = 'red' | 'orange' | 'blue' | 'green' | 'none';
 
 export interface LastReminderInput {

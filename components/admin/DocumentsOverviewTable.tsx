@@ -1138,7 +1138,7 @@ export default function DocumentsOverviewTable({
                             >
                               Po przypomnieniu
                             </span>
-                          ) : row.signing_reason === 'organic' ? (
+                          ) : (row.signing_reason === 'organic_no_reminder' || row.signing_reason === 'organic_post_factum') ? (
                             <span
                               className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700"
                               title="Klient sam podpisal umowe / karte kwalifikacyjna (bez przypomnienia lub przed przypomnieniem)"
