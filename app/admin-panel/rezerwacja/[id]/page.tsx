@@ -2,7 +2,7 @@
 
 import { Edit, X, FileText, Download, Upload, Trash2, User, CheckCircle2, CheckCircle, XCircle, SquarePen, Mic } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import DocumentStatusPanel from '@/components/admin/DocumentStatusPanel';
@@ -30,6 +30,7 @@ import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
 import { qualificationCardService } from '@/lib/services/QualificationCardService';
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { isSmsValidationError } from '@/lib/utils/confirmForceAcceptIfNeeded';
+import { computeTransportDifferentCities } from '@/lib/utils/computeTransportDifferentCities';
 import ForceAcceptConfirmModal from '@/components/admin/ForceAcceptConfirmModal';
 import AdminVerifyCodeModal from '@/components/admin/AdminVerifyCodeModal';
 import DocumentVersionsList from '@/components/admin/DocumentVersionsList';
@@ -195,7 +196,6 @@ export default function ReservationDetailPage() {
     return_type: string;
     return_city: string | null;
     return_transport_city_id: number | null;
-    transport_different_cities: boolean;
   }>({
     departure_type: 'wlasny',
     departure_city: null,
@@ -203,8 +203,19 @@ export default function ReservationDetailPage() {
     return_type: 'wlasny',
     return_city: null,
     return_transport_city_id: null,
-    transport_different_cities: false,
   });
+  /**
+   * Ptaszek „Różne miasta wyjazdu i powrotu" — wartość AUTOMATYCZNA (read-only),
+   * liczona z aktualnego stanu transportu wg reguły karty DwhFUHiq. Nie zapisywana
+   * do bazy (pole reservations.transport_different_cities pozostaje nietknięte).
+   */
+  const transportDifferentCities = useMemo(
+    () => computeTransportDifferentCities(
+      { type: transportDraft.departure_type, city: transportDraft.departure_city },
+      { type: transportDraft.return_type, city: transportDraft.return_city },
+    ),
+    [transportDraft.departure_type, transportDraft.departure_city, transportDraft.return_type, transportDraft.return_city],
+  );
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [invoiceDraft, setInvoiceDraft] = useState<{
     wants_invoice?: boolean;
@@ -1125,9 +1136,6 @@ export default function ReservationDetailPage() {
       return_type: reservation.return_type ?? 'wlasny',
       return_city: reservation.return_city ?? null,
       return_transport_city_id: r.return_transport_city_id ?? null,
-      transport_different_cities: reservation.transport_different_cities ?? (
-        (reservation.departure_city && reservation.return_city && reservation.departure_city !== reservation.return_city) ? true : false
-      ),
     });
   }, [
     reservation?.id,
@@ -1137,7 +1145,6 @@ export default function ReservationDetailPage() {
     reservation?.return_type,
     reservation?.return_city,
     (reservation as any)?.return_transport_city_id,
-    reservation?.transport_different_cities,
   ]);
 
   // Load document files and check HTML existence (wywoływane z useEffect i po zapisie umowy)
@@ -3970,8 +3977,7 @@ export default function ReservationDetailPage() {
                     (d.departure_transport_city_id ?? null) === ((r as any).departure_transport_city_id ?? null) &&
                     (d.return_type === (r.return_type ?? 'wlasny')) &&
                     (d.return_city ?? null) === (r.return_city ?? null) &&
-                    (d.return_transport_city_id ?? null) === ((r as any).return_transport_city_id ?? null) &&
-                    d.transport_different_cities === (r.transport_different_cities ?? false);
+                    (d.return_transport_city_id ?? null) === ((r as any).return_transport_city_id ?? null);
                   return (
                     <button
                       type="button"
@@ -3989,7 +3995,8 @@ export default function ReservationDetailPage() {
                               return_type: transportDraft.return_type,
                               return_city: transportDraft.return_city ?? null,
                               return_transport_city_id: transportDraft.return_transport_city_id ?? null,
-                              transport_different_cities: transportDraft.transport_different_cities,
+                              // transport_different_cities: NIE wysyłamy — ptaszek jest
+                              // automatyczny (read-only), pole w bazie pozostaje nietknięte (DwhFUHiq).
                             }) },
                           );
                           setReservation((prev) => (prev && updated ? { ...prev, ...updated } : updated));
@@ -4000,7 +4007,6 @@ export default function ReservationDetailPage() {
                             return_type: updated.return_type ?? 'wlasny',
                             return_city: updated.return_city ?? null,
                             return_transport_city_id: (updated as any).return_transport_city_id ?? null,
-                            transport_different_cities: updated.transport_different_cities ?? false,
                           });
                           showSuccess('Transport został zaktualizowany.');
                           if (reservation?.id) {
@@ -4112,9 +4118,11 @@ export default function ReservationDetailPage() {
                   <input
                     type="checkbox"
                     id="transport-different-cities"
-                    checked={transportDraft.transport_different_cities}
-                    onChange={(e) => setTransportDraft((p) => ({ ...p, transport_different_cities: e.target.checked }))}
-                    className="rounded border-gray-300"
+                    checked={transportDifferentCities}
+                    disabled
+                    readOnly
+                    title="Wartość automatyczna — zaznaczona gdy wyjazd i powrót to różne miejsca (transport własny liczony jako jedno)."
+                    className="rounded border-gray-300 cursor-not-allowed"
                   />
                   <label htmlFor="transport-different-cities" className="text-sm text-gray-700">Różne miasta wyjazdu i powrotu</label>
                 </div>
