@@ -1059,10 +1059,10 @@ const mapReservationToPaymentFormat = async (
     : reservation.property_city || reservation.property_period || null;
 
   // Transport
-  const transportDeparture = reservation.departure_type === 'own'
+  const transportDeparture = reservation.departure_type === 'wlasny'
     ? 'Własny'
     : reservation.departure_city || null;
-  const transportReturn = reservation.return_type === 'own'
+  const transportReturn = reservation.return_type === 'wlasny'
     ? 'Własny'
     : reservation.return_city || null;
 
@@ -2903,10 +2903,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           : item.property_city || item.property_period || '';
 
         // Calculate transport info
-        const transportDeparture = item.departure_type === 'own'
+        const transportDeparture = item.departure_type === 'wlasny'
           ? 'Własny'
           : item.departure_city || '';
-        const transportReturn = item.return_type === 'own'
+        const transportReturn = item.return_type === 'wlasny'
           ? 'Własny'
           : item.return_city || '';
 
