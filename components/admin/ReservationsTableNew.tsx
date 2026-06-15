@@ -11,6 +11,7 @@ import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
 import DateRangeCalendar from '@/components/admin/DateRangeCalendar';
 import DocumentStatusBadge, { getDocumentStatusVisual, DocumentStatus } from '@/components/admin/DocumentStatusBadge';
 import { getExportSheetName } from '@/lib/exportExcelUtils';
+import { dedupeFilterValues } from '@/lib/utils/dedupeFilterValues';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
@@ -2549,8 +2550,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
   // Get values to display in filter modal (search results or default from current page)
   const getFilterDisplayValues = (columnKey: string): string[] => {
-    // Use frozen options to prevent modal from "jumping" during data reload
-    const baseOptions = frozenFilterOptions.length > 0 ? frozenFilterOptions : getUniqueColumnValues(columnKey);
+    // Use frozen options to prevent modal from "jumping" during data reload.
+    // Bug gsOJQywn: dedup po znormalizowanym kluczu (trim + locale-lower) — paginacja
+    // /filter-search ze wstawianym sentinelem "Własny" (offset=0) powodowała powrót tego
+    // samego miasta w 2 batchach po konkatenacji → React "two children with same key".
+    const baseOptions = dedupeFilterValues(
+      frozenFilterOptions.length > 0 ? frozenFilterOptions : getUniqueColumnValues(columnKey),
+    );
 
     // For amount columns with search query, filter locally from frozen/base options
     if (isAmountColumn(columnKey) && filterSearchQuery.trim()) {
@@ -2571,7 +2577,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
     // If user is searching and has results, show search results (dla dat: sortuj od najnowszej)
     if (filterSearchQuery.trim() && filterSearchResults.length > 0) {
-      return isDateCol ? sortDateFilterValues(filterSearchResults) : filterSearchResults;
+      // Bug gsOJQywn: dedup także wyników wyszukiwania (paginacja "load more" może powtórzyć wartość)
+      const dedupedSearch = dedupeFilterValues(filterSearchResults);
+      return isDateCol ? sortDateFilterValues(dedupedSearch) : dedupedSearch;
     }
     // If searching but no results yet or empty, show nothing during search
     if (filterSearchQuery.trim() && isFilterSearching) {
