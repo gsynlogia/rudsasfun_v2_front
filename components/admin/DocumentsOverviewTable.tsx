@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, ChangeEvent, KeyboardEvent, useMemo, useRef } from 'react';
-import { RefreshCw, FileText, CheckCircle2, FilterX, Mail, MessageSquare, Send, Info } from 'lucide-react';
+import { RefreshCw, FileText, CheckCircle2, FilterX, Mail, MessageSquare, Send, Info, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -282,10 +282,17 @@ function buildQueryString(
   effectiveShowOrganic: boolean = false,
   hideRecentReminders: boolean = false,
   hideApproved: boolean = false,
+  sortBy: string | null = null,
+  sortDir: 'asc' | 'desc' = 'desc',
 ): string {
   const params = new URLSearchParams();
   params.set('page', String(page));
   params.set('limit', String(ITEMS_PER_PAGE));
+  // Trello FLYLzAHA (2026-06-16): sortowanie kolumny "Ostatnia data przypomnienia".
+  if (sortBy) {
+    params.set('sort_by', sortBy);
+    params.set('sort_dir', sortDir);
+  }
 
   // Bug Ani 2026-06-01: domyślnie pokaż WSZYSTKIE; exclude_effective_reminders tylko gdy
   // checkbox „Ukryj zatwierdzone" (hideApproved). Logika w pure helperze (testowalna).
@@ -410,6 +417,10 @@ export default function DocumentsOverviewTable({
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [filters, setFilters] = useState<FiltersState>(initialFilters);
   const [pageInputValue, setPageInputValue] = useState('');
+  // Trello FLYLzAHA (2026-06-16): sortowanie kolumny "Ostatnia data przypomnienia".
+  // sortBy=null → domyślne (created_at desc). Klik nagłówka cykluje: desc → asc → brak.
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -504,7 +515,7 @@ export default function DocumentsOverviewTable({
     setLoading(true);
     setError(null);
     try {
-      const qs = buildQueryString(page, f, mode, effectiveShowOrganic, hideRecentReminders, hideApproved);
+      const qs = buildQueryString(page, f, mode, effectiveShowOrganic, hideRecentReminders, hideApproved, sortBy, sortDir);
       const data = await authenticatedApiCall<PaginatedResponse>(
         `/api/reservations/paginated?${qs}`,
       );
@@ -520,11 +531,26 @@ export default function DocumentsOverviewTable({
     } finally {
       if (token === fetchTokenRef.current) setLoading(false);
     }
-  }, [mode, effectiveShowOrganic, hideRecentReminders, hideApproved]);
+  }, [mode, effectiveShowOrganic, hideRecentReminders, hideApproved, sortBy, sortDir]);
 
   useEffect(() => {
     fetchPage(currentPage, filters);
   }, [currentPage, filters, fetchPage]);
+
+  // Trello FLYLzAHA: klik nagłówka "Ostatnia data przypomnienia" cykluje sortowanie:
+  // desc (najmłodsze pierwsze) → asc (najstarsze) → brak (domyślne created_at). Reset do strony 1.
+  const toggleReminderSort = useCallback(() => {
+    setCurrentPage(1);
+    if (sortBy !== 'last_reminder_at') {
+      setSortBy('last_reminder_at');
+      setSortDir('desc');
+    } else if (sortDir === 'desc') {
+      setSortDir('asc');
+    } else {
+      setSortBy(null);
+      setSortDir('desc');
+    }
+  }, [sortBy, sortDir]);
 
   // Cz. 5 (2026-05-31): toggle modal Skuteczne — URL state ?effective_modal=open
   // Cz. 6 (2026-05-31): zachowujemy WSZYSTKIE inne params w URL (vs poprzednio buildUrlSearchString budowal nowy).
@@ -983,7 +1009,19 @@ export default function DocumentsOverviewTable({
                   />
                 </th>
                 <th className={thBase}>
-                  <span className={colNameClass('reminder')}>Ostatnia data przypomnienia</span>
+                  <span
+                    className={`${colNameClass('reminder')} cursor-pointer select-none inline-flex items-center gap-1 hover:text-[#03adf0]`}
+                    onClick={toggleReminderSort}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleReminderSort(); } }}
+                    title="Sortuj wg ostatniej daty przypomnienia (klik: najmłodsze → najstarsze → domyślne)"
+                  >
+                    Ostatnia data przypomnienia
+                    {sortBy === 'last_reminder_at'
+                      ? (sortDir === 'desc' ? <ArrowDown className="w-3.5 h-3.5" /> : <ArrowUp className="w-3.5 h-3.5" />)
+                      : <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />}
+                  </span>
                   <ColumnFilter
                     type="multi-select"
                     value={filters.reminder}
