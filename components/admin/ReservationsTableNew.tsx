@@ -12,6 +12,7 @@ import DateRangeCalendar from '@/components/admin/DateRangeCalendar';
 import DocumentStatusBadge, { getDocumentStatusVisual, DocumentStatus } from '@/components/admin/DocumentStatusBadge';
 import { getExportSheetName } from '@/lib/exportExcelUtils';
 import { dedupeFilterValues } from '@/lib/utils/dedupeFilterValues';
+import { polishSort } from '@/lib/utils/polishSort';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
@@ -2335,7 +2336,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     if (DATE_FILTER_COLUMNS.includes(columnKey as typeof DATE_FILTER_COLUMNS[number])) {
       return sortDateFilterValues(list);
     }
-    return list.sort();
+    return polishSort(list); // sortowanie wg polskiego alfabetu (Łódź po L, nie na końcu)
   };
 
   // Handle filter toggle: check/uncheck. When "all" selected and user unchecks one → switch to "all except" mode.
