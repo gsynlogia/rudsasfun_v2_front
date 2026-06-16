@@ -1323,6 +1323,35 @@ export interface ReservationsTableNewProps {
 }
 
 /**
+ * Pure parser filtrów z query stringa adresu (źródło prawdy dla chipów "Aktywne filtry").
+ * Render chipów MUSI czytać z URL, nie z columnConfig — columnConfig bywa nadpisywany przez wyścig
+ * wczytywania konfiguracji kolumn z chmury (zwłaszcza na wolniejszym łączu DEV), przez co chipy znikały
+ * po F5 mimo że filtr jest w adresie i działa. URL jest jedynym stabilnym źródłem.
+ */
+export function parseColumnFiltersFromSearch(search: string): {
+  filters: Record<string, string[]>;
+  exclude: Record<string, string[]>;
+  dateFrom: string;
+  dateTo: string;
+} {
+  const params = new URLSearchParams(search || '');
+  const filters: Record<string, string[]> = {};
+  const exclude: Record<string, string[]> = {};
+  params.forEach((value, key) => {
+    if (key.startsWith('filter_')) {
+      const isExclude = key.endsWith('_exclude');
+      const colKey = key.replace('filter_', '').replace('_exclude', '');
+      const sep = colKey === 'sourceName' ? '|' : ',';
+      const vals = value.split(sep).map(v => v.trim()).filter(v => v);
+      if (vals.length === 0) return;
+      if (isExclude) exclude[colKey] = vals;
+      else filters[colKey] = vals;
+    }
+  });
+  return { filters, exclude, dateFrom: params.get('date_from') || '', dateTo: params.get('date_to') || '' };
+}
+
+/**
  * Wspólna tabela rezerwacji z płatnościami.
  * Używana na /admin-panel (rezerwacje → szczegóły rezerwacji) i /admin-panel/payments (→ szczegóły płatności).
  * Ustawienia kolumn są per tableModule (reservations_list_columns / payments_list_columns i w API).
@@ -1477,6 +1506,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     if (sortDirUrl === 'asc' || sortDirUrl === 'desc') setSortDirection(sortDirUrl);
   }, [searchParams]);
 
+  // Trzymaj reaktywne źródło chipów zsynchronizowane z adresem przy montowaniu i każdej zmianie nawigacji
+  // (po F5 useSearchParams wypełnia się asynchronicznie — bierzemy świeży window.location.search).
+  useEffect(() => {
+    if (typeof window !== 'undefined') setUrlSearchString(window.location.search);
+  }, [searchParams]);
+
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1539,6 +1574,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   // This prevents modal from flickering when columnConfig updates
   const [appliedColumnFilters, setAppliedColumnFilters] = useState<string>('{}');
   const [appliedColumnFiltersExclude, setAppliedColumnFiltersExclude] = useState<string>('{}');
+  // Reaktywne odbicie query stringa adresu — JEDYNE źródło prawdy dla chipów "Aktywne filtry".
+  // Aktualizowane przy montowaniu/nawigacji (effect) i przy każdym updateURL. Odporne na wyścig
+  // wczytywania konfiguracji kolumn z chmury (które nadpisuje columnConfig i gasiło chipy po F5).
+  // Initial '' (nie window.location.search) — unika hydration mismatch SSR↔client; effect niżej ustawia po montażu.
+  const [urlSearchString, setUrlSearchString] = useState<string>('');
 
   // State dla alertu o zmianach w płatnościach
   const [paymentChangesAlert, setPaymentChangesAlert] = useState<{
@@ -1601,6 +1641,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const queryString = params.toString();
     const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
     window.history.replaceState({}, '', newUrl);
+    // Synchronizuj reaktywne źródło chipów z aktualnym adresem (replaceState nie odświeża useSearchParams).
+    setUrlSearchString(queryString ? `?${queryString}` : '');
   }, []);
 
   // Filter change handler - only updates local state, search happens on Enter or button click
@@ -2721,28 +2763,26 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       setCurrentPage(1);
       return;
     }
-    const updated = columnConfig.map(col => {
-      if (col.key !== columnKey) return col;
-      const exclude = col.exclude || [];
-      if (exclude.includes(value)) {
-        return { ...col, exclude: exclude.filter(x => x !== value) };
-      }
-      const filters = col.filters || [];
-      return { ...col, filters: filters.filter(f => f !== value) };
-    });
-    setColumnConfig(updated);
-    saveColumnPreferences(updated);
-
-    const filtersForApi: Record<string, string[]> = {};
-    const excludeForApi: Record<string, string[]> = {};
-    updated.forEach(col => {
-      if (col.exclude && col.exclude.length > 0) excludeForApi[col.key] = col.exclude;
-      else if (col.filters && col.filters.length > 0) filtersForApi[col.key] = col.allFromDbSelected ? ['__ALL__'] : col.filters;
-    });
-    setAppliedColumnFilters(JSON.stringify(filtersForApi));
-    setAppliedColumnFiltersExclude(JSON.stringify(excludeForApi));
+    // Adres jest źródłem prawdy chipów — usuwamy wartość z include albo exclude wprost w nim,
+    // potem przebudowujemy stan API + konfigurację kolumn z pozostałych filtrów (spójność chip ↔ dane).
+    const parsed = parseColumnFiltersFromSearch(window.location.search);
+    if (parsed.exclude[columnKey]?.includes(value)) {
+      const left = parsed.exclude[columnKey].filter(v => v !== value);
+      if (left.length > 0) parsed.exclude[columnKey] = left; else delete parsed.exclude[columnKey];
+    } else if (parsed.filters[columnKey]?.includes(value)) {
+      const left = parsed.filters[columnKey].filter(v => v !== value);
+      if (left.length > 0) parsed.filters[columnKey] = left; else delete parsed.filters[columnKey];
+    }
+    setAppliedColumnFilters(JSON.stringify(parsed.filters));
+    setAppliedColumnFiltersExclude(JSON.stringify(parsed.exclude));
+    setColumnConfig(prev => prev.map(col => ({
+      ...col,
+      filters: parsed.filters[col.key] || [],
+      exclude: parsed.exclude[col.key] || [],
+    })));
     setColumnHeaderFilterInput(prev => ({ ...prev, [columnKey]: '' }));
     setCurrentPage(1);
+    // updateURL (effect dep applied) przebuduje adres → setUrlSearchString → chip zniknie.
   };
 
   // Check if column has active filters (include or exclude)
@@ -5151,26 +5191,23 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
 
         {/* Active column filters - small orange buttons with X to remove */}
         {(() => {
+          // Chipy budowane WYŁĄCZNIE z adresu (urlSearchString) — odporne na wyścig wczytywania kolumn.
           const activeFilters: { columnKey: string; columnName: string; value: string; isExclude?: boolean }[] = [];
-          if (appliedFilters.dateFrom || appliedFilters.dateTo) {
+          const parsedUrl = parseColumnFiltersFromSearch(urlSearchString);
+          if (parsedUrl.dateFrom || parsedUrl.dateTo) {
             activeFilters.push({
               columnKey: '__createdAtRange',
               columnName: 'Data rezerwacji',
-              value: `${appliedFilters.dateFrom || '...'} - ${appliedFilters.dateTo || '...'}`,
+              value: `${parsedUrl.dateFrom || '...'} - ${parsedUrl.dateTo || '...'}`,
             });
           }
-          columnConfig.forEach(col => {
-            const columnName = COLUMN_DEFINITIONS[col.key as keyof typeof COLUMN_DEFINITIONS] || col.key;
-            if (col.filters && col.filters.length > 0) {
-              col.filters.forEach(value => {
-                activeFilters.push({ columnKey: col.key, columnName, value });
-              });
-            }
-            if (col.exclude && col.exclude.length > 0) {
-              col.exclude.forEach(value => {
-                activeFilters.push({ columnKey: col.key, columnName, value, isExclude: true });
-              });
-            }
+          Object.entries(parsedUrl.filters).forEach(([colKey, vals]) => {
+            const columnName = COLUMN_DEFINITIONS[colKey as keyof typeof COLUMN_DEFINITIONS] || colKey;
+            vals.forEach(value => activeFilters.push({ columnKey: colKey, columnName, value }));
+          });
+          Object.entries(parsedUrl.exclude).forEach(([colKey, vals]) => {
+            const columnName = COLUMN_DEFINITIONS[colKey as keyof typeof COLUMN_DEFINITIONS] || colKey;
+            vals.forEach(value => activeFilters.push({ columnKey: colKey, columnName, value, isExclude: true }));
           });
 
           if (activeFilters.length === 0) return null;
@@ -5190,7 +5227,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                   title={filter.isExclude ? `Usuń wykluczenie: ${filter.columnName} oprócz ${filter.value}` : `Usuń filtr: ${filter.columnName} = ${filter.value}`}
                 >
                   <span className="font-medium">{filter.columnName}:</span>
-                  <span>{filter.isExclude ? `oprócz ${filter.value}` : filter.value}</span>
+                  <span>{filter.value === '__ALL__' ? 'wszystkie z bazy' : (filter.isExclude ? `oprócz ${filter.value}` : filter.value)}</span>
                   <XIcon className="w-3 h-3 text-white group-hover:text-orange-100" />
                 </button>
               ))}
@@ -5205,9 +5242,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               {activeFilters.length > 1 && (
                 <button
                   onClick={() => {
-                    const updated = columnConfig.map(col => ({ ...col, filters: [], exclude: [] }));
-                    setColumnConfig(updated);
-                    saveColumnPreferences(updated);
+                    setColumnConfig(prev => prev.map(col => ({ ...col, filters: [], exclude: [] })));
                     setAppliedColumnFilters('{}');
                     setAppliedColumnFiltersExclude('{}');
                     setColumnHeaderFilterInput({});
@@ -5215,6 +5250,16 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                     setHeaderFilterPopoverRect(null);
                     applyCreatedAtRangeFilter('', '');
                     setCurrentPage(1);
+                    // Usuń filtry kolumn i dat WPROST z adresu (źródło chipów), zachowując search/telefon.
+                    if (typeof window !== 'undefined') {
+                      const params = new URLSearchParams(window.location.search);
+                      Array.from(params.keys()).forEach(k => {
+                        if (k.startsWith('filter_') || k === 'date_from' || k === 'date_to' || k === 'date_excluded') params.delete(k);
+                      });
+                      const qs = params.toString();
+                      window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+                      setUrlSearchString(qs ? `?${qs}` : '');
+                    }
                   }}
                   className="text-xs text-orange-600 hover:text-orange-800 underline ml-2"
                 >
