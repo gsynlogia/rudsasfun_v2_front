@@ -1409,19 +1409,25 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     const dateToUrl = searchParams?.get('date_to') || '';
     const archiveFromUrl = searchParams?.get('archive') as 'active' | 'archived' | 'all' | null;
 
-    // Parse column filters from URL. Źródło: nazwy zawierają przecinki – separator w URL to '|'
+    // Parse column filters z URL (include i exclude). Źródło: nazwy z przecinkami – separator '|' dla sourceName.
+    // Exclude (filter_*_exclude) odtwarzamy symetrycznie do include — inaczej po F5 ginie filtr API + chip.
     const columnFiltersFromUrl: Record<string, string[]> = {};
+    const columnExcludeFromUrl: Record<string, string[]> = {};
     searchParams?.forEach((value, key) => {
-      if (key.startsWith('filter_') && !key.endsWith('_exclude')) {
-        const colKey = key.replace('filter_', '');
+      if (key.startsWith('filter_')) {
+        const isExclude = key.endsWith('_exclude');
+        const colKey = key.replace('filter_', '').replace('_exclude', '');
         const sep = colKey === 'sourceName' ? '|' : ',';
-        columnFiltersFromUrl[colKey] = value.split(sep).map(v => v.trim()).filter(v => v);
+        const vals = value.split(sep).map(v => v.trim()).filter(v => v);
+        if (isExclude) columnExcludeFromUrl[colKey] = vals;
+        else columnFiltersFromUrl[colKey] = vals;
       }
     });
     const hasColumnFilters = Object.keys(columnFiltersFromUrl).length > 0;
+    const hasColumnExclude = Object.keys(columnExcludeFromUrl).length > 0;
 
     const phoneFromUrl = searchParams?.get('phone') || '';
-    const hasUrlFilters = searchFromUrl || phoneFromUrl || reservationFromUrl || statusFromUrl || campFromUrl || dateFromUrl || dateToUrl || archiveFromUrl || hasColumnFilters;
+    const hasUrlFilters = searchFromUrl || phoneFromUrl || reservationFromUrl || statusFromUrl || campFromUrl || dateFromUrl || dateToUrl || archiveFromUrl || hasColumnFilters || hasColumnExclude;
 
     if (hasUrlFilters) {
       const urlFilters: SearchFilters = {
@@ -1448,15 +1454,16 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         setArchiveFilter(archiveFromUrl);
       }
 
-      // Set column filters from URL
-      if (hasColumnFilters) {
-        setAppliedColumnFilters(JSON.stringify(columnFiltersFromUrl));
-        // Also update columnConfig to reflect the filters in UI
+      // Set column filters z URL (include + exclude). columnConfig steruje chipami, applied* steruje API.
+      if (hasColumnFilters || hasColumnExclude) {
+        if (hasColumnFilters) setAppliedColumnFilters(JSON.stringify(columnFiltersFromUrl));
+        if (hasColumnExclude) setAppliedColumnFiltersExclude(JSON.stringify(columnExcludeFromUrl));
+        // Odtwarzamy columnConfig z URL — chip pokaże dokładnie to, czym faktycznie filtruje API.
         setColumnConfig(prev => prev.map(col => {
-          if (columnFiltersFromUrl[col.key]) {
-            return { ...col, filters: columnFiltersFromUrl[col.key] };
-          }
-          return col;
+          const next = { ...col };
+          if (columnFiltersFromUrl[col.key]) next.filters = columnFiltersFromUrl[col.key];
+          if (columnExcludeFromUrl[col.key]) next.exclude = columnExcludeFromUrl[col.key];
+          return next;
         }));
       }
 
@@ -2004,7 +2011,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             return {
               key: col.key,
               visible: col.visible !== false,
-              filters: Array.isArray(col.filters) ? col.filters : [],
+              // Filtry/exclude NIE należą do konfiguracji kolumn — żyją wyłącznie w URL.
+              // Ignorujemy stare zapisane (brudny storage), inaczej nadpisywałyby filtr z adresu po F5.
+              filters: [] as string[],
             };
           });
         const missingFromDefault = DEFAULT_COLUMN_ORDER.filter(key => !seenKeys.has(key));
@@ -2120,7 +2129,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       const seen = new Set(toPersist.map(c => c.key));
       const appended = DEFAULT_COLUMN_ORDER.filter(k => !seen.has(k)).map(key => ({ key, visible: true, filters: [] as string[] }));
       const fullConfig = [...toPersist, ...appended];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toPersist));
+      // Persystujemy WYŁĄCZNIE kolejność/widoczność — filtry/exclude należą do URL, nie do konfiguracji
+      // kolumn. Inaczej brudny storage nadpisywałby filtr z adresu po F5. Stan React (setColumnConfig)
+      // zachowuje filtry w bieżącej sesji — normalny flow (klik filtra) działa bez zmian.
+      const toPersistClean = toPersist.map(c => ({ key: c.key, visible: c.visible }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toPersistClean));
       setColumnConfig([...fullConfig]);
 
       // Debounced save to cloud (1 second delay)
@@ -2130,8 +2143,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       saveToCloudTimeoutRef.current = setTimeout(async () => {
         try {
           const payload = tableModule === 'payments'
-            ? { payments_columns_config: JSON.stringify(toPersist) }
-            : { reservations_columns_config: JSON.stringify(toPersist) };
+            ? { payments_columns_config: JSON.stringify(toPersistClean) }
+            : { reservations_columns_config: JSON.stringify(toPersistClean) };
           await authenticatedApiCall('/api/admin-users/me/settings', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
