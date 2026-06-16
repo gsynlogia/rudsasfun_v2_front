@@ -117,6 +117,10 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
   const [isSigned, setIsSigned] = useState(false);
   const [currentDocumentId, setCurrentDocumentId] = useState<number | null>(null);
   const [latestCardStatus, setLatestCardStatus] = useState<'in_verification' | 'accepted' | 'rejected' | null>(null);
+  // Trello dfgc8CPO (2026-06-16): data podpisu klienta (sms_verified_at) z bazy. Gdy parent nie
+  // przekaże daty, używamy tej zamiast getCurrentDateTime() — inaczej karta pokazywała godzinę
+  // OTWARCIA przez admina jako datę podpisu klienta (np. podgląd zatwierdzonej karty w admin panel).
+  const [latestCardSignedAtFromDb, setLatestCardSignedAtFromDb] = useState<string | null>(null);
   const effectiveLatestCardStatus = (latestCardStatusFromParent ?? latestCardStatus) as 'in_verification' | 'accepted' | 'rejected' | null;
   const [resendTimer, setResendTimer] = useState(60);
   const [showRegulationError, setShowRegulationError] = useState(false);
@@ -333,8 +337,10 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
         } else {
           setLatestCardStatus(null);
         }
+        // Trello dfgc8CPO: zapamiętaj rzeczywistą datę podpisu klienta (sms_verified_at).
+        setLatestCardSignedAtFromDb(latest?.sms_verified_at ?? null);
       })
-      .catch(() => setLatestCardStatus(null));
+      .catch(() => { setLatestCardStatus(null); setLatestCardSignedAtFromDb(null); });
   }, [reservationIdProp, printMode]);
 
   // Automatyczny druk w trybie printMode
@@ -1735,11 +1741,15 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
 
             {(() => {
               const firstParentName = (formData.parentNames || '').split(',')[0].trim() || 'Opiekun prawny';
-              const signedAtDate = latestCardSignedAtFromParent
-                ? new Date(latestCardSignedAtFromParent).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              // Trello dfgc8CPO (2026-06-16): rzeczywista data podpisu klienta — najpierw z parenta
+              // (panel klienta), potem z bazy (sms_verified_at, np. podgląd w admin panel). Fallback do
+              // getCurrentDateTime() tylko gdy karta NIE jest jeszcze podpisana (brak sms_verified_at).
+              const effectiveSignedAt = latestCardSignedAtFromParent || latestCardSignedAtFromDb;
+              const signedAtDate = effectiveSignedAt
+                ? new Date(effectiveSignedAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
                 : null;
-              const signedAtFull = latestCardSignedAtFromParent
-                ? (() => { const d = new Date(latestCardSignedAtFromParent); return `${d.toLocaleDateString('pl-PL')}, ${d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`; })()
+              const signedAtFull = effectiveSignedAt
+                ? (() => { const d = new Date(effectiveSignedAt); return `${d.toLocaleDateString('pl-PL')}, ${d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`; })()
                 : getCurrentDateTime();
 
               const showSignatureBoxes = isSigned || effectiveLatestCardStatus === 'in_verification' || effectiveLatestCardStatus === 'accepted';
