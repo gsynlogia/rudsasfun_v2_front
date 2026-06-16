@@ -88,7 +88,9 @@ export default function LegacyPromotionBanner({
             <span className="ml-2 px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded">wycofana</span>
           )}
         </p>
-        <p className="text-xs text-amber-800 mt-1">{helpText}</p>
+        {/* Trello yO9Eygcf: klient (readOnly) widzi TYLKO nazwę promocji — bez komentarza
+            "starsza wersja... skontaktuj się z biurem". Komentarz pozostaje tylko dla admina. */}
+        {!readOnly && <p className="text-xs text-amber-800 mt-1">{helpText}</p>}
         {!readOnly && onDeleteClick && (
           <button
             type="button"
