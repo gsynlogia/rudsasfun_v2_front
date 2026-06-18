@@ -6,13 +6,28 @@
  * Panel po zapisie woła PATCH /api/v2/reservations/{id}/promotion-v2 z nowymi wartościami.
  * Backend (już gotowy) automatycznie wystawia aneks dla rezerwacji z umową 'accepted'.
  *
- * ZAKAZ w testach: wysyłka SMS i email. Wszystko mockowane (fetch zwraca stuby).
+ * Bug #266 (Trello YCJXoLXt): panel używał surowego `fetch` z ręcznym nagłówkiem
+ * Authorization z propa `authToken`. Gdy token admina wygasł — dropdown był pusty i
+ * pokazywał się surowy komunikat "Promocje: 401". Naprawa: wszystkie wywołania HTTP
+ * przeniesione na `authenticatedFetch` z `@/lib/utils/api`, który bierze świeży token z
+ * AuthService i przy 401 robi logout + redirect na /admin-panel/login.
+ * Dlatego testy mockują `@/lib/utils/api`, NIE globalny `fetch`.
+ *
+ * ZAKAZ w testach: wysyłka SMS i email. Wszystko mockowane (authenticatedFetch zwraca stuby).
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import AdminPromotionV2EditPanel from '@/components/admin/AdminPromotionV2EditPanel';
+
+// Mock warstwy auth/HTTP — komponent woła `authenticatedFetch` z @/lib/utils/api.
+// Mockujemy tę funkcję bezpośrednio, żeby testować logikę panelu w izolacji od
+// AuthService / window.location / globalnego fetch.
+const mockAuthenticatedFetch = jest.fn();
+jest.mock('@/lib/utils/api', () => ({
+  authenticatedFetch: (...args: unknown[]) => mockAuthenticatedFetch(...args),
+}));
 
 // Mock toast context — rejestruje wywołania, żebyśmy mogli asertować że toast
 // jest wywoływany przy sukcesie/błędzie zapisu.
@@ -51,48 +66,44 @@ const SNAPSHOT_EMPTY = {
   admin_code_discount_override: null,
 };
 
-function mockFetch(responses: Record<string, any>) {
-  return jest.fn((url: string, init?: RequestInit) => {
-    const method = init?.method ?? 'GET';
-    const key = `${method} ${url}`;
-    const stub = responses[key] ?? responses[url];
-    if (!stub) return Promise.reject(new Error(`No mock for ${key}`));
-    return Promise.resolve({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve(stub),
-    } as Response);
-  });
+// Buduje stub Response (ok=true, status=200) z zadanym JSON-em.
+function okResponse(payload: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(payload),
+  } as Response;
+}
+
+// Domyślny router odpowiedzi: dopasowuje po metodzie + fragmencie URL.
+// `authenticatedFetch` wywoływane jest z RELATYWNYM endpointem (bez prefiksu API).
+function routeDefault(
+  endpoint: string,
+  init?: RequestInit,
+  overrides?: { snapshot?: unknown },
+): Promise<Response> {
+  const method = init?.method ?? 'GET';
+  if (method === 'GET' && endpoint === '/api/v2/promotions/') return Promise.resolve(okResponse(PROMOTIONS_FIXTURE));
+  if (method === 'GET' && endpoint === '/api/v2/promo-codes/') return Promise.resolve(okResponse(CODES_FIXTURE));
+  if (method === 'GET' && endpoint.includes('/api/v2/reservations/1234/promotion-v2')) {
+    return Promise.resolve(okResponse(overrides?.snapshot ?? SNAPSHOT_EMPTY));
+  }
+  return Promise.reject(new Error(`No mock for ${method} ${endpoint}`));
 }
 
 describe('AdminPromotionV2EditPanel', () => {
-  beforeEach(() => {
-    // TD-038 fix: komponent uzywa `process.env.NEXT_PUBLIC_API_URL || ''` jako prefix
-    // (AdminPromotionV2EditPanel.tsx:82). Test runner ma env var ustawiony na
-    // 'http://localhost:8000' (Next.js dev env), wiec komponent wola
-    // 'http://localhost:8000/api/v2/promotions/' ktore nie matchuje mock keys.
-    // Zerowanie env var w beforeEach zmusza komponent do uzywania path-only URLs.
-    process.env.NEXT_PUBLIC_API_URL = '';
-    (global as any).fetch = mockFetch({
-      'GET /api/v2/promotions/': PROMOTIONS_FIXTURE,
-      'GET /api/v2/promo-codes/': CODES_FIXTURE,
-      'GET /api/v2/reservations/1234/promotion-v2': SNAPSHOT_EMPTY,
-    });
-  });
-
   afterEach(() => {
     jest.clearAllMocks();
     mockShowSuccess.mockClear();
     mockShowError.mockClear();
+    mockAuthenticatedFetch.mockReset();
   });
 
   it('renders promotion select and code select after loading lists', async () => {
-    render(
-      <AdminPromotionV2EditPanel
-        reservationId={1234}
-        authToken="fake-token"
-      />,
-    );
+    mockAuthenticatedFetch.mockImplementation((endpoint: string, init?: RequestInit) => routeDefault(endpoint, init));
+
+    render(<AdminPromotionV2EditPanel reservationId={1234} />);
+
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: /promocja/i })).toBeInTheDocument();
     });
@@ -100,41 +111,64 @@ describe('AdminPromotionV2EditPanel', () => {
     expect(screen.getByText(/LATO2026/)).toBeInTheDocument();
   });
 
+  it('calls authenticatedFetch with RELATIVE endpoints (no API prefix, no manual auth header)', async () => {
+    mockAuthenticatedFetch.mockImplementation((endpoint: string, init?: RequestInit) => routeDefault(endpoint, init));
+
+    render(<AdminPromotionV2EditPanel reservationId={1234} />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /promocja/i })).toBeInTheDocument());
+
+    const calledEndpoints = mockAuthenticatedFetch.mock.calls.map((c) => c[0] as string);
+    expect(calledEndpoints).toContain('/api/v2/promotions/');
+    expect(calledEndpoints).toContain('/api/v2/promo-codes/');
+    expect(calledEndpoints).toContain('/api/v2/reservations/1234/promotion-v2');
+    // Żaden endpoint nie zawiera ręcznego prefiksu http (authenticatedFetch dodaje API_BASE_URL sam).
+    calledEndpoints.forEach((ep) => expect(ep.startsWith('http')).toBe(false));
+    // Żadne wywołanie GET nie przekazuje ręcznego nagłówka Authorization.
+    mockAuthenticatedFetch.mock.calls.forEach((c) => {
+      const init = c[1] as RequestInit | undefined;
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      expect(headers.Authorization).toBeUndefined();
+    });
+  });
+
+  it('does NOT show raw "Promocje: 401" — 401 handled by authenticatedFetch (logout+redirect)', async () => {
+    // Symulacja: token wygasł. authenticatedFetch z @/lib/utils/api przy 401 sam robi
+    // authService.logout() + redirect; tu mock zwraca odrzucenie (jak po przekierowaniu),
+    // a kluczowe: panel NIE renderuje surowego "Promocje: 401".
+    mockAuthenticatedFetch.mockImplementation((endpoint: string) => {
+      // authenticatedFetch po 401 przekierowuje — w teście symulujemy że promise
+      // nigdy nie rozwiązuje się normalnym Response z body (redirect przerywa flow).
+      // Zwracamy odrzucenie "redirect", żeby catch ustawił generyczny błąd, NIE "Promocje: 401".
+      return Promise.reject(new Error('redirecting to login'));
+    });
+
+    render(<AdminPromotionV2EditPanel reservationId={1234} />);
+
+    await waitFor(() => {
+      // Loader znika (finally), panel nie wisi w "Ładowanie…".
+      expect(screen.queryByText(/Ładowanie listy promocji/i)).not.toBeInTheDocument();
+    });
+    // Najważniejsze: NIE ma surowego komunikatu "Promocje: 401".
+    expect(screen.queryByText(/Promocje:\s*401/i)).not.toBeInTheDocument();
+  });
+
   it('calls PATCH /api/v2/reservations/{id}/promotion-v2 with selected ids on save', async () => {
-    const patchMock = jest.fn(() =>
-      Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) } as Response),
-    );
-    (global as any).fetch = jest.fn((url: string, init?: RequestInit) => {
+    const patchMock = jest.fn(() => Promise.resolve(okResponse({})));
+    mockAuthenticatedFetch.mockImplementation((endpoint: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET';
-      if (method === 'PATCH' && url.includes('/api/v2/reservations/1234/promotion-v2')) {
-        return patchMock(url, init);
+      if (method === 'PATCH' && endpoint.includes('/api/v2/reservations/1234/promotion-v2')) {
+        return patchMock(endpoint, init);
       }
-      if (url === '/api/v2/promotions/') {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(PROMOTIONS_FIXTURE) } as Response);
-      }
-      if (url === '/api/v2/promo-codes/') {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CODES_FIXTURE) } as Response);
-      }
-      if (url.includes('/api/v2/reservations/1234/promotion-v2') && method === 'GET') {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(SNAPSHOT_EMPTY) } as Response);
-      }
-      return Promise.reject(new Error(`Unexpected ${method} ${url}`));
+      return routeDefault(endpoint, init);
     });
 
     const onSaved = jest.fn();
-    render(
-      <AdminPromotionV2EditPanel
-        reservationId={1234}
-        authToken="fake-token"
-        onSaved={onSaved}
-      />,
-    );
+    render(<AdminPromotionV2EditPanel reservationId={1234} onSaved={onSaved} />);
     await waitFor(() => expect(screen.getByRole('combobox', { name: /promocja/i })).toBeInTheDocument());
 
     const promoSelect = screen.getByRole('combobox', { name: /promocja/i }) as HTMLSelectElement;
     fireEvent.change(promoSelect, { target: { value: '1' } });
 
-    // Input kodu rabatowego z autocomplete (datalist) — użytkownik wpisuje lub wybiera
     const codeInput = screen.getByLabelText(/kod rabatowy/i) as HTMLInputElement;
     fireEvent.change(codeInput, { target: { value: '2KOTY' } }); // kategoria=gadzet (laczy) → brak konfliktu
 
@@ -147,7 +181,6 @@ describe('AdminPromotionV2EditPanel', () => {
     expect(body.promotion_v2_id).toBe(1);
     expect(body.promo_code_id).toBe(11);
     expect(onSaved).toHaveBeenCalled();
-    // Po sukcesie — toast success
     await waitFor(() => expect(mockShowSuccess).toHaveBeenCalled());
   });
 
@@ -160,20 +193,11 @@ describe('AdminPromotionV2EditPanel', () => {
       applied_promo_code_discount: 20,
       total_price: 2880,
     };
-    (global as any).fetch = mockFetch({
-      'GET /api/v2/promotions/': PROMOTIONS_FIXTURE,
-      'GET /api/v2/promo-codes/': CODES_FIXTURE,
-      'GET /api/v2/reservations/1234/promotion-v2': SNAPSHOT_WITH_DATA,
-    });
+    mockAuthenticatedFetch.mockImplementation((endpoint: string, init?: RequestInit) =>
+      routeDefault(endpoint, init, { snapshot: SNAPSHOT_WITH_DATA }));
 
-    render(
-      <AdminPromotionV2EditPanel
-        reservationId={1234}
-        authToken="fake-token"
-      />,
-    );
+    render(<AdminPromotionV2EditPanel reservationId={1234} />);
 
-    // Wait for fetches and prefill
     await waitFor(() => {
       const promoSelect = screen.getByRole('combobox', { name: /promocja/i }) as HTMLSelectElement;
       expect(promoSelect.value).toBe('2'); // Duża rodzina (id=2 z fixture)
@@ -202,20 +226,18 @@ describe('AdminPromotionV2EditPanel', () => {
       applied_promotion_discount: 50,
       total_price: 2950,
     };
-    (global as any).fetch = mockFetch({
-      'GET /api/v2/promotions/': PROMOTION_WITH_CHECKBOX,
-      'GET /api/v2/promo-codes/': CODES_FIXTURE,
-      'GET /api/v2/reservations/1234/promotion-v2': SNAPSHOT_WITH_CUSTOM,
+    mockAuthenticatedFetch.mockImplementation((endpoint: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET' && endpoint === '/api/v2/promotions/') return Promise.resolve(okResponse(PROMOTION_WITH_CHECKBOX));
+      if (method === 'GET' && endpoint === '/api/v2/promo-codes/') return Promise.resolve(okResponse(CODES_FIXTURE));
+      if (method === 'GET' && endpoint.includes('/api/v2/reservations/1234/promotion-v2')) {
+        return Promise.resolve(okResponse(SNAPSHOT_WITH_CUSTOM));
+      }
+      return Promise.reject(new Error(`No mock for ${method} ${endpoint}`));
     });
 
-    render(
-      <AdminPromotionV2EditPanel
-        reservationId={1234}
-        authToken="fake-token"
-      />,
-    );
+    render(<AdminPromotionV2EditPanel reservationId={1234} />);
 
-    // Poczekaj aż zostanie załadowana promocja i custom fields się renderują
     await waitFor(() => {
       expect(screen.getByText(/Deklaracja dwóch obozów/)).toBeInTheDocument();
     });
@@ -225,29 +247,13 @@ describe('AdminPromotionV2EditPanel', () => {
 
   it('rejects save when typed code does not match any known code', async () => {
     const patchMock = jest.fn();
-    (global as any).fetch = jest.fn((url: string, init?: RequestInit) => {
+    mockAuthenticatedFetch.mockImplementation((endpoint: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET';
-      if (method === 'PATCH') {
-        return patchMock(url, init);
-      }
-      if (url === '/api/v2/promotions/') {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(PROMOTIONS_FIXTURE) } as Response);
-      }
-      if (url === '/api/v2/promo-codes/') {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CODES_FIXTURE) } as Response);
-      }
-      if (url.includes('/api/v2/reservations/1234/promotion-v2') && method === 'GET') {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(SNAPSHOT_EMPTY) } as Response);
-      }
-      return Promise.reject(new Error(`Unexpected ${method} ${url}`));
+      if (method === 'PATCH') return patchMock(endpoint, init);
+      return routeDefault(endpoint, init);
     });
 
-    render(
-      <AdminPromotionV2EditPanel
-        reservationId={1234}
-        authToken="fake-token"
-      />,
-    );
+    render(<AdminPromotionV2EditPanel reservationId={1234} />);
     await waitFor(() => expect(screen.getByLabelText(/kod rabatowy/i)).toBeInTheDocument());
 
     const codeInput = screen.getByLabelText(/kod rabatowy/i) as HTMLInputElement;
@@ -261,7 +267,7 @@ describe('AdminPromotionV2EditPanel', () => {
   });
 
   it('shows error message when save fails', async () => {
-    (global as any).fetch = jest.fn((url: string, init?: RequestInit) => {
+    mockAuthenticatedFetch.mockImplementation((endpoint: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET';
       if (method === 'PATCH') {
         return Promise.resolve({
@@ -270,24 +276,10 @@ describe('AdminPromotionV2EditPanel', () => {
           json: () => Promise.resolve({ detail: 'Konflikt promocji i kodu' }),
         } as Response);
       }
-      if (url === '/api/v2/promotions/') {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(PROMOTIONS_FIXTURE) } as Response);
-      }
-      if (url === '/api/v2/promo-codes/') {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CODES_FIXTURE) } as Response);
-      }
-      if (url.includes('/api/v2/reservations/1234/promotion-v2') && method === 'GET') {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(SNAPSHOT_EMPTY) } as Response);
-      }
-      return Promise.reject(new Error(`Unexpected ${method} ${url}`));
+      return routeDefault(endpoint, init);
     });
 
-    render(
-      <AdminPromotionV2EditPanel
-        reservationId={1234}
-        authToken="fake-token"
-      />,
-    );
+    render(<AdminPromotionV2EditPanel reservationId={1234} />);
     await waitFor(() => expect(screen.getByRole('combobox', { name: /promocja/i })).toBeInTheDocument());
 
     const promoSelect = screen.getByRole('combobox', { name: /promocja/i }) as HTMLSelectElement;
@@ -297,7 +289,6 @@ describe('AdminPromotionV2EditPanel', () => {
     await waitFor(() => {
       expect(screen.getByText(/Konflikt promocji i kodu/)).toBeInTheDocument();
     });
-    // Po błędzie — toast error
     expect(mockShowError).toHaveBeenCalled();
   });
 });

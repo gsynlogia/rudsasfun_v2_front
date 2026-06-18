@@ -3945,7 +3945,6 @@ export default function ReservationDetailPage() {
             <div className="mb-4">
               <AdminPromotionV2EditPanel
                 reservationId={reservation.id}
-                authToken={authService.getToken()}
                 onSaved={() => { bumpPromotionSnapshot(); refetchReservation(); }}
               />
             </div>

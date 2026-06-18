@@ -18,6 +18,7 @@ import { AlertTriangle, Trash2 } from 'lucide-react';
 
 import { useToast } from '@/components/ToastContainer';
 import LegacyPromotionBanner from '@/components/promotion/LegacyPromotionBanner';
+import { authenticatedFetch } from '@/lib/utils/api';
 
 interface PromotionV2 {
   id: number;
@@ -40,7 +41,6 @@ interface PromoCodeLite {
 
 interface Props {
   reservationId: number;
-  authToken: string | null;
   onSaved?: () => void;
 }
 
@@ -55,7 +55,7 @@ interface LegacyPromoInfo {
 }
 
 export default function AdminPromotionV2EditPanel({
-  reservationId, authToken, onSaved,
+  reservationId, onSaved,
 }: Props) {
   const [promotions, setPromotions] = useState<PromotionV2[]>([]);
   const [codes, setCodes] = useState<PromoCodeLite[]>([]);
@@ -79,8 +79,6 @@ export default function AdminPromotionV2EditPanel({
   const [confirmDeleteLegacy, setConfirmDeleteLegacy] = useState(false);
   const [deletingLegacy, setDeletingLegacy] = useState(false);
 
-  const API = process.env.NEXT_PUBLIC_API_URL || '';
-  const authHeader: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
@@ -90,9 +88,9 @@ export default function AdminPromotionV2EditPanel({
         setLoading(true);
         // Równolegle: listy słownikowe + snapshot bieżącego stanu rezerwacji.
         const [resPromos, resCodes, resSnap] = await Promise.all([
-          fetch(`${API}/api/v2/promotions/`, { headers: authHeader }),
-          fetch(`${API}/api/v2/promo-codes/`, { headers: authHeader }),
-          fetch(`${API}/api/v2/reservations/${reservationId}/promotion-v2`, { headers: authHeader }),
+          authenticatedFetch('/api/v2/promotions/'),
+          authenticatedFetch('/api/v2/promo-codes/'),
+          authenticatedFetch(`/api/v2/reservations/${reservationId}/promotion-v2`),
         ]);
         if (!resPromos.ok) throw new Error(`Promocje: ${resPromos.status}`);
         if (!resCodes.ok) throw new Error(`Kody: ${resCodes.status}`);
@@ -134,7 +132,7 @@ export default function AdminPromotionV2EditPanel({
       }
     })();
     return () => { cancelled = true; };
-  }, [API, authToken, reservationId]);
+  }, [reservationId]);
 
   const selectedPromo = useMemo(
     () => promotions.find((p) => p.id === promotionId) || null,
@@ -160,9 +158,8 @@ export default function AdminPromotionV2EditPanel({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/api/v2/reservations/${reservationId}/promotion-v2`, {
+      const res = await authenticatedFetch(`/api/v2/reservations/${reservationId}/promotion-v2`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify({
           promotion_v2_id: promotionId,
           promo_code_id: codeResolve.id,
@@ -192,9 +189,8 @@ export default function AdminPromotionV2EditPanel({
     setDeletingLegacy(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/api/v2/reservations/${reservationId}/legacy-promotion`, {
+      const res = await authenticatedFetch(`/api/v2/reservations/${reservationId}/legacy-promotion`, {
         method: 'DELETE',
-        headers: authHeader,
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
