@@ -103,6 +103,8 @@ interface QualificationFormProps {
   latestCardStatusFromParent?: string | null;
   /** Data podpisania dokumentu (signed_at z signed_documents). */
   latestCardSignedAtFromParent?: string | null;
+  /** Trello dfgc8CPO: data ZATWIERDZENIA przez organizatora (approved_at). NULL dla historycznych → fallback. */
+  latestCardApprovedAtFromParent?: string | null;
   /** Tryb widoku karty: robocza (draft) / zatwierdzona (podpisana SMS-em) */
   viewMode?: 'robocza' | 'zatwierdzona';
   /** Callback do przelaczenia trybu widoku */
@@ -111,7 +113,7 @@ interface QualificationFormProps {
   hasVerifiedVersion?: boolean;
 }
 
-export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, secondParentFromPayload, formSnapshotFromDb, printMode = false, onSaveSuccess, latestCardStatusFromParent, latestCardSignedAtFromParent, viewMode, onViewModeChange, hasVerifiedVersion }: QualificationFormProps) {
+export function QualificationForm({ reservationId: reservationIdProp, reservationData, signedPayload, secondParentFromPayload, formSnapshotFromDb, printMode = false, onSaveSuccess, latestCardStatusFromParent, latestCardSignedAtFromParent, latestCardApprovedAtFromParent, viewMode, onViewModeChange, hasVerifiedVersion }: QualificationFormProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureCode, setSignatureCode] = useState('');
   const [isSigned, setIsSigned] = useState(false);
@@ -121,6 +123,8 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
   // przekaże daty, używamy tej zamiast getCurrentDateTime() — inaczej karta pokazywała godzinę
   // OTWARCIA przez admina jako datę podpisu klienta (np. podgląd zatwierdzonej karty w admin panel).
   const [latestCardSignedAtFromDb, setLatestCardSignedAtFromDb] = useState<string | null>(null);
+  // Trello dfgc8CPO: data zatwierdzenia organizatora z bazy (approved_at), gdy parent nie poda.
+  const [latestCardApprovedAtFromDb, setLatestCardApprovedAtFromDb] = useState<string | null>(null);
   const effectiveLatestCardStatus = (latestCardStatusFromParent ?? latestCardStatus) as 'in_verification' | 'accepted' | 'rejected' | null;
   const [resendTimer, setResendTimer] = useState(60);
   const [showRegulationError, setShowRegulationError] = useState(false);
@@ -327,7 +331,7 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ status: string; sms_verified_at?: string | null }>) => {
+      .then((docs: Array<{ status: string; sms_verified_at?: string | null; approved_at?: string | null }>) => {
         const latest = docs[0];
         if (latest && (latest.status === 'accepted' || latest.status === 'rejected')) {
           setLatestCardStatus(latest.status as 'accepted' | 'rejected');
@@ -337,10 +341,11 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
         } else {
           setLatestCardStatus(null);
         }
-        // Trello dfgc8CPO: zapamiętaj rzeczywistą datę podpisu klienta (sms_verified_at).
+        // Trello dfgc8CPO: zapamiętaj datę podpisu klienta (sms_verified_at) i datę zatwierdzenia organizatora (approved_at).
         setLatestCardSignedAtFromDb(latest?.sms_verified_at ?? null);
+        setLatestCardApprovedAtFromDb(latest?.approved_at ?? null);
       })
-      .catch(() => { setLatestCardStatus(null); setLatestCardSignedAtFromDb(null); });
+      .catch(() => { setLatestCardStatus(null); setLatestCardSignedAtFromDb(null); setLatestCardApprovedAtFromDb(null); });
   }, [reservationIdProp, printMode]);
 
   // Automatyczny druk w trybie printMode
@@ -1752,6 +1757,14 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 ? (() => { const d = new Date(effectiveSignedAt); return `${d.toLocaleDateString('pl-PL')}, ${d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`; })()
                 : getCurrentDateTime();
 
+              // Trello dfgc8CPO: data podpisu ORGANIZATORA = data zatwierdzenia (approved_at). Fallback gdy
+              // NULL (dokumenty sprzed wdrożenia / brak approved_at) → data klienta, czyli BEZ zmiany wyglądu
+              // historycznych dokumentów. Blok klienta (signedAtFull) zostaje na dacie podpisu klienta.
+              const effectiveApprovedAt = latestCardApprovedAtFromParent || latestCardApprovedAtFromDb;
+              const organizerDate = effectiveApprovedAt
+                ? new Date(effectiveApprovedAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : (signedAtDate || getCurrentDateTime().split(',')[0]);
+
               const showSignatureBoxes = isSigned || effectiveLatestCardStatus === 'in_verification' || effectiveLatestCardStatus === 'accepted';
 
               if (printMode) return null;
@@ -1797,9 +1810,9 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                     {/* Lewa strona — Organizator */}
                     {effectiveLatestCardStatus === 'accepted' ? (
                       <div className="signed-confirmation" style={{ flex: 1 }}>
-                        <div className="signed-header">Data: {signedAtDate || getCurrentDateTime().split(',')[0]} i podpis Organizatora</div>
+                        <div className="signed-header">Data: {organizerDate} i podpis Organizatora</div>
                         <div className="signed-role" style={{ color: '#03adf0' }}>RADSAS FUN sp. z o.o.</div>
-                        <div className="signed-timestamp">{signedAtDate || getCurrentDateTime().split(',')[0]}</div>
+                        <div className="signed-timestamp">{organizerDate}</div>
                       </div>
                     ) : (
                       <div style={{ flex: 1, background: '#fef3c7', color: '#92400e', padding: '0.6rem 1.2rem', borderRadius: '4px', fontSize: '9pt', fontWeight: 600, display: 'flex', alignItems: 'center' }}>

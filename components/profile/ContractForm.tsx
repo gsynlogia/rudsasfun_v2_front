@@ -112,6 +112,8 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
   const [printErrors, setPrintErrors] = useState<Partial<Record<PrintErrorKey, boolean>>>({});
   const [latestContractStatus, setLatestContractStatus] = useState<'in_verification' | 'accepted' | 'rejected' | null>(null);
   const [latestContractSignedAt, setLatestContractSignedAt] = useState<string | null>(null);
+  // Trello dfgc8CPO: data zatwierdzenia umowy przez organizatora (approved_at). NULL dla historycznych → fallback.
+  const [latestContractApprovedAt, setLatestContractApprovedAt] = useState<string | null>(null);
   const { showWarning: showToastWarning } = useToast();
 
   // 2026-05-24 (REZ-1828 prewencja): toast warning gdy klient zamknie modal SMS bez wpisania kodu.
@@ -238,7 +240,7 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((docs: Array<{ status: string; signed_at?: string | null; sms_verified_at?: string | null }>) => {
+      .then((docs: Array<{ status: string; signed_at?: string | null; sms_verified_at?: string | null; approved_at?: string | null }>) => {
         const latest = docs[0];
         if (latest && (latest.status === 'accepted' || latest.status === 'rejected')) {
           setLatestContractStatus(latest.status as 'accepted' | 'rejected');
@@ -251,8 +253,10 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
           setLatestContractStatus(null);
           setLatestContractSignedAt(null);
         }
+        // Trello dfgc8CPO: data zatwierdzenia organizatora (approved_at).
+        setLatestContractApprovedAt(latest?.approved_at ?? null);
       })
-      .catch(() => { setLatestContractStatus(null); setLatestContractSignedAt(null); });
+      .catch(() => { setLatestContractStatus(null); setLatestContractSignedAt(null); setLatestContractApprovedAt(null); });
   }, [reservationId, printMode]);
 
   // Aktualna data i godzina
@@ -911,6 +915,12 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
                 ? (() => { const d = new Date(latestContractSignedAt); return `${d.toLocaleDateString('pl-PL')}, ${d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`; })()
                 : getCurrentDateTime();
 
+              // Trello dfgc8CPO: data podpisu ORGANIZATORA = data zatwierdzenia (approved_at). Fallback gdy
+              // NULL (umowy sprzed wdrożenia) → data klienta — bez zmiany wyglądu historycznych umów.
+              const organizerDate = latestContractApprovedAt
+                ? new Date(latestContractApprovedAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : (signedAtDate || getCurrentDate());
+
               const showSignatureBoxes = isSigned || latestContractStatus === 'in_verification' || latestContractStatus === 'accepted';
 
               if (showSignatureBoxes) {
@@ -919,9 +929,9 @@ export function ContractForm({ reservationId, reservationData, signedPayload, pr
                     {/* Lewa strona — Organizator */}
                     {latestContractStatus === 'accepted' ? (
                       <div className="signed-confirmation" style={{ flex: '1 1 0', minWidth: 0, fontSize: '8pt' }}>
-                        <div className="signed-header" style={{ fontSize: '8pt' }}>Data: {signedAtDate || getCurrentDate()} i podpis Organizatora</div>
+                        <div className="signed-header" style={{ fontSize: '8pt' }}>Data: {organizerDate} i podpis Organizatora</div>
                         <div className="signed-role" style={{ color: '#03adf0', fontSize: '9pt' }}>RADSAS FUN sp. z o.o.</div>
-                        <div className="signed-timestamp">{signedAtDate || getCurrentDate()}</div>
+                        <div className="signed-timestamp">{organizerDate}</div>
                       </div>
                     ) : (
                       <div style={{ flex: '1 1 0', minWidth: 0, background: '#fef3c7', color: '#92400e', padding: '0.5rem 0.8rem', borderRadius: '4px', fontSize: '8pt', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
