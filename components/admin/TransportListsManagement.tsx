@@ -13,12 +13,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Connection, Direction, CityCounts, ParticipantRow, Tabor } from '@/lib/types/transportLists';
 import {
-  listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant,
+  listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant, deleteTabor,
 } from '@/lib/services/transportListsApi';
 
 import AddTaborModal from './transport/AddTaborModal';
 import CitiesPanel from './transport/CitiesPanel';
+import DeleteTaborModal from './transport/DeleteTaborModal';
 import ParticipantsPanel from './transport/ParticipantsPanel';
+import TaborOverflowModal from './transport/TaborOverflowModal';
 import TaborPanel from './transport/TaborPanel';
 
 type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy (Nr 22)
@@ -37,6 +39,8 @@ export default function TransportListsManagement() {
   const [openTaborId, setOpenTaborId] = useState<number | null>(null); // tabor przyjmujący uczestników (Nr 26)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set()); // zaznaczeni uczestnicy do wsadzenia
   const [reloadKey, setReloadKey] = useState(0); // wymusza re-fetch kart taborów (capacity/uczestnicy) po wsadzeniu
+  const [deleteTarget, setDeleteTarget] = useState<Tabor | null>(null); // tabor do usunięcia (Nr 29)
+  const [overflowInfo, setOverflowInfo] = useState<{ capacity?: number; occupied?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,25 +103,35 @@ export default function TransportListsManagement() {
     });
   }, []);
 
-  // Wsadź uczestników do otwartego taboru (Nr 26): assign każdego + reload. Overflow → komunikat (pełny modal Nr 29).
+  // Wsadź uczestników do otwartego taboru (Nr 26): assign każdego + reload. Overflow → modal (Nr 29).
   const assignToOpenTabor = useCallback(async (rids: number[]) => {
     if (openTaborId == null || rids.length === 0) return;
-    let overflow = false;
+    let overflow: { capacity?: number; occupied?: number } | null = null;
     for (const rid of rids) {
       const r = await assignParticipant(openTaborId, rid);
-      if (r.overflow) { overflow = true; break; }
+      if (r.overflow) { overflow = { capacity: r.capacity, occupied: r.occupied }; break; }
     }
     setSelectedIds(new Set());
     await reloadData();
-    setError(overflow ? 'Tabor za mały — nie wszyscy się zmieścili (zwiększ liczbę miejsc).' : null);
+    if (overflow) setOverflowInfo(overflow);
   }, [openTaborId, reloadData]);
 
   // Wsadzenie pojedynczego uczestnika przez drag&drop na kartę taboru.
   const dropAssign = useCallback(async (taborId: number, rid: number) => {
     const r = await assignParticipant(taborId, rid);
     await reloadData();
-    setError(r.overflow ? 'Tabor za mały — brak wolnych miejsc.' : null);
+    if (r.overflow) setOverflowInfo({ capacity: r.capacity, occupied: r.occupied });
   }, [reloadData]);
+
+  // Usuń tabor (Nr 29): po potwierdzeniu — deleteTabor + reload + zamknij otwarty jeśli usunięto.
+  const confirmDeleteTabor = useCallback(async () => {
+    if (deleteTarget == null) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
+    await deleteTabor(id);
+    if (openTaborId === id) setOpenTaborId(null);
+    await reloadData();
+  }, [deleteTarget, openTaborId, reloadData]);
 
   // Lookup imion uczestników (reservation_id → „Nazwisko Imię") dla kart taborów.
   const participantNames = useMemo(() => {
@@ -252,7 +266,8 @@ export default function TransportListsManagement() {
               openTaborId={openTaborId}
               onOpenTabor={(id) => { setOpenTaborId(id); setPanelMode('participants'); }}
               onDropAssign={(taborId, rid) => void dropAssign(taborId, rid)}
-              onEdit={(t) => { setEditingTabor(t); setTaborModalOpen(true); }} />
+              onEdit={(t) => { setEditingTabor(t); setTaborModalOpen(true); }}
+              onDelete={(t) => setDeleteTarget(t)} />
           </Panel>
         </div>
       )}
@@ -269,6 +284,15 @@ export default function TransportListsManagement() {
       {taborModalOpen && activeConnectionId != null && (
         <AddTaborModal connectionId={activeConnectionId} tabor={editingTabor}
           onClose={() => setTaborModalOpen(false)} onSaved={reloadData} />
+      )}
+      {deleteTarget && (
+        <DeleteTaborModal
+          taborLabel={`${deleteTarget.name ?? deleteTarget.type}${deleteTarget.number ? ` #${deleteTarget.number}` : ''}`}
+          onConfirm={() => void confirmDeleteTabor()} onClose={() => setDeleteTarget(null)} />
+      )}
+      {overflowInfo && (
+        <TaborOverflowModal capacity={overflowInfo.capacity} occupied={overflowInfo.occupied}
+          onClose={() => setOverflowInfo(null)} />
       )}
     </div>
   );

@@ -86,14 +86,23 @@ export async function listTaborParticipants(id: number): Promise<TaborParticipan
   return jsonOrThrow(await authenticatedFetch(`${BASE}/tabors/${id}/participants`), 'listTaborParticipants');
 }
 
-/** Przypisz uczestnika do taboru. Zwraca {overflow:true} gdy 409 (tabor za mały) — bez rzucania. */
+/** Przypisz uczestnika do taboru. Zwraca {overflow:true,capacity,occupied} gdy 409 (tabor za mały) — bez rzucania. */
 export async function assignParticipant(
   taborId: number, reservationId: number, isTransfer = false,
-): Promise<{ ok: boolean; overflow?: boolean; participant?: TaborParticipant }> {
+): Promise<{ ok: boolean; overflow?: boolean; capacity?: number; occupied?: number; participant?: TaborParticipant }> {
   const res = await authenticatedFetch(`${BASE}/tabors/${taborId}/participants`, {
     method: 'POST', body: JSON.stringify({ reservation_id: reservationId, is_transfer: isTransfer }),
   });
-  if (res.status === 409) return { ok: false, overflow: true };
+  if (res.status === 409) {
+    let capacity: number | undefined;
+    let occupied: number | undefined;
+    try {
+      const body = await res.json();
+      capacity = body?.detail?.capacity;
+      occupied = body?.detail?.occupied;
+    } catch { /* brak body */ }
+    return { ok: false, overflow: true, capacity, occupied };
+  }
   if (!res.ok) throw new Error(`assignParticipant: ${res.status}`);
   return { ok: true, participant: await res.json() };
 }

@@ -26,10 +26,11 @@ interface TaborPanelProps {
   onOpenTabor: (id: number) => void;
   onDropAssign: (taborId: number, reservationId: number) => void;
   reloadKey: number;
+  onDelete: (tabor: Tabor) => void;
 }
 
 export default function TaborPanel(
-  { tabors, participantNames, onEdit, openTaborId, onOpenTabor, onDropAssign, reloadKey }: TaborPanelProps,
+  { tabors, participantNames, onEdit, openTaborId, onOpenTabor, onDropAssign, reloadKey, onDelete }: TaborPanelProps,
 ) {
   if (tabors.length === 0) {
     return (
@@ -43,7 +44,7 @@ export default function TaborPanel(
       {tabors.map((t) => (
         <TaborCard key={t.id} tabor={t} participantNames={participantNames} onEdit={onEdit} reloadKey={reloadKey}
           isOpen={openTaborId === t.id} onOpen={() => onOpenTabor(t.id)}
-          onDrop={(rid) => onDropAssign(t.id, rid)} />
+          onDrop={(rid) => onDropAssign(t.id, rid)} onDelete={() => onDelete(t)} />
       ))}
     </div>
   );
@@ -57,9 +58,10 @@ interface TaborCardProps {
   onOpen: () => void;
   onDrop: (reservationId: number) => void;
   reloadKey: number;
+  onDelete: () => void;
 }
 
-function TaborCard({ tabor, participantNames, onEdit, isOpen, onOpen, onDrop, reloadKey }: TaborCardProps) {
+function TaborCard({ tabor, participantNames, onEdit, isOpen, onOpen, onDrop, reloadKey, onDelete }: TaborCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [capacity, setCapacity] = useState<TaborCapacity | null>(null);
@@ -118,7 +120,10 @@ function TaborCard({ tabor, participantNames, onEdit, isOpen, onOpen, onDrop, re
             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700" data-testid="tabor-edit">
             <Pencil className="h-4 w-4" />
           </button>
-          <span title="Usuń (Nr 29)" className="rounded p-1 text-gray-400 hover:bg-gray-100"><Trash2 className="h-4 w-4" /></span>
+          <button type="button" title="Usuń tabor" onClick={onDelete} data-testid="tabor-delete"
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600">
+            <Trash2 className="h-4 w-4" />
+          </button>
           <span title="Dokument (Nr 31)"
             className={`rounded p-1 hover:bg-gray-100 ${tabor.document_approved ? 'text-emerald-600' : 'text-orange-500'}`}>
             <FileText className="h-4 w-4" />
