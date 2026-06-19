@@ -11,11 +11,14 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Connection, Direction, CityCounts, ParticipantRow } from '@/lib/types/transportLists';
-import { listConnections, getConnectionCities, getConnectionParticipants } from '@/lib/services/transportListsApi';
+import type { Connection, Direction, CityCounts, ParticipantRow, Tabor } from '@/lib/types/transportLists';
+import {
+  listConnections, getConnectionCities, getConnectionParticipants, listTabors,
+} from '@/lib/services/transportListsApi';
 
 import CitiesPanel from './transport/CitiesPanel';
 import ParticipantsPanel from './transport/ParticipantsPanel';
+import TaborPanel from './transport/TaborPanel';
 
 type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy (Nr 22)
 
@@ -26,6 +29,7 @@ export default function TransportListsManagement() {
   const [panelMode, setPanelMode] = useState<PanelMode>('numbers');
   const [cities, setCities] = useState<CityCounts[]>([]);
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
+  const [tabors, setTabors] = useState<Tabor[]>([]);
   const [transferCityIds, setTransferCityIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +68,7 @@ export default function TransportListsManagement() {
     if (activeConnectionId == null) {
       setCities([]);
       setParticipants([]);
+      setTabors([]);
       return;
     }
     let cancelled = false;
@@ -73,8 +78,20 @@ export default function TransportListsManagement() {
     getConnectionParticipants(activeConnectionId)
       .then((data) => { if (!cancelled) setParticipants(data); })
       .catch(() => { if (!cancelled) setParticipants([]); });
+    listTabors(activeConnectionId)
+      .then((data) => { if (!cancelled) setTabors(data); })
+      .catch(() => { if (!cancelled) setTabors([]); });
     return () => { cancelled = true; };
   }, [activeConnectionId]);
+
+  // Lookup imion uczestników (reservation_id → „Nazwisko Imię") dla kart taborów.
+  const participantNames = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const p of participants) {
+      m.set(p.reservation_id, `${p.last_name ?? ''} ${p.first_name ?? ''}`.trim() || `#${p.reservation_id}`);
+    }
+    return m;
+  }, [participants]);
 
   const totals = useMemo(() => cities.reduce(
     (acc, c) => ({
@@ -192,7 +209,7 @@ export default function TransportListsManagement() {
               : <ParticipantsPanel participants={participants} />}
           </Panel>
           <Panel title="Tabor">
-            <PlaceholderZone label="Karty taborów + wsadzanie (Nr 27-29)" />
+            <TaborPanel tabors={tabors} participantNames={participantNames} />
           </Panel>
         </div>
       )}
