@@ -1,16 +1,21 @@
 'use client';
 
 /**
- * Panel ŚRODKOWY „Uczestnicy" (Nr 25-26) — imienna lista 5 kolumn + filtr/sort + wsadzanie do taboru.
- * Nr 25: kolumny UCZESTNIK|TEMAT|PRZYSTANEK|TAG|REGION + filtr i sort na każdej; nieprzypisani u góry, przypisani wyszarzeni.
- * Nr 26: gdy tabor otwarty (assignMode) → checkboxy zaznaczania + „Przenieś do taboru (N)" + „Zaznacz tematami" + drag&drop.
+ * Panel ŚRODKOWY „Uczestnicy" — 1:1 z makietą Figma (ParticipantsPanel.tsx).
+ * Trzy stany (jak makieta):
+ *  1. PUSTY — gdy nic nie zaznaczone i brak otwartego taboru („Zaznacz miasto lub ośrodek...").
+ *  2. CYFRY — wielka liczba ŁĄCZNIE zaznaczonych (panelMode='numbers').
+ *  3. UCZESTNICY — tabela UCZESTNIK|TEMAT OBOZU|PRZYSTANEK|MIASTO|TAG + floating badge ŁĄCZNIE.
+ * Tabor otwarty (assignMode) → checkboxy zaznaczania + „Przenieś do taboru" + drag&drop (Nr 26).
+ * Dane realne z bazy; mock makiety ignorowany. MIASTO = participant_city (zamieszkania).
  */
-import { ChevronsUpDown, ChevronUp, ChevronDown, MoveRight, AlertTriangle } from 'lucide-react';
+import { Filter, ChevronsUpDown, ChevronUp, ChevronDown, MoveRight, AlertTriangle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type { ParticipantRow } from '@/lib/types/transportLists';
 
 type SortDir = 'asc' | 'desc';
+type PanelMode = 'numbers' | 'participants';
 
 interface Column { key: string; label: string; get: (p: ParticipantRow) => string; }
 
@@ -18,29 +23,40 @@ const COLUMNS: Column[] = [
   { key: 'uczestnik', label: 'Uczestnik', get: (p) => `${p.last_name ?? ''} ${p.first_name ?? ''}`.trim() },
   { key: 'temat', label: 'Temat obozu', get: (p) => p.topic ?? '' },
   { key: 'przystanek', label: 'Przystanek', get: (p) => p.city ?? '' },
+  { key: 'miasto', label: 'Miasto', get: (p) => p.participant_city ?? '' },
   { key: 'tag', label: 'Tag', get: (p) => p.tag ?? '' },
-  { key: 'region', label: 'Region', get: (p) => p.region ?? '' },
 ];
 
+/** Kolor tagu wg makiety: B*→zielony, S*→niebieski, L*→pomarańczowy. */
+function tagColor(tag: string | null): string {
+  const t = (tag ?? '').toUpperCase();
+  if (t.startsWith('B')) return 'bg-[#228629]';
+  if (t.startsWith('S')) return 'bg-[#00adee]';
+  if (t.startsWith('L')) return 'bg-[#ff8c00]';
+  return 'bg-gray-500';
+}
+
 interface Props {
-  participants: ParticipantRow[];
+  participants: ParticipantRow[];        // już przefiltrowani do zaznaczenia (lub wszyscy w assignMode)
+  panelMode: PanelMode;
+  hasSelection: boolean;
+  selectedTotal: number;
   assignMode: boolean;
   selectedIds: Set<number>;
   onToggleSelect: (rid: number) => void;
   onAssignSelected: () => void;
   onEarlyLeave: (rid: number) => void;
-  visibleCols: Set<string>;                    // Nr 37: konfiguracja kolumn (Uczestnik zawsze widoczny)
-  onOpenReservation: (reservationNumber: string | null) => void; // Nr 37: klik → rezerwacja
+  onOpenReservation: (reservationNumber: string | null) => void;
 }
 
-export default function ParticipantsPanel(
-  { participants, assignMode, selectedIds, onToggleSelect, onAssignSelected, onEarlyLeave,
-    visibleCols, onOpenReservation }: Props,
-) {
-  const cols = COLUMNS.filter((c) => c.key === 'uczestnik' || visibleCols.has(c.key));
+export default function ParticipantsPanel({
+  participants, panelMode, hasSelection, selectedTotal, assignMode, selectedIds,
+  onToggleSelect, onAssignSelected, onEarlyLeave, onOpenReservation,
+}: Props) {
   const [sortKey, setSortKey] = useState<string>('uczestnik');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
 
   const toggleSort = (key: string) => {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -62,129 +78,134 @@ export default function ParticipantsPanel(
     });
   }, [participants, filters, sortKey, sortDir]);
 
-  const unassignedVisible = rows.filter((p) => !p.is_assigned);
-  const themes = useMemo(
-    () => Array.from(new Set(unassignedVisible.map((p) => p.topic).filter(Boolean))) as string[],
-    [unassignedVisible],
-  );
-
-  const selectAllUnassigned = () => {
-    unassignedVisible.forEach((p) => { if (!selectedIds.has(p.reservation_id)) onToggleSelect(p.reservation_id); });
-  };
-  const selectByTheme = (theme: string) => {
-    unassignedVisible.forEach((p) => {
-      if (p.topic === theme && !selectedIds.has(p.reservation_id)) onToggleSelect(p.reservation_id);
-    });
-  };
-
-  if (participants.length === 0) {
-    return <p className="py-8 text-center text-sm text-gray-400">Brak uczestników dla tego połączenia.</p>;
+  // STAN 1 — pusty (makieta: Filter 48px + tekst). Gdy tabor otwarty pokazujemy tabelę mimo braku zaznaczenia.
+  if (!hasSelection && !assignMode) {
+    return (
+      <div className="flex h-full items-center justify-center py-20" data-testid="participants-empty">
+        <div className="text-center">
+          <Filter size={48} className="mx-auto mb-2 text-gray-400" />
+          <p className="font-medium text-gray-500">Zaznacz miasto lub ośrodek po lewej stronie</p>
+          <p className="text-sm text-gray-400">aby wyświetlić szczegóły</p>
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <div className="flex h-full flex-col">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs text-gray-500" data-testid="participants-count">
-          Uczestników: <span className="font-semibold">{rows.length}</span> / {participants.length}
-        </span>
-        {assignMode && (
-          <div className="flex items-center gap-2">
-            <select className="rounded border border-gray-300 px-1.5 py-1 text-xs" defaultValue=""
-              data-testid="select-by-theme"
-              onChange={(e) => { if (e.target.value) { selectByTheme(e.target.value); e.target.value = ''; } }}>
-              <option value="">Zaznacz tematami…</option>
-              {themes.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <button type="button" onClick={onAssignSelected} disabled={selectedIds.size === 0}
-              data-testid="assign-selected"
-              className="flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50">
-              <MoveRight className="h-3.5 w-3.5" /> Przenieś do taboru ({selectedIds.size})
-            </button>
-          </div>
-        )}
+  // STAN 2 — Cyfry (makieta: ŁĄCZNIE + wielka liczba). Tylko gdy brak otwartego taboru.
+  if (panelMode === 'numbers' && !assignMode) {
+    return (
+      <div className="flex h-full items-center justify-center py-20" data-testid="participants-numbers">
+        <div className="text-center">
+          <p className="mb-4 font-medium text-gray-500">ŁĄCZNIE</p>
+          <div className="text-8xl font-bold text-[#00adee]" data-testid="selected-total">{selectedTotal}</div>
+          <p className="mt-4 text-sm text-gray-400">uczestników</p>
+        </div>
       </div>
-      <div className="overflow-auto">
+    );
+  }
+
+  // STAN 3 — Uczestnicy (tabela)
+  const unassignedVisible = rows.filter((p) => !p.is_assigned);
+  const cols = COLUMNS;
+
+  return (
+    <div className="relative flex h-full flex-col">
+      {assignMode && (
+        <div className="mb-2 flex items-center justify-end">
+          <button type="button" onClick={onAssignSelected} disabled={selectedIds.size === 0}
+            data-testid="assign-selected"
+            className="flex items-center gap-1 rounded bg-green-500 px-3 py-1 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50">
+            <MoveRight className="h-3.5 w-3.5" /> Przenieś do taboru ({selectedIds.size})
+          </button>
+        </div>
+      )}
+      {/* Floating badge ŁĄCZNIE (makieta) */}
+      <div className="pointer-events-none fixed bottom-20 right-8 z-40" data-testid="total-badge">
+        <div className="rounded-xl border-2 border-white bg-gradient-to-br from-[#00adee] to-[#0099d6] px-5 py-3 text-white shadow-xl">
+          <p className="mb-0.5 text-xs font-medium opacity-90">ŁĄCZNIE</p>
+          <div className="text-3xl font-bold leading-none">{selectedTotal}</div>
+          <p className="mt-0.5 text-xs opacity-75">uczestników</p>
+        </div>
+      </div>
+      <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 340px)' }}>
         <table className="w-full text-sm" data-testid="participants-table">
-          <thead className="sticky top-0 bg-white">
-            <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-gray-700 text-left text-xs font-semibold uppercase tracking-wide text-white">
               {assignMode && (
-                <th className="px-1 py-2">
+                <th className="px-3 py-3 text-center" style={{ width: '3rem' }}>
                   <input type="checkbox" aria-label="Zaznacz wszystkich nieprzypisanych"
                     checked={unassignedVisible.length > 0 && unassignedVisible.every((p) => selectedIds.has(p.reservation_id))}
-                    onChange={selectAllUnassigned} />
+                    onChange={() => unassignedVisible.forEach((p) => { if (!selectedIds.has(p.reservation_id)) onToggleSelect(p.reservation_id); })} />
                 </th>
               )}
               {cols.map((c) => (
-                <th key={c.key} className="px-2 py-2">
-                  <button type="button" onClick={() => toggleSort(c.key)} className="flex items-center gap-1 hover:text-gray-800">
-                    {c.label}
-                    {sortKey === c.key
-                      ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
-                      : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
-                  </button>
+                <th key={c.key} className="relative px-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => toggleSort(c.key)} className="hover:opacity-80">{c.label.toUpperCase()}</button>
+                    <button type="button" onClick={() => setOpenFilter(openFilter === c.key ? null : c.key)}
+                      className="rounded p-0.5 hover:bg-white/20" aria-label={`Filtruj ${c.label}`}>
+                      <Filter size={14} />
+                    </button>
+                    <button type="button" onClick={() => toggleSort(c.key)} className="rounded p-0.5 hover:bg-white/20" aria-label={`Sortuj ${c.label}`}>
+                      {sortKey === c.key
+                        ? (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                        : <ChevronsUpDown size={14} />}
+                    </button>
+                  </div>
+                  {openFilter === c.key && (
+                    <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white p-3 shadow-xl">
+                      <input type="text" autoFocus placeholder={`Szukaj: ${c.label}…`} value={filters[c.key] ?? ''}
+                        onChange={(e) => setFilters((f) => ({ ...f, [c.key]: e.target.value }))}
+                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm font-normal text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#00adee]" />
+                    </div>
+                  )}
                 </th>
               ))}
-              {!assignMode && <th className="px-2 py-2 text-right">Akcja</th>}
-            </tr>
-            <tr className="border-b border-gray-100">
-              {assignMode && <th />}
-              {cols.map((c) => (
-                <th key={c.key} className="px-1 pb-1">
-                  <input type="text" placeholder="filtr…" value={filters[c.key] ?? ''}
-                    onChange={(e) => setFilters((f) => ({ ...f, [c.key]: e.target.value }))}
-                    className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs font-normal" />
-                </th>
-              ))}
-              {!assignMode && <th />}
+              {!assignMode && <th className="px-2 py-3 text-right" style={{ width: '3rem' }} />}
             </tr>
           </thead>
           <tbody>
-            {rows.map((p) => (
-              <tr key={`${p.reservation_id}`}
-                draggable={assignMode && !p.is_assigned}
-                onDragStart={(e) => e.dataTransfer.setData('text/plain', String(p.reservation_id))}
-                className={`border-b border-gray-50 hover:bg-sky-50 ${p.is_assigned ? 'opacity-60' : ''} ${
-                  assignMode && !p.is_assigned ? 'cursor-grab' : ''}`}>
-                {assignMode && (
-                  <td className="px-1 py-1.5">
-                    {!p.is_assigned && (
-                      <input type="checkbox" aria-label={`Zaznacz ${p.last_name} ${p.first_name}`}
-                        checked={selectedIds.has(p.reservation_id)}
-                        onChange={() => onToggleSelect(p.reservation_id)} />
-                    )}
-                  </td>
-                )}
-                {cols.map((c) => {
-                  if (c.key === 'uczestnik') {
-                    return (
-                      <td key={c.key} className="px-2 py-1.5 font-medium">
-                        <button type="button" onClick={() => onOpenReservation(p.reservation_number)}
-                          className="text-sky-700 hover:underline" data-testid="participant-link">
-                          {p.last_name} {p.first_name}
-                        </button>
-                      </td>
-                    );
-                  }
-                  if (c.key === 'tag') {
-                    return (
-                      <td key={c.key} className="px-2 py-1.5">
-                        {p.tag && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-700">{p.tag}</span>}
-                      </td>
-                    );
-                  }
-                  return <td key={c.key} className="px-2 py-1.5 text-gray-700">{c.get(p) || '—'}</td>;
-                })}
-                {!assignMode && (
-                  <td className="px-2 py-1.5 text-right">
-                    <button type="button" title="Wyjazd przed zakończeniem" data-testid="early-leave-btn"
-                      onClick={() => onEarlyLeave(p.reservation_id)}
-                      className="rounded bg-red-600 px-1.5 py-1 text-white hover:bg-red-700">
-                      <AlertTriangle className="h-3.5 w-3.5" />
+            {rows.map((p) => {
+              const isSelected = selectedIds.has(p.reservation_id);
+              return (
+                <tr key={p.reservation_id}
+                  draggable={assignMode && !p.is_assigned}
+                  onDragStart={(e) => e.dataTransfer.setData('text/plain', String(p.reservation_id))}
+                  className={`border-b border-gray-200 transition-colors ${
+                    p.is_assigned ? 'bg-gray-100 opacity-60' : isSelected ? 'bg-blue-50' : 'hover:bg-blue-50'} ${
+                    assignMode && !p.is_assigned ? 'cursor-grab' : ''}`}>
+                  {assignMode && (
+                    <td className="px-3 py-3 text-center">
+                      {!p.is_assigned && (
+                        <input type="checkbox" aria-label={`Zaznacz ${p.last_name} ${p.first_name}`}
+                          checked={isSelected} onChange={() => onToggleSelect(p.reservation_id)} />
+                      )}
+                    </td>
+                  )}
+                  <td className="px-3 py-3 font-medium">
+                    <button type="button" onClick={() => onOpenReservation(p.reservation_number)}
+                      className="text-[#00adee] hover:underline" data-testid="participant-link">
+                      {`${p.last_name ?? ''} ${p.first_name ?? ''}`.trim() || `#${p.reservation_id}`}
                     </button>
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="px-3 py-3 text-gray-600">{p.topic || '—'}</td>
+                  <td className="px-3 py-3 text-gray-600">{p.city || '—'}</td>
+                  <td className="px-3 py-3 text-gray-600">{p.participant_city || '—'}</td>
+                  <td className="px-3 py-3">
+                    {p.tag && <span className={`rounded-md px-3 py-1 text-xs font-medium text-white ${tagColor(p.tag)}`}>{p.tag}</span>}
+                  </td>
+                  {!assignMode && (
+                    <td className="px-2 py-3 text-right">
+                      <button type="button" title="Wyjazd przed zakończeniem" data-testid="early-leave-btn"
+                        onClick={() => onEarlyLeave(p.reservation_id)}
+                        className="rounded bg-red-600 p-1 text-white hover:bg-red-700">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

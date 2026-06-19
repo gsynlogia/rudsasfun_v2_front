@@ -1,0 +1,114 @@
+/**
+ * Testy czystej logiki zaznaczania miast/resortów w „Listach transportowych" (makieta Figma 1:1).
+ * Trzy poziomy: MASTER, per MIASTO (selectedCities), per KOMÓRKA RESORTU (selectedResortCells).
+ * Logika odtworzona z AdminPanel.tsx makiety (isCityFullySelected / isResortCellSelected /
+ * toggleCitySelection / toggleResortCellSelection / hasAnySelection / calculateSelectedTotal).
+ */
+import {
+  emptySelection, isCityFullySelected, isResortCellSelected, hasAnySelection,
+  toggleCity, toggleResortCell, toggleMaster, calculateSelectedTotal, isParticipantSelected,
+  type Resort,
+} from '@/lib/utils/transportSelection';
+
+const RESORTS: Resort[] = ['beaver', 'sawa', 'limba'];
+// cityData wzór (realne liczby sezonu arrival): Warszawa B=300 S=85 L=59 razem=444, Łódź B=135 S=21 L=12 razem=168
+const CITIES = [
+  { city: 'Warszawa', beaver: 300, sawa: 85, limba: 59, razem: 444 },
+  { city: 'Łódź', beaver: 135, sawa: 21, limba: 12, razem: 168 },
+];
+
+describe('transportSelection — stan pusty', () => {
+  it('pusty stan nie ma żadnego zaznaczenia', () => {
+    const s = emptySelection();
+    expect(hasAnySelection(s)).toBe(false);
+    expect(isCityFullySelected(s, 'Warszawa')).toBe(false);
+    expect(isResortCellSelected(s, 'Warszawa', 'beaver')).toBe(false);
+    expect(calculateSelectedTotal(s, CITIES)).toBe(0);
+  });
+});
+
+describe('transportSelection — zaznaczenie całego miasta', () => {
+  it('toggleCity zaznacza całe miasto: wszystkie resorty zaznaczone', () => {
+    const s = toggleCity(emptySelection(), 'Warszawa');
+    expect(hasAnySelection(s)).toBe(true);
+    expect(isCityFullySelected(s, 'Warszawa')).toBe(true);
+    expect(isResortCellSelected(s, 'Warszawa', 'beaver')).toBe(true);
+    expect(isResortCellSelected(s, 'Warszawa', 'sawa')).toBe(true);
+    expect(isResortCellSelected(s, 'Warszawa', 'limba')).toBe(true);
+    expect(calculateSelectedTotal(s, CITIES)).toBe(444);
+  });
+
+  it('toggleCity drugi raz odznacza miasto', () => {
+    let s = toggleCity(emptySelection(), 'Warszawa');
+    s = toggleCity(s, 'Warszawa');
+    expect(hasAnySelection(s)).toBe(false);
+    expect(isCityFullySelected(s, 'Warszawa')).toBe(false);
+  });
+});
+
+describe('transportSelection — komórka resortu (częściowe)', () => {
+  it('toggleResortCell na pustym zaznacza jeden resort (miasto częściowe, nie pełne)', () => {
+    const s = toggleResortCell(emptySelection(), 'Warszawa', 'beaver', RESORTS);
+    expect(isResortCellSelected(s, 'Warszawa', 'beaver')).toBe(true);
+    expect(isResortCellSelected(s, 'Warszawa', 'sawa')).toBe(false);
+    expect(isCityFullySelected(s, 'Warszawa')).toBe(false);
+    expect(hasAnySelection(s)).toBe(true);
+    expect(calculateSelectedTotal(s, CITIES)).toBe(300); // tylko beaver
+  });
+
+  it('zaznaczenie wszystkich resortów scala do pełnego miasta', () => {
+    let s = toggleResortCell(emptySelection(), 'Warszawa', 'beaver', RESORTS);
+    s = toggleResortCell(s, 'Warszawa', 'sawa', RESORTS);
+    s = toggleResortCell(s, 'Warszawa', 'limba', RESORTS);
+    expect(isCityFullySelected(s, 'Warszawa')).toBe(true);
+    expect(calculateSelectedTotal(s, CITIES)).toBe(444);
+  });
+
+  it('klik resortu na pełnym mieście odznacza tylko ten resort (reszta zostaje)', () => {
+    let s = toggleCity(emptySelection(), 'Warszawa'); // pełne
+    s = toggleResortCell(s, 'Warszawa', 'sawa', RESORTS); // odznacz Sawa
+    expect(isResortCellSelected(s, 'Warszawa', 'sawa')).toBe(false);
+    expect(isResortCellSelected(s, 'Warszawa', 'beaver')).toBe(true);
+    expect(isResortCellSelected(s, 'Warszawa', 'limba')).toBe(true);
+    expect(isCityFullySelected(s, 'Warszawa')).toBe(false);
+    expect(calculateSelectedTotal(s, CITIES)).toBe(300 + 59); // beaver+limba
+  });
+
+  it('odznaczenie ostatniej komórki usuwa miasto z zaznaczenia', () => {
+    let s = toggleResortCell(emptySelection(), 'Warszawa', 'beaver', RESORTS);
+    s = toggleResortCell(s, 'Warszawa', 'beaver', RESORTS);
+    expect(hasAnySelection(s)).toBe(false);
+  });
+});
+
+describe('transportSelection — master', () => {
+  it('toggleMaster zaznacza wszystkie miasta', () => {
+    const all = CITIES.map((c) => c.city);
+    const s = toggleMaster(emptySelection(), all);
+    expect(isCityFullySelected(s, 'Warszawa')).toBe(true);
+    expect(isCityFullySelected(s, 'Łódź')).toBe(true);
+    expect(calculateSelectedTotal(s, CITIES)).toBe(444 + 168);
+  });
+
+  it('toggleMaster gdy wszystko zaznaczone — czyści', () => {
+    const all = CITIES.map((c) => c.city);
+    let s = toggleMaster(emptySelection(), all);
+    s = toggleMaster(s, all);
+    expect(hasAnySelection(s)).toBe(false);
+  });
+});
+
+describe('transportSelection — filtr uczestników', () => {
+  it('uczestnik z pełnego miasta jest zaznaczony niezależnie od regionu', () => {
+    const s = toggleCity(emptySelection(), 'Warszawa');
+    expect(isParticipantSelected(s, 'Warszawa', 'BEAVER')).toBe(true);
+    expect(isParticipantSelected(s, 'Warszawa', 'SAWA')).toBe(true);
+    expect(isParticipantSelected(s, 'Łódź', 'BEAVER')).toBe(false);
+  });
+
+  it('uczestnik z częściowego miasta tylko gdy region pasuje do zaznaczonego resortu', () => {
+    const s = toggleResortCell(emptySelection(), 'Warszawa', 'beaver', RESORTS);
+    expect(isParticipantSelected(s, 'Warszawa', 'BEAVER')).toBe(true);
+    expect(isParticipantSelected(s, 'Warszawa', 'SAWA')).toBe(false);
+  });
+});

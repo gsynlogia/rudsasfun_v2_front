@@ -89,7 +89,8 @@ export interface ParticipantRow {
   topic: string | null;
   tag: string | null;
   region: string | null;
-  city: string | null;
+  city: string | null;              // PRZYSTANEK (transport_cities.city)
+  participant_city: string | null;  // MIASTO zamieszkania (reservations.participant_city)
   transport_city_id: number | null;
   is_assigned: boolean;
 }

@@ -62,6 +62,18 @@ export async function getOrphanedAssignments(id: number): Promise<OrphanedAssign
     await authenticatedFetch(`${BASE}/connections/${id}/orphaned-assignments`), 'getOrphanedAssignments');
 }
 
+// ---------- AUTOMATYZACJA SEZONOWA (rozkaz Pana 2026-06-19) ----------
+// Miasta + uczestnicy generowani z całego sezonu (wszystkie aktywne turnusy) — bez „Dodaj połączenie".
+export async function getSeasonCities(direction: Direction): Promise<CityCounts[]> {
+  return jsonOrThrow(
+    await authenticatedFetch(`${BASE}/season/cities?direction=${direction}`), 'getSeasonCities');
+}
+
+export async function getSeasonParticipants(direction: Direction): Promise<ParticipantRow[]> {
+  return jsonOrThrow(
+    await authenticatedFetch(`${BASE}/season/participants?direction=${direction}`), 'getSeasonParticipants');
+}
+
 // ---------- TABORY ----------
 export async function listTabors(connectionId: number): Promise<Tabor[]> {
   return jsonOrThrow(await authenticatedFetch(`${BASE}/connections/${connectionId}/tabors`), 'listTabors');

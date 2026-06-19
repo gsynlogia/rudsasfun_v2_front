@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * Moduł „Listy transportowe" (Nr 21+) — główny widok admina.
- * Full HD, nieresponsywny (cały panel admina jest Full HD). Layout: górny pasek + pasek połączeń
- * (toggle kierunku Przyjazd/Powrót) + 3 strefy: Miasta | Uczestnicy | Tabor.
- * Panele wypełniane w kolejnych zadaniach (Nr 23-27). Tu: fundament layoutu + ładowanie połączeń.
+ * Moduł „Listy transportowe" — główny widok admina (1:1 z makietą Figma, dane realne z bazy).
+ * AUTOMATYZACJA (rozkaz Pana 2026-06-19): po wejściu tabela Miast wypełniona OD RAZU danymi CAŁEGO
+ * sezonu (wszystkie niezarchiwizowane turnusy) — bez ręcznego „Dodaj połączenie". Po wybraniu połączenia
+ * dane zawężają się do jego turnusów (fundament taborów/list zostaje). Zaznaczanie miast/resortów filtruje
+ * panel Uczestnicy (pusty gdy nic nie zaznaczone). Layout: pasek akcji + pasek połączeń (kierunek) + 3 strefy.
  */
 import {
   MapPin, Home, Plus, Users, Hash, GitCompare, ListChecks, Table2, Bus, AlertCircle, X,
@@ -14,8 +15,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Connection, Direction, CityCounts, ParticipantRow, Tabor } from '@/lib/types/transportLists';
 import {
   listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant, deleteTabor,
-  deleteConnection, setEarlyLeave, getEarlyLeaveStats,
+  deleteConnection, setEarlyLeave, getEarlyLeaveStats, getSeasonCities, getSeasonParticipants,
 } from '@/lib/services/transportListsApi';
+import {
+  type Resort, type SelectionState, emptySelection, toggleCity, toggleResortCell, toggleMaster,
+  hasAnySelection, calculateSelectedTotal, isParticipantSelected,
+} from '@/lib/utils/transportSelection';
 
 import AddConnectionModal from './transport/AddConnectionModal';
 import AddTaborModal from './transport/AddTaborModal';
@@ -28,7 +33,8 @@ import TransportCompareModal from './transport/TransportCompareModal';
 import TransportDocumentModal from './transport/TransportDocumentModal';
 import TransportListsModal from './transport/TransportListsModal';
 
-type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy (Nr 22)
+type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy
+const ALL_RESORTS: Resort[] = ['beaver', 'sawa', 'limba'];
 
 export default function TransportListsManagement() {
   const [direction, setDirection] = useState<Direction>('arrival');
@@ -38,87 +44,122 @@ export default function TransportListsManagement() {
   const [cities, setCities] = useState<CityCounts[]>([]);
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
   const [tabors, setTabors] = useState<Tabor[]>([]);
-  const [transferCityIds, setTransferCityIds] = useState<Set<number>>(new Set());
+  const [selection, setSelection] = useState<SelectionState>(emptySelection());     // zaznaczone miasta/resorty
+  const [transferCities, setTransferCities] = useState<Set<string>>(new Set());      // przesiadki (po nazwie)
   const [taborModalOpen, setTaborModalOpen] = useState(false);
   const [editingTabor, setEditingTabor] = useState<Tabor | null>(null);
-  const [openTaborId, setOpenTaborId] = useState<number | null>(null); // tabor przyjmujący uczestników (Nr 26)
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set()); // zaznaczeni uczestnicy do wsadzenia
-  const [reloadKey, setReloadKey] = useState(0); // wymusza re-fetch kart taborów (capacity/uczestnicy) po wsadzeniu
-  const [deleteTarget, setDeleteTarget] = useState<Tabor | null>(null); // tabor do usunięcia (Nr 29)
+  const [openTaborId, setOpenTaborId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [reloadKey, setReloadKey] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<Tabor | null>(null);
   const [overflowInfo, setOverflowInfo] = useState<{ capacity?: number; occupied?: number } | null>(null);
-  const [connModalOpen, setConnModalOpen] = useState(false); // modal Dodaj połączenie (Nr 30)
+  const [connModalOpen, setConnModalOpen] = useState(false);
   const [deleteConnTarget, setDeleteConnTarget] = useState<Connection | null>(null);
-  const [documentTabor, setDocumentTabor] = useState<Tabor | null>(null); // modal Wypuść listę (Nr 31-33)
-  const [listsModalOpen, setListsModalOpen] = useState(false); // modal Listy — historia (Nr 34)
-  const [compareOpen, setCompareOpen] = useState(false); // widok Porównaj (Nr 35)
-  const [earlyLeaveTarget, setEarlyLeaveTarget] = useState<number | null>(null); // wyjazd przed zakończeniem (Nr 36)
+  const [documentTabor, setDocumentTabor] = useState<Tabor | null>(null);
+  const [listsModalOpen, setListsModalOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [earlyLeaveTarget, setEarlyLeaveTarget] = useState<number | null>(null);
   const [earlyLeaveNote, setEarlyLeaveNote] = useState('');
   const [earlyLeaveCount, setEarlyLeaveCount] = useState(0);
-  const [columnsModalOpen, setColumnsModalOpen] = useState(false); // konfiguracja kolumn (Nr 37)
-  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['temat', 'przystanek', 'tag', 'region']));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const toggleTransfer = useCallback((cityId: number) => {
-    setTransferCityIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(cityId)) next.delete(cityId);
-      else next.add(cityId);
-      return next;
-    });
-  }, []);
-
   const loadConnections = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const data = await listConnections(direction);
       setConnections(data);
-      setActiveConnectionId((prev) =>
-        prev && data.some((c) => c.id === prev) ? prev : (data[0]?.id ?? null));
+      setActiveConnectionId((prev) => (prev && data.some((c) => c.id === prev) ? prev : null));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Błąd ładowania połączeń');
-    } finally {
-      setLoading(false);
     }
   }, [direction]);
 
-  useEffect(() => {
-    void loadConnections();
-  }, [loadConnections]);
+  useEffect(() => { void loadConnections(); }, [loadConnections]);
 
-  // Wspólny reload danych aktywnego połączenia (miasta + uczestnicy + tabory) — używany po wsadzaniu/edycji.
+  // Reload danych aktywnego źródła: SEZON (auto z bazy) gdy brak połączenia, inaczej dane połączenia.
   const reloadData = useCallback(async () => {
-    if (activeConnectionId == null) {
-      setCities([]); setParticipants([]); setTabors([]);
-      return;
+    setLoading(true);
+    try {
+      if (activeConnectionId == null) {
+        const [c, p] = await Promise.all([
+          getSeasonCities(direction).catch(() => [] as CityCounts[]),
+          getSeasonParticipants(direction).catch(() => [] as ParticipantRow[]),
+        ]);
+        setCities(c); setParticipants(p); setTabors([]);
+      } else {
+        const [c, p, t] = await Promise.all([
+          getConnectionCities(activeConnectionId).catch(() => [] as CityCounts[]),
+          getConnectionParticipants(activeConnectionId).catch(() => [] as ParticipantRow[]),
+          listTabors(activeConnectionId).catch(() => [] as Tabor[]),
+        ]);
+        setCities(c); setParticipants(p); setTabors(t);
+      }
+      setReloadKey((k) => k + 1);
+    } finally {
+      setLoading(false);
     }
-    const [c, p, t] = await Promise.all([
-      getConnectionCities(activeConnectionId).catch(() => [] as CityCounts[]),
-      getConnectionParticipants(activeConnectionId).catch(() => [] as ParticipantRow[]),
-      listTabors(activeConnectionId).catch(() => [] as Tabor[]),
-    ]);
-    setCities(c); setParticipants(p); setTabors(t);
-    setReloadKey((k) => k + 1); // odśwież karty taborów (occupied/uczestnicy)
-  }, [activeConnectionId]);
+  }, [activeConnectionId, direction]);
 
   useEffect(() => {
-    setTransferCityIds(new Set());  // stan per połączenie — reset przy zmianie
+    setTransferCities(new Set());
+    setSelection(emptySelection());
     setOpenTaborId(null);
     setSelectedIds(new Set());
     void reloadData();
   }, [reloadData]);
 
+  // ---------- agregaty + zaznaczanie ----------
+  const totals = useMemo(() => cities.reduce(
+    (acc, c) => ({
+      razem: acc.razem + c.razem, beaver: acc.beaver + c.beaver,
+      sawa: acc.sawa + c.sawa, limba: acc.limba + c.limba, nieprzyp: acc.nieprzyp + c.nieprzyp,
+    }),
+    { razem: 0, beaver: 0, sawa: 0, limba: 0, nieprzyp: 0 },
+  ), [cities]);
+
+  const visibleResorts = useMemo(() => ALL_RESORTS.filter((r) => totals[r] > 0), [totals]);
+  const allCityNames = useMemo(() => cities.map((c) => c.city), [cities]);
+  const hasSelection = hasAnySelection(selection);
+  const selectedTotal = useMemo(() => calculateSelectedTotal(selection, cities), [selection, cities]);
+  const assignMode = openTaborId != null;
+
+  // Uczestnicy panelu: w trybie taboru — wszyscy (do wsadzania); inaczej — przefiltrowani do zaznaczenia.
+  const displayedParticipants = useMemo(() => {
+    if (assignMode) return participants;
+    if (!hasSelection) return [];
+    return participants.filter((p) => isParticipantSelected(selection, p.city, p.region));
+  }, [assignMode, hasSelection, participants, selection]);
+
+  const onToggleCity = useCallback((city: string) => setSelection((s) => toggleCity(s, city)), []);
+  const onToggleResortCell = useCallback(
+    (city: string, resort: Resort) => setSelection((s) => toggleResortCell(s, city, resort, visibleResorts)),
+    [visibleResorts]);
+  const onToggleMaster = useCallback(() => setSelection((s) => toggleMaster(s, allCityNames)), [allCityNames]);
+
+  const onToggleTransfer = useCallback((city: string) => {
+    setTransferCities((prev) => {
+      const next = new Set(prev);
+      if (next.has(city)) next.delete(city); else next.add(city);
+      return next;
+    });
+  }, []);
+  const onToggleAllTransfers = useCallback(() => {
+    setTransferCities((prev) => {
+      const allChecked = allCityNames.length > 0 && allCityNames.every((c) => prev.has(c));
+      return allChecked ? new Set() : new Set(allCityNames);
+    });
+  }, [allCityNames]);
+
+  // ---------- tabor / wsadzanie (fundament — bez zmian zachowania) ----------
   const toggleSelect = useCallback((rid: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(rid)) next.delete(rid);
-      else next.add(rid);
+      if (next.has(rid)) next.delete(rid); else next.add(rid);
       return next;
     });
   }, []);
 
-  // Wsadź uczestników do otwartego taboru (Nr 26): assign każdego + reload. Overflow → modal (Nr 29).
   const assignToOpenTabor = useCallback(async (rids: number[]) => {
     if (openTaborId == null || rids.length === 0) return;
     let overflow: { capacity?: number; occupied?: number } | null = null;
@@ -131,14 +172,12 @@ export default function TransportListsManagement() {
     if (overflow) setOverflowInfo(overflow);
   }, [openTaborId, reloadData]);
 
-  // Wsadzenie pojedynczego uczestnika przez drag&drop na kartę taboru.
   const dropAssign = useCallback(async (taborId: number, rid: number) => {
     const r = await assignParticipant(taborId, rid);
     await reloadData();
     if (r.overflow) setOverflowInfo({ capacity: r.capacity, occupied: r.occupied });
   }, [reloadData]);
 
-  // Usuń tabor (Nr 29): po potwierdzeniu — deleteTabor + reload + zamknij otwarty jeśli usunięto.
   const confirmDeleteTabor = useCallback(async () => {
     if (deleteTarget == null) return;
     const id = deleteTarget.id;
@@ -148,22 +187,19 @@ export default function TransportListsManagement() {
     await reloadData();
   }, [deleteTarget, openTaborId, reloadData]);
 
-  // Nowe połączenie utworzone (Nr 30): odśwież listę i aktywuj (przełącz kierunek jeśli inny niż bieżący).
   const handleConnectionCreated = useCallback(async (conn: Connection) => {
     if (conn.direction === direction) {
       await loadConnections();
       setActiveConnectionId(conn.id);
     } else {
-      setDirection(conn.direction); // useEffect przeładuje listę nowego kierunku
+      setDirection(conn.direction);
     }
   }, [direction, loadConnections]);
 
-  // Statystyka „wyjazd przed zakończeniem" (Nr 36) — odświeżana razem z danymi (reloadKey).
   useEffect(() => {
     getEarlyLeaveStats().then((s) => setEarlyLeaveCount(s.early_leave_count)).catch(() => {});
   }, [reloadKey]);
 
-  // Oznacz „wyjazd przed zakończeniem" + notatka (Nr 36): uczestnik wypada z transportu powrotnego.
   const markEarlyLeave = useCallback(async () => {
     if (earlyLeaveTarget == null) return;
     const rid = earlyLeaveTarget;
@@ -174,7 +210,6 @@ export default function TransportListsManagement() {
     await reloadData();
   }, [earlyLeaveTarget, earlyLeaveNote, reloadData]);
 
-  // Usuń połączenie (Nr 30): CASCADE usuwa tabory + przypisania; lista i aktywne się odświeżają.
   const confirmDeleteConnection = useCallback(async () => {
     if (deleteConnTarget == null) return;
     const id = deleteConnTarget.id;
@@ -184,7 +219,6 @@ export default function TransportListsManagement() {
     await loadConnections();
   }, [deleteConnTarget, activeConnectionId, loadConnections]);
 
-  // Lookup imion uczestników (reservation_id → „Nazwisko Imię") dla kart taborów.
   const participantNames = useMemo(() => {
     const m = new Map<number, string>();
     for (const p of participants) {
@@ -193,13 +227,7 @@ export default function TransportListsManagement() {
     return m;
   }, [participants]);
 
-  const totals = useMemo(() => cities.reduce(
-    (acc, c) => ({
-      razem: acc.razem + c.razem, beaver: acc.beaver + c.beaver,
-      sawa: acc.sawa + c.sawa, limba: acc.limba + c.limba, nieprzyp: acc.nieprzyp + c.nieprzyp,
-    }),
-    { razem: 0, beaver: 0, sawa: 0, limba: 0, nieprzyp: 0 },
-  ), [cities]);
+  const middleTitle = assignMode || panelMode === 'participants' ? 'Uczestnicy' : 'Cyfry';
 
   return (
     <div className="flex flex-col gap-3" style={{ minWidth: 1280 }}>
@@ -223,25 +251,25 @@ export default function TransportListsManagement() {
           <button type="button" disabled={activeConnectionId == null}
             onClick={() => { setEditingTabor(null); setTaborModalOpen(true); }}
             className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-            title="Dodaj tabor">
+            title={activeConnectionId == null ? 'Najpierw wybierz/dodaj połączenie' : 'Dodaj tabor'}>
             <Plus className="h-4 w-4" /> Dodaj Tabor
           </button>
-          {/* Toggle Cyfry / Uczestnicy (Nr 22) */}
+          {/* Toggle Cyfry / Uczestnicy */}
           <div className="ml-2 flex overflow-hidden rounded-md border border-gray-300">
-            <button type="button" onClick={() => setPanelMode('numbers')}
+            <button type="button" onClick={() => setPanelMode('numbers')} data-testid="mode-numbers"
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
                 panelMode === 'numbers' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
               <Hash className="h-4 w-4" /> Cyfry
             </button>
-            <button type="button" onClick={() => setPanelMode('participants')}
+            <button type="button" onClick={() => setPanelMode('participants')} data-testid="mode-participants"
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
                 panelMode === 'participants' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
               <Users className="h-4 w-4" /> Uczestnicy
             </button>
           </div>
-          <button type="button" onClick={() => setColumnsModalOpen(true)} data-testid="open-columns"
-            className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            title="Konfiguracja kolumn tabeli uczestników">
+          <button type="button"
+            className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-400"
+            disabled title="Konfiguracja kolumn — wkrótce">
             <Table2 className="h-4 w-4" /> Tabela
           </button>
         </div>
@@ -250,6 +278,12 @@ export default function TransportListsManagement() {
       {/* ---------- PASEK POŁĄCZEŃ + TOGGLE KIERUNKU ---------- */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setActiveConnectionId(null)} data-testid="season-tab"
+            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium ${
+              activeConnectionId == null ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            title="Cały sezon — wszystkie aktywne turnusy">
+            Cały sezon
+          </button>
           {connections.map((c) => (
             <span key={c.id}
               className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium ${
@@ -266,17 +300,17 @@ export default function TransportListsManagement() {
           ))}
           <button type="button" onClick={() => setConnModalOpen(true)} data-testid="add-connection"
             className="flex items-center gap-1.5 rounded-md border border-dashed border-gray-400 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            title="Dodaj kolejne połączenie">
-            <Plus className="h-4 w-4" /> Dodaj kolejne połączenie
+            title="Dodaj połączenie (grupowanie turnusów do taborów/list)">
+            <Plus className="h-4 w-4" /> Dodaj połączenie
           </button>
         </div>
         <div className="flex overflow-hidden rounded-md border border-gray-300">
-          <button type="button" onClick={() => setDirection('arrival')}
+          <button type="button" onClick={() => setDirection('arrival')} data-testid="dir-arrival"
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
               direction === 'arrival' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
             <MapPin className="h-4 w-4" /> Przyjazd do ośrodka
           </button>
-          <button type="button" onClick={() => setDirection('return')}
+          <button type="button" onClick={() => setDirection('return')} data-testid="dir-return"
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
               direction === 'return' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
             <Home className="h-4 w-4" /> Powrót z ośrodka
@@ -284,60 +318,55 @@ export default function TransportListsManagement() {
         </div>
       </div>
 
-      {/* ---------- STANY ---------- */}
       {error && (
         <div className="flex items-center gap-2 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
           <AlertCircle className="h-4 w-4" /> {error}
         </div>
       )}
-      {loading && <div className="py-10 text-center text-gray-500">Ładowanie połączeń…</div>}
-
-      {!loading && connections.length === 0 && (
-        <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 py-12 text-center">
-          <Bus className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-          <p className="text-gray-600">
-            Brak połączeń dla kierunku „{direction === 'arrival' ? 'Przyjazd' : 'Powrót'}".
-          </p>
-          <p className="mt-1 text-sm text-gray-500">Dodaj pierwsze połączenie, aby zacząć układać listy.</p>
-        </div>
-      )}
+      {loading && <div className="py-10 text-center text-gray-500">Ładowanie danych transportu…</div>}
 
       {/* ---------- 3 STREFY (Full HD) ---------- */}
-      {!loading && connections.length > 0 && (
-        <div className="grid gap-3" style={{ gridTemplateColumns: '380px 1fr 420px' }}>
+      {!loading && (
+        <div className="grid gap-3" style={{ gridTemplateColumns: '540px 1fr 400px' }}>
           <Panel title="Miasta">
-            <CitiesPanel cities={cities} totals={totals}
-              transferCityIds={transferCityIds} onToggleTransfer={toggleTransfer} />
+            <CitiesPanel cities={cities} totals={totals} visibleResorts={visibleResorts}
+              selection={selection} onToggleCity={onToggleCity} onToggleResortCell={onToggleResortCell}
+              onToggleMaster={onToggleMaster} transferCities={transferCities}
+              onToggleTransfer={onToggleTransfer} onToggleAllTransfers={onToggleAllTransfers} />
           </Panel>
-          <Panel title={panelMode === 'numbers' ? 'Cyfry' : 'Uczestnicy'}>
-            {panelMode === 'numbers'
-              ? <NumbersView totals={totals} earlyLeaveCount={earlyLeaveCount} />
-              : <ParticipantsPanel participants={participants}
-                  assignMode={openTaborId != null} selectedIds={selectedIds}
-                  onToggleSelect={toggleSelect}
-                  onAssignSelected={() => void assignToOpenTabor([...selectedIds])}
-                  onEarlyLeave={(rid) => { setEarlyLeaveTarget(rid); setEarlyLeaveNote(''); }}
-                  visibleCols={visibleCols}
-                  onOpenReservation={(num) => { if (num && typeof window !== 'undefined') window.open(`/admin-panel/rezerwacja/${num}`, '_blank'); }} />}
+          <Panel title={middleTitle}>
+            <ParticipantsPanel participants={displayedParticipants} panelMode={panelMode}
+              hasSelection={hasSelection} selectedTotal={selectedTotal} assignMode={assignMode}
+              selectedIds={selectedIds} onToggleSelect={toggleSelect}
+              onAssignSelected={() => void assignToOpenTabor([...selectedIds])}
+              onEarlyLeave={(rid) => { setEarlyLeaveTarget(rid); setEarlyLeaveNote(''); }}
+              onOpenReservation={(num) => { if (num && typeof window !== 'undefined') window.open(`/admin-panel/rezerwacja/${num}`, '_blank'); }} />
           </Panel>
           <Panel title="Tabor">
-            <TaborPanel tabors={tabors} participantNames={participantNames} reloadKey={reloadKey}
-              openTaborId={openTaborId}
-              onOpenTabor={(id) => { setOpenTaborId(id); setPanelMode('participants'); }}
-              onDropAssign={(taborId, rid) => void dropAssign(taborId, rid)}
-              onEdit={(t) => { setEditingTabor(t); setTaborModalOpen(true); }}
-              onDelete={(t) => setDeleteTarget(t)}
-              onDocument={(t) => setDocumentTabor(t)} />
+            {activeConnectionId == null ? (
+              <div className="flex h-full flex-col items-center justify-center px-4 text-center text-gray-400">
+                <Bus className="mb-2 h-8 w-8" />
+                <p className="text-sm">Dane całego sezonu (podgląd).</p>
+                <p className="mt-1 text-xs">Dodaj połączenie, aby układać tabory i wypuszczać listy.</p>
+              </div>
+            ) : (
+              <TaborPanel tabors={tabors} participantNames={participantNames} reloadKey={reloadKey}
+                openTaborId={openTaborId}
+                onOpenTabor={(id) => { setOpenTaborId(id); setPanelMode('participants'); }}
+                onDropAssign={(taborId, rid) => void dropAssign(taborId, rid)}
+                onEdit={(t) => { setEditingTabor(t); setTaborModalOpen(true); }}
+                onDelete={(t) => setDeleteTarget(t)}
+                onDocument={(t) => setDocumentTabor(t)} />
+            )}
           </Panel>
         </div>
       )}
 
-      {/* Widget „łącznie poza aplikacją" (F12/U11) — widoczny w trybie Uczestnicy */}
-      {!loading && connections.length > 0 && panelMode === 'participants' && (
-        <div className="fixed bottom-8 right-8 z-40 rounded-xl bg-sky-600 px-5 py-3 text-white shadow-lg"
-          data-testid="total-widget">
-          <div className="text-xs uppercase tracking-wide opacity-90">Łącznie</div>
-          <div className="text-3xl font-bold leading-none">{totals.razem}</div>
+      {/* statystyka wyjazdu przed zakończeniem (dyskretna) */}
+      {!loading && (
+        <div className="text-right text-xs text-gray-500" data-testid="early-leave-stat">
+          Wyjazd przed zakończeniem (ogółem):{' '}
+          <span className={`font-semibold ${earlyLeaveCount > 0 ? 'text-red-600' : 'text-gray-700'}`}>{earlyLeaveCount}</span>
         </div>
       )}
 
@@ -364,37 +393,6 @@ export default function TransportListsManagement() {
       )}
       {listsModalOpen && <TransportListsModal onClose={() => setListsModalOpen(false)} />}
       {compareOpen && <TransportCompareModal onClose={() => setCompareOpen(false)} />}
-      {columnsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="columns-modal">
-          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
-            <h3 className="mb-3 text-lg font-semibold">Zarządzaj kolumnami tabeli</h3>
-            <p className="mb-2 text-xs text-gray-500">Kolumna „Uczestnik" jest zawsze widoczna.</p>
-            <div className="flex flex-col gap-2">
-              {[['temat', 'Temat obozu'], ['przystanek', 'Przystanek'], ['tag', 'Tag'], ['region', 'Region']].map(([key, label]) => (
-                <label key={key} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={visibleCols.has(key)} data-testid={`col-${key}`}
-                    onChange={() => setVisibleCols((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(key)) next.delete(key); else next.add(key);
-                      return next;
-                    })} />
-                  {label}
-                </label>
-              ))}
-            </div>
-            {/* Import listy — decyzja właściciela: nieaktywny w v1 */}
-            <button type="button" disabled data-testid="import-list"
-              className="mt-4 w-full rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-400"
-              title="Importuj listę — funkcja niedostępna w tej wersji">
-              Importuj listę (wkrótce)
-            </button>
-            <div className="mt-4 flex justify-end">
-              <button type="button" onClick={() => setColumnsModalOpen(false)}
-                className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white">Gotowe</button>
-            </div>
-          </div>
-        </div>
-      )}
       {earlyLeaveTarget != null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="early-leave-modal">
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
@@ -435,58 +433,13 @@ export default function TransportListsManagement() {
   );
 }
 
-/** Widok „Cyfry" (Radek) — wielka liczba ŁĄCZNIE + rozbicie per resort + nieprzypisani + wyjazd przed zakończeniem. */
-function NumbersView(
-  { totals, earlyLeaveCount }:
-  { totals: { razem: number; beaver: number; sawa: number; limba: number; nieprzyp: number }; earlyLeaveCount: number },
-) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4">
-      <div className="text-center">
-        <div className="text-xs uppercase tracking-wide text-gray-500">Łącznie uczestników</div>
-        <div className="text-7xl font-bold text-sky-600" data-testid="total-numbers">{totals.razem}</div>
-      </div>
-      <div className="flex gap-3 text-sm">
-        <ResortPill label="Beaver" value={totals.beaver} color="text-emerald-700 bg-emerald-50" />
-        <ResortPill label="Sawa" value={totals.sawa} color="text-blue-700 bg-blue-50" />
-        <ResortPill label="Limba" value={totals.limba} color="text-orange-700 bg-orange-50" />
-      </div>
-      <div className="text-sm text-gray-600">
-        Nieprzypisani do taboru:{' '}
-        <span className={`font-semibold ${totals.nieprzyp > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-          {totals.nieprzyp}
-        </span>
-      </div>
-      <div className="text-sm text-gray-600" data-testid="early-leave-stat">
-        Wyjazd przed zakończeniem (ogółem):{' '}
-        <span className={`font-semibold ${earlyLeaveCount > 0 ? 'text-red-600' : 'text-gray-700'}`}>{earlyLeaveCount}</span>
-      </div>
-    </div>
-  );
-}
-
-function ResortPill({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <span className={`rounded-md px-3 py-1.5 font-medium ${color}`}>{label}: {value}</span>
-  );
-}
-
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex min-h-[420px] flex-col rounded-lg border border-gray-200 bg-white">
+    <section className="flex min-h-[480px] flex-col rounded-lg border border-gray-200 bg-white">
       <header className="border-b border-gray-100 px-4 py-2.5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">{title}</h2>
       </header>
-      <div className="flex-1 p-4">{children}</div>
+      <div className="flex-1 p-3">{children}</div>
     </section>
-  );
-}
-
-function PlaceholderZone({ label, hint }: { label: string; hint?: string }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center text-center text-gray-400">
-      <p className="text-sm">{label}</p>
-      {hint && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
-    </div>
   );
 }
