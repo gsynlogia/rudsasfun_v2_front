@@ -9,10 +9,10 @@
 import {
   MapPin, Home, Plus, Users, Hash, GitCompare, ListChecks, Table2, Bus, AlertCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Connection, Direction } from '@/lib/types/transportLists';
-import { listConnections } from '@/lib/services/transportListsApi';
+import type { Connection, Direction, CityCounts } from '@/lib/types/transportLists';
+import { listConnections, getConnectionCities } from '@/lib/services/transportListsApi';
 
 type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy (Nr 22)
 
@@ -21,6 +21,7 @@ export default function TransportListsManagement() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [activeConnectionId, setActiveConnectionId] = useState<number | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>('numbers');
+  const [cities, setCities] = useState<CityCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +44,28 @@ export default function TransportListsManagement() {
     void loadConnections();
   }, [loadConnections]);
 
+  // Liczby per miasto dla aktywnego połączenia (zasilają widok Cyfry + widget ŁĄCZNIE)
+  useEffect(() => {
+    if (activeConnectionId == null) {
+      setCities([]);
+      return;
+    }
+    let cancelled = false;
+    getConnectionCities(activeConnectionId)
+      .then((data) => { if (!cancelled) setCities(data); })
+      .catch(() => { if (!cancelled) setCities([]); });
+    return () => { cancelled = true; };
+  }, [activeConnectionId]);
+
   const activeConnection = connections.find((c) => c.id === activeConnectionId) ?? null;
+
+  const totals = useMemo(() => cities.reduce(
+    (acc, c) => ({
+      razem: acc.razem + c.razem, beaver: acc.beaver + c.beaver,
+      sawa: acc.sawa + c.sawa, limba: acc.limba + c.limba, nieprzyp: acc.nieprzyp + c.nieprzyp,
+    }),
+    { razem: 0, beaver: 0, sawa: 0, limba: 0, nieprzyp: 0 },
+  ), [cities]);
 
   return (
     <div className="flex flex-col gap-3" style={{ minWidth: 1280 }}>
@@ -148,14 +170,54 @@ export default function TransportListsManagement() {
               hint={activeConnection ? `Połączenie: ${activeConnection.name}` : undefined} />
           </Panel>
           <Panel title={panelMode === 'numbers' ? 'Cyfry' : 'Uczestnicy'}>
-            <PlaceholderZone label="Lista uczestników / agregaty (Nr 25-26)" />
+            {panelMode === 'numbers'
+              ? <NumbersView totals={totals} />
+              : <PlaceholderZone label="Imienna lista uczestników (Nr 25-26)" />}
           </Panel>
           <Panel title="Tabor">
             <PlaceholderZone label="Karty taborów + wsadzanie (Nr 27-29)" />
           </Panel>
         </div>
       )}
+
+      {/* Widget „łącznie poza aplikacją" (F12/U11) — widoczny w trybie Uczestnicy */}
+      {!loading && connections.length > 0 && panelMode === 'participants' && (
+        <div className="fixed bottom-8 right-8 z-40 rounded-xl bg-sky-600 px-5 py-3 text-white shadow-lg"
+          data-testid="total-widget">
+          <div className="text-xs uppercase tracking-wide opacity-90">Łącznie</div>
+          <div className="text-3xl font-bold leading-none">{totals.razem}</div>
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Widok „Cyfry" (Radek) — wielka liczba ŁĄCZNIE + rozbicie per resort + nieprzypisani. */
+function NumbersView({ totals }: { totals: { razem: number; beaver: number; sawa: number; limba: number; nieprzyp: number } }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4">
+      <div className="text-center">
+        <div className="text-xs uppercase tracking-wide text-gray-500">Łącznie uczestników</div>
+        <div className="text-7xl font-bold text-sky-600" data-testid="total-numbers">{totals.razem}</div>
+      </div>
+      <div className="flex gap-3 text-sm">
+        <ResortPill label="Beaver" value={totals.beaver} color="text-emerald-700 bg-emerald-50" />
+        <ResortPill label="Sawa" value={totals.sawa} color="text-blue-700 bg-blue-50" />
+        <ResortPill label="Limba" value={totals.limba} color="text-orange-700 bg-orange-50" />
+      </div>
+      <div className="text-sm text-gray-600">
+        Nieprzypisani do taboru:{' '}
+        <span className={`font-semibold ${totals.nieprzyp > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+          {totals.nieprzyp}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ResortPill({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <span className={`rounded-md px-3 py-1.5 font-medium ${color}`}>{label}: {value}</span>
   );
 }
 
