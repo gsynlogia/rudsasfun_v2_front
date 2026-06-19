@@ -254,16 +254,22 @@ export default function TransportListsManagement() {
             title={activeConnectionId == null ? 'Najpierw wybierz/dodaj połączenie' : 'Dodaj tabor'}>
             <Plus className="h-4 w-4" /> Dodaj Tabor
           </button>
-          {/* Toggle Cyfry / Uczestnicy */}
-          <div className="ml-2 flex overflow-hidden rounded-md border border-gray-300">
+          {/* Toggle Cyfry / Uczestnicy — switch 1:1 z makietą (Cyfry ⬤ Uczestnicy) */}
+          <div className="ml-2 flex items-center gap-2">
             <button type="button" onClick={() => setPanelMode('numbers')} data-testid="mode-numbers"
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
-                panelMode === 'numbers' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
+              className={`flex items-center gap-1 text-sm font-medium ${
+                panelMode === 'numbers' ? 'text-[#00adee]' : 'text-gray-500'}`}>
               <Hash className="h-4 w-4" /> Cyfry
             </button>
+            <label className="relative inline-flex cursor-pointer items-center" title="Przełącz Cyfry / Uczestnicy">
+              <input type="checkbox" className="peer sr-only" data-testid="mode-switch"
+                checked={panelMode === 'participants'}
+                onChange={(e) => setPanelMode(e.target.checked ? 'participants' : 'numbers')} />
+              <div className="h-7 w-14 rounded-full bg-gray-200 transition-colors peer-checked:bg-[#00adee] after:absolute after:left-0.5 after:top-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-7" />
+            </label>
             <button type="button" onClick={() => setPanelMode('participants')} data-testid="mode-participants"
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
-                panelMode === 'participants' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
+              className={`flex items-center gap-1 text-sm font-medium ${
+                panelMode === 'participants' ? 'text-[#00adee]' : 'text-gray-500'}`}>
               <Users className="h-4 w-4" /> Uczestnicy
             </button>
           </div>
