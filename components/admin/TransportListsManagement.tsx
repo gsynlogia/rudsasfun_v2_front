@@ -11,10 +11,11 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Connection, Direction, CityCounts } from '@/lib/types/transportLists';
-import { listConnections, getConnectionCities } from '@/lib/services/transportListsApi';
+import type { Connection, Direction, CityCounts, ParticipantRow } from '@/lib/types/transportLists';
+import { listConnections, getConnectionCities, getConnectionParticipants } from '@/lib/services/transportListsApi';
 
 import CitiesPanel from './transport/CitiesPanel';
+import ParticipantsPanel from './transport/ParticipantsPanel';
 
 type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy (Nr 22)
 
@@ -24,6 +25,7 @@ export default function TransportListsManagement() {
   const [activeConnectionId, setActiveConnectionId] = useState<number | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>('numbers');
   const [cities, setCities] = useState<CityCounts[]>([]);
+  const [participants, setParticipants] = useState<ParticipantRow[]>([]);
   const [transferCityIds, setTransferCityIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,12 +63,16 @@ export default function TransportListsManagement() {
     setTransferCityIds(new Set()); // przesiadki są per połączenie — reset przy zmianie
     if (activeConnectionId == null) {
       setCities([]);
+      setParticipants([]);
       return;
     }
     let cancelled = false;
     getConnectionCities(activeConnectionId)
       .then((data) => { if (!cancelled) setCities(data); })
       .catch(() => { if (!cancelled) setCities([]); });
+    getConnectionParticipants(activeConnectionId)
+      .then((data) => { if (!cancelled) setParticipants(data); })
+      .catch(() => { if (!cancelled) setParticipants([]); });
     return () => { cancelled = true; };
   }, [activeConnectionId]);
 
@@ -183,7 +189,7 @@ export default function TransportListsManagement() {
           <Panel title={panelMode === 'numbers' ? 'Cyfry' : 'Uczestnicy'}>
             {panelMode === 'numbers'
               ? <NumbersView totals={totals} />
-              : <PlaceholderZone label="Imienna lista uczestników (Nr 25-26)" />}
+              : <ParticipantsPanel participants={participants} />}
           </Panel>
           <Panel title="Tabor">
             <PlaceholderZone label="Karty taborów + wsadzanie (Nr 27-29)" />
