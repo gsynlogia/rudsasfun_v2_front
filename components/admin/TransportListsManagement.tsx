@@ -14,6 +14,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Connection, Direction, CityCounts } from '@/lib/types/transportLists';
 import { listConnections, getConnectionCities } from '@/lib/services/transportListsApi';
 
+import CitiesPanel from './transport/CitiesPanel';
+
 type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy (Nr 22)
 
 export default function TransportListsManagement() {
@@ -56,8 +58,6 @@ export default function TransportListsManagement() {
       .catch(() => { if (!cancelled) setCities([]); });
     return () => { cancelled = true; };
   }, [activeConnectionId]);
-
-  const activeConnection = connections.find((c) => c.id === activeConnectionId) ?? null;
 
   const totals = useMemo(() => cities.reduce(
     (acc, c) => ({
@@ -166,8 +166,7 @@ export default function TransportListsManagement() {
       {!loading && connections.length > 0 && (
         <div className="grid gap-3" style={{ gridTemplateColumns: '380px 1fr 420px' }}>
           <Panel title="Miasta">
-            <PlaceholderZone label="Tabela miast + liczby per resort (Nr 23-24)"
-              hint={activeConnection ? `Połączenie: ${activeConnection.name}` : undefined} />
+            <CitiesPanel cities={cities} totals={totals} />
           </Panel>
           <Panel title={panelMode === 'numbers' ? 'Cyfry' : 'Uczestnicy'}>
             {panelMode === 'numbers'
