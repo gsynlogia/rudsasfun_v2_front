@@ -27,6 +27,10 @@ async function jsonOrThrow<T>(res: Response, context: string): Promise<T> {
 }
 
 // ---------- POŁĄCZENIA ----------
+export async function getAvailableTags(): Promise<string[]> {
+  return jsonOrThrow(await authenticatedFetch(`${BASE}/tags`), 'getAvailableTags');
+}
+
 export async function listConnections(direction?: Direction): Promise<Connection[]> {
   const q = direction ? `?direction=${direction}` : '';
   return jsonOrThrow(await authenticatedFetch(`${BASE}/connections${q}`), 'listConnections');

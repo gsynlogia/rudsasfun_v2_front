@@ -7,15 +7,17 @@
  * Panele wypełniane w kolejnych zadaniach (Nr 23-27). Tu: fundament layoutu + ładowanie połączeń.
  */
 import {
-  MapPin, Home, Plus, Users, Hash, GitCompare, ListChecks, Table2, Bus, AlertCircle,
+  MapPin, Home, Plus, Users, Hash, GitCompare, ListChecks, Table2, Bus, AlertCircle, X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Connection, Direction, CityCounts, ParticipantRow, Tabor } from '@/lib/types/transportLists';
 import {
   listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant, deleteTabor,
+  deleteConnection,
 } from '@/lib/services/transportListsApi';
 
+import AddConnectionModal from './transport/AddConnectionModal';
 import AddTaborModal from './transport/AddTaborModal';
 import CitiesPanel from './transport/CitiesPanel';
 import DeleteTaborModal from './transport/DeleteTaborModal';
@@ -41,6 +43,8 @@ export default function TransportListsManagement() {
   const [reloadKey, setReloadKey] = useState(0); // wymusza re-fetch kart taborów (capacity/uczestnicy) po wsadzeniu
   const [deleteTarget, setDeleteTarget] = useState<Tabor | null>(null); // tabor do usunięcia (Nr 29)
   const [overflowInfo, setOverflowInfo] = useState<{ capacity?: number; occupied?: number } | null>(null);
+  const [connModalOpen, setConnModalOpen] = useState(false); // modal Dodaj połączenie (Nr 30)
+  const [deleteConnTarget, setDeleteConnTarget] = useState<Connection | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -133,6 +137,26 @@ export default function TransportListsManagement() {
     await reloadData();
   }, [deleteTarget, openTaborId, reloadData]);
 
+  // Nowe połączenie utworzone (Nr 30): odśwież listę i aktywuj (przełącz kierunek jeśli inny niż bieżący).
+  const handleConnectionCreated = useCallback(async (conn: Connection) => {
+    if (conn.direction === direction) {
+      await loadConnections();
+      setActiveConnectionId(conn.id);
+    } else {
+      setDirection(conn.direction); // useEffect przeładuje listę nowego kierunku
+    }
+  }, [direction, loadConnections]);
+
+  // Usuń połączenie (Nr 30): CASCADE usuwa tabory + przypisania; lista i aktywne się odświeżają.
+  const confirmDeleteConnection = useCallback(async () => {
+    if (deleteConnTarget == null) return;
+    const id = deleteConnTarget.id;
+    setDeleteConnTarget(null);
+    await deleteConnection(id);
+    if (activeConnectionId === id) setActiveConnectionId(null);
+    await loadConnections();
+  }, [deleteConnTarget, activeConnectionId, loadConnections]);
+
   // Lookup imion uczestników (reservation_id → „Nazwisko Imię") dla kart taborów.
   const participantNames = useMemo(() => {
     const m = new Map<number, string>();
@@ -200,17 +224,22 @@ export default function TransportListsManagement() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {connections.map((c) => (
-            <button key={c.id} type="button" onClick={() => setActiveConnectionId(c.id)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                c.id === activeConnectionId
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-              {c.name}{c.date ? ` · ${c.date}` : ''}
-            </button>
+            <span key={c.id}
+              className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium ${
+                c.id === activeConnectionId ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}>
+              <button type="button" onClick={() => setActiveConnectionId(c.id)}>
+                {c.name}{c.date ? ` · ${c.date}` : ''}
+              </button>
+              <button type="button" title="Usuń połączenie" data-testid="connection-delete"
+                onClick={() => setDeleteConnTarget(c)}
+                className={`ml-0.5 rounded ${c.id === activeConnectionId ? 'hover:bg-white/20' : 'hover:bg-gray-300'}`}>
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </span>
           ))}
-          <button type="button" disabled
-            className="flex items-center gap-1.5 rounded-md border border-dashed border-gray-400 px-3 py-1.5 text-sm font-medium text-gray-600 opacity-70"
-            title="Dodaj kolejne połączenie (wkrótce — Nr 30)">
+          <button type="button" onClick={() => setConnModalOpen(true)} data-testid="add-connection"
+            className="flex items-center gap-1.5 rounded-md border border-dashed border-gray-400 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            title="Dodaj kolejne połączenie">
             <Plus className="h-4 w-4" /> Dodaj kolejne połączenie
           </button>
         </div>
@@ -293,6 +322,27 @@ export default function TransportListsManagement() {
       {overflowInfo && (
         <TaborOverflowModal capacity={overflowInfo.capacity} occupied={overflowInfo.occupied}
           onClose={() => setOverflowInfo(null)} />
+      )}
+      {connModalOpen && (
+        <AddConnectionModal defaultDirection={direction}
+          onClose={() => setConnModalOpen(false)} onCreated={(c) => void handleConnectionCreated(c)} />
+      )}
+      {deleteConnTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="delete-connection-modal">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+            <h3 className="mb-2 text-lg font-semibold text-red-700">Usuń połączenie</h3>
+            <p className="text-sm text-gray-700">
+              Czy na pewno usunąć połączenie <span className="font-semibold">{deleteConnTarget.name}</span>?
+            </p>
+            <p className="mt-2 text-sm text-gray-500">Usunięte zostaną też tabory i przypisania tego połączenia. Wypuszczone listy zostają.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteConnTarget(null)}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm">Anuluj</button>
+              <button type="button" onClick={() => void confirmDeleteConnection()} data-testid="delete-connection-confirm"
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white">Usuń połączenie</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
