@@ -5,7 +5,7 @@
  * Nr 25: kolumny UCZESTNIK|TEMAT|PRZYSTANEK|TAG|REGION + filtr i sort na każdej; nieprzypisani u góry, przypisani wyszarzeni.
  * Nr 26: gdy tabor otwarty (assignMode) → checkboxy zaznaczania + „Przenieś do taboru (N)" + „Zaznacz tematami" + drag&drop.
  */
-import { ChevronsUpDown, ChevronUp, ChevronDown, MoveRight } from 'lucide-react';
+import { ChevronsUpDown, ChevronUp, ChevronDown, MoveRight, AlertTriangle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type { ParticipantRow } from '@/lib/types/transportLists';
@@ -28,10 +28,11 @@ interface Props {
   selectedIds: Set<number>;
   onToggleSelect: (rid: number) => void;
   onAssignSelected: () => void;
+  onEarlyLeave: (rid: number) => void;
 }
 
 export default function ParticipantsPanel(
-  { participants, assignMode, selectedIds, onToggleSelect, onAssignSelected }: Props,
+  { participants, assignMode, selectedIds, onToggleSelect, onAssignSelected, onEarlyLeave }: Props,
 ) {
   const [sortKey, setSortKey] = useState<string>('uczestnik');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -119,6 +120,7 @@ export default function ParticipantsPanel(
                   </button>
                 </th>
               ))}
+              {!assignMode && <th className="px-2 py-2 text-right">Akcja</th>}
             </tr>
             <tr className="border-b border-gray-100">
               {assignMode && <th />}
@@ -129,6 +131,7 @@ export default function ParticipantsPanel(
                     className="w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs font-normal" />
                 </th>
               ))}
+              {!assignMode && <th />}
             </tr>
           </thead>
           <tbody>
@@ -154,6 +157,15 @@ export default function ParticipantsPanel(
                   {p.tag && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-700">{p.tag}</span>}
                 </td>
                 <td className="px-2 py-1.5 text-xs text-gray-500">{p.region ?? '—'}</td>
+                {!assignMode && (
+                  <td className="px-2 py-1.5 text-right">
+                    <button type="button" title="Wyjazd przed zakończeniem" data-testid="early-leave-btn"
+                      onClick={() => onEarlyLeave(p.reservation_id)}
+                      className="rounded bg-red-600 px-1.5 py-1 text-white hover:bg-red-700">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

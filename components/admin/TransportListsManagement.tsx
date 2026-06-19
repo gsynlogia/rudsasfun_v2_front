@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Connection, Direction, CityCounts, ParticipantRow, Tabor } from '@/lib/types/transportLists';
 import {
   listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant, deleteTabor,
-  deleteConnection,
+  deleteConnection, setEarlyLeave, getEarlyLeaveStats,
 } from '@/lib/services/transportListsApi';
 
 import AddConnectionModal from './transport/AddConnectionModal';
@@ -51,6 +51,9 @@ export default function TransportListsManagement() {
   const [documentTabor, setDocumentTabor] = useState<Tabor | null>(null); // modal Wypuść listę (Nr 31-33)
   const [listsModalOpen, setListsModalOpen] = useState(false); // modal Listy — historia (Nr 34)
   const [compareOpen, setCompareOpen] = useState(false); // widok Porównaj (Nr 35)
+  const [earlyLeaveTarget, setEarlyLeaveTarget] = useState<number | null>(null); // wyjazd przed zakończeniem (Nr 36)
+  const [earlyLeaveNote, setEarlyLeaveNote] = useState('');
+  const [earlyLeaveCount, setEarlyLeaveCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,6 +155,22 @@ export default function TransportListsManagement() {
       setDirection(conn.direction); // useEffect przeładuje listę nowego kierunku
     }
   }, [direction, loadConnections]);
+
+  // Statystyka „wyjazd przed zakończeniem" (Nr 36) — odświeżana razem z danymi (reloadKey).
+  useEffect(() => {
+    getEarlyLeaveStats().then((s) => setEarlyLeaveCount(s.early_leave_count)).catch(() => {});
+  }, [reloadKey]);
+
+  // Oznacz „wyjazd przed zakończeniem" + notatka (Nr 36): uczestnik wypada z transportu powrotnego.
+  const markEarlyLeave = useCallback(async () => {
+    if (earlyLeaveTarget == null) return;
+    const rid = earlyLeaveTarget;
+    const note = earlyLeaveNote;
+    setEarlyLeaveTarget(null);
+    setEarlyLeaveNote('');
+    await setEarlyLeave(rid, true, note || undefined);
+    await reloadData();
+  }, [earlyLeaveTarget, earlyLeaveNote, reloadData]);
 
   // Usuń połączenie (Nr 30): CASCADE usuwa tabory + przypisania; lista i aktywne się odświeżają.
   const confirmDeleteConnection = useCallback(async () => {
@@ -290,11 +309,12 @@ export default function TransportListsManagement() {
           </Panel>
           <Panel title={panelMode === 'numbers' ? 'Cyfry' : 'Uczestnicy'}>
             {panelMode === 'numbers'
-              ? <NumbersView totals={totals} />
+              ? <NumbersView totals={totals} earlyLeaveCount={earlyLeaveCount} />
               : <ParticipantsPanel participants={participants}
                   assignMode={openTaborId != null} selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
-                  onAssignSelected={() => void assignToOpenTabor([...selectedIds])} />}
+                  onAssignSelected={() => void assignToOpenTabor([...selectedIds])}
+                  onEarlyLeave={(rid) => { setEarlyLeaveTarget(rid); setEarlyLeaveNote(''); }} />}
           </Panel>
           <Panel title="Tabor">
             <TaborPanel tabors={tabors} participantNames={participantNames} reloadKey={reloadKey}
@@ -340,6 +360,25 @@ export default function TransportListsManagement() {
       )}
       {listsModalOpen && <TransportListsModal onClose={() => setListsModalOpen(false)} />}
       {compareOpen && <TransportCompareModal onClose={() => setCompareOpen(false)} />}
+      {earlyLeaveTarget != null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="early-leave-modal">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+            <h3 className="mb-2 flex items-center gap-2 text-lg font-semibold text-red-700">
+              <AlertCircle className="h-5 w-5" /> Wyjazd przed zakończeniem
+            </h3>
+            <p className="text-sm text-gray-600">Uczestnik zostanie wykluczony z transportu powrotnego. Podaj powód:</p>
+            <textarea value={earlyLeaveNote} onChange={(e) => setEarlyLeaveNote(e.target.value)} rows={3}
+              placeholder="np. odbiór własny 3 dni przed końcem turnusu"
+              className="mt-2 w-full rounded border border-gray-300 p-2 text-sm" data-testid="early-leave-note" />
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setEarlyLeaveTarget(null)}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm">Anuluj</button>
+              <button type="button" onClick={() => void markEarlyLeave()} data-testid="early-leave-confirm"
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white">Oznacz</button>
+            </div>
+          </div>
+        </div>
+      )}
       {deleteConnTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="delete-connection-modal">
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
@@ -361,8 +400,11 @@ export default function TransportListsManagement() {
   );
 }
 
-/** Widok „Cyfry" (Radek) — wielka liczba ŁĄCZNIE + rozbicie per resort + nieprzypisani. */
-function NumbersView({ totals }: { totals: { razem: number; beaver: number; sawa: number; limba: number; nieprzyp: number } }) {
+/** Widok „Cyfry" (Radek) — wielka liczba ŁĄCZNIE + rozbicie per resort + nieprzypisani + wyjazd przed zakończeniem. */
+function NumbersView(
+  { totals, earlyLeaveCount }:
+  { totals: { razem: number; beaver: number; sawa: number; limba: number; nieprzyp: number }; earlyLeaveCount: number },
+) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4">
       <div className="text-center">
@@ -379,6 +421,10 @@ function NumbersView({ totals }: { totals: { razem: number; beaver: number; sawa
         <span className={`font-semibold ${totals.nieprzyp > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
           {totals.nieprzyp}
         </span>
+      </div>
+      <div className="text-sm text-gray-600" data-testid="early-leave-stat">
+        Wyjazd przed zakończeniem (ogółem):{' '}
+        <span className={`font-semibold ${earlyLeaveCount > 0 ? 'text-red-600' : 'text-gray-700'}`}>{earlyLeaveCount}</span>
       </div>
     </div>
   );
