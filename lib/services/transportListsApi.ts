@@ -102,8 +102,13 @@ export async function assignParticipant(
     let occupied: number | undefined;
     try {
       const body = await res.json();
-      capacity = body?.detail?.capacity;
-      occupied = body?.detail?.occupied;
+      // Globalny handler API serializuje detail-dict jako string (repr z ' '), więc parsujemy oba warianty.
+      let detail = body?.detail;
+      if (typeof detail === 'string') {
+        try { detail = JSON.parse(detail.replace(/'/g, '"')); } catch { detail = null; }
+      }
+      capacity = detail?.capacity;
+      occupied = detail?.occupied;
     } catch { /* brak body */ }
     return { ok: false, overflow: true, capacity, occupied };
   }
