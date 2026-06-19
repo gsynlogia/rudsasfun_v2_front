@@ -24,6 +24,7 @@ import DeleteTaborModal from './transport/DeleteTaborModal';
 import ParticipantsPanel from './transport/ParticipantsPanel';
 import TaborOverflowModal from './transport/TaborOverflowModal';
 import TaborPanel from './transport/TaborPanel';
+import TransportCompareModal from './transport/TransportCompareModal';
 import TransportDocumentModal from './transport/TransportDocumentModal';
 import TransportListsModal from './transport/TransportListsModal';
 
@@ -49,6 +50,7 @@ export default function TransportListsManagement() {
   const [deleteConnTarget, setDeleteConnTarget] = useState<Connection | null>(null);
   const [documentTabor, setDocumentTabor] = useState<Tabor | null>(null); // modal Wypuść listę (Nr 31-33)
   const [listsModalOpen, setListsModalOpen] = useState(false); // modal Listy — historia (Nr 34)
+  const [compareOpen, setCompareOpen] = useState(false); // widok Porównaj (Nr 35)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -187,9 +189,9 @@ export default function TransportListsManagement() {
           <h1 className="text-xl font-semibold text-gray-900">Listy transportowe</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" disabled
-            className="flex items-center gap-1.5 rounded-md bg-violet-600/90 px-3 py-1.5 text-sm font-medium text-white opacity-60"
-            title="Porównaj połączenia (wkrótce — Nr 35)">
+          <button type="button" onClick={() => setCompareOpen(true)} data-testid="open-compare"
+            className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white"
+            title="Porównaj połączenia">
             <GitCompare className="h-4 w-4" /> Porównaj
           </button>
           <button type="button" onClick={() => setListsModalOpen(true)} data-testid="open-lists"
@@ -337,6 +339,7 @@ export default function TransportListsManagement() {
           onClose={() => setDocumentTabor(null)} onApproved={() => void reloadData()} />
       )}
       {listsModalOpen && <TransportListsModal onClose={() => setListsModalOpen(false)} />}
+      {compareOpen && <TransportCompareModal onClose={() => setCompareOpen(false)} />}
       {deleteConnTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="delete-connection-modal">
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
