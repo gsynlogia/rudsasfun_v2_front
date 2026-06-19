@@ -6,7 +6,9 @@
  * Rozwinięcie: miejsca wychowawców W1..Wn (fioletowe, kierownik na W1) + miejsca uczestników 1..N + „Wolne miejsce".
  * Akcje Edytuj/Usuń/Dokument = Nr 28-31 (podpięcie później). Wsadzanie (drag&drop) = Nr 26.
  */
-import { ChevronDown, ChevronRight, Pencil, Trash2, FileText, CheckCircle2 } from 'lucide-react';
+import {
+  ChevronDown, ChevronRight, Pencil, Trash2, FileText, CheckCircle2, PackagePlus,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import type { Tabor, TaborCapacity, TaborParticipant } from '@/lib/types/transportLists';
@@ -20,9 +22,15 @@ interface TaborPanelProps {
   tabors: Tabor[];
   participantNames: Map<number, string>;
   onEdit: (tabor: Tabor) => void;
+  openTaborId: number | null;
+  onOpenTabor: (id: number) => void;
+  onDropAssign: (taborId: number, reservationId: number) => void;
+  reloadKey: number;
 }
 
-export default function TaborPanel({ tabors, participantNames, onEdit }: TaborPanelProps) {
+export default function TaborPanel(
+  { tabors, participantNames, onEdit, openTaborId, onOpenTabor, onDropAssign, reloadKey }: TaborPanelProps,
+) {
   if (tabors.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-gray-400" data-testid="tabor-empty">
@@ -33,17 +41,27 @@ export default function TaborPanel({ tabors, participantNames, onEdit }: TaborPa
   return (
     <div className="flex flex-col gap-3" data-testid="tabor-panel">
       {tabors.map((t) => (
-        <TaborCard key={t.id} tabor={t} participantNames={participantNames} onEdit={onEdit} />
+        <TaborCard key={t.id} tabor={t} participantNames={participantNames} onEdit={onEdit} reloadKey={reloadKey}
+          isOpen={openTaborId === t.id} onOpen={() => onOpenTabor(t.id)}
+          onDrop={(rid) => onDropAssign(t.id, rid)} />
       ))}
     </div>
   );
 }
 
-function TaborCard(
-  { tabor, participantNames, onEdit }:
-  { tabor: Tabor; participantNames: Map<number, string>; onEdit: (tabor: Tabor) => void },
-) {
+interface TaborCardProps {
+  tabor: Tabor;
+  participantNames: Map<number, string>;
+  onEdit: (tabor: Tabor) => void;
+  isOpen: boolean;
+  onOpen: () => void;
+  onDrop: (reservationId: number) => void;
+  reloadKey: number;
+}
+
+function TaborCard({ tabor, participantNames, onEdit, isOpen, onOpen, onDrop, reloadKey }: TaborCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [capacity, setCapacity] = useState<TaborCapacity | null>(null);
   const [assigned, setAssigned] = useState<TaborParticipant[]>([]);
 
@@ -52,13 +70,22 @@ function TaborCard(
     getTaborCapacity(tabor.id).then((c) => { if (!cancelled) setCapacity(c); }).catch(() => {});
     listTaborParticipants(tabor.id).then((p) => { if (!cancelled) setAssigned(p); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [tabor.id]);
+  }, [tabor.id, reloadKey]);
 
   const occupied = assigned.length;
   const capValue = capacity?.capacity ?? Math.max(0, tabor.seats - tabor.supervisor_seats);
 
   return (
-    <div className="rounded-lg border border-gray-200" data-testid="tabor-card">
+    <div data-testid="tabor-card"
+      className={`rounded-lg border ${isOpen ? 'border-sky-500 ring-2 ring-sky-200' : 'border-gray-200'} ${
+        dragOver ? 'bg-sky-50' : ''}`}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault(); setDragOver(false);
+        const rid = Number(e.dataTransfer.getData('text/plain'));
+        if (rid) onDrop(rid);
+      }}>
       <div className="flex items-start gap-2 px-3 py-2">
         <button type="button" onClick={() => setExpanded((e) => !e)} className="flex flex-1 items-start gap-2 text-left">
           {expanded ? <ChevronDown className="mt-0.5 h-4 w-4 text-gray-400" /> : <ChevronRight className="mt-0.5 h-4 w-4 text-gray-400" />}
@@ -82,6 +109,11 @@ function TaborCard(
           </div>
         </button>
         <span className="flex gap-1">
+          <button type="button" title={isOpen ? 'Tabor otwarty — wsadzaj uczestników' : 'Otwórz do wsadzania'}
+            onClick={onOpen} data-testid="tabor-open"
+            className={`rounded p-1 ${isOpen ? 'bg-sky-100 text-sky-700' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700'}`}>
+            <PackagePlus className="h-4 w-4" />
+          </button>
           <button type="button" title="Edytuj" onClick={() => onEdit(tabor)}
             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700" data-testid="tabor-edit">
             <Pencil className="h-4 w-4" />

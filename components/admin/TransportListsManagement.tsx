@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Connection, Direction, CityCounts, ParticipantRow, Tabor } from '@/lib/types/transportLists';
 import {
-  listConnections, getConnectionCities, getConnectionParticipants, listTabors,
+  listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant,
 } from '@/lib/services/transportListsApi';
 
 import AddTaborModal from './transport/AddTaborModal';
@@ -34,11 +34,9 @@ export default function TransportListsManagement() {
   const [transferCityIds, setTransferCityIds] = useState<Set<number>>(new Set());
   const [taborModalOpen, setTaborModalOpen] = useState(false);
   const [editingTabor, setEditingTabor] = useState<Tabor | null>(null);
-
-  const refreshTabors = useCallback(() => {
-    if (activeConnectionId == null) return;
-    listTabors(activeConnectionId).then(setTabors).catch(() => setTabors([]));
-  }, [activeConnectionId]);
+  const [openTaborId, setOpenTaborId] = useState<number | null>(null); // tabor przyjmujący uczestników (Nr 26)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set()); // zaznaczeni uczestnicy do wsadzenia
+  const [reloadKey, setReloadKey] = useState(0); // wymusza re-fetch kart taborów (capacity/uczestnicy) po wsadzeniu
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,27 +68,56 @@ export default function TransportListsManagement() {
     void loadConnections();
   }, [loadConnections]);
 
-  // Liczby per miasto dla aktywnego połączenia (zasilają widok Cyfry + widget ŁĄCZNIE)
-  useEffect(() => {
-    setTransferCityIds(new Set()); // przesiadki są per połączenie — reset przy zmianie
+  // Wspólny reload danych aktywnego połączenia (miasta + uczestnicy + tabory) — używany po wsadzaniu/edycji.
+  const reloadData = useCallback(async () => {
     if (activeConnectionId == null) {
-      setCities([]);
-      setParticipants([]);
-      setTabors([]);
+      setCities([]); setParticipants([]); setTabors([]);
       return;
     }
-    let cancelled = false;
-    getConnectionCities(activeConnectionId)
-      .then((data) => { if (!cancelled) setCities(data); })
-      .catch(() => { if (!cancelled) setCities([]); });
-    getConnectionParticipants(activeConnectionId)
-      .then((data) => { if (!cancelled) setParticipants(data); })
-      .catch(() => { if (!cancelled) setParticipants([]); });
-    listTabors(activeConnectionId)
-      .then((data) => { if (!cancelled) setTabors(data); })
-      .catch(() => { if (!cancelled) setTabors([]); });
-    return () => { cancelled = true; };
+    const [c, p, t] = await Promise.all([
+      getConnectionCities(activeConnectionId).catch(() => [] as CityCounts[]),
+      getConnectionParticipants(activeConnectionId).catch(() => [] as ParticipantRow[]),
+      listTabors(activeConnectionId).catch(() => [] as Tabor[]),
+    ]);
+    setCities(c); setParticipants(p); setTabors(t);
+    setReloadKey((k) => k + 1); // odśwież karty taborów (occupied/uczestnicy)
   }, [activeConnectionId]);
+
+  useEffect(() => {
+    setTransferCityIds(new Set());  // stan per połączenie — reset przy zmianie
+    setOpenTaborId(null);
+    setSelectedIds(new Set());
+    void reloadData();
+  }, [reloadData]);
+
+  const toggleSelect = useCallback((rid: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rid)) next.delete(rid);
+      else next.add(rid);
+      return next;
+    });
+  }, []);
+
+  // Wsadź uczestników do otwartego taboru (Nr 26): assign każdego + reload. Overflow → komunikat (pełny modal Nr 29).
+  const assignToOpenTabor = useCallback(async (rids: number[]) => {
+    if (openTaborId == null || rids.length === 0) return;
+    let overflow = false;
+    for (const rid of rids) {
+      const r = await assignParticipant(openTaborId, rid);
+      if (r.overflow) { overflow = true; break; }
+    }
+    setSelectedIds(new Set());
+    await reloadData();
+    setError(overflow ? 'Tabor za mały — nie wszyscy się zmieścili (zwiększ liczbę miejsc).' : null);
+  }, [openTaborId, reloadData]);
+
+  // Wsadzenie pojedynczego uczestnika przez drag&drop na kartę taboru.
+  const dropAssign = useCallback(async (taborId: number, rid: number) => {
+    const r = await assignParticipant(taborId, rid);
+    await reloadData();
+    setError(r.overflow ? 'Tabor za mały — brak wolnych miejsc.' : null);
+  }, [reloadData]);
 
   // Lookup imion uczestników (reservation_id → „Nazwisko Imię") dla kart taborów.
   const participantNames = useMemo(() => {
@@ -215,10 +242,16 @@ export default function TransportListsManagement() {
           <Panel title={panelMode === 'numbers' ? 'Cyfry' : 'Uczestnicy'}>
             {panelMode === 'numbers'
               ? <NumbersView totals={totals} />
-              : <ParticipantsPanel participants={participants} />}
+              : <ParticipantsPanel participants={participants}
+                  assignMode={openTaborId != null} selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                  onAssignSelected={() => void assignToOpenTabor([...selectedIds])} />}
           </Panel>
           <Panel title="Tabor">
-            <TaborPanel tabors={tabors} participantNames={participantNames}
+            <TaborPanel tabors={tabors} participantNames={participantNames} reloadKey={reloadKey}
+              openTaborId={openTaborId}
+              onOpenTabor={(id) => { setOpenTaborId(id); setPanelMode('participants'); }}
+              onDropAssign={(taborId, rid) => void dropAssign(taborId, rid)}
               onEdit={(t) => { setEditingTabor(t); setTaborModalOpen(true); }} />
           </Panel>
         </div>
@@ -235,7 +268,7 @@ export default function TransportListsManagement() {
 
       {taborModalOpen && activeConnectionId != null && (
         <AddTaborModal connectionId={activeConnectionId} tabor={editingTabor}
-          onClose={() => setTaborModalOpen(false)} onSaved={refreshTabors} />
+          onClose={() => setTaborModalOpen(false)} onSaved={reloadData} />
       )}
     </div>
   );
