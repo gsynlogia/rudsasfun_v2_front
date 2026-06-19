@@ -23,6 +23,15 @@ export interface ConnectionCreate {
   date?: string | null;
 }
 
+/** P1: turnus z datami (start=przyjazd, end=powrót) + status użycia per kierunek (modal Dodaj połączenie). */
+export interface TagDetail {
+  tag: string;
+  start_date: string | null;
+  end_date: string | null;
+  used_arrival: boolean;
+  used_return: boolean;
+}
+
 export interface Tabor {
   id: number;
   connection_id: number;

@@ -7,7 +7,7 @@ import { authenticatedFetch } from '@/lib/utils/api';
 import type {
   Connection, ConnectionCreate, Tabor, TaborCreate, TaborUpdate, TaborCapacity,
   CityCounts, ParticipantRow, TaborParticipant, OrphanedAssignment,
-  TransportListSummary, TransportListDetail, CompareEntry, Direction,
+  TransportListSummary, TransportListDetail, CompareEntry, Direction, TagDetail,
 } from '@/lib/types/transportLists';
 
 const BASE = '/api/transport-lists';
@@ -72,6 +72,10 @@ export async function getSeasonCities(direction: Direction): Promise<CityCounts[
 export async function getSeasonParticipants(direction: Direction): Promise<ParticipantRow[]> {
   return jsonOrThrow(
     await authenticatedFetch(`${BASE}/season/participants?direction=${direction}`), 'getSeasonParticipants');
+}
+
+export async function getTagsDetailed(): Promise<TagDetail[]> {
+  return jsonOrThrow(await authenticatedFetch(`${BASE}/season/tags-detailed`), 'getTagsDetailed');
 }
 
 // ---------- TABORY ----------
