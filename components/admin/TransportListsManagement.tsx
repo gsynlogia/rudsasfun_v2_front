@@ -24,6 +24,7 @@ import DeleteTaborModal from './transport/DeleteTaborModal';
 import ParticipantsPanel from './transport/ParticipantsPanel';
 import TaborOverflowModal from './transport/TaborOverflowModal';
 import TaborPanel from './transport/TaborPanel';
+import TransportDocumentModal from './transport/TransportDocumentModal';
 
 type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy (Nr 22)
 
@@ -45,6 +46,7 @@ export default function TransportListsManagement() {
   const [overflowInfo, setOverflowInfo] = useState<{ capacity?: number; occupied?: number } | null>(null);
   const [connModalOpen, setConnModalOpen] = useState(false); // modal Dodaj połączenie (Nr 30)
   const [deleteConnTarget, setDeleteConnTarget] = useState<Connection | null>(null);
+  const [documentTabor, setDocumentTabor] = useState<Tabor | null>(null); // modal Wypuść listę (Nr 31-33)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -296,7 +298,8 @@ export default function TransportListsManagement() {
               onOpenTabor={(id) => { setOpenTaborId(id); setPanelMode('participants'); }}
               onDropAssign={(taborId, rid) => void dropAssign(taborId, rid)}
               onEdit={(t) => { setEditingTabor(t); setTaborModalOpen(true); }}
-              onDelete={(t) => setDeleteTarget(t)} />
+              onDelete={(t) => setDeleteTarget(t)}
+              onDocument={(t) => setDocumentTabor(t)} />
           </Panel>
         </div>
       )}
@@ -326,6 +329,10 @@ export default function TransportListsManagement() {
       {connModalOpen && (
         <AddConnectionModal defaultDirection={direction}
           onClose={() => setConnModalOpen(false)} onCreated={(c) => void handleConnectionCreated(c)} />
+      )}
+      {documentTabor && (
+        <TransportDocumentModal taborId={documentTabor.id} direction={direction}
+          onClose={() => setDocumentTabor(null)} onApproved={() => void reloadData()} />
       )}
       {deleteConnTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="delete-connection-modal">
