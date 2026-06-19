@@ -29,11 +29,15 @@ interface Props {
   onToggleSelect: (rid: number) => void;
   onAssignSelected: () => void;
   onEarlyLeave: (rid: number) => void;
+  visibleCols: Set<string>;                    // Nr 37: konfiguracja kolumn (Uczestnik zawsze widoczny)
+  onOpenReservation: (reservationNumber: string | null) => void; // Nr 37: klik → rezerwacja
 }
 
 export default function ParticipantsPanel(
-  { participants, assignMode, selectedIds, onToggleSelect, onAssignSelected, onEarlyLeave }: Props,
+  { participants, assignMode, selectedIds, onToggleSelect, onAssignSelected, onEarlyLeave,
+    visibleCols, onOpenReservation }: Props,
 ) {
+  const cols = COLUMNS.filter((c) => c.key === 'uczestnik' || visibleCols.has(c.key));
   const [sortKey, setSortKey] = useState<string>('uczestnik');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -110,7 +114,7 @@ export default function ParticipantsPanel(
                     onChange={selectAllUnassigned} />
                 </th>
               )}
-              {COLUMNS.map((c) => (
+              {cols.map((c) => (
                 <th key={c.key} className="px-2 py-2">
                   <button type="button" onClick={() => toggleSort(c.key)} className="flex items-center gap-1 hover:text-gray-800">
                     {c.label}
@@ -124,7 +128,7 @@ export default function ParticipantsPanel(
             </tr>
             <tr className="border-b border-gray-100">
               {assignMode && <th />}
-              {COLUMNS.map((c) => (
+              {cols.map((c) => (
                 <th key={c.key} className="px-1 pb-1">
                   <input type="text" placeholder="filtr…" value={filters[c.key] ?? ''}
                     onChange={(e) => setFilters((f) => ({ ...f, [c.key]: e.target.value }))}
@@ -150,13 +154,26 @@ export default function ParticipantsPanel(
                     )}
                   </td>
                 )}
-                <td className="px-2 py-1.5 font-medium text-gray-800">{p.last_name} {p.first_name}</td>
-                <td className="px-2 py-1.5 text-gray-700">{p.topic ?? '—'}</td>
-                <td className="px-2 py-1.5 text-gray-700">{p.city ?? '—'}</td>
-                <td className="px-2 py-1.5">
-                  {p.tag && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-700">{p.tag}</span>}
-                </td>
-                <td className="px-2 py-1.5 text-xs text-gray-500">{p.region ?? '—'}</td>
+                {cols.map((c) => {
+                  if (c.key === 'uczestnik') {
+                    return (
+                      <td key={c.key} className="px-2 py-1.5 font-medium">
+                        <button type="button" onClick={() => onOpenReservation(p.reservation_number)}
+                          className="text-sky-700 hover:underline" data-testid="participant-link">
+                          {p.last_name} {p.first_name}
+                        </button>
+                      </td>
+                    );
+                  }
+                  if (c.key === 'tag') {
+                    return (
+                      <td key={c.key} className="px-2 py-1.5">
+                        {p.tag && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-700">{p.tag}</span>}
+                      </td>
+                    );
+                  }
+                  return <td key={c.key} className="px-2 py-1.5 text-gray-700">{c.get(p) || '—'}</td>;
+                })}
                 {!assignMode && (
                   <td className="px-2 py-1.5 text-right">
                     <button type="button" title="Wyjazd przed zakończeniem" data-testid="early-leave-btn"

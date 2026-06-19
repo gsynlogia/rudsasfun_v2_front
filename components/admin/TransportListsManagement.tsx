@@ -54,6 +54,8 @@ export default function TransportListsManagement() {
   const [earlyLeaveTarget, setEarlyLeaveTarget] = useState<number | null>(null); // wyjazd przed zakończeniem (Nr 36)
   const [earlyLeaveNote, setEarlyLeaveNote] = useState('');
   const [earlyLeaveCount, setEarlyLeaveCount] = useState(0);
+  const [columnsModalOpen, setColumnsModalOpen] = useState(false); // konfiguracja kolumn (Nr 37)
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['temat', 'przystanek', 'tag', 'region']));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -237,9 +239,9 @@ export default function TransportListsManagement() {
               <Users className="h-4 w-4" /> Uczestnicy
             </button>
           </div>
-          <button type="button" disabled
-            className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 opacity-60"
-            title="Konfiguracja kolumn (wkrótce — Nr 37)">
+          <button type="button" onClick={() => setColumnsModalOpen(true)} data-testid="open-columns"
+            className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            title="Konfiguracja kolumn tabeli uczestników">
             <Table2 className="h-4 w-4" /> Tabela
           </button>
         </div>
@@ -314,7 +316,9 @@ export default function TransportListsManagement() {
                   assignMode={openTaborId != null} selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
                   onAssignSelected={() => void assignToOpenTabor([...selectedIds])}
-                  onEarlyLeave={(rid) => { setEarlyLeaveTarget(rid); setEarlyLeaveNote(''); }} />}
+                  onEarlyLeave={(rid) => { setEarlyLeaveTarget(rid); setEarlyLeaveNote(''); }}
+                  visibleCols={visibleCols}
+                  onOpenReservation={(num) => { if (num && typeof window !== 'undefined') window.open(`/admin-panel/rezerwacja/${num}`, '_blank'); }} />}
           </Panel>
           <Panel title="Tabor">
             <TaborPanel tabors={tabors} participantNames={participantNames} reloadKey={reloadKey}
@@ -360,6 +364,37 @@ export default function TransportListsManagement() {
       )}
       {listsModalOpen && <TransportListsModal onClose={() => setListsModalOpen(false)} />}
       {compareOpen && <TransportCompareModal onClose={() => setCompareOpen(false)} />}
+      {columnsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="columns-modal">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+            <h3 className="mb-3 text-lg font-semibold">Zarządzaj kolumnami tabeli</h3>
+            <p className="mb-2 text-xs text-gray-500">Kolumna „Uczestnik" jest zawsze widoczna.</p>
+            <div className="flex flex-col gap-2">
+              {[['temat', 'Temat obozu'], ['przystanek', 'Przystanek'], ['tag', 'Tag'], ['region', 'Region']].map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={visibleCols.has(key)} data-testid={`col-${key}`}
+                    onChange={() => setVisibleCols((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(key)) next.delete(key); else next.add(key);
+                      return next;
+                    })} />
+                  {label}
+                </label>
+              ))}
+            </div>
+            {/* Import listy — decyzja właściciela: nieaktywny w v1 */}
+            <button type="button" disabled data-testid="import-list"
+              className="mt-4 w-full rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-400"
+              title="Importuj listę — funkcja niedostępna w tej wersji">
+              Importuj listę (wkrótce)
+            </button>
+            <div className="mt-4 flex justify-end">
+              <button type="button" onClick={() => setColumnsModalOpen(false)}
+                className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white">Gotowe</button>
+            </div>
+          </div>
+        </div>
+      )}
       {earlyLeaveTarget != null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="early-leave-modal">
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
