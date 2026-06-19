@@ -16,6 +16,7 @@ import {
   listConnections, getConnectionCities, getConnectionParticipants, listTabors,
 } from '@/lib/services/transportListsApi';
 
+import AddTaborModal from './transport/AddTaborModal';
 import CitiesPanel from './transport/CitiesPanel';
 import ParticipantsPanel from './transport/ParticipantsPanel';
 import TaborPanel from './transport/TaborPanel';
@@ -31,6 +32,13 @@ export default function TransportListsManagement() {
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
   const [tabors, setTabors] = useState<Tabor[]>([]);
   const [transferCityIds, setTransferCityIds] = useState<Set<number>>(new Set());
+  const [taborModalOpen, setTaborModalOpen] = useState(false);
+  const [editingTabor, setEditingTabor] = useState<Tabor | null>(null);
+
+  const refreshTabors = useCallback(() => {
+    if (activeConnectionId == null) return;
+    listTabors(activeConnectionId).then(setTabors).catch(() => setTabors([]));
+  }, [activeConnectionId]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,9 +128,10 @@ export default function TransportListsManagement() {
             title="Historia list (wkrótce — Nr 34)">
             <ListChecks className="h-4 w-4" /> Listy
           </button>
-          <button type="button" disabled
-            className="flex items-center gap-1.5 rounded-md bg-emerald-600/90 px-3 py-1.5 text-sm font-medium text-white opacity-60"
-            title="Dodaj tabor (wkrótce — Nr 28)">
+          <button type="button" disabled={activeConnectionId == null}
+            onClick={() => { setEditingTabor(null); setTaborModalOpen(true); }}
+            className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            title="Dodaj tabor">
             <Plus className="h-4 w-4" /> Dodaj Tabor
           </button>
           {/* Toggle Cyfry / Uczestnicy (Nr 22) */}
@@ -209,7 +218,8 @@ export default function TransportListsManagement() {
               : <ParticipantsPanel participants={participants} />}
           </Panel>
           <Panel title="Tabor">
-            <TaborPanel tabors={tabors} participantNames={participantNames} />
+            <TaborPanel tabors={tabors} participantNames={participantNames}
+              onEdit={(t) => { setEditingTabor(t); setTaborModalOpen(true); }} />
           </Panel>
         </div>
       )}
@@ -221,6 +231,11 @@ export default function TransportListsManagement() {
           <div className="text-xs uppercase tracking-wide opacity-90">Łącznie</div>
           <div className="text-3xl font-bold leading-none">{totals.razem}</div>
         </div>
+      )}
+
+      {taborModalOpen && activeConnectionId != null && (
+        <AddTaborModal connectionId={activeConnectionId} tabor={editingTabor}
+          onClose={() => setTaborModalOpen(false)} onSaved={refreshTabors} />
       )}
     </div>
   );
