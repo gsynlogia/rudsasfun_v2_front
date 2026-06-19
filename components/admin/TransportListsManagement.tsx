@@ -24,8 +24,18 @@ export default function TransportListsManagement() {
   const [activeConnectionId, setActiveConnectionId] = useState<number | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>('numbers');
   const [cities, setCities] = useState<CityCounts[]>([]);
+  const [transferCityIds, setTransferCityIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const toggleTransfer = useCallback((cityId: number) => {
+    setTransferCityIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cityId)) next.delete(cityId);
+      else next.add(cityId);
+      return next;
+    });
+  }, []);
 
   const loadConnections = useCallback(async () => {
     setLoading(true);
@@ -48,6 +58,7 @@ export default function TransportListsManagement() {
 
   // Liczby per miasto dla aktywnego połączenia (zasilają widok Cyfry + widget ŁĄCZNIE)
   useEffect(() => {
+    setTransferCityIds(new Set()); // przesiadki są per połączenie — reset przy zmianie
     if (activeConnectionId == null) {
       setCities([]);
       return;
@@ -166,7 +177,8 @@ export default function TransportListsManagement() {
       {!loading && connections.length > 0 && (
         <div className="grid gap-3" style={{ gridTemplateColumns: '380px 1fr 420px' }}>
           <Panel title="Miasta">
-            <CitiesPanel cities={cities} totals={totals} />
+            <CitiesPanel cities={cities} totals={totals}
+              transferCityIds={transferCityIds} onToggleTransfer={toggleTransfer} />
           </Panel>
           <Panel title={panelMode === 'numbers' ? 'Cyfry' : 'Uczestnicy'}>
             {panelMode === 'numbers'
