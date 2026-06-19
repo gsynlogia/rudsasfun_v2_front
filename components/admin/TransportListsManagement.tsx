@@ -25,6 +25,7 @@ import ParticipantsPanel from './transport/ParticipantsPanel';
 import TaborOverflowModal from './transport/TaborOverflowModal';
 import TaborPanel from './transport/TaborPanel';
 import TransportDocumentModal from './transport/TransportDocumentModal';
+import TransportListsModal from './transport/TransportListsModal';
 
 type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy (Nr 22)
 
@@ -47,6 +48,7 @@ export default function TransportListsManagement() {
   const [connModalOpen, setConnModalOpen] = useState(false); // modal Dodaj połączenie (Nr 30)
   const [deleteConnTarget, setDeleteConnTarget] = useState<Connection | null>(null);
   const [documentTabor, setDocumentTabor] = useState<Tabor | null>(null); // modal Wypuść listę (Nr 31-33)
+  const [listsModalOpen, setListsModalOpen] = useState(false); // modal Listy — historia (Nr 34)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,9 +192,9 @@ export default function TransportListsManagement() {
             title="Porównaj połączenia (wkrótce — Nr 35)">
             <GitCompare className="h-4 w-4" /> Porównaj
           </button>
-          <button type="button" disabled
-            className="flex items-center gap-1.5 rounded-md bg-blue-600/90 px-3 py-1.5 text-sm font-medium text-white opacity-60"
-            title="Historia list (wkrótce — Nr 34)">
+          <button type="button" onClick={() => setListsModalOpen(true)} data-testid="open-lists"
+            className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
+            title="Historia wypuszczonych list">
             <ListChecks className="h-4 w-4" /> Listy
           </button>
           <button type="button" disabled={activeConnectionId == null}
@@ -334,6 +336,7 @@ export default function TransportListsManagement() {
         <TransportDocumentModal taborId={documentTabor.id} direction={direction}
           onClose={() => setDocumentTabor(null)} onApproved={() => void reloadData()} />
       )}
+      {listsModalOpen && <TransportListsModal onClose={() => setListsModalOpen(false)} />}
       {deleteConnTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="delete-connection-modal">
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
