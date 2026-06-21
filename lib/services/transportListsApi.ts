@@ -8,6 +8,7 @@ import type {
   Connection, ConnectionCreate, Tabor, TaborCreate, TaborUpdate, TaborCapacity,
   CityCounts, ParticipantRow, TaborParticipant, OrphanedAssignment,
   TransportListSummary, TransportListDetail, CompareEntry, Direction, TagDetail,
+  TransportRoute, TransportRouteCreate, TransportRouteUpdate,
 } from '@/lib/types/transportLists';
 
 const BASE = '/api/transport-lists';
@@ -76,6 +77,41 @@ export async function getSeasonParticipants(direction: Direction): Promise<Parti
 
 export async function getTagsDetailed(): Promise<TagDetail[]> {
   return jsonOrThrow(await authenticatedFetch(`${BASE}/season/tags-detailed`), 'getTagsDetailed');
+}
+
+// ---------- DESTYNACJE / TRASY (G02: CRUD kolorów + przypisań miast) ----------
+export async function listRoutes(): Promise<TransportRoute[]> {
+  return jsonOrThrow(await authenticatedFetch(`${BASE}/routes`), 'listRoutes');
+}
+
+export async function createRoute(body: TransportRouteCreate): Promise<TransportRoute> {
+  return jsonOrThrow(
+    await authenticatedFetch(`${BASE}/routes`, { method: 'POST', body: JSON.stringify(body) }),
+    'createRoute');
+}
+
+export async function updateRoute(id: number, body: TransportRouteUpdate): Promise<TransportRoute> {
+  return jsonOrThrow(
+    await authenticatedFetch(`${BASE}/routes/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    'updateRoute');
+}
+
+export async function deleteRoute(id: number): Promise<void> {
+  const res = await authenticatedFetch(`${BASE}/routes/${id}`, { method: 'DELETE' });
+  if (!res.ok && res.status !== 204) throw new Error(`deleteRoute: ${res.status}`);
+}
+
+export async function assignCityToRoute(id: number, cityName: string): Promise<TransportRoute> {
+  return jsonOrThrow(
+    await authenticatedFetch(`${BASE}/routes/${id}/cities`, {
+      method: 'POST', body: JSON.stringify({ city_name: cityName }),
+    }), 'assignCityToRoute');
+}
+
+export async function unassignCityFromRoute(id: number, cityName: string): Promise<void> {
+  const res = await authenticatedFetch(
+    `${BASE}/routes/${id}/cities?city_name=${encodeURIComponent(cityName)}`, { method: 'DELETE' });
+  if (!res.ok && res.status !== 204) throw new Error(`unassignCityFromRoute: ${res.status}`);
 }
 
 // ---------- TABORY ----------

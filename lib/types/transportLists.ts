@@ -81,7 +81,8 @@ export interface CityCounts {
   city: string;
   transport_city_id: number | null;
   display_order: number | null;
-  route_color: string | null;
+  route_id: number | null;       // G02: id destynacji (grupowanie „Trasa" + edycja po kliknięciu)
+  route_color: string | null;    // G02: color_key destynacji z bazy (null = miasto nieprzypisane)
   beaver: number;
   sawa: number;
   limba: number;
@@ -89,6 +90,30 @@ export interface CityCounts {
   trasa: number;
   nieprzyp: number;
   is_transfer: boolean;
+}
+
+// G02: destynacje (trasy) — CRUD kolorów/przypisań miast (zastępuje hardcoded ROUTE_OF/ROUTE_BG).
+export type RouteColorKey =
+  | 'blue' | 'orange' | 'green' | 'gray' | 'red' | 'yellow'
+  | 'teal' | 'pink' | 'indigo' | 'sky' | 'violet' | 'purple';
+
+export interface TransportRoute {
+  id: number;
+  name: string;
+  color_key: RouteColorKey;
+  display_order: number;
+  cities: string[];
+}
+
+export interface TransportRouteCreate {
+  name: string;
+  color_key: RouteColorKey;
+  cities?: string[];
+}
+
+export interface TransportRouteUpdate {
+  name?: string;
+  color_key?: RouteColorKey;
 }
 
 export interface ParticipantRow {

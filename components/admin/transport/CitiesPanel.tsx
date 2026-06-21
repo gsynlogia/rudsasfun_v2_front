@@ -15,45 +15,14 @@ import type { CityCounts } from '@/lib/types/transportLists';
 import {
   type Resort, type SelectionState, isCityFullySelected, isResortCellSelected,
 } from '@/lib/utils/transportSelection';
+import { routeRowClasses } from '@/lib/utils/transportRouteColors';
 
 interface Totals { razem: number; beaver: number; sawa: number; limba: number; nieprzyp: number; }
 
 const RESORT_LABELS: Record<Resort, string> = { beaver: 'Beaver', sawa: 'Sawa', limba: 'Limba' };
 
-// Trasy/destynacje + kolory (makieta §6.2). Klucz = nazwa miasta (lower, exact PL z bazy).
-const ROUTE_OF: Record<string, number> = {
-  warszawa: 1,
-  łódź: 2, włocławek: 2,
-  toruń: 3,
-  kraków: 4, kielce: 4, radom: 4,
-  katowice: 5, częstochowa: 5, 'piotrków trybunalski': 5, bełchatów: 5,
-  wrocław: 6, leszno: 6, poznań: 6, gniezno: 6,
-  bydgoszcz: 7,
-  szczecin: 8, kołobrzeg: 8, koszalin: 8, słupsk: 8,
-  lębork: 9,
-  gdynia: 10,
-  gdańsk: 11,
-  własny: 12,
-};
-// Tła wierszy 1:1 z makietą: bazowo -100 (gray-200), hover -200 (gray-300), podświetlone -300 (gray-400).
-const ROUTE_BG: Record<number, { base: string; hover: string; active: string }> = {
-  1: { base: 'bg-blue-100', hover: 'hover:bg-blue-200', active: 'bg-blue-300' },
-  2: { base: 'bg-orange-100', hover: 'hover:bg-orange-200', active: 'bg-orange-300' },
-  3: { base: 'bg-green-100', hover: 'hover:bg-green-200', active: 'bg-green-300' },
-  4: { base: 'bg-gray-200', hover: 'hover:bg-gray-300', active: 'bg-gray-400' },
-  5: { base: 'bg-red-100', hover: 'hover:bg-red-200', active: 'bg-red-300' },
-  6: { base: 'bg-yellow-100', hover: 'hover:bg-yellow-200', active: 'bg-yellow-300' },
-  7: { base: 'bg-teal-100', hover: 'hover:bg-teal-200', active: 'bg-teal-300' },
-  8: { base: 'bg-pink-100', hover: 'hover:bg-pink-200', active: 'bg-pink-300' },
-  9: { base: 'bg-indigo-100', hover: 'hover:bg-indigo-200', active: 'bg-indigo-300' },
-  10: { base: 'bg-sky-100', hover: 'hover:bg-sky-200', active: 'bg-sky-300' },
-  11: { base: 'bg-violet-100', hover: 'hover:bg-violet-200', active: 'bg-violet-300' },
-  12: { base: 'bg-purple-100', hover: 'hover:bg-purple-200', active: 'bg-purple-300' },
-};
-
-function routeOf(city: string): number | null {
-  return ROUTE_OF[city.trim().toLowerCase()] ?? null;
-}
+// G02: destynacja (route_id) + kolor (route_color) pochodzą z BAZY (CityCounts), nie z hardcoded mapy.
+// Mapowanie color_key -> klasy Tailwind: lib/utils/transportRouteColors (routeRowClasses, testowane).
 
 interface CitiesPanelProps {
   cities: CityCounts[];
@@ -78,8 +47,7 @@ export default function CitiesPanel({
   const routeTotals = useMemo(() => {
     const m = new Map<number, number>();
     for (const c of cities) {
-      const r = routeOf(c.city);
-      if (r != null) m.set(r, (m.get(r) ?? 0) + c.razem);
+      if (c.route_id != null) m.set(c.route_id, (m.get(c.route_id) ?? 0) + c.razem);
     }
     return m;
   }, [cities]);
@@ -122,10 +90,9 @@ export default function CitiesPanel({
         </thead>
         <tbody>
           {cities.map((c) => {
-            const route = routeOf(c.city);
-            const colors = route != null ? ROUTE_BG[route] : null;
+            const route = c.route_id;
             const isActive = route != null && route === hoveredRoute;
-            const bg = colors ? `${isActive ? colors.active : colors.base} ${colors.hover}` : '';
+            const bg = routeRowClasses(c.route_color, isActive);
             const isTransfer = transferCities.has(c.city);
             return (
               <Fragment key={c.transport_city_id ?? c.city}>

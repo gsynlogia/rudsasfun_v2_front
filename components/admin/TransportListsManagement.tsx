@@ -9,6 +9,7 @@
  */
 import {
   MapPin, Home, Plus, Users, Hash, GitCompare, ListChecks, Table2, Bus, AlertCircle, X, UserX, Trash2,
+  Palette,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -35,6 +36,7 @@ import TaborPanel from './transport/TaborPanel';
 import TransportCompareModal from './transport/TransportCompareModal';
 import TransportDocumentModal from './transport/TransportDocumentModal';
 import TransportListsModal from './transport/TransportListsModal';
+import RoutesManagerModal from './transport/RoutesManagerModal';
 
 type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy
 const ALL_RESORTS: Resort[] = ['beaver', 'sawa', 'limba'];
@@ -69,6 +71,7 @@ export default function TransportListsManagement() {
   const [error, setError] = useState<string | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);  // „Tabela"
   const [columnsModalOpen, setColumnsModalOpen] = useState(false);
+  const [routesModalOpen, setRoutesModalOpen] = useState(false);                            // G02: CRUD destynacji
 
   // „Tabela": konfiguracja widocznych kolumn zapamiętana w localStorage (film: „widoki na poziomie local storage").
   useEffect(() => {
@@ -313,6 +316,11 @@ export default function TransportListsManagement() {
               <Users className="h-4 w-4" /> Uczestnicy
             </button>
           </div>
+          <button type="button" onClick={() => setRoutesModalOpen(true)} data-testid="open-routes"
+            className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            title="Destynacje — trasy i kolory miast (CRUD)">
+            <Palette className="h-4 w-4" /> Destynacje
+          </button>
           <button type="button" onClick={() => setColumnsModalOpen(true)} data-testid="open-columns"
             className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
             title="Konfiguracja widocznych kolumn">
@@ -493,6 +501,13 @@ export default function TransportListsManagement() {
         </div>
       )}
       {compareOpen && <TransportCompareModal onClose={() => setCompareOpen(false)} />}
+      {routesModalOpen && (
+        <RoutesManagerModal
+          allCityNames={cities.map((c) => c.city)}
+          onClose={() => setRoutesModalOpen(false)}
+          onChanged={() => { void reloadData(); }}
+        />
+      )}
       {earlyLeaveTarget != null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="early-leave-modal">
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
