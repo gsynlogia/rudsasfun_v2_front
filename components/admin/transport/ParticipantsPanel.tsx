@@ -176,8 +176,11 @@ export default function ParticipantsPanel({
                 <tr key={p.reservation_id}
                   draggable={assignMode && canAssign(p)}
                   onDragStart={(e) => e.dataTransfer.setData('text/plain', String(p.reservation_id))}
-                  className={`border-b border-gray-200 transition-colors ${
-                    p.is_assigned ? 'bg-gray-100 opacity-60' : isSelected ? 'bg-blue-50' : 'hover:bg-blue-50'} ${
+                  data-testid={p.early_leave ? 'early-leave-row' : undefined}
+                  className={`border-b transition-colors ${
+                    p.early_leave
+                      ? 'border-red-300 bg-red-100 ring-1 ring-inset ring-red-400'  // G05: raziło po oczach
+                      : `border-gray-200 ${p.is_assigned ? 'bg-gray-100 opacity-60' : isSelected ? 'bg-blue-50' : 'hover:bg-blue-50'}`} ${
                     assignMode && canAssign(p) ? 'cursor-grab' : ''}`}>
                   {assignMode && (
                     <td className="px-3 py-3 text-center">

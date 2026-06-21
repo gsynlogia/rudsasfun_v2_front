@@ -102,6 +102,7 @@ export interface ParticipantRow {
   participant_city: string | null;  // MIASTO zamieszkania (reservations.participant_city)
   transport_city_id: number | null;
   is_assigned: boolean;
+  early_leave: boolean;             // G05: 'wyjazd przed zakończeniem' (czerwony wiersz)
 }
 
 export interface TaborParticipant {
