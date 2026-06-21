@@ -8,6 +8,7 @@ import {
   emptySelection, isCityFullySelected, isResortCellSelected, hasAnySelection,
   toggleCity, toggleResortCell, toggleMaster, calculateSelectedTotal, isParticipantSelected,
   isTransferParticipant, canReassignParticipant, distinctSorted, toggleColumnKey, boundedToggle,
+  reorderList,
   type Resort,
 } from '@/lib/utils/transportSelection';
 
@@ -191,5 +192,23 @@ describe('transportSelection — boundedToggle (Porównaj max 2, rozkaz Pana)', 
   });
   it('zawsze pozwala odznaczyć (nawet przy pełnym limicie)', () => {
     expect([...boundedToggle(new Set([1, 2]), 1, 2)]).toEqual([2]);
+  });
+});
+
+describe('transportSelection — reorderList (drag&drop dzieci w taborze, film H12)', () => {
+  it('przenosi element na pozycję docelową (w przód)', () => {
+    expect(reorderList([1, 2, 3, 4], 1, 3)).toEqual([2, 3, 1, 4]);
+  });
+  it('przenosi element w tył', () => {
+    expect(reorderList([1, 2, 3, 4], 4, 2)).toEqual([1, 4, 2, 3]);
+  });
+  it('id spoza listy lub równe → kopia bez zmian', () => {
+    expect(reorderList([1, 2, 3], 9, 2)).toEqual([1, 2, 3]);
+    expect(reorderList([1, 2, 3], 2, 2)).toEqual([1, 2, 3]);
+  });
+  it('nie mutuje wejścia', () => {
+    const src = [1, 2, 3];
+    reorderList(src, 1, 3);
+    expect(src).toEqual([1, 2, 3]);
   });
 });

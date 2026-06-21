@@ -19,7 +19,7 @@ import type {
 import {
   listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant, deleteTabor,
   deleteConnection, setEarlyLeave, getEarlyLeaveStats, getSeasonCities, getSeasonParticipants,
-  getOrphanedAssignments, autoCleanupOrphaned, removeParticipant,
+  getOrphanedAssignments, autoCleanupOrphaned, removeParticipant, reorderTaborParticipants,
 } from '@/lib/services/transportListsApi';
 import {
   type Resort, type SelectionState, emptySelection, toggleCity, toggleResortCell, toggleMaster,
@@ -224,6 +224,12 @@ export default function TransportListsManagement() {
   // Wspólny dla G04 (usuń wypadniętego z listy orphaned) i G06 (wyjmij uczestnika z taboru).
   const handleRemoveParticipant = useCallback(async (participantId: number) => {
     await removeParticipant(participantId);
+    await reloadData();
+  }, [reloadData]);
+
+  // H12: drag&drop kolejność dzieci w taborze — zapis order_number + reload (renumeracja z backendu).
+  const handleReorderTabor = useCallback(async (taborId: number, participantIds: number[]) => {
+    await reorderTaborParticipants(taborId, participantIds);
     await reloadData();
   }, [reloadData]);
 
@@ -452,6 +458,7 @@ export default function TransportListsManagement() {
                 onOpenTabor={(id) => { setOpenTaborId(id); setPanelMode('participants'); }}
                 onDropAssign={(taborId, rid) => void dropAssign(taborId, rid)}
                 onRemoveParticipant={(pid) => void handleRemoveParticipant(pid)}
+                onReorder={(taborId, ids) => void handleReorderTabor(taborId, ids)}
                 onEdit={(t) => { setEditingTabor(t); setTaborModalOpen(true); }}
                 onDelete={(t) => setDeleteTarget(t)}
                 onDocument={(t) => setDocumentTabor(t)} />

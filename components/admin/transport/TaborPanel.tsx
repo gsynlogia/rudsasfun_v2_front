@@ -13,6 +13,9 @@ import { useEffect, useState } from 'react';
 
 import type { Tabor, TaborCapacity, TaborParticipant } from '@/lib/types/transportLists';
 import { getTaborCapacity, listTaborParticipants } from '@/lib/services/transportListsApi';
+import { reorderList } from '@/lib/utils/transportSelection';
+
+const DND_PARTICIPANT = 'application/x-tabor-participant';   // klucz reorderu (odróżnia od wsadzania)
 
 const TYPE_LABEL: Record<string, string> = {
   autokar: 'Autokar', pociag: 'Pociąg', wlasny: 'Własny', prywatny: 'Prywatny',
@@ -26,6 +29,7 @@ interface TaborPanelProps {
   onOpenTabor: (id: number) => void;
   onDropAssign: (taborId: number, reservationId: number) => void;
   onRemoveParticipant: (participantId: number) => void;  // G06: wyjęcie pojedynczego uczestnika
+  onReorder: (taborId: number, participantIds: number[]) => void;  // H12: drag&drop kolejność dzieci
   reloadKey: number;
   onDelete: (tabor: Tabor) => void;
   onDocument: (tabor: Tabor) => void;
@@ -33,7 +37,7 @@ interface TaborPanelProps {
 
 export default function TaborPanel(
   { tabors, participantNames, onEdit, openTaborId, onOpenTabor, onDropAssign, onRemoveParticipant,
-    reloadKey, onDelete, onDocument }: TaborPanelProps,
+    onReorder, reloadKey, onDelete, onDocument }: TaborPanelProps,
 ) {
   if (tabors.length === 0) {
     return (
@@ -48,7 +52,8 @@ export default function TaborPanel(
         <TaborCard key={t.id} tabor={t} participantNames={participantNames} onEdit={onEdit} reloadKey={reloadKey}
           isOpen={openTaborId === t.id} onOpen={() => onOpenTabor(t.id)}
           onDrop={(rid) => onDropAssign(t.id, rid)} onDelete={() => onDelete(t)}
-          onRemoveParticipant={onRemoveParticipant} onDocument={() => onDocument(t)} />
+          onRemoveParticipant={onRemoveParticipant}
+          onReorder={(ids) => onReorder(t.id, ids)} onDocument={() => onDocument(t)} />
       ))}
     </div>
   );
@@ -62,6 +67,7 @@ interface TaborCardProps {
   onOpen: () => void;
   onDrop: (reservationId: number) => void;
   onRemoveParticipant: (participantId: number) => void;
+  onReorder: (participantIds: number[]) => void;
   reloadKey: number;
   onDelete: () => void;
   onDocument: () => void;
@@ -69,12 +75,13 @@ interface TaborCardProps {
 
 function TaborCard(
   { tabor, participantNames, onEdit, isOpen, onOpen, onDrop, onRemoveParticipant,
-    reloadKey, onDelete, onDocument }: TaborCardProps,
+    onReorder, reloadKey, onDelete, onDocument }: TaborCardProps,
 ) {
   const [expanded, setExpanded] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [capacity, setCapacity] = useState<TaborCapacity | null>(null);
   const [assigned, setAssigned] = useState<TaborParticipant[]>([]);
+  const [dragId, setDragId] = useState<number | null>(null);   // H12: przeciągany uczestnik (reorder)
 
   useEffect(() => {
     let cancelled = false;
@@ -158,8 +165,26 @@ function TaborCard(
           })}
           {Array.from({ length: capValue }, (_, i) => {
             const p = assigned[i];
+            // H12: reorder przez drag&drop. Zajęte miejsce draggable; drop na innym zajętym → nowa kolejność.
+            const onReorderDrop = (targetId: number) => {
+              if (dragId == null || dragId === targetId) return;
+              const next = reorderList(assigned.map((a) => a.id), dragId, targetId);
+              setDragId(null);
+              onReorder(next);
+            };
             return (
-              <li key={`s${i}`} className="flex items-center gap-2 px-2 py-1">
+              <li key={`s${i}`} data-testid={p ? 'tabor-participant-row' : undefined}
+                draggable={!!p}
+                onDragStart={p ? (e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.setData(DND_PARTICIPANT, String(p.id));
+                  setDragId(p.id);
+                } : undefined}
+                onDragEnd={() => setDragId(null)}
+                onDragOver={p && dragId != null ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
+                onDrop={p && dragId != null ? (e) => { e.preventDefault(); e.stopPropagation(); onReorderDrop(p.id); } : undefined}
+                className={`flex items-center gap-2 px-2 py-1 ${p ? 'cursor-grab' : ''} ${
+                  dragId != null && p && dragId !== p.id ? 'hover:bg-sky-50' : ''}`}>
                 <span className="w-8 text-gray-500">{i + 1}</span>
                 {p
                   ? <>

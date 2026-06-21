@@ -182,6 +182,14 @@ export async function removeParticipant(participantId: number): Promise<void> {
   if (!res.ok && res.status !== 204) throw new Error(`removeParticipant: ${res.status}`);
 }
 
+/** P3 (film H12): zmiana kolejności dzieci w taborze (drag&drop) — participantIds w docelowej kolejności. */
+export async function reorderTaborParticipants(taborId: number, participantIds: number[]): Promise<void> {
+  const res = await authenticatedFetch(`${BASE}/tabors/${taborId}/reorder`, {
+    method: 'PATCH', body: JSON.stringify({ participant_ids: participantIds }),
+  });
+  if (!res.ok && res.status !== 204) throw new Error(`reorderTaborParticipants: ${res.status}`);
+}
+
 // ---------- WYJAZD PRZED ZAKOŃCZENIEM ----------
 export async function setEarlyLeave(reservationId: number, earlyLeave: boolean, note?: string): Promise<void> {
   const res = await authenticatedFetch(`${BASE}/reservations/${reservationId}/early-leave`, {

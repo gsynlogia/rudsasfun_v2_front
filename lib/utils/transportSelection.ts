@@ -169,6 +169,20 @@ export function toggleColumnKey(visible: string[], key: string): string[] {
 }
 
 /**
+ * Reorder listy id: przenosi `fromId` na pozycję `toId` (drag&drop dzieci w taborze, film H12).
+ * Zwraca nową tablicę (bez mutacji). Gdy któreś id spoza listy lub równe — zwraca kopię bez zmian.
+ */
+export function reorderList(ids: number[], fromId: number, toId: number): number[] {
+  const from = ids.indexOf(fromId);
+  const to = ids.indexOf(toId);
+  if (from < 0 || to < 0 || from === to) return [...ids];
+  const next = [...ids];
+  next.splice(from, 1);
+  next.splice(to, 0, fromId);
+  return next;
+}
+
+/**
  * Toggle id w zbiorze z górnym limitem (Nr 35 „Porównaj" — max 2, rozkaz Pana 2026-06-21).
  * Odznaczenie zawsze możliwe; zaznaczenie tylko gdy rozmiar < max (inaczej zwraca zbiór bez zmian).
  */
