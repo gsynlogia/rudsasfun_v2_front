@@ -19,7 +19,7 @@ import type {
 import {
   listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant, deleteTabor,
   deleteConnection, setEarlyLeave, getEarlyLeaveStats, getSeasonCities, getSeasonParticipants,
-  getOrphanedAssignments, removeParticipant,
+  getOrphanedAssignments, autoCleanupOrphaned, removeParticipant,
 } from '@/lib/services/transportListsApi';
 import {
   type Resort, type SelectionState, emptySelection, toggleCity, toggleResortCell, toggleMaster,
@@ -49,7 +49,8 @@ export default function TransportListsManagement() {
   const [cities, setCities] = useState<CityCounts[]>([]);
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
   const [tabors, setTabors] = useState<Tabor[]>([]);
-  const [orphaned, setOrphaned] = useState<OrphanedAssignment[]>([]);                // G04: kto wypadł z taboru
+  const [orphaned, setOrphaned] = useState<OrphanedAssignment[]>([]);                // G04: kto wypadł z taboru (zatwierdzone — ręcznie)
+  const [autoRemovedCount, setAutoRemovedCount] = useState(0);                       // Nr 17 AUTO: ilu auto-usunięto z roboczych
   const [selection, setSelection] = useState<SelectionState>(emptySelection());     // zaznaczone miasta/resorty
   const [transferCities, setTransferCities] = useState<Set<string>>(new Set());      // przesiadki (po nazwie)
   const [taborModalOpen, setTaborModalOpen] = useState(false);
@@ -113,8 +114,12 @@ export default function TransportListsManagement() {
           getSeasonCities(direction).catch(() => [] as CityCounts[]),
           getSeasonParticipants(direction).catch(() => [] as ParticipantRow[]),
         ]);
-        setCities(c); setParticipants(p); setTabors([]); setOrphaned([]);
+        setCities(c); setParticipants(p); setTabors([]); setOrphaned([]); setAutoRemovedCount(0);
       } else {
+        // Nr 17 AUTO: najpierw automatyczne wypadanie z taborów ROBOCZYCH (bezpiecznik: zatwierdzone listy
+        // nietknięte). Dopiero potem dane — orphaned z odczytu = już tylko zatwierdzone (do ręcznej decyzji).
+        const cleanup = await autoCleanupOrphaned(activeConnectionId).catch(
+          () => ({ removed: [] as OrphanedAssignment[], kept_locked: [] as OrphanedAssignment[] }));
         const [c, p, t, o] = await Promise.all([
           getConnectionCities(activeConnectionId).catch(() => [] as CityCounts[]),
           getConnectionParticipants(activeConnectionId).catch(() => [] as ParticipantRow[]),
@@ -122,6 +127,7 @@ export default function TransportListsManagement() {
           getOrphanedAssignments(activeConnectionId).catch(() => [] as OrphanedAssignment[]),
         ]);
         setCities(c); setParticipants(p); setTabors(t); setOrphaned(o);
+        setAutoRemovedCount(cleanup.removed.length);
       }
       setReloadKey((k) => k + 1);
     } finally {
@@ -379,7 +385,17 @@ export default function TransportListsManagement() {
       )}
       {loading && <div className="py-10 text-center text-gray-500">Ładowanie danych transportu…</div>}
 
-      {/* ---------- G04 (Nr 17): KTO WYPADŁ Z TABORU (orphaned) ---------- */}
+      {/* ---------- Nr 17 AUTO: ilu automatycznie wypadło z taborów roboczych ---------- */}
+      {!loading && autoRemovedCount > 0 && (
+        <div className="flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800"
+          data-testid="auto-removed-banner">
+          <UserX className="h-4 w-4" />
+          Automatycznie usunięto {autoRemovedCount} {autoRemovedCount === 1 ? 'uczestnika' : 'uczestników'} z taborów roboczych
+          (zmiana danych: rezygnacja / zmiana turnusu / transport własny / wyjazd przed czasem).
+        </div>
+      )}
+
+      {/* ---------- G04 (Nr 17): KTO WYPADŁ Z TABORU ZATWIERDZONEGO (orphaned — ręcznie) ---------- */}
       {!loading && orphaned.length > 0 && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3" data-testid="orphaned-panel">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
