@@ -7,6 +7,7 @@
 import {
   emptySelection, isCityFullySelected, isResortCellSelected, hasAnySelection,
   toggleCity, toggleResortCell, toggleMaster, calculateSelectedTotal, isParticipantSelected,
+  isTransferParticipant,
   type Resort,
 } from '@/lib/utils/transportSelection';
 
@@ -110,5 +111,28 @@ describe('transportSelection — filtr uczestników', () => {
     const s = toggleResortCell(emptySelection(), 'Warszawa', 'beaver', RESORTS);
     expect(isParticipantSelected(s, 'Warszawa', 'BEAVER')).toBe(true);
     expect(isParticipantSelected(s, 'Warszawa', 'SAWA')).toBe(false);
+  });
+});
+
+describe('transportSelection — przesiadka is_transfer (G01, film E2/E3)', () => {
+  // E2: uczestnik z miasta przesiadkowego (hub Toruń) musi móc trafić na DWIE listy → is_transfer=true.
+  it('uczestnik z miasta przesiadkowego → is_transfer=true', () => {
+    const transfer = new Set(['Toruń', 'Warszawa']);
+    expect(isTransferParticipant('Warszawa', transfer)).toBe(true);
+    expect(isTransferParticipant('Toruń', transfer)).toBe(true);
+  });
+
+  it('uczestnik z miasta nieprzesiadkowego → false (zwykłe wsadzenie, blokada po 1 raz)', () => {
+    const transfer = new Set(['Toruń']);
+    expect(isTransferParticipant('Łódź', transfer)).toBe(false);
+  });
+
+  it('brak miasta uczestnika → false (nie przesiadka)', () => {
+    expect(isTransferParticipant(null, new Set(['Toruń']))).toBe(false);
+    expect(isTransferParticipant('', new Set(['Toruń']))).toBe(false);
+  });
+
+  it('pusty zbiór przesiadek (E3: nikomu nie dano przesiadki) → false', () => {
+    expect(isTransferParticipant('Toruń', new Set())).toBe(false);
   });
 });

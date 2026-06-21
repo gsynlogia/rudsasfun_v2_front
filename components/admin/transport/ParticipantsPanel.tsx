@@ -13,6 +13,7 @@ import { Filter, ChevronsUpDown, ChevronUp, ChevronDown, MoveRight, AlertTriangl
 import { useMemo, useState } from 'react';
 
 import type { ParticipantRow } from '@/lib/types/transportLists';
+import { isTransferParticipant } from '@/lib/utils/transportSelection';
 
 type SortDir = 'asc' | 'desc';
 type PanelMode = 'numbers' | 'participants';
@@ -43,6 +44,7 @@ interface Props {
   selectedTotal: number;
   assignMode: boolean;
   selectedIds: Set<number>;
+  transferCities: Set<string>;           // G01: przystanki oznaczone jako przesiadkowe (hub Toruń)
   onToggleSelect: (rid: number) => void;
   onAssignSelected: () => void;
   onEarlyLeave: (rid: number) => void;
@@ -50,7 +52,7 @@ interface Props {
 }
 
 export default function ParticipantsPanel({
-  participants, panelMode, hasSelection, selectedTotal, assignMode, selectedIds,
+  participants, panelMode, hasSelection, selectedTotal, assignMode, selectedIds, transferCities,
   onToggleSelect, onAssignSelected, onEarlyLeave, onOpenReservation,
 }: Props) {
   const [sortKey, setSortKey] = useState<string>('uczestnik');
@@ -105,6 +107,9 @@ export default function ParticipantsPanel({
   }
 
   // STAN 3 — Uczestnicy (tabela)
+  // G01 (film E2): przesiadkowy uczestnik (przystanek ∈ transferCities) może trafić na 2 listy →
+  // pozostaje wsadzalny (drag + checkbox) mimo „wyszarzenia" po pierwszym przypisaniu.
+  const canAssign = (p: ParticipantRow) => !p.is_assigned || isTransferParticipant(p.city, transferCities);
   const unassignedVisible = rows.filter((p) => !p.is_assigned);
   const cols = COLUMNS;
 
@@ -169,15 +174,18 @@ export default function ParticipantsPanel({
               const isSelected = selectedIds.has(p.reservation_id);
               return (
                 <tr key={p.reservation_id}
-                  draggable={assignMode && !p.is_assigned}
+                  draggable={assignMode && canAssign(p)}
                   onDragStart={(e) => e.dataTransfer.setData('text/plain', String(p.reservation_id))}
                   className={`border-b border-gray-200 transition-colors ${
                     p.is_assigned ? 'bg-gray-100 opacity-60' : isSelected ? 'bg-blue-50' : 'hover:bg-blue-50'} ${
-                    assignMode && !p.is_assigned ? 'cursor-grab' : ''}`}>
+                    assignMode && canAssign(p) ? 'cursor-grab' : ''}`}>
                   {assignMode && (
                     <td className="px-3 py-3 text-center">
-                      {!p.is_assigned && (
-                        <input type="checkbox" aria-label={`Zaznacz ${p.last_name} ${p.first_name}`}
+                      {canAssign(p) && (
+                        <input type="checkbox"
+                          aria-label={`Zaznacz ${p.last_name} ${p.first_name}`}
+                          title={p.is_assigned ? 'Przesiadka — można wsadzić na drugą listę' : undefined}
+                          data-testid={p.is_assigned ? 'transfer-reassign' : undefined}
                           checked={isSelected} onChange={() => onToggleSelect(p.reservation_id)} />
                       )}
                     </td>

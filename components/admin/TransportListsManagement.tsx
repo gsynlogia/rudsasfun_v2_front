@@ -19,7 +19,7 @@ import {
 } from '@/lib/services/transportListsApi';
 import {
   type Resort, type SelectionState, emptySelection, toggleCity, toggleResortCell, toggleMaster,
-  hasAnySelection, calculateSelectedTotal, isParticipantSelected,
+  hasAnySelection, calculateSelectedTotal, isParticipantSelected, isTransferParticipant,
 } from '@/lib/utils/transportSelection';
 
 import AddConnectionModal from './transport/AddConnectionModal';
@@ -160,23 +160,32 @@ export default function TransportListsManagement() {
     });
   }, []);
 
+  // G01 (film E2): mapa rezerwacja → przystanek, by ustalić przesiadkowość przy wsadzaniu do taboru.
+  const participantCityById = useMemo(() => {
+    const m = new Map<number, string | null>();
+    for (const p of participants) m.set(p.reservation_id, p.city ?? null);
+    return m;
+  }, [participants]);
+
   const assignToOpenTabor = useCallback(async (rids: number[]) => {
     if (openTaborId == null || rids.length === 0) return;
     let overflow: { capacity?: number; occupied?: number } | null = null;
     for (const rid of rids) {
-      const r = await assignParticipant(openTaborId, rid);
+      const transfer = isTransferParticipant(participantCityById.get(rid) ?? null, transferCities);
+      const r = await assignParticipant(openTaborId, rid, transfer);
       if (r.overflow) { overflow = { capacity: r.capacity, occupied: r.occupied }; break; }
     }
     setSelectedIds(new Set());
     await reloadData();
     if (overflow) setOverflowInfo(overflow);
-  }, [openTaborId, reloadData]);
+  }, [openTaborId, reloadData, participantCityById, transferCities]);
 
   const dropAssign = useCallback(async (taborId: number, rid: number) => {
-    const r = await assignParticipant(taborId, rid);
+    const transfer = isTransferParticipant(participantCityById.get(rid) ?? null, transferCities);
+    const r = await assignParticipant(taborId, rid, transfer);
     await reloadData();
     if (r.overflow) setOverflowInfo({ capacity: r.capacity, occupied: r.occupied });
-  }, [reloadData]);
+  }, [reloadData, participantCityById, transferCities]);
 
   const confirmDeleteTabor = useCallback(async () => {
     if (deleteTarget == null) return;
@@ -343,7 +352,7 @@ export default function TransportListsManagement() {
           <Panel title={middleTitle}>
             <ParticipantsPanel participants={displayedParticipants} panelMode={panelMode}
               hasSelection={hasSelection} selectedTotal={selectedTotal} assignMode={assignMode}
-              selectedIds={selectedIds} onToggleSelect={toggleSelect}
+              selectedIds={selectedIds} onToggleSelect={toggleSelect} transferCities={transferCities}
               onAssignSelected={() => void assignToOpenTabor([...selectedIds])}
               onEarlyLeave={(rid) => { setEarlyLeaveTarget(rid); setEarlyLeaveNote(''); }}
               onOpenReservation={(num) => { if (num && typeof window !== 'undefined') window.open(`/admin-panel/rezerwacja/${num}`, '_blank'); }} />

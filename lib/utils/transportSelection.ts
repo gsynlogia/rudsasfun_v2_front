@@ -122,6 +122,19 @@ export function calculateSelectedTotal(s: SelectionState, cities: CityLike[]): n
   return total;
 }
 
+/**
+ * G01 (film E2/E3): czy uczestnik kwalifikuje się jako PRZESIADKOWY.
+ * Miasto-przystanek uczestnika jest oznaczone checkboxem ⇄ (transferCities). Przesiadkowy uczestnik
+ * (hub Toruń) może trafić na DWIE listy transportowe — flaga is_transfer pozwala backendowi na duplikat
+ * i odblokowuje ponowne wsadzenie mimo „wyszarzenia" (już przypisany raz). Bez przesiadki = blokada po 1 raz.
+ */
+export function isTransferParticipant(
+  participantCity: string | null, transferCities: Set<string>,
+): boolean {
+  if (!participantCity) return false;
+  return transferCities.has(participantCity);
+}
+
 /** Czy uczestnik (po przystanku=mieście i regionie) należy do bieżącego zaznaczenia. */
 export function isParticipantSelected(
   s: SelectionState, participantCity: string | null, participantRegion: string | null,
