@@ -168,6 +168,18 @@ export function toggleColumnKey(visible: string[], key: string): string[] {
   return visible.includes(key) ? visible.filter((k) => k !== key) : [...visible, key];
 }
 
+/**
+ * Toggle id w zbiorze z górnym limitem (Nr 35 „Porównaj" — max 2, rozkaz Pana 2026-06-21).
+ * Odznaczenie zawsze możliwe; zaznaczenie tylko gdy rozmiar < max (inaczej zwraca zbiór bez zmian).
+ */
+export function boundedToggle(set: Set<number>, id: number, max: number): Set<number> {
+  const next = new Set(set);
+  if (next.has(id)) { next.delete(id); return next; }
+  if (next.size >= max) return next;        // limit osiągnięty — nie dodawaj
+  next.add(id);
+  return next;
+}
+
 /** Czy uczestnik (po przystanku=mieście i regionie) należy do bieżącego zaznaczenia. */
 export function isParticipantSelected(
   s: SelectionState, participantCity: string | null, participantRegion: string | null,

@@ -1,14 +1,17 @@
 'use client';
 
 /**
- * Widok „Porównaj" (Nr 35) — zestawienie 2+ połączeń obok siebie (TransportCompareModal/View z makiety).
- * Krok 1: wybór połączeń checkboxami (min 2 — decyzja właściciela „2 i więcej"). Krok 2: tabele liczb per miasto side-by-side.
+ * Widok „Porównaj" (Nr 35) — zestawienie DOKŁADNIE 2 połączeń obok siebie (rozkaz Pana: max 2).
+ * Krok 1: wybór 2 połączeń checkboxami (limit 2). Krok 2: tabele liczb per miasto side-by-side.
  */
 import { X, GitCompare } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import type { Connection, CompareEntry } from '@/lib/types/transportLists';
 import { listConnections, compareConnections } from '@/lib/services/transportListsApi';
+import { boundedToggle } from '@/lib/utils/transportSelection';
+
+const COMPARE_MAX = 2;   // rozkaz Pana 2026-06-21: porównanie ograniczone do max 2
 
 export default function TransportCompareModal({ onClose }: { onClose: () => void }) {
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -18,12 +21,7 @@ export default function TransportCompareModal({ onClose }: { onClose: () => void
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, []);
 
-  const toggle = (id: number) => setSelected((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    return next;
-  });
+  const toggle = (id: number) => setSelected((prev) => boundedToggle(prev, id, COMPARE_MAX));
 
   async function handleCompare() {
     setError(null);
@@ -44,12 +42,14 @@ export default function TransportCompareModal({ onClose }: { onClose: () => void
         <div className="flex-1 overflow-auto px-5 py-4">
           {!result ? (
             <>
-              <p className="mb-2 text-sm text-gray-600">Zaznacz co najmniej 2 połączenia do porównania:</p>
+              <p className="mb-2 text-sm text-gray-600">Zaznacz dokładnie 2 połączenia do porównania (max 2):</p>
               <ul className="flex flex-col gap-1.5" data-testid="compare-options">
-                {connections.map((c) => (
+                {connections.map((c) => {
+                  const limitReached = selected.size >= COMPARE_MAX && !selected.has(c.id);
+                  return (
                   <li key={c.id}>
-                    <label className="flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm">
-                      <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} />
+                    <label className={`flex items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm ${limitReached ? 'opacity-40' : ''}`}>
+                      <input type="checkbox" checked={selected.has(c.id)} disabled={limitReached} onChange={() => toggle(c.id)} />
                       <span className="font-medium">{c.name}</span>
                       <span className={`rounded px-1.5 py-0.5 text-xs ${c.direction === 'return' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}`}>
                         {c.direction === 'return' ? 'POWRÓT' : 'DO ośrodka'}
@@ -57,7 +57,8 @@ export default function TransportCompareModal({ onClose }: { onClose: () => void
                       {c.date && <span className="text-xs text-gray-500">{c.date}</span>}
                     </label>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
               {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             </>

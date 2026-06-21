@@ -7,7 +7,7 @@
 import {
   emptySelection, isCityFullySelected, isResortCellSelected, hasAnySelection,
   toggleCity, toggleResortCell, toggleMaster, calculateSelectedTotal, isParticipantSelected,
-  isTransferParticipant, canReassignParticipant, distinctSorted, toggleColumnKey,
+  isTransferParticipant, canReassignParticipant, distinctSorted, toggleColumnKey, boundedToggle,
   type Resort,
 } from '@/lib/utils/transportSelection';
 
@@ -176,5 +176,20 @@ describe('transportSelection — toggleColumnKey (konfiguracja kolumn „Tabela"
   });
   it('dodaje wcześniej ukrytą kolumnę', () => {
     expect(toggleColumnKey(['uczestnik'], 'tag')).toEqual(['uczestnik', 'tag']);
+  });
+});
+
+describe('transportSelection — boundedToggle (Porównaj max 2, rozkaz Pana)', () => {
+  it('dodaje gdy poniżej limitu', () => {
+    expect([...boundedToggle(new Set<number>(), 5, 2)]).toEqual([5]);
+    expect([...boundedToggle(new Set([1]), 2, 2)]).toEqual([1, 2]);
+  });
+  it('NIE dodaje 3. elementu gdy limit=2', () => {
+    const r = boundedToggle(new Set([1, 2]), 3, 2);
+    expect(r.size).toBe(2);
+    expect(r.has(3)).toBe(false);
+  });
+  it('zawsze pozwala odznaczyć (nawet przy pełnym limicie)', () => {
+    expect([...boundedToggle(new Set([1, 2]), 1, 2)]).toEqual([2]);
   });
 });
