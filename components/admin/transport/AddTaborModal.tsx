@@ -81,13 +81,21 @@ export default function AddTaborModal({ connectionId, tabor, onClose, onSaved }:
         <div className="mb-3">
           <label className="mb-1 block text-sm font-medium text-gray-700">Typ taboru</label>
           <div className="flex gap-2">
-            {TYPES.map((t) => (
-              <button key={t.value} type="button" onClick={() => setType(t.value)}
+            {TYPES.map((t) => {
+              // Film G2: „Pociąg" wyszarzony — zarezerwowany na zapas (jeszcze nieobsługiwany).
+              const disabled = t.value === 'pociag';
+              return (
+              <button key={t.value} type="button" disabled={disabled}
+                onClick={() => !disabled && setType(t.value)}
+                data-testid={`tabor-type-${t.value}`}
+                title={disabled ? 'Pociąg — wkrótce (na zapas)' : undefined}
                 className={`flex-1 rounded-md border px-2 py-1.5 text-sm ${
-                  type === t.value ? 'border-sky-600 bg-sky-50 text-sky-700' : 'border-gray-300 text-gray-700'}`}>
+                  disabled ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'
+                    : type === t.value ? 'border-sky-600 bg-sky-50 text-sky-700' : 'border-gray-300 text-gray-700'}`}>
                 {t.label}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
