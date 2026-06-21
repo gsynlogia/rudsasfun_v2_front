@@ -6,11 +6,12 @@
  * Nr 32: nagłówek „za przednią szybę" + akcje Excel / Drukuj / Zapisz bufor / Zatwierdź (immutable po approve).
  * Nr 33: kolumna „Upoważnienia" renderowana TYLKO dla kierunku return; edytowalna w buforze (P1 — ręcznie).
  */
-import { X, FileSpreadsheet, Printer, Check, Save } from 'lucide-react';
+import { X, FileSpreadsheet, Printer, Check, Save, Trash2, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import type { Direction, ListPayload, ListPayloadParticipant, TransportListDetail } from '@/lib/types/transportLists';
 import { releaseList, patchList, approveList, downloadListExcel } from '@/lib/services/transportListsApi';
+import { addBlankParticipant, removeParticipantAt } from '@/lib/utils/transportListPayload';
 
 interface Props {
   taborId: number;
@@ -58,6 +59,9 @@ export default function TransportDocumentModal({ taborId, direction, onClose, on
       return { ...p, participants };
     });
   };
+  // film: ręczne dodanie/usunięcie osoby na liście (bufor) — NIE dotyka bazy rezerwacji.
+  const addRow = () => setPayload((p) => (p ? addBlankParticipant(p, isReturn) : p));
+  const removeRow = (idx: number) => setPayload((p) => (p ? removeParticipantAt(p, idx) : p));
 
   async function savebuffer() {
     if (!list || !payload) return;
@@ -129,14 +133,27 @@ export default function TransportDocumentModal({ taborId, direction, onClose, on
                     {['LP', 'Imię', 'Nazwisko', 'Rocznik', 'Opiekun', 'Kontakt', 'Turnus', 'Przystanek', 'Miejsce zbiórki']
                       .map((h) => <th key={h} className="border px-1.5 py-1">{h}</th>)}
                     {isReturn && <th className="border px-1.5 py-1" data-testid="col-upowaznienia">Upoważnienia</th>}
+                    {!immutable && <th className="border px-1.5 py-1" />}
                   </tr>
                 </thead>
                 <tbody>
                   {groups.map((g) => g.rows.map(({ row, idx }, gi) => (
                     <tr key={row.reservation_id ?? `${g.stop}-${idx}`} className={resortBg(row.turnus)}>
                       <td className="border px-1.5 py-1">{row.lp}</td>
-                      <td className="border px-1.5 py-1">{row.first_name}</td>
-                      <td className="border px-1.5 py-1">{row.last_name}</td>
+                      <td className="border px-1 py-0.5">
+                        {immutable ? row.first_name : (
+                          <input value={row.first_name ?? ''} data-testid="document-first-name"
+                            onChange={(e) => updateRow(idx, 'first_name', e.target.value)}
+                            className="w-full bg-transparent px-1 text-xs" placeholder="imię" />
+                        )}
+                      </td>
+                      <td className="border px-1 py-0.5">
+                        {immutable ? row.last_name : (
+                          <input value={row.last_name ?? ''} data-testid="document-last-name"
+                            onChange={(e) => updateRow(idx, 'last_name', e.target.value)}
+                            className="w-full bg-transparent px-1 text-xs" placeholder="nazwisko" />
+                        )}
+                      </td>
                       <td className="border px-1.5 py-1">{row.rocznik ?? ''}</td>
                       <td className="border px-1.5 py-1">{row.opiekun ?? ''}</td>
                       <td className="border px-1.5 py-1">{row.kontakt ?? ''}</td>
@@ -156,10 +173,25 @@ export default function TransportDocumentModal({ taborId, direction, onClose, on
                             className="w-full bg-transparent px-1 text-xs" placeholder="kto odbiera" />
                         </td>
                       )}
+                      {!immutable && (
+                        <td className="border px-1 py-0.5 text-center">
+                          <button type="button" data-testid="document-remove-row" title="Usuń osobę z listy"
+                            onClick={() => removeRow(idx)}
+                            className="rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   )))}
                 </tbody>
               </table>
+              {!immutable && (
+                <button type="button" onClick={addRow} data-testid="document-add-row"
+                  className="mt-2 flex items-center gap-1.5 rounded-md border border-dashed border-gray-400 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
+                  <UserPlus className="h-4 w-4" /> Dodaj osobę
+                </button>
+              )}
             </>
           )}
         </div>
