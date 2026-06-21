@@ -160,6 +160,14 @@ export function distinctSorted(values: (string | null | undefined)[]): string[] 
   return [...set].sort((a, b) => a.localeCompare(b, 'pl'));
 }
 
+/**
+ * Konfiguracja kolumn panelu Uczestnicy („Tabela", film: „widoki na poziomie local storage zaznaczasz").
+ * Przełącza widoczność kolumny po kluczu (toggle w liście widocznych).
+ */
+export function toggleColumnKey(visible: string[], key: string): string[] {
+  return visible.includes(key) ? visible.filter((k) => k !== key) : [...visible, key];
+}
+
 /** Czy uczestnik (po przystanku=mieście i regionie) należy do bieżącego zaznaczenia. */
 export function isParticipantSelected(
   s: SelectionState, participantCity: string | null, participantRegion: string | null,

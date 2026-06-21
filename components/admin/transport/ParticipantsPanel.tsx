@@ -28,6 +28,10 @@ const COLUMNS: Column[] = [
   { key: 'tag', label: 'Tag', get: (p) => p.tag ?? '' },
 ];
 
+// Konfiguracja kolumn („Tabela", localStorage): meta + domyślnie wszystkie widoczne.
+export const PARTICIPANT_COLUMN_META = COLUMNS.map((c) => ({ key: c.key, label: c.label }));
+export const DEFAULT_VISIBLE_COLUMNS = COLUMNS.map((c) => c.key);
+
 /** Kolor tagu wg makiety: B*→zielony, S*→niebieski, L*→pomarańczowy. */
 function tagColor(tag: string | null): string {
   const t = (tag ?? '').toUpperCase();
@@ -45,6 +49,7 @@ interface Props {
   assignMode: boolean;
   selectedIds: Set<number>;
   transferCities: Set<string>;           // G01: przystanki oznaczone jako przesiadkowe (hub Toruń)
+  visibleColumns: string[];              // „Tabela": klucze widocznych kolumn
   onToggleSelect: (rid: number) => void;
   onAssignSelected: () => void;
   onEarlyLeave: (rid: number) => void;
@@ -53,7 +58,7 @@ interface Props {
 
 export default function ParticipantsPanel({
   participants, panelMode, hasSelection, selectedTotal, assignMode, selectedIds, transferCities,
-  onToggleSelect, onAssignSelected, onEarlyLeave, onOpenReservation,
+  visibleColumns, onToggleSelect, onAssignSelected, onEarlyLeave, onOpenReservation,
 }: Props) {
   const [sortKey, setSortKey] = useState<string>('uczestnik');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -118,7 +123,8 @@ export default function ParticipantsPanel({
   // pozostaje wsadzalny (drag + checkbox) mimo „wyszarzenia" po pierwszym przypisaniu.
   const canAssign = (p: ParticipantRow) => canReassignParticipant(p.is_assigned, p.city, transferCities);
   const unassignedVisible = rows.filter((p) => !p.is_assigned);
-  const cols = COLUMNS;
+  const cols = COLUMNS.filter((c) => visibleColumns.includes(c.key));   // „Tabela": tylko widoczne kolumny
+  const show = (key: string) => visibleColumns.includes(key);
 
   return (
     <div className="relative flex h-full flex-col">
@@ -204,18 +210,22 @@ export default function ParticipantsPanel({
                       )}
                     </td>
                   )}
+                  {show('uczestnik') && (
                   <td className="px-3 py-3 font-medium">
                     <button type="button" onClick={() => onOpenReservation(p.reservation_number)}
                       className="text-[#00adee] hover:underline" data-testid="participant-link">
                       {`${p.last_name ?? ''} ${p.first_name ?? ''}`.trim() || `#${p.reservation_id}`}
                     </button>
                   </td>
-                  <td className="px-3 py-3 text-gray-600">{p.topic || '—'}</td>
-                  <td className="px-3 py-3 text-gray-600">{p.city || '—'}</td>
-                  <td className="px-3 py-3 text-gray-600">{p.participant_city || '—'}</td>
+                  )}
+                  {show('temat') && <td className="px-3 py-3 text-gray-600">{p.topic || '—'}</td>}
+                  {show('przystanek') && <td className="px-3 py-3 text-gray-600">{p.city || '—'}</td>}
+                  {show('miasto') && <td className="px-3 py-3 text-gray-600">{p.participant_city || '—'}</td>}
+                  {show('tag') && (
                   <td className="px-3 py-3">
                     {p.tag && <span className={`rounded-md px-3 py-1 text-xs font-medium text-white ${tagColor(p.tag)}`}>{p.tag}</span>}
                   </td>
+                  )}
                   {!assignMode && (
                     <td className="px-2 py-3 text-right">
                       <button type="button" title="Wyjazd przed zakończeniem" data-testid="early-leave-btn"

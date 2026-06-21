@@ -22,14 +22,14 @@ import {
 } from '@/lib/services/transportListsApi';
 import {
   type Resort, type SelectionState, emptySelection, toggleCity, toggleResortCell, toggleMaster,
-  hasAnySelection, calculateSelectedTotal, isParticipantSelected, isTransferParticipant,
+  hasAnySelection, calculateSelectedTotal, isParticipantSelected, isTransferParticipant, toggleColumnKey,
 } from '@/lib/utils/transportSelection';
 
 import AddConnectionModal from './transport/AddConnectionModal';
 import AddTaborModal from './transport/AddTaborModal';
 import CitiesPanel from './transport/CitiesPanel';
 import DeleteTaborModal from './transport/DeleteTaborModal';
-import ParticipantsPanel from './transport/ParticipantsPanel';
+import ParticipantsPanel, { PARTICIPANT_COLUMN_META, DEFAULT_VISIBLE_COLUMNS } from './transport/ParticipantsPanel';
 import TaborOverflowModal from './transport/TaborOverflowModal';
 import TaborPanel from './transport/TaborPanel';
 import TransportCompareModal from './transport/TransportCompareModal';
@@ -67,6 +67,26 @@ export default function TransportListsManagement() {
   const [earlyLeaveCount, setEarlyLeaveCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);  // „Tabela"
+  const [columnsModalOpen, setColumnsModalOpen] = useState(false);
+
+  // „Tabela": konfiguracja widocznych kolumn zapamiętana w localStorage (film: „widoki na poziomie local storage").
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('transport_participant_columns');
+      const arr = saved ? JSON.parse(saved) : null;
+      if (Array.isArray(arr) && arr.length) setVisibleColumns(arr);
+    } catch { /* brak/uszkodzony localStorage → domyślne */ }
+  }, []);
+
+  const toggleColumn = useCallback((key: string) => {
+    setVisibleColumns((cur) => {
+      const next = toggleColumnKey(cur, key);
+      const safe = next.length ? next : cur;   // nie pozwól ukryć wszystkich kolumn
+      try { localStorage.setItem('transport_participant_columns', JSON.stringify(safe)); } catch { /* ignore */ }
+      return safe;
+    });
+  }, []);
 
   const loadConnections = useCallback(async () => {
     setError(null);
@@ -293,9 +313,9 @@ export default function TransportListsManagement() {
               <Users className="h-4 w-4" /> Uczestnicy
             </button>
           </div>
-          <button type="button"
-            className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-400"
-            disabled title="Konfiguracja kolumn — wkrótce">
+          <button type="button" onClick={() => setColumnsModalOpen(true)} data-testid="open-columns"
+            className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            title="Konfiguracja widocznych kolumn">
             <Table2 className="h-4 w-4" /> Tabela
           </button>
         </div>
@@ -390,6 +410,7 @@ export default function TransportListsManagement() {
             <ParticipantsPanel participants={displayedParticipants} panelMode={panelMode}
               hasSelection={hasSelection} selectedTotal={selectedTotal} assignMode={assignMode}
               selectedIds={selectedIds} onToggleSelect={toggleSelect} transferCities={transferCities}
+              visibleColumns={visibleColumns}
               onAssignSelected={() => void assignToOpenTabor([...selectedIds])}
               onEarlyLeave={(rid) => { setEarlyLeaveTarget(rid); setEarlyLeaveNote(''); }}
               onOpenReservation={(num) => { if (num && typeof window !== 'undefined') window.open(`/admin-panel/rezerwacja/${num}`, '_blank'); }} />
@@ -445,6 +466,32 @@ export default function TransportListsManagement() {
           onClose={() => setDocumentTabor(null)} onApproved={() => void reloadData()} />
       )}
       {listsModalOpen && <TransportListsModal onClose={() => setListsModalOpen(false)} />}
+      {columnsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="columns-modal">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Widoczne kolumny uczestników</h3>
+              <button type="button" onClick={() => setColumnsModalOpen(false)} className="rounded p-1 hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-3 text-xs text-gray-500">Zapamiętane w tej przeglądarce (localStorage).</p>
+            <div className="flex flex-col gap-2">
+              {PARTICIPANT_COLUMN_META.map((c) => (
+                <label key={c.key} className="flex items-center gap-2 text-sm text-gray-800">
+                  <input type="checkbox" checked={visibleColumns.includes(c.key)} data-testid={`col-toggle-${c.key}`}
+                    onChange={() => toggleColumn(c.key)} />
+                  {c.label}
+                </label>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button type="button" onClick={() => setColumnsModalOpen(false)}
+                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white">Gotowe</button>
+            </div>
+          </div>
+        </div>
+      )}
       {compareOpen && <TransportCompareModal onClose={() => setCompareOpen(false)} />}
       {earlyLeaveTarget != null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="early-leave-modal">

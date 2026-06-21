@@ -7,7 +7,7 @@
 import {
   emptySelection, isCityFullySelected, isResortCellSelected, hasAnySelection,
   toggleCity, toggleResortCell, toggleMaster, calculateSelectedTotal, isParticipantSelected,
-  isTransferParticipant, canReassignParticipant, distinctSorted,
+  isTransferParticipant, canReassignParticipant, distinctSorted, toggleColumnKey,
   type Resort,
 } from '@/lib/utils/transportSelection';
 
@@ -167,5 +167,14 @@ describe('transportSelection — distinctSorted (filtr = lista rozwijana, film: 
 
   it('przycina białe znaki i traktuje jak tę samą wartość', () => {
     expect(distinctSorted([' Akrobatyka ', 'Akrobatyka'])).toEqual(['Akrobatyka']);
+  });
+});
+
+describe('transportSelection — toggleColumnKey (konfiguracja kolumn „Tabela", film: localStorage)', () => {
+  it('odznacza widoczną kolumnę', () => {
+    expect(toggleColumnKey(['uczestnik', 'temat', 'tag'], 'temat')).toEqual(['uczestnik', 'tag']);
+  });
+  it('dodaje wcześniej ukrytą kolumnę', () => {
+    expect(toggleColumnKey(['uczestnik'], 'tag')).toEqual(['uczestnik', 'tag']);
   });
 });
