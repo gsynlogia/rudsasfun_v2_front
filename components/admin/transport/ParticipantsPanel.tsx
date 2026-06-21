@@ -143,8 +143,8 @@ export default function ParticipantsPanel({
           </button>
         </div>
       )}
-      {/* Floating badge ŁĄCZNIE (makieta) */}
-      <div className="pointer-events-none fixed bottom-20 right-8 z-40" data-testid="total-badge">
+      {/* Floating badge ŁĄCZNIE — absolute względem panelu (relative parent), by NIE „uciekał" przy scrollu strony */}
+      <div className="pointer-events-none absolute bottom-4 right-4 z-40" data-testid="total-badge">
         <div className="rounded-xl border-2 border-white bg-gradient-to-br from-[#00adee] to-[#0099d6] px-5 py-3 text-white shadow-xl">
           <p className="mb-0.5 text-xs font-medium opacity-90">ŁĄCZNIE</p>
           <div className="text-3xl font-bold leading-none">{selectedTotal}</div>
