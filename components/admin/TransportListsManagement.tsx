@@ -8,14 +8,17 @@
  * panel Uczestnicy (pusty gdy nic nie zaznaczone). Layout: pasek akcji + pasek połączeń (kierunek) + 3 strefy.
  */
 import {
-  MapPin, Home, Plus, Users, Hash, GitCompare, ListChecks, Table2, Bus, AlertCircle, X,
+  MapPin, Home, Plus, Users, Hash, GitCompare, ListChecks, Table2, Bus, AlertCircle, X, UserX, Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Connection, Direction, CityCounts, ParticipantRow, Tabor } from '@/lib/types/transportLists';
+import type {
+  Connection, Direction, CityCounts, ParticipantRow, Tabor, OrphanedAssignment,
+} from '@/lib/types/transportLists';
 import {
   listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant, deleteTabor,
   deleteConnection, setEarlyLeave, getEarlyLeaveStats, getSeasonCities, getSeasonParticipants,
+  getOrphanedAssignments, removeParticipant,
 } from '@/lib/services/transportListsApi';
 import {
   type Resort, type SelectionState, emptySelection, toggleCity, toggleResortCell, toggleMaster,
@@ -44,6 +47,7 @@ export default function TransportListsManagement() {
   const [cities, setCities] = useState<CityCounts[]>([]);
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
   const [tabors, setTabors] = useState<Tabor[]>([]);
+  const [orphaned, setOrphaned] = useState<OrphanedAssignment[]>([]);                // G04: kto wypadł z taboru
   const [selection, setSelection] = useState<SelectionState>(emptySelection());     // zaznaczone miasta/resorty
   const [transferCities, setTransferCities] = useState<Set<string>>(new Set());      // przesiadki (po nazwie)
   const [taborModalOpen, setTaborModalOpen] = useState(false);
@@ -86,14 +90,15 @@ export default function TransportListsManagement() {
           getSeasonCities(direction).catch(() => [] as CityCounts[]),
           getSeasonParticipants(direction).catch(() => [] as ParticipantRow[]),
         ]);
-        setCities(c); setParticipants(p); setTabors([]);
+        setCities(c); setParticipants(p); setTabors([]); setOrphaned([]);
       } else {
-        const [c, p, t] = await Promise.all([
+        const [c, p, t, o] = await Promise.all([
           getConnectionCities(activeConnectionId).catch(() => [] as CityCounts[]),
           getConnectionParticipants(activeConnectionId).catch(() => [] as ParticipantRow[]),
           listTabors(activeConnectionId).catch(() => [] as Tabor[]),
+          getOrphanedAssignments(activeConnectionId).catch(() => [] as OrphanedAssignment[]),
         ]);
-        setCities(c); setParticipants(p); setTabors(t);
+        setCities(c); setParticipants(p); setTabors(t); setOrphaned(o);
       }
       setReloadKey((k) => k + 1);
     } finally {
@@ -186,6 +191,12 @@ export default function TransportListsManagement() {
     await reloadData();
     if (r.overflow) setOverflowInfo({ capacity: r.capacity, occupied: r.occupied });
   }, [reloadData, participantCityById, transferCities]);
+
+  // Wspólny dla G04 (usuń wypadniętego z listy orphaned) i G06 (wyjmij uczestnika z taboru).
+  const handleRemoveParticipant = useCallback(async (participantId: number) => {
+    await removeParticipant(participantId);
+    await reloadData();
+  }, [reloadData]);
 
   const confirmDeleteTabor = useCallback(async () => {
     if (deleteTarget == null) return;
@@ -339,6 +350,32 @@ export default function TransportListsManagement() {
         </div>
       )}
       {loading && <div className="py-10 text-center text-gray-500">Ładowanie danych transportu…</div>}
+
+      {/* ---------- G04 (Nr 17): KTO WYPADŁ Z TABORU (orphaned) ---------- */}
+      {!loading && orphaned.length > 0 && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3" data-testid="orphaned-panel">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
+            <UserX className="h-4 w-4" /> Uczestnicy, którzy wypadli z taboru ({orphaned.length})
+            <span className="font-normal text-amber-700">— zmiana danych po wsadzeniu; usuń z listy.</span>
+          </div>
+          <ul className="flex flex-col gap-1">
+            {orphaned.map((o) => (
+              <li key={o.participant_id} data-testid="orphaned-row"
+                className="flex items-center justify-between gap-3 rounded bg-white px-3 py-1.5 text-sm">
+                <span className="text-gray-800">
+                  {participantNames.get(o.reservation_id) ?? `#${o.reservation_id}`}
+                  <span className="ml-2 text-amber-700">— {o.reason}</span>
+                </span>
+                <button type="button" data-testid="orphaned-remove" title="Usuń wypadniętego z taboru"
+                  onClick={() => void handleRemoveParticipant(o.participant_id)}
+                  className="flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700">
+                  <Trash2 className="h-3.5 w-3.5" /> Usuń z taboru
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* ---------- 3 STREFY (Full HD) ---------- */}
       {!loading && (
