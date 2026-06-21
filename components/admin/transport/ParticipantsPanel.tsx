@@ -26,11 +26,17 @@ const COLUMNS: Column[] = [
   { key: 'przystanek', label: 'Przystanek', get: (p) => p.city ?? '' },
   { key: 'miasto', label: 'Miasto', get: (p) => p.participant_city ?? '' },
   { key: 'tag', label: 'Tag', get: (p) => p.tag ?? '' },
+  // Dodatkowe kolumny z procesu rezerwacji (domyślnie ukryte — włączane w „Tabeli").
+  { key: 'rocznik', label: 'Rocznik', get: (p) => (p.age != null ? String(p.age) : '') },
+  { key: 'plec', label: 'Płeć', get: (p) => p.gender ?? '' },
+  { key: 'opiekun', label: 'Opiekun', get: (p) => p.guardian ?? '' },
+  { key: 'kontakt', label: 'Kontakt', get: (p) => p.guardian_contact ?? '' },
+  { key: 'uwagi', label: 'Uwagi', get: (p) => p.additional_info ?? '' },
 ];
 
-// Konfiguracja kolumn („Tabela", localStorage): meta + domyślnie wszystkie widoczne.
+// Konfiguracja kolumn („Tabela", localStorage). Wszystkie dostępne; domyślnie widoczne tylko pierwsze 5.
 export const PARTICIPANT_COLUMN_META = COLUMNS.map((c) => ({ key: c.key, label: c.label }));
-export const DEFAULT_VISIBLE_COLUMNS = COLUMNS.map((c) => c.key);
+export const DEFAULT_VISIBLE_COLUMNS = ['uczestnik', 'temat', 'przystanek', 'miasto', 'tag'];
 
 /** Kolor tagu wg makiety: B*→zielony, S*→niebieski, L*→pomarańczowy. */
 function tagColor(tag: string | null): string {
@@ -226,6 +232,11 @@ export default function ParticipantsPanel({
                     {p.tag && <span className={`rounded-md px-3 py-1 text-xs font-medium text-white ${tagColor(p.tag)}`}>{p.tag}</span>}
                   </td>
                   )}
+                  {show('rocznik') && <td className="px-3 py-3 text-gray-600">{p.age ?? '—'}</td>}
+                  {show('plec') && <td className="px-3 py-3 text-gray-600">{p.gender ?? '—'}</td>}
+                  {show('opiekun') && <td className="px-3 py-3 text-gray-600">{p.guardian ?? '—'}</td>}
+                  {show('kontakt') && <td className="px-3 py-3 text-gray-600">{p.guardian_contact ?? '—'}</td>}
+                  {show('uwagi') && <td className="max-w-[220px] truncate px-3 py-3 text-gray-600" title={p.additional_info ?? ''}>{p.additional_info ?? '—'}</td>}
                   {!assignMode && (
                     <td className="px-2 py-3 text-right">
                       <button type="button" title="Wyjazd przed zakończeniem" data-testid="early-leave-btn"

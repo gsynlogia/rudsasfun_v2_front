@@ -105,6 +105,10 @@ export interface ParticipantRow {
   transport_city_id: number | null;
   is_assigned: boolean;
   early_leave: boolean;             // G05: 'wyjazd przed zakończeniem' (czerwony wiersz)
+  gender: string | null;            // płeć (Chłopiec/Dziewczynka) — kolumna „Tabela"
+  additional_info: string | null;   // uwagi uczestnika z rezerwacji — kolumna „Tabela"
+  guardian: string | null;          // opiekun (imię+nazwisko)
+  guardian_contact: string | null;  // telefon opiekuna
 }
 
 export interface TaborParticipant {
