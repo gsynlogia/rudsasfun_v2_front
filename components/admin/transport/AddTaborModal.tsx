@@ -32,6 +32,7 @@ export default function AddTaborModal({ connectionId, tabor, onClose, onSaved }:
   const [seats, setSeats] = useState(tabor?.seats ?? 50);
   const [supervisorSeats, setSupervisorSeats] = useState(tabor?.supervisor_seats ?? 0);
   const [carrier, setCarrier] = useState(tabor?.carrier ?? '');
+  const [carrierPhone, setCarrierPhone] = useState(tabor?.carrier_phone ?? '');
   const [driver, setDriver] = useState(tabor?.driver ?? '');
   const [driverPhone, setDriverPhone] = useState(tabor?.driver_phone ?? '');
   const [manager, setManager] = useState(tabor?.transport_manager ?? '');
@@ -52,7 +53,8 @@ export default function AddTaborModal({ connectionId, tabor, onClose, onSaved }:
     setSaving(true);
     const body = {
       type, name: name || null, number: number || null, seats, supervisor_seats: effectiveSupervisor,
-      carrier: carrier || null, driver: driver || null, driver_phone: driverPhone || null,
+      carrier: carrier || null, carrier_phone: carrierPhone || null,
+      driver: driver || null, driver_phone: driverPhone || null,
       transport_manager: manager || null, manager_phone: managerPhone || null,
       supervisors: supervisors.slice(0, extraSupervisorSlots),
       additional_info: info || null,
@@ -101,6 +103,7 @@ export default function AddTaborModal({ connectionId, tabor, onClose, onSaved }:
               onChange={(e) => setSupervisorSeats(Math.max(0, Number(e.target.value) || 0))} />
           </Field>
           <Field label="Przewoźnik"><input className={INPUT} value={carrier} onChange={(e) => setCarrier(e.target.value)} /></Field>
+          <Field label="Telefon przewoźnika"><input className={INPUT} data-testid="carrier-phone-input" value={carrierPhone} onChange={(e) => setCarrierPhone(e.target.value)} /></Field>
           <Field label="Kierowca"><input className={INPUT} value={driver} onChange={(e) => setDriver(e.target.value)} /></Field>
           <Field label="Telefon kierowcy"><input className={INPUT} value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} /></Field>
           <Field label="Kierownik transportu"><input className={INPUT} data-testid="manager-input" value={manager} onChange={(e) => setManager(e.target.value)} /></Field>

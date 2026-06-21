@@ -41,6 +41,7 @@ export interface Tabor {
   seats: number;
   supervisor_seats: number;
   carrier: string | null;
+  carrier_phone: string | null;     // telefon do przewoźnika (film G4)
   driver: string | null;
   driver_phone: string | null;
   transport_manager: string | null;
@@ -58,6 +59,7 @@ export interface TaborCreate {
   seats?: number;
   supervisor_seats?: number;
   carrier?: string | null;
+  carrier_phone?: string | null;
   driver?: string | null;
   driver_phone?: string | null;
   transport_manager?: string | null;
