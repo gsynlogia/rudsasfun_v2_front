@@ -7,7 +7,7 @@
 import {
   emptySelection, isCityFullySelected, isResortCellSelected, hasAnySelection,
   toggleCity, toggleResortCell, toggleMaster, calculateSelectedTotal, isParticipantSelected,
-  isTransferParticipant,
+  isTransferParticipant, canReassignParticipant,
   type Resort,
 } from '@/lib/utils/transportSelection';
 
@@ -134,5 +134,22 @@ describe('transportSelection — przesiadka is_transfer (G01, film E2/E3)', () =
 
   it('pusty zbiór przesiadek (E3: nikomu nie dano przesiadki) → false', () => {
     expect(isTransferParticipant('Toruń', new Set())).toBe(false);
+  });
+});
+
+describe('transportSelection — canReassignParticipant (G01, R1 „zły autobus")', () => {
+  const transfer = new Set(['Toruń']);
+
+  it('nieprzypisany uczestnik → zawsze wsadzalny', () => {
+    expect(canReassignParticipant(false, 'Łódź', transfer)).toBe(true);
+    expect(canReassignParticipant(false, 'Toruń', transfer)).toBe(true);
+  });
+
+  it('przypisany NIE-przesiadkowy → ZABLOKOWANY (nie wejdzie 2× przez pomyłkę)', () => {
+    expect(canReassignParticipant(true, 'Łódź', transfer)).toBe(false);
+  });
+
+  it('przypisany przesiadkowy → wsadzalny ponownie (druga lista, hub Toruń)', () => {
+    expect(canReassignParticipant(true, 'Toruń', transfer)).toBe(true);
   });
 });

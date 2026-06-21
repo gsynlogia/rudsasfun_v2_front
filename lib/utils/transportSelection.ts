@@ -135,6 +135,17 @@ export function isTransferParticipant(
   return transferCities.has(participantCity);
 }
 
+/**
+ * G01 (film E2, R1 „pomyłka = zły autobus"): czy uczestnik może zostać (po)wsadzony do taboru.
+ * Nieprzypisany — zawsze. Przypisany — TYLKO gdy przesiadkowy (hub Toruń → druga lista).
+ * Przypisany NIE-przesiadkowy = zablokowany („wyszarzony"), by nie trafił 2× przez pomyłkę.
+ */
+export function canReassignParticipant(
+  isAssigned: boolean, participantCity: string | null, transferCities: Set<string>,
+): boolean {
+  return !isAssigned || isTransferParticipant(participantCity, transferCities);
+}
+
 /** Czy uczestnik (po przystanku=mieście i regionie) należy do bieżącego zaznaczenia. */
 export function isParticipantSelected(
   s: SelectionState, participantCity: string | null, participantRegion: string | null,

@@ -13,7 +13,7 @@ import { Filter, ChevronsUpDown, ChevronUp, ChevronDown, MoveRight, AlertTriangl
 import { useMemo, useState } from 'react';
 
 import type { ParticipantRow } from '@/lib/types/transportLists';
-import { isTransferParticipant } from '@/lib/utils/transportSelection';
+import { canReassignParticipant } from '@/lib/utils/transportSelection';
 
 type SortDir = 'asc' | 'desc';
 type PanelMode = 'numbers' | 'participants';
@@ -109,7 +109,7 @@ export default function ParticipantsPanel({
   // STAN 3 — Uczestnicy (tabela)
   // G01 (film E2): przesiadkowy uczestnik (przystanek ∈ transferCities) może trafić na 2 listy →
   // pozostaje wsadzalny (drag + checkbox) mimo „wyszarzenia" po pierwszym przypisaniu.
-  const canAssign = (p: ParticipantRow) => !p.is_assigned || isTransferParticipant(p.city, transferCities);
+  const canAssign = (p: ParticipantRow) => canReassignParticipant(p.is_assigned, p.city, transferCities);
   const unassignedVisible = rows.filter((p) => !p.is_assigned);
   const cols = COLUMNS;
 
