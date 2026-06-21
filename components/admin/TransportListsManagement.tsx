@@ -406,6 +406,7 @@ export default function TransportListsManagement() {
                 openTaborId={openTaborId}
                 onOpenTabor={(id) => { setOpenTaborId(id); setPanelMode('participants'); }}
                 onDropAssign={(taborId, rid) => void dropAssign(taborId, rid)}
+                onRemoveParticipant={(pid) => void handleRemoveParticipant(pid)}
                 onEdit={(t) => { setEditingTabor(t); setTaborModalOpen(true); }}
                 onDelete={(t) => setDeleteTarget(t)}
                 onDocument={(t) => setDocumentTabor(t)} />

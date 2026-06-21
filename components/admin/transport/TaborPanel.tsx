@@ -7,7 +7,7 @@
  * Akcje Edytuj/Usuń/Dokument = Nr 28-31 (podpięcie później). Wsadzanie (drag&drop) = Nr 26.
  */
 import {
-  ChevronDown, ChevronRight, Pencil, Trash2, FileText, CheckCircle2, PackagePlus,
+  ChevronDown, ChevronRight, Pencil, Trash2, FileText, CheckCircle2, PackagePlus, X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -25,13 +25,15 @@ interface TaborPanelProps {
   openTaborId: number | null;
   onOpenTabor: (id: number) => void;
   onDropAssign: (taborId: number, reservationId: number) => void;
+  onRemoveParticipant: (participantId: number) => void;  // G06: wyjęcie pojedynczego uczestnika
   reloadKey: number;
   onDelete: (tabor: Tabor) => void;
   onDocument: (tabor: Tabor) => void;
 }
 
 export default function TaborPanel(
-  { tabors, participantNames, onEdit, openTaborId, onOpenTabor, onDropAssign, reloadKey, onDelete, onDocument }: TaborPanelProps,
+  { tabors, participantNames, onEdit, openTaborId, onOpenTabor, onDropAssign, onRemoveParticipant,
+    reloadKey, onDelete, onDocument }: TaborPanelProps,
 ) {
   if (tabors.length === 0) {
     return (
@@ -46,7 +48,7 @@ export default function TaborPanel(
         <TaborCard key={t.id} tabor={t} participantNames={participantNames} onEdit={onEdit} reloadKey={reloadKey}
           isOpen={openTaborId === t.id} onOpen={() => onOpenTabor(t.id)}
           onDrop={(rid) => onDropAssign(t.id, rid)} onDelete={() => onDelete(t)}
-          onDocument={() => onDocument(t)} />
+          onRemoveParticipant={onRemoveParticipant} onDocument={() => onDocument(t)} />
       ))}
     </div>
   );
@@ -59,13 +61,15 @@ interface TaborCardProps {
   isOpen: boolean;
   onOpen: () => void;
   onDrop: (reservationId: number) => void;
+  onRemoveParticipant: (participantId: number) => void;
   reloadKey: number;
   onDelete: () => void;
   onDocument: () => void;
 }
 
 function TaborCard(
-  { tabor, participantNames, onEdit, isOpen, onOpen, onDrop, reloadKey, onDelete, onDocument }: TaborCardProps,
+  { tabor, participantNames, onEdit, isOpen, onOpen, onDrop, onRemoveParticipant,
+    reloadKey, onDelete, onDocument }: TaborCardProps,
 ) {
   const [expanded, setExpanded] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -94,7 +98,8 @@ function TaborCard(
         if (rid) onDrop(rid);
       }}>
       <div className="flex items-start gap-2 px-3 py-2">
-        <button type="button" onClick={() => setExpanded((e) => !e)} className="flex flex-1 items-start gap-2 text-left">
+        <button type="button" onClick={() => setExpanded((e) => !e)} data-testid="tabor-expand"
+          className="flex flex-1 items-start gap-2 text-left">
           {expanded ? <ChevronDown className="mt-0.5 h-4 w-4 text-gray-400" /> : <ChevronRight className="mt-0.5 h-4 w-4 text-gray-400" />}
           <div className="flex-1">
             <div className="flex items-center gap-2">
@@ -147,15 +152,23 @@ function TaborCard(
           {Array.from({ length: capValue }, (_, i) => {
             const p = assigned[i];
             return (
-              <li key={`s${i}`} className="flex gap-2 px-2 py-1">
+              <li key={`s${i}`} className="flex items-center gap-2 px-2 py-1">
                 <span className="w-8 text-gray-500">{i + 1}</span>
                 {p
-                  ? <span className="text-gray-800">
-                      {participantNames.get(p.reservation_id) ?? `#${p.reservation_id}`}
-                      {p.topic_snapshot ? <span className="italic text-gray-500"> · {p.topic_snapshot}</span> : ''}
-                      {p.is_transfer ? <span className="ml-1 text-orange-500">⇄</span> : ''}
-                    </span>
-                  : <span className="text-gray-300">Wolne miejsce</span>}
+                  ? <>
+                      <span className="flex-1 text-gray-800">
+                        {participantNames.get(p.reservation_id) ?? `#${p.reservation_id}`}
+                        {p.topic_snapshot ? <span className="italic text-gray-500"> · {p.topic_snapshot}</span> : ''}
+                        {p.is_transfer ? <span className="ml-1 text-orange-500">⇄</span> : ''}
+                      </span>
+                      {/* G06: wyjmij pojedynczego uczestnika (× przy miejscu) — renumeracja po stronie backendu */}
+                      <button type="button" title="Wyjmij uczestnika z taboru" data-testid="participant-remove"
+                        onClick={() => onRemoveParticipant(p.id)}
+                        className="rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  : <span className="flex-1 text-gray-300">Wolne miejsce</span>}
               </li>
             );
           })}
