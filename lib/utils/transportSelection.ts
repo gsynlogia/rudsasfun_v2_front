@@ -146,6 +146,20 @@ export function canReassignParticipant(
   return !isAssigned || isTransferParticipant(participantCity, transferCities);
 }
 
+/**
+ * Filtr panelu Uczestnicy = LISTA ROZWIJANA (film: „konkretne tematy i przystanki to powinna być
+ * lista rozwijana, a nie taka wyszukiwarka"). Zwraca unikalne, niepuste, posortowane po polsku
+ * wartości kolumny — do wypełnienia <select>.
+ */
+export function distinctSorted(values: (string | null | undefined)[]): string[] {
+  const set = new Set<string>();
+  for (const v of values) {
+    const t = (v ?? '').trim();
+    if (t) set.add(t);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, 'pl'));
+}
+
 /** Czy uczestnik (po przystanku=mieście i regionie) należy do bieżącego zaznaczenia. */
 export function isParticipantSelected(
   s: SelectionState, participantCity: string | null, participantRegion: string | null,

@@ -13,7 +13,7 @@ import { Filter, ChevronsUpDown, ChevronUp, ChevronDown, MoveRight, AlertTriangl
 import { useMemo, useState } from 'react';
 
 import type { ParticipantRow } from '@/lib/types/transportLists';
-import { canReassignParticipant } from '@/lib/utils/transportSelection';
+import { canReassignParticipant, distinctSorted } from '@/lib/utils/transportSelection';
 
 type SortDir = 'asc' | 'desc';
 type PanelMode = 'numbers' | 'participants';
@@ -65,12 +65,19 @@ export default function ParticipantsPanel({
     else { setSortKey(key); setSortDir('asc'); }
   };
 
+  // Filtr = lista rozwijana (film): wybrana wartość = DOKŁADNE dopasowanie (nie substring).
+  const columnOptions = useMemo(() => {
+    const opts: Record<string, string[]> = {};
+    for (const c of COLUMNS) opts[c.key] = distinctSorted(participants.map((p) => c.get(p)));
+    return opts;
+  }, [participants]);
+
   const rows = useMemo(() => {
     const col = (k: string) => COLUMNS.find((c) => c.key === k)!;
     const filtered = participants.filter((p) =>
       COLUMNS.every((c) => {
-        const f = (filters[c.key] ?? '').trim().toLowerCase();
-        return !f || c.get(p).toLowerCase().includes(f);
+        const f = (filters[c.key] ?? '').trim();
+        return !f || c.get(p).trim() === f;
       }));
     const sc = col(sortKey);
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -159,9 +166,13 @@ export default function ParticipantsPanel({
                   </div>
                   {openFilter === c.key && (
                     <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white p-3 shadow-xl">
-                      <input type="text" autoFocus placeholder={`Szukaj: ${c.label}…`} value={filters[c.key] ?? ''}
-                        onChange={(e) => setFilters((f) => ({ ...f, [c.key]: e.target.value }))}
-                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm font-normal text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#00adee]" />
+                      {/* film: „lista rozwijana, a nie taka wyszukiwarka" */}
+                      <select autoFocus value={filters[c.key] ?? ''} data-testid={`filter-select-${c.key}`}
+                        onChange={(e) => { setFilters((f) => ({ ...f, [c.key]: e.target.value })); setOpenFilter(null); }}
+                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm font-normal text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#00adee]">
+                        <option value="">— wszystkie —</option>
+                        {columnOptions[c.key].map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
                     </div>
                   )}
                 </th>

@@ -7,7 +7,7 @@
 import {
   emptySelection, isCityFullySelected, isResortCellSelected, hasAnySelection,
   toggleCity, toggleResortCell, toggleMaster, calculateSelectedTotal, isParticipantSelected,
-  isTransferParticipant, canReassignParticipant,
+  isTransferParticipant, canReassignParticipant, distinctSorted,
   type Resort,
 } from '@/lib/utils/transportSelection';
 
@@ -151,5 +151,21 @@ describe('transportSelection — canReassignParticipant (G01, R1 „zły autobus
 
   it('przypisany przesiadkowy → wsadzalny ponownie (druga lista, hub Toruń)', () => {
     expect(canReassignParticipant(true, 'Toruń', transfer)).toBe(true);
+  });
+});
+
+describe('transportSelection — distinctSorted (filtr = lista rozwijana, film: „nie wyszukiwarka")', () => {
+  it('puste wejście → pusta lista', () => {
+    expect(distinctSorted([])).toEqual([]);
+    expect(distinctSorted([null, undefined, '', '   '])).toEqual([]);
+  });
+
+  it('usuwa duplikaty + puste, sortuje po polsku (Łódź po L, nie na końcu)', () => {
+    expect(distinctSorted(['Bełchatów', 'Łódź', 'Bełchatów', '', 'Warszawa', null]))
+      .toEqual(['Bełchatów', 'Łódź', 'Warszawa']);
+  });
+
+  it('przycina białe znaki i traktuje jak tę samą wartość', () => {
+    expect(distinctSorted([' Akrobatyka ', 'Akrobatyka'])).toEqual(['Akrobatyka']);
   });
 });
