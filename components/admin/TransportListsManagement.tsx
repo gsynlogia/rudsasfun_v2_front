@@ -342,17 +342,38 @@ export default function TransportListsManagement() {
       </div>
 
       {/* ---------- PASEK POŁĄCZEŃ + TOGGLE KIERUNKU ---------- */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Górny rząd: „Dodaj połączenie" NAD listą (zawsze widoczne, nie ucieka na koniec scrolla) + kierunek. */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <button type="button" onClick={() => setConnModalOpen(true)} data-testid="add-connection"
+            className="flex items-center gap-1.5 rounded-md border border-dashed border-gray-400 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            title="Dodaj połączenie (grupowanie turnusów do taborów/list)">
+            <Plus className="h-4 w-4" /> Dodaj połączenie
+          </button>
+          <div className="flex overflow-hidden rounded-md border border-gray-300">
+            <button type="button" onClick={() => setDirection('arrival')} data-testid="dir-arrival"
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
+                direction === 'arrival' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
+              <MapPin className="h-4 w-4" /> Przyjazd do ośrodka
+            </button>
+            <button type="button" onClick={() => setDirection('return')} data-testid="dir-return"
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
+                direction === 'return' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
+              <Home className="h-4 w-4" /> Powrót z ośrodka
+            </button>
+          </div>
+        </div>
+        {/* Dolny rząd: „Cały sezon" + połączenia w POZIOMYM scrollu (overflow-x) — nie zawijają się przy dużej liczbie. */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1" data-testid="connections-scroll">
           <button type="button" onClick={() => setActiveConnectionId(null)} data-testid="season-tab"
-            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium ${
+            className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ${
               activeConnectionId == null ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
             title="Cały sezon — wszystkie aktywne turnusy">
             Cały sezon
           </button>
           {connections.map((c) => (
             <span key={c.id}
-              className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium ${
+              className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ${
                 c.id === activeConnectionId ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}>
               <button type="button" onClick={() => setActiveConnectionId(c.id)}>
                 {c.name}{c.date ? ` · ${c.date}` : ''}
@@ -364,23 +385,6 @@ export default function TransportListsManagement() {
               </button>
             </span>
           ))}
-          <button type="button" onClick={() => setConnModalOpen(true)} data-testid="add-connection"
-            className="flex items-center gap-1.5 rounded-md border border-dashed border-gray-400 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            title="Dodaj połączenie (grupowanie turnusów do taborów/list)">
-            <Plus className="h-4 w-4" /> Dodaj połączenie
-          </button>
-        </div>
-        <div className="flex overflow-hidden rounded-md border border-gray-300">
-          <button type="button" onClick={() => setDirection('arrival')} data-testid="dir-arrival"
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
-              direction === 'arrival' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
-            <MapPin className="h-4 w-4" /> Przyjazd do ośrodka
-          </button>
-          <button type="button" onClick={() => setDirection('return')} data-testid="dir-return"
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${
-              direction === 'return' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700'}`}>
-            <Home className="h-4 w-4" /> Powrót z ośrodka
-          </button>
         </div>
       </div>
 
