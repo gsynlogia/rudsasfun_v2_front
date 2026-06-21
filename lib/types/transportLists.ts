@@ -45,6 +45,7 @@ export interface Tabor {
   driver_phone: string | null;
   transport_manager: string | null;
   manager_phone: string | null;
+  supervisors: string[];            // nazwiska wychowawców „z palca" (poza kierownikiem)
   additional_info: string | null;
   document_approved: boolean;
 }
@@ -61,6 +62,7 @@ export interface TaborCreate {
   driver_phone?: string | null;
   transport_manager?: string | null;
   manager_phone?: string | null;
+  supervisors?: string[];
   additional_info?: string | null;
 }
 

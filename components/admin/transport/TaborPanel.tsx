@@ -143,12 +143,19 @@ function TaborCard(
 
       {expanded && (
         <ul className="border-t border-gray-100 px-3 py-2 text-sm" data-testid="tabor-seats">
-          {Array.from({ length: tabor.supervisor_seats }, (_, i) => (
-            <li key={`w${i}`} className="flex gap-2 rounded bg-purple-50 px-2 py-1 text-purple-800">
-              <span className="w-8 font-semibold">W{i + 1}</span>
-              <span>{i === 0 && tabor.transport_manager ? tabor.transport_manager : 'Miejsce wychowawcy'}</span>
-            </li>
-          ))}
+          {Array.from({ length: tabor.supervisor_seats }, (_, i) => {
+            // W1 = kierownik transportu; W2..Wn = wychowawcy wpisani „z palca" (tabor.supervisors).
+            const label = i === 0
+              ? (tabor.transport_manager || 'Miejsce kierownika')
+              : (tabor.supervisors?.[i - 1] || 'Miejsce wychowawcy');
+            const filled = i === 0 ? !!tabor.transport_manager : !!tabor.supervisors?.[i - 1];
+            return (
+              <li key={`w${i}`} className="flex gap-2 rounded bg-purple-50 px-2 py-1 text-purple-800" data-testid="tabor-w-slot">
+                <span className="w-8 font-semibold">W{i + 1}</span>
+                <span className={filled ? '' : 'italic text-purple-400'}>{label}</span>
+              </li>
+            );
+          })}
           {Array.from({ length: capValue }, (_, i) => {
             const p = assigned[i];
             return (
