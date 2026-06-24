@@ -9,12 +9,13 @@
  * Tabor otwarty (assignMode) → checkboxy zaznaczania + „Przenieś do taboru" + drag&drop (Nr 26).
  * Dane realne z bazy; mock makiety ignorowany. MIASTO = participant_city (zamieszkania).
  */
-import { Filter, ChevronsUpDown, ChevronUp, ChevronDown, MoveRight, AlertTriangle } from 'lucide-react';
+import { Filter, ChevronsUpDown, ChevronUp, ChevronDown, MoveRight, AlertTriangle, Check } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type { ParticipantRow } from '@/lib/types/transportLists';
 import {
   canReassignParticipant, distinctSorted, idsToToggleForMaster, compareDefaultTransportOrder,
+  toggleArrayValue, rowMatchesMultiFilters,
 } from '@/lib/utils/transportSelection';
 
 type SortDir = 'asc' | 'desc';
@@ -73,12 +74,29 @@ export default function ParticipantsPanel({
 }: Props) {
   const [sortKey, setSortKey] = useState<string>(DEFAULT_SORT);   // BUG 006: domyślnie przystanek→resort→nazwisko
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  // BUG 010: filtry kolumn = multi-select (kilka wartości naraz). `draft` = robocze zaznaczenie w lejku
+  // (zatwierdzane przyciskiem „Filtruj"); `filters` = aktywne, użyte do filtrowania wierszy.
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const [draft, setDraft] = useState<string[]>([]);
   const [openFilter, setOpenFilter] = useState<string | null>(null);
 
   const toggleSort = (key: string) => {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const openColumnFilter = (key: string) => {
+    setOpenFilter((cur) => (cur === key ? null : key));
+    setDraft(filters[key] ?? []);          // wczytaj aktywne zaznaczenie do robocznego
+  };
+  const applyFilter = (key: string) => {
+    setFilters((f) => ({ ...f, [key]: draft }));
+    setOpenFilter(null);
+  };
+  const clearFilter = (key: string) => {
+    setFilters((f) => { const n = { ...f }; delete n[key]; return n; });
+    setDraft([]);
+    setOpenFilter(null);
   };
 
   // Filtr = lista rozwijana (film): wybrana wartość = DOKŁADNE dopasowanie (nie substring).
@@ -90,11 +108,9 @@ export default function ParticipantsPanel({
 
   const rows = useMemo(() => {
     const col = (k: string) => COLUMNS.find((c) => c.key === k)!;
+    // BUG 010: multi-select — wiersz przechodzi gdy dla każdej filtrowanej kolumny wartość ∈ wybrane.
     const filtered = participants.filter((p) =>
-      COLUMNS.every((c) => {
-        const f = (filters[c.key] ?? '').trim();
-        return !f || c.get(p).trim() === f;
-      }));
+      rowMatchesMultiFilters((k) => col(k).get(p), filters));
     const dir = sortDir === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
       if (a.is_assigned !== b.is_assigned) return a.is_assigned ? 1 : -1; // nieprzypisani u góry
@@ -173,8 +189,10 @@ export default function ParticipantsPanel({
                 <th key={c.key} className="relative px-3 py-3">
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => toggleSort(c.key)} className="hover:opacity-80">{c.label.toUpperCase()}</button>
-                    <button type="button" onClick={() => setOpenFilter(openFilter === c.key ? null : c.key)}
-                      className="rounded p-0.5 hover:bg-white/20" aria-label={`Filtruj ${c.label}`}>
+                    {/* BUG 010: lejek pomarańczowy gdy filtr aktywny (wybrano ≥1 wartość). */}
+                    <button type="button" onClick={() => openColumnFilter(c.key)}
+                      className={`rounded p-0.5 hover:bg-white/20 ${(filters[c.key]?.length ?? 0) > 0 ? 'text-orange-300' : ''}`}
+                      data-testid={`filter-btn-${c.key}`} aria-label={`Filtruj ${c.label}`}>
                       <Filter size={14} />
                     </button>
                     <button type="button" onClick={() => toggleSort(c.key)} className="rounded p-0.5 hover:bg-white/20" aria-label={`Sortuj ${c.label}`}>
@@ -184,14 +202,29 @@ export default function ParticipantsPanel({
                     </button>
                   </div>
                   {openFilter === c.key && (
-                    <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white p-3 shadow-xl">
-                      {/* film: „lista rozwijana, a nie taka wyszukiwarka" */}
-                      <select autoFocus value={filters[c.key] ?? ''} data-testid={`filter-select-${c.key}`}
-                        onChange={(e) => { setFilters((f) => ({ ...f, [c.key]: e.target.value })); setOpenFilter(null); }}
-                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm font-normal text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#00adee]">
-                        <option value="">— wszystkie —</option>
-                        {columnOptions[c.key].map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
+                    <div className="absolute left-0 top-full z-50 mt-1 w-[240px] rounded-lg border border-gray-200 bg-white p-2 shadow-xl"
+                      data-testid={`filter-panel-${c.key}`}>
+                      {/* BUG 010: checkboxy multi-select — admin wybiera kilka wartości, zatwierdza „Filtruj". */}
+                      <div className="max-h-56 overflow-auto py-1">
+                        {columnOptions[c.key].length === 0 && (
+                          <p className="px-2 py-1 text-xs font-normal text-gray-400">Brak wartości</p>
+                        )}
+                        {columnOptions[c.key].map((opt) => (
+                          <label key={opt} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm font-normal text-gray-800 hover:bg-gray-50">
+                            <input type="checkbox" checked={draft.includes(opt)} data-testid={`filter-opt-${c.key}`}
+                              onChange={() => setDraft((d) => toggleArrayValue(d, opt))} />
+                            {opt}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                        <button type="button" onClick={() => clearFilter(c.key)}
+                          className="rounded px-2 py-1 text-xs font-normal text-gray-500 hover:bg-gray-100">Wyczyść</button>
+                        <button type="button" onClick={() => applyFilter(c.key)} data-testid={`filter-apply-${c.key}`}
+                          className="flex items-center gap-1 rounded bg-[#00adee] px-3 py-1 text-xs font-medium text-white hover:bg-[#0099d6]">
+                          <Check size={12} /> Filtruj ({draft.length})
+                        </button>
+                      </div>
                     </div>
                   )}
                 </th>

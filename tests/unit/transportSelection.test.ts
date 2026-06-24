@@ -9,7 +9,7 @@ import {
   toggleCity, toggleResortCell, toggleMaster, calculateSelectedTotal, isParticipantSelected,
   isTransferParticipant, canReassignParticipant, distinctSorted, toggleColumnKey, boundedToggle,
   reorderList, selectDisplayedParticipants, idsToToggleForMaster, resortRank,
-  compareDefaultTransportOrder,
+  compareDefaultTransportOrder, toggleArrayValue, rowMatchesMultiFilters,
   type Resort,
 } from '@/lib/utils/transportSelection';
 
@@ -282,5 +282,31 @@ describe('resortRank + compareDefaultTransportOrder — sortowanie domyślne (BU
       'Warszawa/BEAVER/Nowak',
       'Warszawa/SAWA/Zielińska',
     ]);
+  });
+});
+
+// ---- BUG 010 (Krzysztof 2026-06-24): filtry kolumn = checkboxy multi-select (kilka wartości naraz) ----
+describe('toggleArrayValue + rowMatchesMultiFilters — filtry wielokrotne (BUG 010)', () => {
+  it('toggleArrayValue dodaje i usuwa wartość', () => {
+    expect(toggleArrayValue([], 'B1')).toEqual(['B1']);
+    expect(toggleArrayValue(['B1', 'S1'], 'B1')).toEqual(['S1']);
+    expect(toggleArrayValue(['B1'], 'S1')).toEqual(['B1', 'S1']);
+  });
+
+  it('brak filtra (pusta tablica) → przepuszcza wszystko', () => {
+    expect(rowMatchesMultiFilters((k) => ({ tag: 'B1', temat: 'Akro' }[k] ?? ''), {})).toBe(true);
+    expect(rowMatchesMultiFilters((k) => ({ tag: 'B1' }[k] ?? ''), { tag: [] })).toBe(true);
+  });
+
+  it('filtr wielokrotny przepuszcza wiersz gdy wartość ∈ wybrane (OR w obrębie kolumny)', () => {
+    const get = (k: string) => ({ tag: 'S1', temat: 'Akrobatyka' }[k] ?? '');
+    expect(rowMatchesMultiFilters(get, { tag: ['B1', 'S1'] })).toBe(true);   // S1 ∈ {B1,S1}
+    expect(rowMatchesMultiFilters(get, { tag: ['B1', 'B2'] })).toBe(false);  // S1 ∉ {B1,B2}
+  });
+
+  it('wiele kolumn = AND (każda kolumna musi pasować)', () => {
+    const get = (k: string) => ({ tag: 'B1', temat: 'Akrobatyka' }[k] ?? '');
+    expect(rowMatchesMultiFilters(get, { tag: ['B1'], temat: ['Akrobatyka'] })).toBe(true);
+    expect(rowMatchesMultiFilters(get, { tag: ['B1'], temat: ['Piłka'] })).toBe(false);
   });
 });

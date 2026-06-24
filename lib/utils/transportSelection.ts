@@ -245,6 +245,24 @@ export function resortRank(region: string | null, tag: string | null): number {
   return 99;
 }
 
+/**
+ * BUG 010 (Krzysztof 2026-06-24): filtry kolumn to checkboxy multi-select — toggle wartości w tablicy.
+ */
+export function toggleArrayValue(arr: string[], value: string): string[] {
+  return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+}
+
+/**
+ * BUG 010: wiersz przechodzi filtry gdy dla KAŻDEJ kolumny (AND) jego wartość należy do wybranych
+ * (OR w obrębie kolumny). Pusta lista wybranych = brak filtra (przepuszcza wszystko).
+ */
+export function rowMatchesMultiFilters(
+  getValue: (key: string) => string, filters: Record<string, string[]>,
+): boolean {
+  return Object.entries(filters).every(
+    ([key, selected]) => selected.length === 0 || selected.includes(getValue(key).trim()));
+}
+
 /** Pola potrzebne do domyślnego sortowania transportu (BUG 006). */
 export interface DefaultSortable {
   city: string | null;

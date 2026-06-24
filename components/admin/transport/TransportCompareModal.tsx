@@ -4,7 +4,7 @@
  * Widok „Porównaj" (Nr 35) — zestawienie DOKŁADNIE 2 połączeń obok siebie (rozkaz Pana: max 2).
  * Krok 1: wybór 2 połączeń checkboxami (limit 2). Krok 2: tabele liczb per miasto side-by-side.
  */
-import { X, GitCompare } from 'lucide-react';
+import { X, GitCompare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import type { Connection, CompareEntry } from '@/lib/types/transportLists';
@@ -28,6 +28,19 @@ export default function TransportCompareModal({ onClose }: { onClose: () => void
     try { setResult(await compareConnections([...selected])); }
     catch (e) { setError(e instanceof Error ? e.message : 'Błąd porównania'); }
   }
+
+  // BUG 016: przekładanie kolumn (←/→) i usuwanie kolumny z porównania (X). Usunięcie ostatniej → powrót do wyboru.
+  const moveColumn = (idx: number, dir: -1 | 1) => setResult((r) => {
+    if (!r) return r;
+    const j = idx + dir;
+    if (j < 0 || j >= r.length) return r;
+    const n = [...r]; [n[idx], n[j]] = [n[j], n[idx]]; return n;
+  });
+  const removeColumn = (idx: number) => setResult((r) => {
+    if (!r) return r;
+    const n = r.filter((_, i) => i !== idx);
+    return n.length ? n : null;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="compare-modal">
@@ -63,15 +76,36 @@ export default function TransportCompareModal({ onClose }: { onClose: () => void
               {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             </>
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${result.length}, minmax(220px, 1fr))` }}
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${result.length}, minmax(240px, 1fr))` }}
               data-testid="compare-grid">
-              {result.map((e) => {
+              {result.map((e, idx) => {
                 const total = e.cities.reduce((s, c) => s + c.razem, 0);
+                const isReturn = e.direction === 'return';
                 return (
-                  <div key={e.connection_id} className="rounded-lg border border-gray-200">
-                    <div className="border-b bg-gray-50 px-3 py-2">
-                      <div className="font-semibold">{e.name}</div>
-                      <div className="text-xs text-gray-500">{e.direction === 'return' ? 'POWRÓT' : 'DO ośrodka'} · ŁĄCZNIE {total}</div>
+                  <div key={e.connection_id} data-testid="compare-column"
+                    className={`overflow-hidden rounded-lg border-2 ${isReturn ? 'border-amber-200' : 'border-sky-200'}`}>
+                    <div className={`flex items-start justify-between gap-1 border-b px-3 py-2 ${isReturn ? 'bg-amber-50' : 'bg-sky-50'}`}>
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-gray-900">{e.name}</div>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+                          <span className={`rounded px-1.5 py-0.5 font-medium ${isReturn ? 'bg-amber-200 text-amber-800' : 'bg-sky-200 text-sky-800'}`}>
+                            {isReturn ? 'POWRÓT' : 'DO ośrodka'}
+                          </span>
+                          <span className="font-bold tabular-nums text-gray-700">ŁĄCZNIE {total}</span>
+                        </div>
+                      </div>
+                      {/* BUG 016: przekładanie + usuwanie kolumny porównania */}
+                      <div className="flex shrink-0 gap-0.5">
+                        <button type="button" onClick={() => moveColumn(idx, -1)} disabled={idx === 0}
+                          data-testid="compare-move-left" title="Przesuń w lewo"
+                          className="rounded p-1 text-gray-500 hover:bg-white disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => moveColumn(idx, 1)} disabled={idx === result.length - 1}
+                          data-testid="compare-move-right" title="Przesuń w prawo"
+                          className="rounded p-1 text-gray-500 hover:bg-white disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => removeColumn(idx)}
+                          data-testid="compare-remove" title="Usuń z porównania"
+                          className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"><X className="h-4 w-4" /></button>
+                      </div>
                     </div>
                     <table className="w-full text-xs">
                       <thead>
