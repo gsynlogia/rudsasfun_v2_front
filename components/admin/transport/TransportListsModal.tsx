@@ -1,16 +1,19 @@
 'use client';
 
 /**
- * Modal „Listy" (Nr 34) — historia wypuszczonych list (TransportListsModal z makiety).
- * Filtry: szukaj (ID/nagłówek), kierunek (DO/POWRÓT), status (robocza/zatwierdzona). Akcja: usuń listę (delete — dorobione).
+ * Modal „Listy" (Nr 34) — AKTYWNE listy transportowe (BUG 007: to nie „historia", a aktywne listy).
+ * Filtry: szukaj (ID/nagłówek), kierunek (DO/POWRÓT), status (robocza/zatwierdzona).
+ * Akcje: OTWÓRZ listę (podgląd/edycja — BUG 007) + usuń listę.
  */
-import { X, Trash2, Search } from 'lucide-react';
+import { X, Trash2, Search, FolderOpen } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { TransportListSummary } from '@/lib/types/transportLists';
 import { listHistory, deleteList } from '@/lib/services/transportListsApi';
 
-export default function TransportListsModal({ onClose }: { onClose: () => void }) {
+export default function TransportListsModal(
+  { onClose, onOpenList }: { onClose: () => void; onOpenList: (listId: number) => void },
+) {
   const [lists, setLists] = useState<TransportListSummary[]>([]);
   const [search, setSearch] = useState('');
   const [direction, setDirection] = useState('');
@@ -36,7 +39,7 @@ export default function TransportListsModal({ onClose }: { onClose: () => void }
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="lists-modal">
       <div className="flex max-h-[88vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
         <div className="flex items-center justify-between border-b px-5 py-3">
-          <h3 className="text-lg font-semibold">Listy transportowe — historia</h3>
+          <h3 className="text-lg font-semibold">Aktywne listy transportowe</h3>
           <button type="button" onClick={onClose} className="rounded p-1 hover:bg-gray-100"><X className="h-5 w-5" /></button>
         </div>
 
@@ -81,10 +84,17 @@ export default function TransportListsModal({ onClose }: { onClose: () => void }
                     <span>{l.created_at?.slice(0, 16).replace('T', ' ')}</span>
                   </div>
                 </div>
-                <button type="button" onClick={() => void handleDelete(l.id)} data-testid="list-delete"
-                  title="Usuń listę" className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {/* BUG 007: brakowało otwierania listy z tego poziomu (był tylko delete). */}
+                  <button type="button" onClick={() => onOpenList(l.id)} data-testid="list-open"
+                    title="Otwórz listę" className="rounded p-1.5 text-gray-400 hover:bg-sky-50 hover:text-sky-600">
+                    <FolderOpen className="h-4 w-4" />
+                  </button>
+                  <button type="button" onClick={() => void handleDelete(l.id)} data-testid="list-delete"
+                    title="Usuń listę" className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

@@ -8,7 +8,8 @@ import {
   emptySelection, isCityFullySelected, isResortCellSelected, hasAnySelection,
   toggleCity, toggleResortCell, toggleMaster, calculateSelectedTotal, isParticipantSelected,
   isTransferParticipant, canReassignParticipant, distinctSorted, toggleColumnKey, boundedToggle,
-  reorderList,
+  reorderList, selectDisplayedParticipants, idsToToggleForMaster, resortRank,
+  compareDefaultTransportOrder,
   type Resort,
 } from '@/lib/utils/transportSelection';
 
@@ -210,5 +211,76 @@ describe('transportSelection — reorderList (drag&drop dzieci w taborze, film H
     const src = [1, 2, 3];
     reorderList(src, 1, 3);
     expect(src).toEqual([1, 2, 3]);
+  });
+});
+
+// ---- BUG 004 (Krzysztof 2026-06-24): filtr miasta MUSI działać też przy otwartym taborze ----
+describe('selectDisplayedParticipants — filtr miasta działa także w assignMode (BUG 004)', () => {
+  const P = (reservation_id: number, city: string, region: string) =>
+    ({ reservation_id, city, region } as { reservation_id: number; city: string | null; region: string | null });
+  const parts = [P(1, 'Warszawa', 'BEAVER'), P(2, 'Łódź', 'SAWA'), P(3, 'Warszawa', 'SAWA')];
+
+  it('poza assignMode bez zaznaczenia → pusto', () => {
+    expect(selectDisplayedParticipants(false, false, parts, emptySelection())).toEqual([]);
+  });
+  it('w assignMode bez zaznaczenia → wszyscy (można wsadzać kogokolwiek)', () => {
+    expect(selectDisplayedParticipants(true, false, parts, emptySelection())).toHaveLength(3);
+  });
+  it('w assignMode Z zaznaczeniem miasta → TYLKO z tego miasta (rdzeń bug 004)', () => {
+    const s = toggleCity(emptySelection(), 'Warszawa');
+    const out = selectDisplayedParticipants(true, true, parts, s);
+    expect(out.map((p) => p.reservation_id).sort()).toEqual([1, 3]);
+  });
+  it('poza assignMode z zaznaczeniem → filtruje (bez regresji)', () => {
+    const s = toggleCity(emptySelection(), 'Łódź');
+    expect(selectDisplayedParticipants(false, true, parts, s).map((p) => p.reservation_id)).toEqual([2]);
+  });
+});
+
+// ---- BUG 009 (Krzysztof 2026-06-24): „zaznacz wszystkich" musi się dać ODKLIKNĄĆ ----
+describe('idsToToggleForMaster — toggle master działa w obie strony (BUG 009)', () => {
+  it('nic nie zaznaczone → zwraca wszystkie do zaznaczenia', () => {
+    expect(idsToToggleForMaster(new Set<number>(), [1, 2, 3])).toEqual([1, 2, 3]);
+  });
+  it('częściowo zaznaczone → tylko brakujące', () => {
+    expect(idsToToggleForMaster(new Set([1]), [1, 2, 3])).toEqual([2, 3]);
+  });
+  it('WSZYSCY zaznaczeni → zwraca wszystkie do ODZNACZENIA (rdzeń bug 009)', () => {
+    expect(idsToToggleForMaster(new Set([1, 2, 3]), [1, 2, 3])).toEqual([1, 2, 3]);
+  });
+  it('pusta lista nieprzypisanych → nic', () => {
+    expect(idsToToggleForMaster(new Set([9]), [])).toEqual([]);
+  });
+});
+
+// ---- BUG 006 (Krzysztof 2026-06-24): domyślne sortowanie przystanek → Beaver/Sawa/Limba → alfabet ----
+describe('resortRank + compareDefaultTransportOrder — sortowanie domyślne (BUG 006)', () => {
+  it('resortRank: Beaver<Sawa<Limba, fallback z tagu, nieznane=99', () => {
+    expect(resortRank('BEAVER', null)).toBe(0);
+    expect(resortRank('SAWA', null)).toBe(1);
+    expect(resortRank('LIMBA', null)).toBe(2);
+    expect(resortRank(null, 'B1')).toBe(0);
+    expect(resortRank(null, 'S3')).toBe(1);
+    expect(resortRank(null, 'L2')).toBe(2);
+    expect(resortRank(null, null)).toBe(99);
+  });
+
+  const P = (city: string, region: string, tag: string, last: string) =>
+    ({ city, region, tag, last_name: last, first_name: '', is_assigned: false });
+
+  it('sortuje: najpierw przystanek (alfabet), potem Beaver→Sawa, potem alfabet nazwisko', () => {
+    const rows = [
+      P('Warszawa', 'SAWA', 'S1', 'Zielińska'),
+      P('Łódź', 'BEAVER', 'B1', 'Kowalski'),
+      P('Warszawa', 'BEAVER', 'B1', 'Nowak'),
+      P('Warszawa', 'BEAVER', 'B1', 'Adamiak'),
+    ];
+    const out = [...rows].sort(compareDefaultTransportOrder).map((r) => `${r.city}/${r.region}/${r.last_name}`);
+    expect(out).toEqual([
+      'Łódź/BEAVER/Kowalski',       // Łódź < Warszawa
+      'Warszawa/BEAVER/Adamiak',    // Warszawa: Beaver przed Sawa, w Beaver alfabet
+      'Warszawa/BEAVER/Nowak',
+      'Warszawa/SAWA/Zielińska',
+    ]);
   });
 });

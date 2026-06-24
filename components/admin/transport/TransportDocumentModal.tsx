@@ -10,12 +10,13 @@ import { X, FileSpreadsheet, Printer, Check, Save, Trash2, UserPlus } from 'luci
 import { useEffect, useState } from 'react';
 
 import type { Direction, ListPayload, ListPayloadParticipant, TransportListDetail } from '@/lib/types/transportLists';
-import { releaseList, patchList, approveList, downloadListExcel } from '@/lib/services/transportListsApi';
-import { addBlankParticipant, removeParticipantAt } from '@/lib/utils/transportListPayload';
+import { releaseList, getList, patchList, approveList, downloadListExcel } from '@/lib/services/transportListsApi';
+import { addBlankParticipant, removeParticipantAt, sortListParticipants, compareListRows } from '@/lib/utils/transportListPayload';
 
 interface Props {
   taborId: number;
   direction: Direction;
+  listId?: number;          // BUG 007: gdy podany — otwiera ISTNIEJĄCĄ listę (podgląd/edycja), nie wypuszcza nowej
   onClose: () => void;
   onApproved: () => void;
 }
@@ -29,7 +30,7 @@ function resortBg(turnus: string | null): string {
   return '';
 }
 
-export default function TransportDocumentModal({ taborId, direction, onClose, onApproved }: Props) {
+export default function TransportDocumentModal({ taborId, direction, listId, onClose, onApproved }: Props) {
   const [list, setList] = useState<TransportListDetail | null>(null);
   const [payload, setPayload] = useState<ListPayload | null>(null);
   const [headerNote, setHeaderNote] = useState('');
@@ -37,12 +38,15 @@ export default function TransportDocumentModal({ taborId, direction, onClose, on
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isReturn = direction === 'return';
+  // BUG 007: kierunek bierzemy z otwartej listy (gdy podgląd po listId), inaczej z propa.
+  const isReturn = (list?.direction ?? direction) === 'return';
   const immutable = list?.status === 'zatwierdzona';
 
   useEffect(() => {
     let cancelled = false;
-    releaseList(taborId, direction).then((l) => {
+    // BUG 007: listId → otwórz istniejącą listę (getList); inaczej wypuść/odśwież roboczą (releaseList).
+    const loader = listId != null ? getList(listId) : releaseList(taborId, direction);
+    loader.then((l) => {
       if (cancelled) return;
       setList(l);
       setHeaderNote(l.header_note ?? '');
@@ -50,7 +54,7 @@ export default function TransportDocumentModal({ taborId, direction, onClose, on
       setLoading(false);
     }).catch((e) => { if (!cancelled) { setError(String(e)); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [taborId, direction]);
+  }, [taborId, direction, listId]);
 
   const updateRow = (idx: number, field: keyof ListPayloadParticipant, value: string) => {
     setPayload((p) => {
@@ -62,10 +66,18 @@ export default function TransportDocumentModal({ taborId, direction, onClose, on
   // film: ręczne dodanie/usunięcie osoby na liście (bufor) — NIE dotyka bazy rezerwacji.
   const addRow = () => setPayload((p) => (p ? addBlankParticipant(p, isReturn) : p));
   const removeRow = (idx: number) => setPayload((p) => (p ? removeParticipantAt(p, idx) : p));
+  // BUG 008: edycja przystanku całej grupy (nowa osoba w pustej grupie dostaje destynację).
+  const updateGroupStop = (idxs: number[], value: string) =>
+    setPayload((p) => (p ? {
+      ...p, participants: p.participants.map((r, i) => (idxs.includes(i) ? { ...r, przystanek: value } : r)),
+    } : p));
 
   async function savebuffer() {
     if (!list || !payload) return;
-    await patchList(list.id, { payload_json: JSON.stringify(payload), header_note: headerNote });
+    // BUG 008/006: zapisuj listę POSORTOWANĄ (przystanek→resort→nazwisko) z LP 1..n.
+    const sorted = { ...payload, participants: sortListParticipants(payload.participants) };
+    setPayload(sorted);
+    await patchList(list.id, { payload_json: JSON.stringify(sorted), header_note: headerNote });
   }
   async function handleSave() {
     setBusy(true); setError(null);
@@ -91,14 +103,18 @@ export default function TransportDocumentModal({ taborId, direction, onClose, on
     URL.revokeObjectURL(url);
   }
 
-  // Grupowanie po przystanku zachowujące kolejność (LP).
+  // BUG 008/006: grupy budowane z POSORTOWANEJ kolejności (przystanek→resort→nazwisko) — nowo dodana
+  // osoba „przesuwa się tam, gdzie ma być" po wpisaniu destynacji. idx pozostaje oryginalny (do edycji).
   const groups: { stop: string; rows: { row: ListPayloadParticipant; idx: number }[] }[] = [];
-  payload?.participants.forEach((row, idx) => {
-    const stop = row.przystanek ?? '—';
-    const g = groups.find((x) => x.stop === stop);
-    if (g) g.rows.push({ row, idx });
-    else groups.push({ stop, rows: [{ row, idx }] });
-  });
+  (payload?.participants ?? [])
+    .map((row, idx) => ({ row, idx }))
+    .sort((a, b) => compareListRows(a.row, b.row))
+    .forEach(({ row, idx }) => {
+      const stop = (row.przystanek ?? '').trim() || '—';
+      const g = groups.find((x) => x.stop === stop);
+      if (g) g.rows.push({ row, idx });
+      else groups.push({ stop, rows: [{ row, idx }] });
+    });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="document-modal">
@@ -159,7 +175,16 @@ export default function TransportDocumentModal({ taborId, direction, onClose, on
                       <td className="border px-1.5 py-1">{row.kontakt ?? ''}</td>
                       <td className="border px-1.5 py-1">{row.turnus ?? ''}</td>
                       {gi === 0
-                        ? <td className="border px-1.5 py-1 font-semibold" rowSpan={g.rows.length}>{g.stop}</td>
+                        ? (
+                          <td className="border px-1.5 py-1 align-top font-semibold" rowSpan={g.rows.length}>
+                            {/* BUG 008: przystanek edytowalny — admin dodaje destynację (też nowej osobie). */}
+                            {immutable ? g.stop : (
+                              <input value={g.stop === '—' ? '' : g.stop} data-testid="document-stop"
+                                onChange={(e) => updateGroupStop(g.rows.map((r) => r.idx), e.target.value)}
+                                className="w-full bg-transparent px-1 text-xs font-semibold" placeholder="przystanek" />
+                            )}
+                          </td>
+                        )
                         : null}
                       <td className="border px-1 py-0.5">
                         <input value={row.miejsce_zbiorki ?? ''} disabled={immutable}
@@ -192,6 +217,16 @@ export default function TransportDocumentModal({ taborId, direction, onClose, on
                   <UserPlus className="h-4 w-4" /> Dodaj osobę
                 </button>
               )}
+
+              {/* BUG 017 (Krzysztof): brakowało okna na uwagi — osobne od nagłówka „za przednią szybę". */}
+              <div className="mt-4">
+                <label htmlFor="document-notes" className="mb-1 block text-sm font-medium text-gray-700">Dodatkowe uwagi</label>
+                <textarea id="document-notes" data-testid="document-notes" rows={2} disabled={immutable}
+                  value={payload.notes ?? ''}
+                  onChange={(e) => setPayload((p) => (p ? { ...p, notes: e.target.value } : p))}
+                  placeholder="Wpisz dodatkowe uwagi do listy…"
+                  className="w-full rounded border border-gray-300 p-2 text-sm" />
+              </div>
             </>
           )}
         </div>

@@ -3,7 +3,7 @@
  * osoby... nie chcę ingerować w bazę"). Dodanie/usunięcie wiersza z renumeracją LP — bez DOM/DB.
  */
 import {
-  renumberLp, removeParticipantAt, addBlankParticipant,
+  renumberLp, removeParticipantAt, addBlankParticipant, sortListParticipants,
 } from '@/lib/utils/transportListPayload';
 import type { ListPayload, ListPayloadParticipant } from '@/lib/types/transportLists';
 
@@ -53,5 +53,37 @@ describe('transportListPayload — addBlankParticipant', () => {
   it('dla powrotu pusty wiersz MA pole upowaznienia', () => {
     const out = addBlankParticipant(payload([], 'return'), true);
     expect(out.participants[0].upowaznienia).toBe('');
+  });
+
+  // BUG 008: nowa osoba ma PUSTY (edytowalny) przystanek, nie sztywne '—'.
+  it('nowy wiersz ma pusty przystanek (edytowalny), nie „—"', () => {
+    const out = addBlankParticipant(payload([]), false);
+    expect(out.participants[0].przystanek).toBe('');
+  });
+});
+
+// BUG 008 + 006-lista: auto-sortowanie listy wg przystanek→resort(turnus B/S/L)→nazwisko; pusty przystanek na koniec.
+describe('transportListPayload — sortListParticipants (auto-sort + nowa osoba trafia na miejsce)', () => {
+  const row = (last: string, stop: string, turnus: string): ListPayloadParticipant => ({
+    lp: 0, reservation_id: 1, first_name: '', last_name: last, rocznik: null,
+    opiekun: null, kontakt: null, turnus, przystanek: stop, miejsce_zbiorki: '', is_transfer: false,
+  });
+
+  it('sortuje przystanek alfabetycznie, w obrębie Beaver przed Sawa, potem nazwisko + renumeruje LP', () => {
+    const out = sortListParticipants([
+      row('Zielińska', 'Warszawa', 'S1'),
+      row('Kowalski', 'Łódź', 'B1'),
+      row('Nowak', 'Warszawa', 'B1'),
+      row('Adamiak', 'Warszawa', 'B1'),
+    ]);
+    expect(out.map((r) => `${r.przystanek}/${r.turnus}/${r.last_name}`)).toEqual([
+      'Łódź/B1/Kowalski', 'Warszawa/B1/Adamiak', 'Warszawa/B1/Nowak', 'Warszawa/S1/Zielińska',
+    ]);
+    expect(out.map((r) => r.lp)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('nowa osoba z PUSTYM przystankiem ląduje na końcu (do uzupełnienia)', () => {
+    const out = sortListParticipants([row('Nowy', '', 'B1'), row('Kowalski', 'Gdańsk', 'B1')]);
+    expect(out.map((r) => r.last_name)).toEqual(['Kowalski', 'Nowy']);
   });
 });

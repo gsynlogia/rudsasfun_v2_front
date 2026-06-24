@@ -23,7 +23,7 @@ import {
 } from '@/lib/services/transportListsApi';
 import {
   type Resort, type SelectionState, emptySelection, toggleCity, toggleResortCell, toggleMaster,
-  hasAnySelection, calculateSelectedTotal, isParticipantSelected, isTransferParticipant, toggleColumnKey,
+  hasAnySelection, calculateSelectedTotal, selectDisplayedParticipants, isTransferParticipant, toggleColumnKey,
 } from '@/lib/utils/transportSelection';
 
 import AddConnectionModal from './transport/AddConnectionModal';
@@ -63,6 +63,7 @@ export default function TransportListsManagement() {
   const [connModalOpen, setConnModalOpen] = useState(false);
   const [deleteConnTarget, setDeleteConnTarget] = useState<Connection | null>(null);
   const [documentTabor, setDocumentTabor] = useState<Tabor | null>(null);
+  const [openListId, setOpenListId] = useState<number | null>(null);   // BUG 007: podgląd istniejącej listy
   const [listsModalOpen, setListsModalOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [earlyLeaveTarget, setEarlyLeaveTarget] = useState<number | null>(null);
@@ -106,8 +107,10 @@ export default function TransportListsManagement() {
   useEffect(() => { void loadConnections(); }, [loadConnections]);
 
   // Reload danych aktywnego źródła: SEZON (auto z bazy) gdy brak połączenia, inaczej dane połączenia.
-  const reloadData = useCallback(async () => {
-    setLoading(true);
+  // BUG 003: `silent` pomija flagę loading — panele NIE znikają (nie unmountują), więc rozwinięty tabor
+  // zostaje otwarty po usunięciu uczestnika. reloadKey i tak wymusza odświeżenie liczb/list w taborach.
+  const reloadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       if (activeConnectionId == null) {
         const [c, p] = await Promise.all([
@@ -158,12 +161,11 @@ export default function TransportListsManagement() {
   const selectedTotal = useMemo(() => calculateSelectedTotal(selection, cities), [selection, cities]);
   const assignMode = openTaborId != null;
 
-  // Uczestnicy panelu: w trybie taboru — wszyscy (do wsadzania); inaczej — przefiltrowani do zaznaczenia.
-  const displayedParticipants = useMemo(() => {
-    if (assignMode) return participants;
-    if (!hasSelection) return [];
-    return participants.filter((p) => isParticipantSelected(selection, p.city, p.region));
-  }, [assignMode, hasSelection, participants, selection]);
+  // Uczestnicy panelu (BUG 004): gdy jest zaznaczenie miasta — ZAWSZE filtruj (także przy otwartym
+  // taborze); bez zaznaczenia w trybie taboru pokazujemy wszystkich do wsadzania, inaczej pusto.
+  const displayedParticipants = useMemo(
+    () => selectDisplayedParticipants(assignMode, hasSelection, participants, selection),
+    [assignMode, hasSelection, participants, selection]);
 
   const onToggleCity = useCallback((city: string) => setSelection((s) => toggleCity(s, city)), []);
   const onToggleResortCell = useCallback(
@@ -222,9 +224,11 @@ export default function TransportListsManagement() {
   }, [reloadData, participantCityById, transferCities]);
 
   // Wspólny dla G04 (usuń wypadniętego z listy orphaned) i G06 (wyjmij uczestnika z taboru).
+  // BUG 003: cichy refresh (silent) — usunięcie uczestnika NIE przeładowuje strony ani nie zamyka
+  // otwartego/rozwiniętego taboru (przy kilku autokarach przeładowanie byłoby uciążliwe).
   const handleRemoveParticipant = useCallback(async (participantId: number) => {
     await removeParticipant(participantId);
-    await reloadData();
+    await reloadData(true);
   }, [reloadData]);
 
   // H12: drag&drop kolejność dzieci w taborze — zapis order_number + reload (renumeracja z backendu).
@@ -457,8 +461,8 @@ export default function TransportListsManagement() {
                 <p className="mt-1 text-xs">Dodaj połączenie, aby układać tabory i wypuszczać listy.</p>
               </div>
             ) : (
-              <TaborPanel tabors={tabors} participantNames={participantNames} reloadKey={reloadKey}
-                openTaborId={openTaborId}
+              <TaborPanel tabors={tabors} participantNames={participantNames} participantStops={participantCityById}
+                reloadKey={reloadKey} openTaborId={openTaborId}
                 onOpenTabor={(id) => { setOpenTaborId(id); setPanelMode('participants'); }}
                 onDropAssign={(taborId, rid) => void dropAssign(taborId, rid)}
                 onRemoveParticipant={(pid) => void handleRemoveParticipant(pid)}
@@ -500,7 +504,15 @@ export default function TransportListsManagement() {
         <TransportDocumentModal taborId={documentTabor.id} direction={direction}
           onClose={() => setDocumentTabor(null)} onApproved={() => void reloadData()} />
       )}
-      {listsModalOpen && <TransportListsModal onClose={() => setListsModalOpen(false)} />}
+      {/* BUG 007: podgląd/edycja istniejącej listy otwartej z modalu „Aktywne listy". */}
+      {openListId != null && (
+        <TransportDocumentModal taborId={0} direction={direction} listId={openListId}
+          onClose={() => setOpenListId(null)} onApproved={() => { setOpenListId(null); void reloadData(); }} />
+      )}
+      {listsModalOpen && (
+        <TransportListsModal onClose={() => setListsModalOpen(false)}
+          onOpenList={(id) => { setListsModalOpen(false); setOpenListId(id); }} />
+      )}
       {columnsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="columns-modal">
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">

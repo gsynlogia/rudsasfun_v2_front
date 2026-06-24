@@ -24,6 +24,7 @@ const TYPE_LABEL: Record<string, string> = {
 interface TaborPanelProps {
   tabors: Tabor[];
   participantNames: Map<number, string>;
+  participantStops: Map<number, string | null>;   // BUG 019: reservation_id → przystanek (zamiast tematu)
   onEdit: (tabor: Tabor) => void;
   openTaborId: number | null;
   onOpenTabor: (id: number) => void;
@@ -36,8 +37,8 @@ interface TaborPanelProps {
 }
 
 export default function TaborPanel(
-  { tabors, participantNames, onEdit, openTaborId, onOpenTabor, onDropAssign, onRemoveParticipant,
-    onReorder, reloadKey, onDelete, onDocument }: TaborPanelProps,
+  { tabors, participantNames, participantStops, onEdit, openTaborId, onOpenTabor, onDropAssign,
+    onRemoveParticipant, onReorder, reloadKey, onDelete, onDocument }: TaborPanelProps,
 ) {
   if (tabors.length === 0) {
     return (
@@ -49,7 +50,8 @@ export default function TaborPanel(
   return (
     <div className="flex flex-col gap-3" data-testid="tabor-panel">
       {tabors.map((t) => (
-        <TaborCard key={t.id} tabor={t} participantNames={participantNames} onEdit={onEdit} reloadKey={reloadKey}
+        <TaborCard key={t.id} tabor={t} participantNames={participantNames} participantStops={participantStops}
+          onEdit={onEdit} reloadKey={reloadKey}
           isOpen={openTaborId === t.id} onOpen={() => onOpenTabor(t.id)}
           onDrop={(rid) => onDropAssign(t.id, rid)} onDelete={() => onDelete(t)}
           onRemoveParticipant={onRemoveParticipant}
@@ -62,6 +64,7 @@ export default function TaborPanel(
 interface TaborCardProps {
   tabor: Tabor;
   participantNames: Map<number, string>;
+  participantStops: Map<number, string | null>;   // BUG 019
   onEdit: (tabor: Tabor) => void;
   isOpen: boolean;
   onOpen: () => void;
@@ -74,7 +77,7 @@ interface TaborCardProps {
 }
 
 function TaborCard(
-  { tabor, participantNames, onEdit, isOpen, onOpen, onDrop, onRemoveParticipant,
+  { tabor, participantNames, participantStops, onEdit, isOpen, onOpen, onDrop, onRemoveParticipant,
     onReorder, reloadKey, onDelete, onDocument }: TaborCardProps,
 ) {
   const [expanded, setExpanded] = useState(false);
@@ -113,7 +116,8 @@ function TaborCard(
               <span className="font-semibold text-gray-900">
                 {TYPE_LABEL[tabor.type] ?? tabor.type} {tabor.name ?? ''}
               </span>
-              {tabor.number && <span className="rounded bg-gray-100 px-1.5 text-xs text-gray-600">#{tabor.number}</span>}
+              {/* BUG 014: Ania prosi o WIĘKSZĄ cyferkę numeru taboru (była za mała). */}
+              {tabor.number && <span className="rounded bg-gray-200 px-2 py-0.5 text-base font-bold text-gray-800" data-testid="tabor-number">#{tabor.number}</span>}
               {tabor.document_approved && (
                 <span className="flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-700">
                   <CheckCircle2 className="h-3 w-3" /> lista kompletna
@@ -190,7 +194,9 @@ function TaborCard(
                   ? <>
                       <span className="flex-1 text-gray-800">
                         {participantNames.get(p.reservation_id) ?? `#${p.reservation_id}`}
-                        {p.topic_snapshot ? <span className="italic text-gray-500"> · {p.topic_snapshot}</span> : ''}
+                        {/* BUG 019: w rozwiniętym taborze pokazujemy PRZYSTANEK (nie temat obozu). */}
+                        {participantStops.get(p.reservation_id)
+                          ? <span className="italic text-gray-500"> · {participantStops.get(p.reservation_id)}</span> : ''}
                         {p.is_transfer ? <span className="ml-1 text-orange-500">⇄</span> : ''}
                       </span>
                       {/* G06: wyjmij pojedynczego uczestnika (× przy miejscu) — renumeracja po stronie backendu */}

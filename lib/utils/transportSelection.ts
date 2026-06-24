@@ -204,3 +204,66 @@ export function isParticipantSelected(
   if (resort !== 'beaver' && resort !== 'sawa' && resort !== 'limba') return false;
   return isResortCellSelected(s, participantCity, resort as Resort);
 }
+
+/**
+ * BUG 004 (Krzysztof 2026-06-24): „klik miasta po lewej NIE filtruje uczestników gdy tabor otwarty".
+ * Reguła: gdy jest JAKIEKOLWIEK zaznaczenie → ZAWSZE filtruj (również w trybie wsadzania do taboru).
+ * Gdy brak zaznaczenia → w trybie taboru pokaż wszystkich (żeby móc wsadzić kogokolwiek), poza nim pusto.
+ * Wcześniej `assignMode` bezwarunkowo zwracał wszystkich → ignorował filtr miasta (root cause).
+ */
+export function selectDisplayedParticipants<
+  T extends { city: string | null; region: string | null },
+>(assignMode: boolean, hasSelection: boolean, participants: T[], selection: SelectionState): T[] {
+  if (!hasSelection) return assignMode ? participants : [];
+  return participants.filter((p) => isParticipantSelected(selection, p.city, p.region));
+}
+
+/**
+ * BUG 009 (Krzysztof 2026-06-24): „zaznacz wszystkich" w taborze — nie dało się ODKLIKNĄĆ.
+ * Zwraca id, które trzeba przełączyć (flip) by master zadziałał w obie strony:
+ * - wszyscy nieprzypisani już zaznaczeni → wszystkie do odznaczenia,
+ * - inaczej → tylko brakujące do zaznaczenia.
+ */
+export function idsToToggleForMaster(selectedIds: Set<number>, unassignedIds: number[]): number[] {
+  const allChecked = unassignedIds.length > 0 && unassignedIds.every((id) => selectedIds.has(id));
+  if (allChecked) return unassignedIds.filter((id) => selectedIds.has(id));   // odznacz wszystkich
+  return unassignedIds.filter((id) => !selectedIds.has(id));                  // zaznacz brakujących
+}
+
+/**
+ * BUG 006 (Krzysztof 2026-06-24): ranga resortu do sortowania „w obrębie przystanku Beaver→Sawa→Limba".
+ * Bierze z region (BEAVER/SAWA/LIMBA), a gdy brak — z pierwszej litery tagu (B/S/L). Nieznane = 99 (na koniec).
+ */
+const RESORT_RANK: Record<string, number> = { beaver: 0, sawa: 1, limba: 2 };
+export function resortRank(region: string | null, tag: string | null): number {
+  const r = (region ?? '').trim().toLowerCase();
+  if (r in RESORT_RANK) return RESORT_RANK[r];
+  const t = (tag ?? '').trim().toUpperCase()[0];
+  if (t === 'B') return 0;
+  if (t === 'S') return 1;
+  if (t === 'L') return 2;
+  return 99;
+}
+
+/** Pola potrzebne do domyślnego sortowania transportu (BUG 006). */
+export interface DefaultSortable {
+  city: string | null;
+  region: string | null;
+  tag: string | null;
+  last_name: string | null;
+  first_name: string | null;
+}
+
+/**
+ * BUG 006: domyślne sortowanie listy uczestników (i listy wygenerowanej):
+ * 1) przystanek alfabetycznie (po polsku), 2) resort Beaver→Sawa→Limba, 3) nazwisko+imię alfabetycznie.
+ */
+export function compareDefaultTransportOrder(a: DefaultSortable, b: DefaultSortable): number {
+  const byCity = (a.city ?? '').localeCompare(b.city ?? '', 'pl');
+  if (byCity !== 0) return byCity;
+  const byResort = resortRank(a.region, a.tag) - resortRank(b.region, b.tag);
+  if (byResort !== 0) return byResort;
+  const an = `${a.last_name ?? ''} ${a.first_name ?? ''}`.trim();
+  const bn = `${b.last_name ?? ''} ${b.first_name ?? ''}`.trim();
+  return an.localeCompare(bn, 'pl');
+}

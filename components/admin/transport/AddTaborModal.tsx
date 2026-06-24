@@ -101,7 +101,7 @@ export default function AddTaborModal({ connectionId, tabor, onClose, onSaved }:
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Nazwa"><input className={INPUT} value={name} onChange={(e) => setName(e.target.value)} /></Field>
-          <Field label="Numer"><input className={INPUT} value={number} onChange={(e) => setNumber(e.target.value)} /></Field>
+          <Field label="Numer"><input className={INPUT} data-testid="tabor-number-input" value={number} onChange={(e) => setNumber(e.target.value)} /></Field>
           <Field label="Ilość miejsc">
             <input type="number" min={1} className={INPUT} value={seats}
               onChange={(e) => setSeats(Math.max(1, Number(e.target.value) || 1))} />

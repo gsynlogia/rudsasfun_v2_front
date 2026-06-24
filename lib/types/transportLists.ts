@@ -173,6 +173,7 @@ export interface ListPayloadParticipant {
 export interface ListPayload {
   direction: Direction;
   header_note?: string;
+  notes?: string;                 // BUG 017: dodatkowe uwagi do listy (osobne od „za przednią szybę")
   tabor: Partial<Tabor>;
   participants: ListPayloadParticipant[];
 }

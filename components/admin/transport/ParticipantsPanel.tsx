@@ -13,10 +13,15 @@ import { Filter, ChevronsUpDown, ChevronUp, ChevronDown, MoveRight, AlertTriangl
 import { useMemo, useState } from 'react';
 
 import type { ParticipantRow } from '@/lib/types/transportLists';
-import { canReassignParticipant, distinctSorted } from '@/lib/utils/transportSelection';
+import {
+  canReassignParticipant, distinctSorted, idsToToggleForMaster, compareDefaultTransportOrder,
+} from '@/lib/utils/transportSelection';
 
 type SortDir = 'asc' | 'desc';
 type PanelMode = 'numbers' | 'participants';
+
+// BUG 006: domyślny tryb sortowania = przystanek → Beaver/Sawa/Limba → nazwisko (gdy admin nic nie kliknął).
+const DEFAULT_SORT = '__default__';
 
 interface Column { key: string; label: string; get: (p: ParticipantRow) => string; }
 
@@ -66,7 +71,7 @@ export default function ParticipantsPanel({
   participants, panelMode, hasSelection, selectedTotal, assignMode, selectedIds, transferCities,
   visibleColumns, onToggleSelect, onAssignSelected, onEarlyLeave, onOpenReservation,
 }: Props) {
-  const [sortKey, setSortKey] = useState<string>('uczestnik');
+  const [sortKey, setSortKey] = useState<string>(DEFAULT_SORT);   // BUG 006: domyślnie przystanek→resort→nazwisko
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
@@ -90,11 +95,12 @@ export default function ParticipantsPanel({
         const f = (filters[c.key] ?? '').trim();
         return !f || c.get(p).trim() === f;
       }));
-    const sc = col(sortKey);
     const dir = sortDir === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
       if (a.is_assigned !== b.is_assigned) return a.is_assigned ? 1 : -1; // nieprzypisani u góry
-      return sc.get(a).localeCompare(sc.get(b), 'pl') * dir;
+      // BUG 006: bez ręcznie wybranej kolumny — domyślne sortowanie przystanek→Beaver/Sawa/Limba→nazwisko.
+      if (sortKey === DEFAULT_SORT) return compareDefaultTransportOrder(a, b);
+      return col(sortKey).get(a).localeCompare(col(sortKey).get(b), 'pl') * dir;
     });
   }, [participants, filters, sortKey, sortDir]);
 
@@ -157,9 +163,10 @@ export default function ParticipantsPanel({
             <tr className="bg-gray-700 text-left text-xs font-semibold uppercase tracking-wide text-white">
               {assignMode && (
                 <th className="px-3 py-3 text-center" style={{ width: '3rem' }}>
-                  <input type="checkbox" aria-label="Zaznacz wszystkich nieprzypisanych"
+                  {/* BUG 009: master działa w obie strony — drugi klik ODZNACZA wszystkich. */}
+                  <input type="checkbox" aria-label="Zaznacz wszystkich nieprzypisanych" data-testid="assign-master"
                     checked={unassignedVisible.length > 0 && unassignedVisible.every((p) => selectedIds.has(p.reservation_id))}
-                    onChange={() => unassignedVisible.forEach((p) => { if (!selectedIds.has(p.reservation_id)) onToggleSelect(p.reservation_id); })} />
+                    onChange={() => idsToToggleForMaster(selectedIds, unassignedVisible.map((p) => p.reservation_id)).forEach(onToggleSelect)} />
                 </th>
               )}
               {cols.map((c) => (
