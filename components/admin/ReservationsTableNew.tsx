@@ -13,6 +13,7 @@ import DocumentStatusBadge, { getDocumentStatusVisual, DocumentStatus } from '@/
 import { getExportSheetName } from '@/lib/exportExcelUtils';
 import { dedupeFilterValues } from '@/lib/utils/dedupeFilterValues';
 import { polishSort } from '@/lib/utils/polishSort';
+import { buildListReturnUrl } from '@/lib/utils/listReturnUrl';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
@@ -5411,13 +5412,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                   const hasCanceledItems = reservation.paymentDetails.items.some(item => item.status === 'canceled');
                   const basePath = `/admin-panel/rezerwacja/${reservation.reservationName}`;
                   const detailPath = detailTarget === 'payment' ? `${basePath}/payments` : basePath;
-                  // Zadanie 3.2: pełny URL listy (filtry, strona, sort) w returnTo – przy powrocie zachowane
-                  const returnParams = new URLSearchParams(searchParams?.toString() ?? '');
-                  if (sortColumn) {
-                    returnParams.set('sort_by', sortColumn);
-                    returnParams.set('sort_dir', sortDirection || 'desc');
-                  }
-                  const returnTo = (pathname || '/admin-panel') + (returnParams.toString() ? `?${returnParams.toString()}` : '');
+                  // BUG 001/002 (Ania): returnTo z AKTUALNEGO adresu (window.location.search), bo filtry/
+                  // wyszukiwarka ustawiane przez UI idą do URL przez window.history.replaceState i NIE odświeżają
+                  // hooka searchParams (stale) — branie z hooka gubiło je przy powrocie. Spójne z chipami (window.location).
+                  const currentSearch = typeof window !== 'undefined'
+                    ? window.location.search
+                    : (searchParams?.toString() ? `?${searchParams.toString()}` : '');
+                  const returnTo = buildListReturnUrl(currentSearch, pathname || '/admin-panel', sortColumn, sortDirection);
                   const reservationUrl = `${detailPath}?returnTo=${encodeURIComponent(returnTo)}${detailTarget === 'reservation' ? '#dane' : ''}`;
 
                   return (

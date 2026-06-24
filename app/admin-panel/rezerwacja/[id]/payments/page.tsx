@@ -76,6 +76,9 @@ export default function ReservationPaymentsPage() {
 
   // Get fromPage param to return to correct pagination page
   const fromPage = searchParams?.get('fromPage');
+  // BUG 001/002 (Ania): pełny URL listy (filtry + wyszukiwarka + sort) — powrót MUSI zachować filtry,
+  // nie tylko numer strony. returnTo budowany przez ReservationsTableNew (buildListReturnUrl).
+  const returnTo = searchParams?.get('returnTo');
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
@@ -455,7 +458,8 @@ export default function ReservationPaymentsPage() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => {
-                  const returnUrl = fromPage ? `/admin-panel/payments?page=${fromPage}` : '/admin-panel/payments';
+                  // BUG 001/002: priorytet returnTo (pełne filtry/wyszukiwarka); fallback fromPage (sama strona).
+                  const returnUrl = returnTo || (fromPage ? `/admin-panel/payments?page=${fromPage}` : '/admin-panel/payments');
                   router.push(returnUrl);
                 }}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded"
