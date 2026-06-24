@@ -10,7 +10,7 @@ import { useToast } from '@/components/ToastContainer';
 import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
 import DateRangeCalendar from '@/components/admin/DateRangeCalendar';
 import DocumentStatusBadge, { getDocumentStatusVisual, DocumentStatus } from '@/components/admin/DocumentStatusBadge';
-import { getExportSheetName } from '@/lib/exportExcelUtils';
+import { getExportSheetName, normalizeGenderLabel } from '@/lib/exportExcelUtils';
 import { dedupeFilterValues } from '@/lib/utils/dedupeFilterValues';
 import { polishSort } from '@/lib/utils/polishSort';
 import { buildListReturnUrl } from '@/lib/utils/listReturnUrl';
@@ -147,6 +147,7 @@ interface BackendReservationWithPayments {
   is_archived?: boolean;
   archived_at?: string | null;
   // Excel-only extras (zwracane tylko gdy include_extras=true)
+  participant_gender?: string | null; // Trello #349 — płeć uczestnika (surowa, normalizowana w eksporcie)
   accommodation_request?: string | null;
   participant_additional_info?: string | null;
   additional_notes?: string | null;
@@ -3052,6 +3053,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           payment7: sortedPayments[6] ? { amount: sortedPayments[6].paid_amount || sortedPayments[6].amount, date: sortedPayments[6].created_at?.split('T')[0] } : null,
           participantAge: item.participant_age?.toString() || '',
           participantCity: item.participant_city || '',
+          // Trello #349 — płeć znormalizowana do czytelnej etykiety (Chłopiec/Dziewczynka) na potrzeby Excela.
+          participantGender: normalizeGenderLabel(item.participant_gender),
           guardianName,
           guardianPhone,
           guardianEmail,
@@ -3255,6 +3258,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         // Kod rabatowy + dane uczestnika (ETAP 1 + ETAP 2)
         { header: 'Kod Rabatowy', getValue: r => r.kodRabatowy },
         { header: 'dieta', getValue: r => r.dietName },
+        // Trello #349 — płeć uczestnika (znormalizowana do Chłopiec/Dziewczynka).
+        { header: 'Płeć', getValue: r => r.participantGender },
         // Atrakcje dodatkowe (WhatsApp Joanna 2026-05-31 14:29) — pole brakowało w XLSX mimo że istnieje w panelu admina.
         // Liczone w computeExportRow z protections/addons (linia 1066-1093).
         { header: 'Oaza', getValue: r => r.hasOaza ? 'Tak' : 'Nie' },

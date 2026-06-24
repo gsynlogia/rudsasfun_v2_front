@@ -1,10 +1,11 @@
 'use client';
 
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
 import SectionGuard from '@/components/admin/SectionGuard';
 import { useToast } from '@/components/ToastContainer';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
@@ -50,6 +51,24 @@ export default function EditInvoicePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Soft delete faktury (#351)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Soft delete faktury ręcznej: oznacza jako skasowaną (backend), wraca do listy płatności. Rekord zostaje w bazie.
+  const handleDeleteInvoice = async () => {
+    if (isNaN(invoiceId)) return;
+    setIsDeleting(true);
+    try {
+      await manualInvoiceService.delete(invoiceId);
+      showSuccess('Faktura została skasowana (można ją przywrócić)');
+      router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Błąd podczas kasowania faktury');
+      setIsDeleting(false);
+      setIsDeleteModalOpen(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -488,10 +507,33 @@ export default function EditInvoicePage() {
                 >
                   {isReadOnly ? 'Wróć' : 'Anuluj'}
                 </button>
+                {/* Soft delete (#351) — tylko faktury ręczne (Fakturownia jest read-only) */}
+                {!isReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDeleteModalOpen(true)}
+                    className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white hover:bg-red-700 transition-all duration-200 ml-auto"
+                    style={{ borderRadius: 0 }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Usuń fakturę
+                  </button>
+                )}
               </div>
             </form>
           </div>
         </div>
+
+        {/* Soft delete faktury (#351) — potwierdzenie kasowania */}
+        <DeleteConfirmationModal
+          isOpen={isDeleteModalOpen}
+          itemType="invoice"
+          itemName={invoiceNumber}
+          itemId={isNaN(invoiceId) ? 0 : invoiceId}
+          onConfirm={handleDeleteInvoice}
+          onCancel={() => setIsDeleteModalOpen(false)}
+          isLoading={isDeleting}
+        />
       </AdminLayout>
     </SectionGuard>
   );

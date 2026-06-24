@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Check, XCircle, RefreshCw, Search, Plus as PlusIcon } from 'lucide-react';
+import { ArrowLeft, Check, XCircle, RefreshCw, Search, Plus as PlusIcon, Trash2 } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
 import SectionGuard from '@/components/admin/SectionGuard';
+import { useToast } from '@/components/ToastContainer';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualInvoiceService, ManualInvoiceResponse } from '@/lib/services/ManualInvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
@@ -97,6 +99,28 @@ export default function ReservationPaymentsPage() {
   // Search states
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
+
+  // Soft delete faktury (#351)
+  const { showSuccess, showError } = useToast();
+  const [deleteInvoiceTarget, setDeleteInvoiceTarget] = useState<{ id: number; number: string } | null>(null);
+  const [isDeletingInvoice, setIsDeletingInvoice] = useState(false);
+
+  // Soft delete faktury ręcznej: oznacza jako skasowaną (backend), odświeża listę. Rekord zostaje w bazie.
+  const handleConfirmDeleteInvoice = async () => {
+    if (!deleteInvoiceTarget || !reservation) return;
+    setIsDeletingInvoice(true);
+    try {
+      await manualInvoiceService.delete(deleteInvoiceTarget.id);
+      const refreshed = await manualInvoiceService.getByReservation(reservation.id);
+      setManualInvoices(refreshed);
+      setDeleteInvoiceTarget(null);
+      showSuccess('Faktura została skasowana (można ją przywrócić)');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Błąd podczas kasowania faktury');
+    } finally {
+      setIsDeletingInvoice(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -823,12 +847,13 @@ export default function ReservationPaymentsPage() {
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Kwota</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Akcje</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-sm text-gray-500">
+                        <td colSpan={5} className="px-3 py-4 text-center text-sm text-gray-500">
                           Brak faktur
                         </td>
                       </tr>
@@ -861,6 +886,22 @@ export default function ReservationPaymentsPage() {
                                 </span>
                               )}
                             </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-right">
+                              {/* Soft delete (#351) — tylko faktury ręczne; Fakturownia jest read-only */}
+                              {_isManual && (
+                                <button
+                                  type="button"
+                                  title="Usuń fakturę"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteInvoiceTarget({ id: invoice.id, number: invoice.invoice_number });
+                                  }}
+                                  className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         );
                       })
@@ -871,6 +912,17 @@ export default function ReservationPaymentsPage() {
             </div>
           </div>
         </div>
+
+        {/* Soft delete faktury (#351) — potwierdzenie kasowania */}
+        <DeleteConfirmationModal
+          isOpen={deleteInvoiceTarget !== null}
+          itemType="invoice"
+          itemName={deleteInvoiceTarget?.number || ''}
+          itemId={deleteInvoiceTarget?.id || 0}
+          onConfirm={handleConfirmDeleteInvoice}
+          onCancel={() => setDeleteInvoiceTarget(null)}
+          isLoading={isDeletingInvoice}
+        />
       </AdminLayout>
     </SectionGuard>
   );

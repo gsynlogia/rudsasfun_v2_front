@@ -2,7 +2,7 @@
 
 import { AlertCircle } from 'lucide-react';
 
-export type DeleteItemType = 'camp' | 'turnus' | 'reservation' | 'payment' | 'transport' | 'diet' | 'other';
+export type DeleteItemType = 'camp' | 'turnus' | 'reservation' | 'payment' | 'transport' | 'diet' | 'invoice' | 'other';
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;
@@ -54,6 +54,8 @@ export default function DeleteConfirmationModal({
         return 'przypisanie transportu';
       case 'diet':
         return 'przypisanie diety';
+      case 'invoice':
+        return 'fakturę';
       default:
         return 'element';
     }
@@ -73,6 +75,8 @@ export default function DeleteConfirmationModal({
         return 'Przypisanie transportu do tego turnusu zostanie usunięte. Transport pozostanie w systemie i będzie dostępny do przypisania do innych turnusów.';
       case 'diet':
         return 'Przypisanie diety do tego turnusu zostanie usunięte. Dieta pozostanie w systemie i będzie dostępna do przypisania do innych turnusów.';
+      case 'invoice':
+        return '';  // Bez dodatkowego tekstu — admin widzi tylko pytanie (soft delete to nasza sprawa).
       default:
         return 'Ta operacja jest nieodwracalna.';
     }
@@ -108,9 +112,11 @@ export default function DeleteConfirmationModal({
           <p className="text-sm text-gray-600 mb-6">
             Czy na pewno chcesz usunąć {itemTypeLabel} <strong>{itemName}</strong>?
           </p>
-          <p className="text-xs text-gray-500 mb-6">
-            {warningText}
-          </p>
+          {warningText && (
+            <p className="text-xs text-gray-500 mb-6">
+              {warningText}
+            </p>
+          )}
 
           <div className="flex items-center justify-end gap-3">
             <button
