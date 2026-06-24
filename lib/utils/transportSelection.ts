@@ -263,6 +263,23 @@ export function rowMatchesMultiFilters(
     ([key, selected]) => selected.length === 0 || selected.includes(getValue(key).trim()));
 }
 
+/**
+ * BUG 016 (Krzysztof 2026-06-24): przekładanie kolumn w „Porównaj" (←/→) — zamiana sąsiednich elementów.
+ * Poza zakresem (skrajna kolumna) → kopia bez zmian. Bez mutacji wejścia.
+ */
+export function swapAdjacent<T>(arr: T[], idx: number, dir: -1 | 1): T[] {
+  const j = idx + dir;
+  if (idx < 0 || idx >= arr.length || j < 0 || j >= arr.length) return [...arr];
+  const next = [...arr];
+  [next[idx], next[j]] = [next[j], next[idx]];
+  return next;
+}
+
+/** BUG 016: usuwanie kolumny z „Porównaj" po indeksie. Bez mutacji wejścia. */
+export function removeAt<T>(arr: T[], idx: number): T[] {
+  return arr.filter((_, i) => i !== idx);
+}
+
 /** Pola potrzebne do domyślnego sortowania transportu (BUG 006). */
 export interface DefaultSortable {
   city: string | null;

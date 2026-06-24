@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 
 import type { Connection, CompareEntry } from '@/lib/types/transportLists';
 import { listConnections, compareConnections } from '@/lib/services/transportListsApi';
-import { boundedToggle } from '@/lib/utils/transportSelection';
+import { boundedToggle, swapAdjacent, removeAt } from '@/lib/utils/transportSelection';
 
 const COMPARE_MAX = 2;   // rozkaz Pana 2026-06-21: porównanie ograniczone do max 2
 
@@ -30,15 +30,11 @@ export default function TransportCompareModal({ onClose }: { onClose: () => void
   }
 
   // BUG 016: przekładanie kolumn (←/→) i usuwanie kolumny z porównania (X). Usunięcie ostatniej → powrót do wyboru.
-  const moveColumn = (idx: number, dir: -1 | 1) => setResult((r) => {
-    if (!r) return r;
-    const j = idx + dir;
-    if (j < 0 || j >= r.length) return r;
-    const n = [...r]; [n[idx], n[j]] = [n[j], n[idx]]; return n;
-  });
+  // Czysta logika w pure helperach swapAdjacent/removeAt (transportSelection — testowane jednostkowo).
+  const moveColumn = (idx: number, dir: -1 | 1) => setResult((r) => (r ? swapAdjacent(r, idx, dir) : r));
   const removeColumn = (idx: number) => setResult((r) => {
     if (!r) return r;
-    const n = r.filter((_, i) => i !== idx);
+    const n = removeAt(r, idx);
     return n.length ? n : null;
   });
 

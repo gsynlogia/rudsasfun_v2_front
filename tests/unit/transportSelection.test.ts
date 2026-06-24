@@ -10,6 +10,7 @@ import {
   isTransferParticipant, canReassignParticipant, distinctSorted, toggleColumnKey, boundedToggle,
   reorderList, selectDisplayedParticipants, idsToToggleForMaster, resortRank,
   compareDefaultTransportOrder, toggleArrayValue, rowMatchesMultiFilters,
+  swapAdjacent, removeAt,
   type Resort,
 } from '@/lib/utils/transportSelection';
 
@@ -308,5 +309,29 @@ describe('toggleArrayValue + rowMatchesMultiFilters — filtry wielokrotne (BUG 
     const get = (k: string) => ({ tag: 'B1', temat: 'Akrobatyka' }[k] ?? '');
     expect(rowMatchesMultiFilters(get, { tag: ['B1'], temat: ['Akrobatyka'] })).toBe(true);
     expect(rowMatchesMultiFilters(get, { tag: ['B1'], temat: ['Piłka'] })).toBe(false);
+  });
+});
+
+// ---- BUG 016 (Krzysztof 2026-06-24): Porównaj — przekładanie (←/→) i usuwanie kolumn ----
+describe('swapAdjacent + removeAt — reorder/usuwanie kolumn porównania (BUG 016)', () => {
+  it('swapAdjacent przesuwa w prawo (zamiana z następnym)', () => {
+    expect(swapAdjacent(['a', 'b', 'c'], 0, 1)).toEqual(['b', 'a', 'c']);
+  });
+  it('swapAdjacent przesuwa w lewo (zamiana z poprzednim)', () => {
+    expect(swapAdjacent(['a', 'b', 'c'], 2, -1)).toEqual(['a', 'c', 'b']);
+  });
+  it('swapAdjacent poza zakresem → kopia bez zmian', () => {
+    expect(swapAdjacent(['a', 'b'], 0, -1)).toEqual(['a', 'b']);
+    expect(swapAdjacent(['a', 'b'], 1, 1)).toEqual(['a', 'b']);
+  });
+  it('removeAt usuwa wskazany indeks', () => {
+    expect(removeAt(['a', 'b', 'c'], 1)).toEqual(['a', 'c']);
+    expect(removeAt(['a'], 0)).toEqual([]);
+  });
+  it('nie mutuje wejścia', () => {
+    const src = ['a', 'b', 'c'];
+    swapAdjacent(src, 0, 1);
+    removeAt(src, 0);
+    expect(src).toEqual(['a', 'b', 'c']);
   });
 });
