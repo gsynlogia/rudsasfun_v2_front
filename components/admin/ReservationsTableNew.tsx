@@ -1877,6 +1877,11 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const DEFAULT_COLUMNS = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true }));
 
   const [columnConfig, setColumnConfig] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
+  // Bug #013 (transport): ref do aktualnego columnConfig — pozwala helperom budującym URL
+  // /api/payments/filter-search (z pustymi useCallback deps) czytać świeże wartości filtra
+  // propertyTag bez przebudowy callbacków przy każdej zmianie filtrów.
+  const columnConfigRef = useRef<ColumnConfig[]>(columnConfig);
+  useEffect(() => { columnConfigRef.current = columnConfig; }, [columnConfig]);
   const [columnModalOpen, setColumnModalOpen] = useState(false);
   const [resetColumnsModalOpen, setResetColumnsModalOpen] = useState(false);
   const [tempColumnConfig, setTempColumnConfig] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
@@ -2422,6 +2427,17 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     setCurrentPage(1);
   };
 
+  // Bug #013 (transport): dla kolumn transportu (transportDeparture/transportReturn) zawężamy
+  // listę miast w lejku do aktualnie wybranego tagu/turnusu. Backend przyjmuje param
+  // filter_propertyTag (CSV). Zwraca '' (brak zmiany) gdy kolumna nie jest transportowa
+  // lub gdy filtr propertyTag jest pusty (wtedy backend zachowuje pełną listę).
+  const transportTagParam = useCallback((column: string | null): string => {
+    if (column !== 'transportDeparture' && column !== 'transportReturn') return '';
+    const tags = columnConfigRef.current.find(c => c.key === 'propertyTag')?.filters ?? [];
+    if (tags.length === 0) return '';
+    return `&filter_propertyTag=${encodeURIComponent(tags.join(','))}`;
+  }, []);
+
   // Run modal filter search (shared by debounced onChange and Enter key)
   const runModalFilterSearch = useCallback(async (query: string, columnKey: string | null) => {
     if (!query.trim() || !columnKey) {
@@ -2433,7 +2449,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     try {
       const q = columnKey === 'guardianPhone' ? normalizePhoneForFilter(query) : query.trim();
       const response = await authenticatedApiCall<{ results: string[]; total: number }>(
-        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(q)}&limit=50`,
+        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(q)}&limit=50${transportTagParam(columnKey)}`,
       );
       setFilterSearchResults(response.results || []);
     } catch (err) {
@@ -2442,7 +2458,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     } finally {
       setIsFilterSearching(false);
     }
-  }, []);
+  }, [transportTagParam]);
 
   // Search filter values in backend (debounced); Enter runs immediately
   const handleFilterSearch = (query: string, columnKey: string | null) => {
@@ -2499,7 +2515,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     setIsFilterSearching(true);
     try {
       const response = await authenticatedApiCall<{ results: string[]; total: number; has_more: boolean }>(
-        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=&limit=10&offset=0`,
+        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=&limit=10&offset=0${transportTagParam(columnKey)}`,
       );
       setFrozenFilterOptions(response.results || []);
       setFilterModalHasMore(response.has_more ?? false);
@@ -2519,7 +2535,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     try {
       const query = openFilterColumn === 'guardianPhone' ? normalizePhoneForFilter(filterSearchQuery) : filterSearchQuery.trim();
       const response = await authenticatedApiCall<{ results: string[]; has_more: boolean }>(
-        `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=10&offset=${filterModalOffset}`,
+        `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=10&offset=${filterModalOffset}${transportTagParam(openFilterColumn)}`,
       );
       const newResults = response.results || [];
       setFrozenFilterOptions(prev => [...prev, ...newResults]);
@@ -2548,7 +2564,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       const query = openFilterColumn === 'guardianPhone' ? normalizePhoneForFilter(filterSearchQuery) : filterSearchQuery.trim();
       while (hasMore) {
         const response = await authenticatedApiCall<{ results: string[]; has_more: boolean }>(
-          `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`,
+          `/api/payments/filter-search?column=${encodeURIComponent(openFilterColumn)}&query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}${transportTagParam(openFilterColumn)}`,
         );
         const chunk = response.results || [];
         for (const v of chunk) {
@@ -2669,7 +2685,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     try {
       const query = columnKey === 'guardianPhone' ? normalizePhoneForFilter(value) : value.trim();
       const response = await authenticatedApiCall<{ results: string[]; total: number }>(
-        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(query)}&limit=20`,
+        `/api/payments/filter-search?column=${encodeURIComponent(columnKey)}&query=${encodeURIComponent(query)}&limit=20${transportTagParam(columnKey)}`,
       );
       const results = response.results || [];
       setColumnConfig(prev => {
