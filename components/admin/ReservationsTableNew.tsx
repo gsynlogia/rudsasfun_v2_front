@@ -301,6 +301,8 @@ interface ReservationPayment {
   payment3?: PaymentRecord | null;
   // Archive info
   isArchived?: boolean;
+  // Czy wystawiono ważną fakturę (#351 follow-up) — kolumna "WYSTAWIONĄ FAKTURĘ"
+  invoiceIssued?: boolean;
 }
 
 /**
@@ -1197,6 +1199,7 @@ const mapReservationToPaymentFormat = async (
     payment2,
     payment3,
     isArchived: reservation.is_archived || false,
+    invoiceIssued: !!reservation.invoice_issued,
   };
 };
 
@@ -1807,6 +1810,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     contractStatus: 'Umowa',
     status: 'Status wpłaty',
     depositAmount: 'Zaliczka',
+    invoiceIssued: 'WYSTAWIONĄ FAKTURĘ',
   };
 
   /** Kolumny z datami – w filtrach sortowane od najnowszej do najstarszej */
@@ -1875,6 +1879,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     'hasTermy',
     'qualificationCardStatus',
     'contractStatus',
+    'invoiceIssued',
   ];
   const DEFAULT_COLUMNS = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true }));
 
@@ -2333,6 +2338,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           break;
         case 'depositAmount':
           value = reservation.depositAmount ? reservation.depositAmount.toFixed(2) : '-';
+          break;
+        case 'invoiceIssued':
+          value = reservation.invoiceIssued ? 'Tak' : 'Nie';
           break;
       }
       if (value !== null && value !== '') {
@@ -3226,6 +3234,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             case 'depositAmount':
               value = reservation.depositAmount ?? '';
               break;
+            case 'invoiceIssued':
+              value = reservation.invoiceIssued ? 'Tak' : 'Nie';
+              break;
             default:
               value = '';
           }
@@ -3286,7 +3297,6 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         { header: 'ulica (FV)', getValue: r => r.invoiceStreet },
         { header: 'kod i miasto (FV)', getValue: r => r.invoiceCodeCity },
         { header: 'nip (FV)', getValue: r => r.invoiceNip },
-        { header: 'wystawiona', getValue: r => r.invoiceIssued ? 'Tak' : 'Nie' },
         // Zgody (ETAP 1)
         { header: 'zgoda 1', getValue: r => r.consent1 ? 'Tak' : 'Nie' },
         { header: 'zgoda 2', getValue: r => r.consent2 ? 'Tak' : 'Nie' },
@@ -3883,6 +3893,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             payment2: allPaymentRecords[1] || null,
             payment3: allPaymentRecords[2] || null,
             isArchived: reservation.is_archived || false,
+            invoiceIssued: !!reservation.invoice_issued,
           } as ReservationPayment;
         });
 
@@ -4108,6 +4119,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         return statusMapCell[reservation.paymentStatus] || reservation.paymentStatus;
       case 'depositAmount':
         return reservation.depositAmount ? reservation.depositAmount.toFixed(2) : '-';
+      case 'invoiceIssued':
+        return reservation.invoiceIssued ? 'Tak' : 'Nie';
       default:
         return null;
     }
@@ -5786,6 +5799,20 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                                 <span className="text-sm font-medium text-gray-900">
                                   {reservation.depositAmount ? formatCurrency(reservation.depositAmount) : '-'}
                                 </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'invoiceIssued') {
+                            // Checkbox "WYSTAWIONĄ FAKTURĘ": ✓ gdy istnieje ważna (niezanulowana, nieskasowana) faktura.
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={!!reservation.invoiceIssued}
+                                  readOnly
+                                  disabled
+                                  aria-label={reservation.invoiceIssued ? 'Faktura wystawiona' : 'Faktura niewystawiona'}
+                                  className="w-4 h-4 accent-green-600 cursor-default"
+                                />
                               </td>
                             );
                           }
