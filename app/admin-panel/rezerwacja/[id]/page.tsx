@@ -4131,6 +4131,39 @@ export default function ReservationDetailPage() {
                     {transportPriceFromDraft > 0 ? `+ ${formatCurrency(transportPriceFromDraft)}` : 'Brak dopłaty'}
                   </span>
                 </div>
+                {/* BUG 015 (Krzysztof): „wyjazd przed zakończeniem" widoczny + ustawiany z poziomu rezerwacji. */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100" data-testid="reservation-early-leave">
+                  <div className="text-sm">
+                    <span className="text-gray-600">Wyjazd przed zakończeniem: </span>
+                    {reservation.transport_early_leave === 1 ? (
+                      <span className="font-semibold text-red-600" data-testid="early-leave-status">
+                        TAK{reservation.transport_early_leave_note ? ` — ${reservation.transport_early_leave_note}` : ''}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500" data-testid="early-leave-status">nie</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="early-leave-toggle"
+                    onClick={async () => {
+                      const isOn = reservation.transport_early_leave === 1;
+                      const note = isOn ? null : (window.prompt('Powód wyjazdu przed zakończeniem (opcjonalnie):') || null);
+                      await authenticatedApiCall(`/api/transport-lists/reservations/${reservation.id}/early-leave`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ early_leave: !isOn, note }),
+                      });
+                      await refetchReservation();
+                    }}
+                    className={`rounded px-3 py-1.5 text-sm font-medium ${
+                      reservation.transport_early_leave === 1
+                        ? 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                        : 'bg-red-600 text-white hover:bg-red-700'}`}
+                  >
+                    {reservation.transport_early_leave === 1 ? 'Odznacz' : 'Oznacz wyjazd przed zakończeniem'}
+                  </button>
+                </div>
               </div>
             </div>
             </>

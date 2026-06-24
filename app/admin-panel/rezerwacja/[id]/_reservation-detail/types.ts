@@ -53,6 +53,8 @@ export interface ReservationDetails {
   return_type?: string | null;
   return_city?: string | null;
   transport_different_cities?: boolean;
+  transport_early_leave?: number | null;        // BUG 015: „wyjazd przed zakończeniem" widoczny w rezerwacji
+  transport_early_leave_note?: string | null;
   selected_source?: string | null;
   source_name?: string | null;
   source_inne_text?: string | null;
