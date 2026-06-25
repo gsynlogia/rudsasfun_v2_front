@@ -303,6 +303,8 @@ interface ReservationPayment {
   isArchived?: boolean;
   // Czy wystawiono ważną fakturę (#351 follow-up) — kolumna "WYSTAWIONĄ FAKTURĘ"
   invoiceIssued?: boolean;
+  // Płeć uczestnika znormalizowana (Chłopiec/Dziewczynka) — kolumna "Płeć", ta sama wartość co Excel
+  participantGender?: string;
 }
 
 /**
@@ -1200,6 +1202,7 @@ const mapReservationToPaymentFormat = async (
     payment3,
     isArchived: reservation.is_archived || false,
     invoiceIssued: !!reservation.invoice_issued,
+    participantGender: normalizeGenderLabel(reservation.participant_gender),
   };
 };
 
@@ -1811,6 +1814,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     status: 'Status wpłaty',
     depositAmount: 'Zaliczka',
     invoiceIssued: 'WYSTAWIONĄ FAKTURĘ',
+    participantGender: 'Płeć',
   };
 
   /** Kolumny z datami – w filtrach sortowane od najnowszej do najstarszej */
@@ -1880,6 +1884,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     'qualificationCardStatus',
     'contractStatus',
     'invoiceIssued',
+    'participantGender',
   ];
   const DEFAULT_COLUMNS = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true }));
 
@@ -2341,6 +2346,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           break;
         case 'invoiceIssued':
           value = reservation.invoiceIssued ? 'Tak' : 'Nie';
+          break;
+        case 'participantGender':
+          value = reservation.participantGender || '';
           break;
       }
       if (value !== null && value !== '') {
@@ -3237,6 +3245,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             case 'invoiceIssued':
               value = reservation.invoiceIssued ? 'Tak' : 'Nie';
               break;
+            case 'participantGender':
+              value = reservation.participantGender || '';
+              break;
             default:
               value = '';
           }
@@ -3269,8 +3280,6 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         // Kod rabatowy + dane uczestnika (ETAP 1 + ETAP 2)
         { header: 'Kod Rabatowy', getValue: r => r.kodRabatowy },
         { header: 'dieta', getValue: r => r.dietName },
-        // Trello #349 — płeć uczestnika (znormalizowana do Chłopiec/Dziewczynka).
-        { header: 'Płeć', getValue: r => r.participantGender },
         // Atrakcje dodatkowe (WhatsApp Joanna 2026-05-31 14:29) — pole brakowało w XLSX mimo że istnieje w panelu admina.
         // Liczone w computeExportRow z protections/addons (linia 1066-1093).
         { header: 'Oaza', getValue: r => r.hasOaza ? 'Tak' : 'Nie' },
@@ -3894,6 +3903,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             payment3: allPaymentRecords[2] || null,
             isArchived: reservation.is_archived || false,
             invoiceIssued: !!reservation.invoice_issued,
+            participantGender: normalizeGenderLabel(reservation.participant_gender),
           } as ReservationPayment;
         });
 
@@ -4121,6 +4131,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         return reservation.depositAmount ? reservation.depositAmount.toFixed(2) : '-';
       case 'invoiceIssued':
         return reservation.invoiceIssued ? 'Tak' : 'Nie';
+      case 'participantGender':
+        return reservation.participantGender || '-';
       default:
         return null;
     }
@@ -5813,6 +5825,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                                   aria-label={reservation.invoiceIssued ? 'Faktura wystawiona' : 'Faktura niewystawiona'}
                                   className="w-4 h-4 accent-green-600 cursor-default"
                                 />
+                              </td>
+                            );
+                          } else if (columnKey === 'participantGender') {
+                            // Płeć uczestnika (Chłopiec/Dziewczynka) — ta sama wartość co w Excelu.
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                <span className="text-sm text-gray-900">{reservation.participantGender || '-'}</span>
                               </td>
                             );
                           }
