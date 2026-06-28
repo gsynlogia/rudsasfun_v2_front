@@ -13,7 +13,14 @@ import SectionGuard from '@/components/admin/SectionGuard';
  * Displays reservations table with full payment details (like PaymentsManagement)
  */
 function ReservationsTableWrapper() {
-  return <ReservationsTableNew />;
+  // Lista rezerwacji = filtry + nawigacja do szczegółów (czysty ODCZYT — edycja danych jest
+  // dopiero w widoku szczegółów rezerwacji). data-acl-keep → w trybie read-only CAŁY obszar
+  // listy pozostaje aktywny (filtry, wyszukiwarki, przełączniki widoku, eksport) — nic nie wyłączamy.
+  return (
+    <div data-acl-keep>
+      <ReservationsTableNew />
+    </div>
+  );
 }
 
 export default function AdminPanelPage() {

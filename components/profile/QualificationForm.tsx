@@ -951,6 +951,9 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
             )}
             <button
               onClick={handlePrint}
+              // ACL 2026-06-28: druk = ODCZYT — przycisk aktywny też w panelu admina dla kont read-only
+              // (data-acl-keep pomija disabler SectionGuard; u klienta poza panelem = no-op).
+              data-acl-keep
               className="flex items-center gap-2 bg-[#03adf0] text-white px-5 py-2.5 rounded-lg hover:bg-[#0299d6] transition text-sm font-medium"
             >
               <Printer className="w-4 h-4" />
@@ -994,6 +997,8 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
           )}
           <button
             onClick={handlePrint}
+            // ACL 2026-06-28: druk = ODCZYT — aktywny też dla read-only w panelu admina (patrz wyżej).
+            data-acl-keep
             className="flex items-center gap-2 bg-[#03adf0] text-white px-3 py-1.5 rounded text-xs font-medium"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -2556,7 +2561,12 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           margin: 0 0 0.25rem 0;
         }
 
-        @media (max-width: 768px) {
+        /* ACL/print 2026-06-29 (rozkaz Pana): układ mobilny TYLKO na ekranie ('screen and ...').
+           W druku przeglądarka oceniała max-width względem (zwężonej marginesami) szerokości strony
+           i włączała pionowy układ mobilny (.checkbox-group: column, .info-row/.signature-row: 1fr) —
+           pozycje (np. szczepienia) stawały jedna pod drugą. Wykluczenie druku => zawsze układ desktop
+           (obok siebie), identycznie jak w podglądzie na ekranie. */
+        @media screen and (max-width: 768px) {
           .page {
             width: 100%;
             min-height: auto;

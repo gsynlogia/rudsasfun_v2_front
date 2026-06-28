@@ -33,6 +33,11 @@ export default function NewAdminUserPage() {
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [showPassword, setShowPassword] = useState(false);
+  // Zabezpieczenie przed autouzupełnianiem przeglądarki (menedżer haseł podstawiał login/hasło
+  // zalogowanego admina). Pola startują jako readOnly — przeglądarka NIE wypełnia readonly.
+  // Odblokowują się dopiero przy kliknięciu (onFocus). Bug zgłoszony przez właściciela 2026-06-28.
+  const [fieldsLocked, setFieldsLocked] = useState(true);
+  const unlockFields = () => setFieldsLocked(false);
 
   // Settings
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -146,7 +151,12 @@ export default function NewAdminUserPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
+            {/* Honeypot — przeglądarka autouzupełnia te ukryte pola zamiast prawdziwych poniżej */}
+            <input type="text" name="username" autoComplete="username" tabIndex={-1} aria-hidden="true"
+                   style={{ position: 'absolute', opacity: 0, height: 0, width: 0, pointerEvents: 'none' }} />
+            <input type="password" name="password" autoComplete="current-password" tabIndex={-1} aria-hidden="true"
+                   style={{ position: 'absolute', opacity: 0, height: 0, width: 0, pointerEvents: 'none' }} />
             {/* Login */}
             <div>
               <label htmlFor="login" className="block text-sm font-medium text-gray-700 mb-2">
@@ -154,9 +164,13 @@ export default function NewAdminUserPage() {
               </label>
               <input
                 id="login"
+                name="rf-new-admin-login"
                 type="text"
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
+                onFocus={unlockFields}
+                readOnly={fieldsLocked}
+                autoComplete="off"
                 required
                 className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                 style={{ borderRadius: 0 }}
@@ -172,9 +186,13 @@ export default function NewAdminUserPage() {
               </label>
               <input
                 id="email"
+                name="rf-new-admin-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onFocus={unlockFields}
+                readOnly={fieldsLocked}
+                autoComplete="off"
                 className="w-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                 style={{ borderRadius: 0 }}
                 placeholder="Wprowadź adres email (opcjonalnie)"
@@ -190,9 +208,13 @@ export default function NewAdminUserPage() {
               <div className="relative">
                 <input
                   id="password"
+                  name="rf-new-admin-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onFocus={unlockFields}
+                  readOnly={fieldsLocked}
+                  autoComplete="new-password"
                   required
                   className="w-full px-4 py-2 pr-10 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                   style={{ borderRadius: 0 }}

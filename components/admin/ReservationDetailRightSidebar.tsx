@@ -26,6 +26,12 @@ interface ReservationDetailRightSidebarProps {
   getContent: (tab: ReservationRightTabId) => ReactNode;
   /** Gdy ustawione (np. przy #dokumenty), prawy panel przełącza się na tę zakładkę, żeby historia wersji była od razu widoczna. */
   suggestedTab?: ReservationRightTabId | null;
+  /**
+   * ACL (rozkaz Pana 2026-06-28): ukrywa CAŁKOWICIE zakładkę „Notatki wewnętrzne" dla kont
+   * z poziomem tylko-do-odczytu na sekcji „reservations" (poziom < WRITE). Zakładka znika,
+   * a aktywna zakładka spada na „events" (backend i tak zwraca 403 na GET notatek dla read-only).
+   */
+  hideNotes?: boolean;
 }
 
 function getStoredTab(): ReservationRightTabId {
@@ -64,26 +70,35 @@ function setStoredTab(tab: ReservationRightTabId) {
 export function ReservationDetailRightSidebar({
   getContent,
   suggestedTab,
+  hideNotes = false,
 }: ReservationDetailRightSidebarProps) {
-  const [activeTab, setActiveTab] = useState<ReservationRightTabId>(getStoredTab);
+  // Read-only (hideNotes): zakładka notatek znika, a aktywna zakładka nigdy nie jest „notes".
+  const resolveTab = (t: ReservationRightTabId): ReservationRightTabId =>
+    hideNotes && t === 'notes' ? 'events' : t;
+
+  const [activeTab, setActiveTab] = useState<ReservationRightTabId>(() => resolveTab(getStoredTab()));
 
   useEffect(() => {
-    setActiveTab(getStoredTab());
-  }, []);
+    setActiveTab(resolveTab(getStoredTab()));
+  }, [hideNotes]);
 
   useEffect(() => {
     if (suggestedTab && suggestedTab !== activeTab) {
-      setActiveTab(suggestedTab);
-      setStoredTab(suggestedTab);
+      const next = resolveTab(suggestedTab);
+      setActiveTab(next);
+      setStoredTab(next);
     }
   }, [suggestedTab]);
 
+  const visibleTabs = hideNotes ? TABS.filter((t) => t.id !== 'notes') : TABS;
+
   const handleTab = (id: ReservationRightTabId) => {
-    setActiveTab(id);
-    setStoredTab(id);
+    const next = resolveTab(id);
+    setActiveTab(next);
+    setStoredTab(next);
   };
 
-  const content = getContent(activeTab);
+  const content = getContent(resolveTab(activeTab));
 
   return (
     <aside
@@ -94,7 +109,7 @@ export function ReservationDetailRightSidebar({
     >
       {/* Pasek zakładek – ikony Lucide */}
       <div className="flex items-stretch border-b border-white/20 flex-shrink-0">
-        {TABS.map(({ id, icon: Icon, label }) => (
+        {visibleTabs.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
             type="button"

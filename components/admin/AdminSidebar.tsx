@@ -105,9 +105,18 @@ export default function AdminSidebar() {
   const defaultUser: UserWithDefaults = { groups: [] };
   const userWithDefaults: UserWithDefaults = user || defaultUser;
   const isAdmin = userWithDefaults.groups.includes('admin');
+  // Normalizacja nazw sekcji: menu używa historycznych (transports/diets/cms/settings),
+  // a uprawnienia zwracają kanoniczne (transport/catalog/documents/system). Porównujemy po normalizacji.
+  const sectionAliases: Record<string, string> = {
+    transports: 'transport', diets: 'catalog', promotions: 'catalog',
+    protections: 'catalog', sources: 'catalog', addons: 'catalog',
+    cms: 'documents', settings: 'system',
+  };
+  const normalizeSec = (s: string) => sectionAliases[s] ?? s;
+  const accessibleNormalized = accessibleSections.map(normalizeSec);
   const baseMenuItems = isAdmin
     ? menuItemsWithSuperFunctions
-    : menuItemsWithSuperFunctions.filter(item => accessibleSections.includes(item.section));
+    : menuItemsWithSuperFunctions.filter(item => accessibleNormalized.includes(normalizeSec(item.section)));
 
   const menuItems = baseMenuItems.filter(item => {
     if (item.key === 'super-functions') return canAccessSuperFunctions;

@@ -22,6 +22,16 @@
  * - Production: uses https://api.rezerwacja.radsas-fun.pl (from .env)
  */
 export function getApiBaseUrl(): string {
+  // Lokalne subdomeny *.syn.test (dev przez NPM proxy): frontend radsas.syn.test → API api.radsas.syn.test.
+  // MUSI być PRZED env check — inaczej NEXT_PUBLIC_API_URL=http://localhost:8000 wygra i da
+  // mixed content (https→http) + błąd CORS. Localhost idzie dalej do env check (bez zmian).
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host.endsWith('.syn.test') && !host.startsWith('api.')) {
+      return `https://api.${host}`;
+    }
+  }
+
   // If NEXT_PUBLIC_API_URL is explicitly set, use it (highest priority)
   // This respects Next.js .env file priority:
   // - .env.local (local development) will override .env (production)

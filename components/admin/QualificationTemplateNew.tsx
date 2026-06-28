@@ -998,6 +998,25 @@ export function QualificationTemplateNew({ reservationId: reservationIdProp, res
           )}
         </div>
       )}
+      {/* Podgląd WERSJI dokumentu (kafelek „Wersje dokumentów") otwiera ten komponent z previewOnly:
+          wcześniej pasek z „Drukuj" był ukryty (readOnlyView). Pokazujemy dolny pasek TYLKO z „Drukuj"
+          (bez „Zapisz"), żeby z podglądu wersji dało się wydrukować. data-acl-keep → aktywny też dla
+          kont read-only (druk = odczyt). Rozkaz Pana 2026-06-29. */}
+      {previewOnly && !printMode && (
+        <div className="no-print fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.08)]">
+          <div className="max-w-[210mm] mx-auto px-4 py-3 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              data-acl-keep
+              onClick={handlePrint}
+              className="flex items-center gap-2 bg-[#03adf0] text-white px-5 py-2.5 rounded-lg hover:bg-[#0299d6] transition text-sm font-medium"
+            >
+              <Printer className="w-4 h-4" />
+              Drukuj
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Formularz - dwie strony A4 */}
       <div className="form-container">

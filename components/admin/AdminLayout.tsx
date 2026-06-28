@@ -107,16 +107,20 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
     // banner (np. TestBanner), zwieksz odjemnik (np. -48px).
     <div className="w-full bg-white flex flex-col" style={{ height: 'calc(100dvh - 24px)' }}>
       <div className="flex-1 flex overflow-hidden">
-      {/* Sidebar with logo */}
-      <AdminSidebar />
+      {/* Sidebar with logo — data-acl-keep: nawigacja/wylogowanie zawsze aktywne (też w trybie read-only) */}
+      <div data-acl-keep style={{ display: 'contents' }}>
+        <AdminSidebar />
+      </div>
 
       {/* Main Content Area - scrollable, takes remaining space */}
       <div
         className="flex-1 overflow-auto relative transition-all duration-300 pl-0.5"
         style={{ marginLeft: effectiveWidth }}
       >
-        {/* Notification icon - fixed in top-right corner */}
+        {/* Notification icon - fixed in top-right corner.
+            ACL 2026-06-29: data-acl-keep → otwieranie powiadomień = nawigacja/odczyt, aktywne też dla read-only. */}
         <button
+          data-acl-keep
           className="fixed top-11 right-3 z-50 w-10 h-10 bg-slate-800 hover:bg-slate-700 text-white rounded-full flex items-center justify-center shadow-lg transition-colors cursor-pointer"
           title="Powiadomienia"
           onClick={openNotifications}
@@ -157,7 +161,9 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
           <>
             <div className="flex items-center justify-between flex-shrink-0 p-4 border-b border-gray-200 bg-white z-10">
               <h2 className="text-lg font-semibold text-gray-900">{documentTitle}</h2>
+              {/* ACL 2026-06-29: data-acl-keep → zamknięcie podglądu (X) = nawigacja, aktywne dla read-only. */}
               <button
+                data-acl-keep
                 onClick={close}
                 className="p-2 rounded-none text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors cursor-pointer"
                 title="Zamknij"
@@ -182,6 +188,7 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
                 )}
               </div>
               <button
+                data-acl-keep
                 onClick={close}
                 className="p-2 hover:bg-gray-200 rounded-full transition-colors"
                 title="Zamknij"

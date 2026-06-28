@@ -147,3 +147,12 @@ aside.sticky-wrapper,
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #a0aec0;
 }
+
+/* ACL — tryb tylko-do-odczytu: kursor "zakaz" tylko na WYŁĄCZONYCH polach edycji.
+   Filtry/wyszukiwarki (data-acl-filters) NIE są wyłączane → zachowują normalny kursor. */
+.acl-readonly input:disabled,
+.acl-readonly select:disabled,
+.acl-readonly textarea:disabled,
+.acl-readonly button:disabled {
+  cursor: not-allowed;
+}

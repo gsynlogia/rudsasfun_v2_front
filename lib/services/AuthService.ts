@@ -19,6 +19,7 @@ export interface LoginResponse {
     user_type?: string;
     groups: string[];
     accessible_sections?: string[];
+    section_levels?: Record<string, number>;
     created_at?: string;
     updated_at?: string;
   };
@@ -31,6 +32,8 @@ export interface User {
   user_type?: string;
   groups: string[];
   accessible_sections?: string[];
+  /** ACL: mapa {sekcja: poziom 0-50}. Źródło prawdy = backend; hook usePermission ukrywa akcje. */
+  section_levels?: Record<string, number>;
   created_at?: string;
   updated_at?: string;
   /** Czy użytkownik ma ustawione hasło (klient). */

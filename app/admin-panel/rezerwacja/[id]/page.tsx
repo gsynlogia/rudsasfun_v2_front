@@ -19,6 +19,7 @@ import { QualificationForm } from '@/components/profile/QualificationForm';
 import PromotionV2Snapshot from '@/components/profile/PromotionV2Snapshot';
 import { useToast } from '@/components/ToastContainer';
 import { useAdminRightPanel } from '@/context/AdminRightPanelContext';
+import { usePermission } from '@/lib/hooks/usePermission';
 import { authService } from '@/lib/services/AuthService';
 import type { ReservationData } from '@/lib/contractReservationMapping';
 import { mapReservationToContractForm } from '@/lib/contractReservationMapping';
@@ -123,6 +124,11 @@ export default function ReservationDetailPage() {
   const searchParams = useSearchParams();
   const { showSuccess, showError } = useToast();
   const { openDocument, close: closeRightPanel } = useAdminRightPanel();
+  // ACL (rozkaz Pana 2026-06-28): moduł notatek wewnętrznych dostępny TYLKO dla kont z poziomem
+  // ≥ WRITE na sekcji „reservations". Konta tylko-do-odczytu (kierownik) NIE widzą notatek
+  // (zakładka ukryta + backend zwraca 403 na GET notatek). Bypass (admin/superadmin) → canWrite=true.
+  const permission = usePermission();
+  const canSeeNotes = permission.canWrite('reservations');
   // params.id contains the reservation number (e.g., REZ-2025-001)
   const reservationNumber = typeof params?.id === 'string'
     ? params.id
@@ -1481,6 +1487,13 @@ export default function ReservationDetailPage() {
   useEffect(() => {
     const loadNotes = async () => {
       if (!reservation) return;
+      // ACL: konto tylko-do-odczytu nie ma dostępu do notatek (moduł ukryty + backend 403).
+      // Pomijamy fetch, żeby nie generować 403 w audycie ACL i logach.
+      if (!canSeeNotes) {
+        setNotes([]);
+        setLoadingNotes(false);
+        return;
+      }
 
       console.log('DEBUG loadNotes - reservation:', {
         id: reservation.id,
@@ -1517,7 +1530,7 @@ export default function ReservationDetailPage() {
     };
 
     loadNotes();
-  }, [reservation]);
+  }, [reservation, canSeeNotes]);
 
   // Notes management functions
   const handleCreateNote = async () => {
@@ -3217,6 +3230,7 @@ export default function ReservationDetailPage() {
                       </button>
                       <button
                         type="button"
+                        data-acl-keep
                         onClick={() => {
                           if (!reservation) return;
                           openDocument(
@@ -3224,6 +3238,8 @@ export default function ReservationDetailPage() {
                             // viewMode='zatwierdzona' = read-only (inputy disabled, jak printMode) ALE pozwala
                             // useEffect fetchowi signed_documents zadziałać (printMode=true blokuje fetch linia 318,
                             // przez co latestCardStatus zostaje null i sekcja signed_confirmation się nie renderuje).
+                            // ACL 2026-06-28: dla read-only formularz zostaje POD disablerem (pola + „Zapisz zmiany"
+                            // wyłączone), a aktywny pozostaje TYLKO przycisk „Drukuj" (data-acl-keep w QualificationForm).
                             <QualificationForm
                               reservationId={reservation.id}
                               reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
@@ -3296,10 +3312,13 @@ export default function ReservationDetailPage() {
                         </div>
                         <button
                           type="button"
+                          data-acl-keep
                           onClick={() => {
                             if (!reservation) return;
                             openDocument(
                               // Bug #202: jw. — viewMode='zatwierdzona' żeby useEffect fetch zadziałał.
+                              // ACL 2026-06-28: read-only → formularz pod disablerem (pola + „Zapisz zmiany" off),
+                              // aktywny TYLKO „Drukuj" (data-acl-keep w QualificationForm). Wydruk = odczyt, nie edycja.
                               <QualificationForm
                                 reservationId={reservation.id}
                                 reservationData={mapReservationToQualificationForm(reservation as unknown as ReservationData)}
@@ -3413,7 +3432,9 @@ export default function ReservationDetailPage() {
                 </div>
               </div>
                 </div>
-                <div className="w-80 xl:w-96 flex-shrink-0 flex flex-col min-h-0 border-l border-gray-200 pl-4">
+                {/* ACL 2026-06-29: data-acl-keep → kafelki wersji dokumentów (czysty PODGLĄD/odczyt) klikalne
+                    także dla kont read-only. DocumentVersionsList nie ma żadnych akcji edycji — tylko onPreview. */}
+                <div data-acl-keep className="w-80 xl:w-96 flex-shrink-0 flex flex-col min-h-0 border-l border-gray-200 pl-4">
                   {/* 2026-05-24 REZ-1828: zastąpienie placeholderu "Graj" listą wersji dokumentów (5 wariantów kolorystycznych).
                       Klik w kafelek otwiera ten sam modal podglądu co globalny widget (identyczna logika z renderDocTile). */}
                   <DocumentVersionsList
@@ -4852,6 +4873,8 @@ export default function ReservationDetailPage() {
             // ukryty z UI (zastąpiony DocumentVersionsList w panelu Dokumenty). Pozostaje undefined.
             // TODO TD-011: po fizycznym usunięciu tabu 'documents' usunąć też ten prop.
             suggestedTab={undefined}
+            // ACL 2026-06-28: ukryj zakładkę notatek dla kont tylko-do-odczytu (poziom < WRITE na reservations).
+            hideNotes={!canSeeNotes}
           />
             {/* Modal archiwizacji rezerwacji */}
             <UniversalModal

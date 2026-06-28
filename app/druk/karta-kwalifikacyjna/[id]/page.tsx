@@ -112,10 +112,45 @@ export default function PrintQualificationCardPage() {
     : { reservationId: reservationId.startsWith('REZ-') ? reservationId : `REZ-2026-${reservationId}` };
 
   return (
-    <QualificationForm
-      reservationData={qualificationData}
-      signedPayload={qualificationCardSignedPayload ?? undefined}
-      printMode={true}
-    />
+    <>
+      {/* Druk karty kwalifikacyjnej — poprawki @media print SCOPED do tej strony (rozkaz Pana 2026-06-29:
+          „tylko karta, reszty nie dotykaj"). Naprawia: (1) pustą 1. stronę — globalne tło/Banner (tlo2.png +
+          DevBanner) i offset 56px spychały .page (page-break-inside:avoid) na 2. stronę; (2) zawijanie w pion
+          przy domyślnych marginesach drukarki — @page margin:0 sprawia, że .page 210mm mieści się na A4.
+          Efekt: w drukarce identycznie jak w podglądzie na ekranie. */}
+      <style>{`
+        @page { size: A4; margin: 0; }
+        @media print {
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            background-image: none !important;
+          }
+          /* Pokaż TYLKO formularz druku — schowaj globalny chrome (DevBanner/TestBanner/puste divy),
+             żeby .page zaczynała się od góry 1. strony i nie generowała pustej kartki. */
+          body > *:not(.print-layout) { display: none !important; }
+          .print-layout {
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+          /* .page w druku: białe tło (na ekranie białe było tylko @media screen), bez cienia/marginesu,
+             dokładnie jeden arkusz A4 na .page. */
+          .page {
+            background: #ffffff !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+          }
+        }
+      `}</style>
+      <QualificationForm
+        reservationData={qualificationData}
+        signedPayload={qualificationCardSignedPayload ?? undefined}
+        printMode={true}
+      />
+    </>
   );
 }

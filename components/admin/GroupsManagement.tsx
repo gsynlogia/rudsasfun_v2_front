@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
 
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { usePermission } from '@/lib/hooks/usePermission';
 
 interface Group {
   id: number;
@@ -31,6 +32,8 @@ interface _GroupWithUsers extends Group {
  */
 export default function GroupsManagement() {
   const router = useRouter();
+  // ACL: ukrywanie akcji wg poziomu w sekcji "users_admin" (defense-in-depth; backend i tak egzekwuje).
+  const perm = usePermission();
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   // State for groups data
@@ -175,15 +178,17 @@ export default function GroupsManagement() {
             </div>
           </div>
 
-          {/* Add Group Button */}
-          <button
-            onClick={handleCreateGroup}
-            className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-colors"
-            style={{ borderRadius: 0, cursor: 'pointer' }}
-          >
-            <Plus size={18} />
-            <span>Dodaj grupę</span>
-          </button>
+          {/* Add Group Button — widoczny od poziomu WRITE w sekcji kont/grup */}
+          {perm.canWrite('users_admin') && (
+            <button
+              onClick={handleCreateGroup}
+              className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-colors"
+              style={{ borderRadius: 0, cursor: 'pointer' }}
+            >
+              <Plus size={18} />
+              <span>Dodaj grupę</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -251,15 +256,17 @@ export default function GroupsManagement() {
                             >
                               <UserCog size={18} />
                             </button>
-                            <button
-                              onClick={() => handleEditGroup(group)}
-                              className="text-[#03adf0] hover:text-[#0288c7] transition-colors"
-                              title="Edytuj grupę"
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <Edit size={18} />
-                            </button>
-                            {!isDefaultGroup(group.name) && (
+                            {perm.canEdit('users_admin') && (
+                              <button
+                                onClick={() => handleEditGroup(group)}
+                                className="text-[#03adf0] hover:text-[#0288c7] transition-colors"
+                                title="Edytuj grupę"
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <Edit size={18} />
+                              </button>
+                            )}
+                            {!isDefaultGroup(group.name) && perm.canHardDelete('users_admin') && (
                               <button
                                 onClick={() => handleDeleteClick(group)}
                                 className="text-red-600 hover:text-red-800 transition-colors"
