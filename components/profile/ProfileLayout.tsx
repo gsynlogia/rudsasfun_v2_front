@@ -6,6 +6,7 @@ import { ReactNode, useState, useEffect } from 'react';
 
 import { ReservationPaymentHeaderProvider } from '@/contexts/ReservationPaymentHeaderContext';
 import Footer from '../Footer';
+import ClientHeartbeat from './ClientHeartbeat';
 import HeaderTop from '../HeaderTop';
 
 import { ChevronDown, ChevronUp } from 'lucide-react';
@@ -85,6 +86,8 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
       <div className="min-h-screen w-full flex flex-col" style={{ overflow: 'visible', position: 'relative' }}>
         {/* Belka developerska przeniesiona do app/layout.tsx (DevBanner) — renderowana globalnie. */}
         <HeaderTop />
+        {/* Feature „Klienci online" — heartbeat na wszystkich widokach panelu klienta (jeden punkt). */}
+        <ClientHeartbeat />
 
       {/* Mobile Bottom Navigation Bar */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-area-bottom">

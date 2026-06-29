@@ -122,6 +122,7 @@ export default function SettingsPage() {
           <>
             {/* Tpay wycofany (2026-03-19) — toggle płatności online usunięty */}
             <BankAccountSettings />
+            <HeartbeatIntervalSettings />
           </>
         )}
       </div>
@@ -478,6 +479,83 @@ function BankAccountSettings() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Ustawienie częstotliwości heartbeat „Klienci online" (feature wariant A).
+ * Admin ustawia co ile sekund panel klienta zgłasza obecność (domyślnie 60, min. 15).
+ */
+function HeartbeatIntervalSettings() {
+  const [value, setValue] = useState<string>('60');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const API = getApiBaseUrlRuntime();
+        const d = await authenticatedApiCall<{ value: string }>(
+          `${API}/api/system-settings/client_heartbeat_interval_seconds`,
+        );
+        setValue(d.value || '60');
+      } catch {
+        // brak ustawienia → domyślne 60
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setMsg('');
+    try {
+      const API = getApiBaseUrlRuntime();
+      const n = Math.max(15, parseInt(value, 10) || 60);
+      await authenticatedApiCall(
+        `${API}/api/system-settings/client_heartbeat_interval_seconds`,
+        { method: 'PUT', body: JSON.stringify({ value: String(n) }) },
+      );
+      setValue(String(n));
+      setMsg('Zapisano.');
+    } catch (e: any) {
+      setMsg(e?.message || 'Błąd zapisu.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="bg-white border border-gray-200 p-4 sm:p-6 mt-4">
+      <h3 className="text-base font-semibold text-gray-800 mb-1">
+        Klienci online — częstotliwość sygnału (heartbeat)
+      </h3>
+      <p className="text-xs text-gray-500 mb-3">
+        Co ile sekund panel klienta zgłasza obecność. Domyślnie 60 s (min. 15).
+      </p>
+      <div className="flex items-center gap-3 flex-wrap">
+        <input
+          type="number"
+          min={15}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="w-28 border border-gray-300 px-3 py-2 text-sm"
+        />
+        <span className="text-sm text-gray-500">sekund</span>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-4 py-2 text-sm bg-[#03adf0] text-white hover:bg-[#0288c7] disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Zapisywanie…' : 'Zapisz'}
+        </button>
+        {msg ? <span className="text-sm text-gray-600">{msg}</span> : null}
+      </div>
     </div>
   );
 }

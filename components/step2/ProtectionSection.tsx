@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
+import ConfirmPurchaseModal from './ConfirmPurchaseModal';
 import type { ReservationItem } from '@/types/reservation';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
@@ -46,6 +47,8 @@ export default function ProtectionSection() {
   };
 
   const [selectedProtections, setSelectedProtections] = useState<Set<string>>(getInitialSelectedProtections);
+  // Trello 355 (punkt 1): modal potwierdzenia przy dokupywaniu ubezpieczenia w kreatorze
+  const [confirmProtection, setConfirmProtection] = useState<{ id: string; name: string; price: number } | null>(null);
   const protectionReservationIdsRef = useRef<Map<string, string>>(new Map()); // Map: protectionId -> reservationItemId
   const [documents, setDocuments] = useState<Map<string, string>>(new Map()); // Map: document name -> file_url
   const [protections, setProtections] = useState<Protection[]>([]);
@@ -310,7 +313,14 @@ export default function ProtectionSection() {
             return (
               <button
                 key={protection.id}
-                onClick={() => toggleProtection(protection.id)}
+                onClick={() => {
+                  // Trello 355: przy DODAWANIU (dokupywaniu) pokaż modal; przy odznaczaniu — od razu
+                  if (selectedProtections.has(protection.id)) {
+                    toggleProtection(protection.id);
+                  } else {
+                    setConfirmProtection({ id: protection.id, name: protection.name, price: protection.price });
+                  }
+                }}
                 className={`w-24 h-24 sm:w-28 sm:h-28 flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
                   isSelected
                     ? 'bg-[#03adf0] text-white'
@@ -423,6 +433,17 @@ export default function ProtectionSection() {
           </>
         )}
       </section>
+
+      <ConfirmPurchaseModal
+        isOpen={confirmProtection !== null}
+        itemName={confirmProtection?.name || ''}
+        price={confirmProtection?.price}
+        onCancel={() => setConfirmProtection(null)}
+        onConfirm={() => {
+          if (confirmProtection) toggleProtection(confirmProtection.id);
+          setConfirmProtection(null);
+        }}
+      />
     </div>
   );
 }

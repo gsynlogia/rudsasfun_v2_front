@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
 import { useReservation } from '@/context/ReservationContext';
+import ConfirmPurchaseModal from './ConfirmPurchaseModal';
 import type { ReservationItem } from '@/types/reservation';
 import { API_BASE_URL, getStaticAssetUrl } from '@/utils/api-config';
 import { loadStep2FormData, saveStep2FormData } from '@/utils/sessionStorage';
@@ -42,6 +43,8 @@ export default function AddonsSection() {
   };
 
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(getInitialSelectedAddons);
+  // Trello 355 (punkt 1): modal potwierdzenia przy dokupywaniu atrakcji w kreatorze
+  const [confirmAddon, setConfirmAddon] = useState<{ id: string; name: string; price: number } | null>(null);
   const [addonDescription, setAddonDescription] = useState<string>('');
   const [infoHeader, setInfoHeader] = useState<string>('');
   const [loadingDescription, setLoadingDescription] = useState(true);
@@ -372,7 +375,14 @@ export default function AddonsSection() {
             return (
               <button
                 key={addon.id}
-                onClick={() => toggleAddon(addon.id)}
+                onClick={() => {
+                  // Trello 355: przy DODAWANIU (dokupywaniu) pokaż modal; przy odznaczaniu — od razu
+                  if (selectedAddons.has(addon.id)) {
+                    toggleAddon(addon.id);
+                  } else {
+                    setConfirmAddon({ id: addon.id, name: addon.name, price: addon.price });
+                  }
+                }}
                 className={`w-28 h-28 sm:w-32 sm:h-32 flex flex-col items-center justify-center gap-2 transition-colors ${
                   isSelected
                     ? 'bg-[#03adf0] text-white'
@@ -457,6 +467,17 @@ export default function AddonsSection() {
           </div>
         ) : null}
       </section>
+
+      <ConfirmPurchaseModal
+        isOpen={confirmAddon !== null}
+        itemName={confirmAddon?.name || ''}
+        price={confirmAddon?.price}
+        onCancel={() => setConfirmAddon(null)}
+        onConfirm={() => {
+          if (confirmAddon) toggleAddon(confirmAddon.id);
+          setConfirmAddon(null);
+        }}
+      />
     </div>
   );
 }

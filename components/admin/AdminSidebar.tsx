@@ -16,8 +16,10 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
+  Users,
 } from 'lucide-react';
 import Image from 'next/image';
+import OnlineClientsCounter from './OnlineClientsCounter';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -118,10 +120,23 @@ export default function AdminSidebar() {
     ? menuItemsWithSuperFunctions
     : menuItemsWithSuperFunctions.filter(item => accessibleNormalized.includes(normalizeSec(item.section)));
 
-  const menuItems = baseMenuItems.filter(item => {
+  let menuItems = baseMenuItems.filter(item => {
     if (item.key === 'super-functions') return canAccessSuperFunctions;
     return true;
   });
+
+  // „Klienci online" — TYLKO dla prawdziwych adminów (grupa admin). Konta read-only (np. Kierownik) NIE
+  // widzą tej pozycji (rozkaz Pana: tylko admini, nikt inny). Backend i tak egzekwuje (require_admin_bypass).
+  if (isAdmin) {
+    const onlineItem = {
+      href: '/admin-panel/online-klienci', icon: Users, label: 'Klienci online',
+      key: 'online-klienci', section: 'system',
+    };
+    const idx = menuItems.findIndex(i => i.key === 'settings');
+    menuItems = idx >= 0
+      ? [...menuItems.slice(0, idx), onlineItem, ...menuItems.slice(idx)]
+      : [...menuItems, onlineItem];
+  }
 
   const isActive = (href: string) => {
     const path = pathname || '';
@@ -205,6 +220,9 @@ export default function AdminSidebar() {
           )}
         </button>
       </div>
+
+      {/* Licznik „Klienci online" pod logo — TYLKO admin/superadmin (sam się ukrywa dla read-only). */}
+      <OnlineClientsCounter isCollapsed={isCollapsed} />
 
       <nav className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
         {/* Menu Items */}

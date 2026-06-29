@@ -36,6 +36,19 @@ interface Protection {
 }
 
 /**
+ * Czy turnus już się rozpoczął — liczone w strefie biznesowej Europe/Warsaw (Trello 355, punkt 3).
+ * Od dnia rozpoczęcia obozu klient nie może domawiać atrakcji dodatkowych ani ubezpieczeń.
+ * Porównanie stringów "YYYY-MM-DD" jest leksykograficznie == chronologicznie.
+ */
+function isCampStarted(startDateIso?: string | null): boolean {
+  if (!startDateIso) return false;
+  const todayWarsaw = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Warsaw', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date()); // "YYYY-MM-DD"
+  return todayWarsaw >= startDateIso.slice(0, 10);
+}
+
+/**
  * AdditionalServicesTiles Component
  * Displays tiles for additional services (addons and protection)
  * Based on detailed design specification
@@ -58,6 +71,9 @@ export default function AdditionalServicesTiles({
   // Tpay wycofany (2026-03-19) — płatności online na stałe wyłączone
   const [onlinePaymentsEnabled] = useState<boolean>(false);
   const [loadingOnlinePaymentsStatus] = useState(false);
+  // Trello 355: modal potwierdzenia domówienia atrakcji + blokada od startu turnusu
+  const [confirmTile, setConfirmTile] = useState<{ id: string; name: string; price: number } | null>(null);
+  const campStarted = isCampStarted(reservation?.property_start_date);
 
   // Fetch addons and protections from API
   useEffect(() => {
@@ -477,32 +493,34 @@ export default function AdditionalServicesTiles({
         price: addon.price,
         icon: renderIcon(addon, isActive),
         isActive,
-        hasButton: !isActive, // Button only for inactive (not in reservation)
+        hasButton: !isActive && !campStarted, // Trello 355: po starcie turnusu klient nie domawia atrakcji
         buttonText: 'domów',
         buttonColor: '#3BAAF5',
-        onClick: () => handleServicePayment(addon.id.toString(), addon.name, addon.price, 'addon'),
+        // Trello 355: klik otwiera modal potwierdzenia „czy na pewno dokupujesz?" (zamiast od razu API)
+        onClick: () => setConfirmTile({ id: addon.id.toString(), name: addon.name, price: addon.price }),
       };
     }),
-    // Protection - show protections from API (matching selectedProtection)
+    // Protection — Trello 355 (punkt 2+3): KLIENT NIE domawia ubezpieczeń (OAZA, TARCZA) w panelu.
+    // Pokazujemy TYLKO już wykupione (jako informację), bez przycisku „domów". Niewykupionych nie
+    // wyświetlamy (.filter(isActive)) — domawianie ubezpieczeń dostępne wyłącznie w kreatorze.
     ...(protectionTiles.length > 0
-      ? protectionTiles.map((protection) => {
-          const isActive = selectedProtectionNumericIds.has(parseInt(protection.id.replace('protection-', ''), 10));
-          return {
-            type: 'protection' as const,
-            id: protection.id,
-            name: protection.name,
-            price: protection.price,
-            icon: protection.icon(isActive),
-            isActive,
-            hasButton: !isActive, // Button only for inactive (not in reservation)
-            buttonText: 'domów',
-            buttonColor: '#3BAAF5',
-            onClick: () => handleServicePayment(protection.id, protection.name, protection.price, 'protection'),
-          };
-        })
-      : // Fallback to legacy protections if API failed
-        // Show ALL legacy protections (not just purchased ones) so users can buy additional ones
-        legacyProtections
+      ? protectionTiles
+          .map((protection) => {
+            const isActive = selectedProtectionNumericIds.has(parseInt(protection.id.replace('protection-', ''), 10));
+            return {
+              type: 'protection' as const,
+              id: protection.id,
+              name: protection.name,
+              price: protection.price,
+              icon: protection.icon(isActive),
+              isActive,
+              hasButton: false,
+              buttonText: '',
+              buttonColor: '#3BAAF5',
+            };
+          })
+          .filter((t) => t.isActive)
+      : legacyProtections
           .map((protection) => {
             const isActive = selectedProtection?.some((id: string) => id === protection.id || id === `protection-${protection.id}`) || false;
             return {
@@ -512,12 +530,12 @@ export default function AdditionalServicesTiles({
               price: protection.price,
               icon: protection.icon(isActive),
               isActive,
-              hasButton: !isActive,
-              buttonText: 'domów',
+              hasButton: false,
+              buttonText: '',
               buttonColor: '#3BAAF5',
-              onClick: () => handleServicePayment(protection.id, protection.name, protection.price, 'protection'),
             };
-          })),
+          })
+          .filter((t) => t.isActive)),
   ];
 
   // Sort by name for consistent display (Kieszonkowe always first)
@@ -543,6 +561,11 @@ export default function AdditionalServicesTiles({
   return (
     <div className="mb-6">
       <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-3 sm:mb-4">Usługi dodatkowe</h5>
+      {campStarted && (
+        <div className="mb-3 bg-amber-50 border-l-4 border-amber-400 p-3 text-xs sm:text-sm text-amber-800">
+          Obóz już się rozpoczął — domawianie atrakcji dodatkowych i ubezpieczeń nie jest już możliwe.
+        </div>
+      )}
       <div className="grid grid-cols-4 gap-3 sm:gap-4 md:gap-5 w-full">
         {sortedTiles.map((tile) => {
           const { isActive } = tile;
@@ -689,6 +712,40 @@ export default function AdditionalServicesTiles({
               </div>
             </div>
           )}
+        </div>
+      </UniversalModal>
+
+      {/* Trello 355: modal potwierdzenia domówienia atrakcji dodatkowej */}
+      <UniversalModal
+        isOpen={confirmTile !== null}
+        onClose={() => setConfirmTile(null)}
+        title="Potwierdzenie dokupienia"
+        maxWidth="sm"
+      >
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-800">
+            Czy na pewno dokupujesz wybraną opcję
+            {confirmTile ? <>: <span className="font-semibold">„{confirmTile.name}"</span></> : ''}
+            {confirmTile && confirmTile.price > 0 ? ` (+${confirmTile.price} PLN)` : ''}?
+          </p>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => setConfirmTile(null)}
+              className="px-5 py-2 bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition-colors"
+            >
+              Anuluj
+            </button>
+            <button
+              onClick={() => {
+                const t = confirmTile;
+                setConfirmTile(null);
+                if (t) handleServicePayment(t.id, t.name, t.price, 'addon');
+              }}
+              className="px-5 py-2 bg-[#03adf0] text-white font-medium hover:bg-[#0288c7] transition-colors"
+            >
+              Tak, dokupuję
+            </button>
+          </div>
         </div>
       </UniversalModal>
     </div>
