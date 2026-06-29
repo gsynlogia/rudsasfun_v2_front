@@ -178,7 +178,7 @@ export default function AdminSidebar() {
 
   return (
     <div
-      className="fixed left-0 bg-slate-800 z-50 transition-all duration-300 ease-in-out shadow-xl"
+      className="fixed left-0 bg-slate-800 z-50 transition-all duration-300 ease-in-out shadow-xl flex flex-col"
       style={{
         width: sidebarWidth,
         top: 0,
@@ -224,7 +224,7 @@ export default function AdminSidebar() {
       {/* Licznik „Klienci online" pod logo — TYLKO admin/superadmin (sam się ukrywa dla read-only). */}
       <OnlineClientsCounter isCollapsed={isCollapsed} />
 
-      <nav className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
+      <nav className="flex flex-col flex-1 min-h-0">
         {/* Menu Items */}
         <div className="flex-1 pt-2 overflow-y-auto">
           {loading ? (
