@@ -501,8 +501,8 @@ export default function AdditionalServicesTiles({
       };
     }),
     // Protection — Trello 355 (punkt 2+3): KLIENT NIE domawia ubezpieczeń (OAZA, TARCZA) w panelu.
-    // Pokazujemy TYLKO już wykupione (jako informację), bez przycisku „domów". Niewykupionych nie
-    // wyświetlamy (.filter(isActive)) — domawianie ubezpieczeń dostępne wyłącznie w kreatorze.
+    // Pokazujemy WSZYSTKIE jako informację — szare (niekupione) / niebieskie (kupione), ale BEZ
+    // przycisku „domów". Domawianie ubezpieczeń dostępne wyłącznie w kreatorze nowej rezerwacji.
     ...(protectionTiles.length > 0
       ? protectionTiles
           .map((protection) => {
@@ -519,7 +519,6 @@ export default function AdditionalServicesTiles({
               buttonColor: '#3BAAF5',
             };
           })
-          .filter((t) => t.isActive)
       : legacyProtections
           .map((protection) => {
             const isActive = selectedProtection?.some((id: string) => id === protection.id || id === `protection-${protection.id}`) || false;
@@ -534,8 +533,7 @@ export default function AdditionalServicesTiles({
               buttonText: '',
               buttonColor: '#3BAAF5',
             };
-          })
-          .filter((t) => t.isActive)),
+          })),
   ];
 
   // Sort by name for consistent display (Kieszonkowe always first)
@@ -573,6 +571,10 @@ export default function AdditionalServicesTiles({
           const bgColor = isActive ? '#3BAAF5' : '#F3F3F3';
           const textColor = isActive ? 'text-white' : 'text-gray-600';
           const iconColor = isActive ? 'text-white' : 'text-gray-400';
+          // Trello 355: klikalne tylko to, co realnie ma akcję — kieszonkowe (zawsze) oraz dodatki
+          // z przyciskiem „domów" (atrakcje przed startem turnusu). Reszta (ubezpieczenia, atrakcje po
+          // starcie, pozycje kupione) = nieklikalne → kursor „nie wolno" (przekreślone kółeczko), bez hovera.
+          const clickable = tile.type === 'pocket' || (tile as { hasButton?: boolean }).hasButton === true;
 
           return (
             <div
@@ -583,13 +585,14 @@ export default function AdditionalServicesTiles({
                 p-2 sm:p-3
                 transition-colors
                 flex-shrink-0
-                cursor-pointer
+                ${clickable ? 'cursor-pointer' : 'cursor-not-allowed'}
               `}
               style={{
                 borderRadius: '0px', // Perfect square, no rounded edges
                 backgroundColor: bgColor,
               }}
               onMouseEnter={(e) => {
+                if (!clickable) return;
                 if (isActive) {
                   e.currentTarget.style.backgroundColor = '#0288c7'; // Darker blue on hover
                 } else {
