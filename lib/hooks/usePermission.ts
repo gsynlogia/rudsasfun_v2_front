@@ -69,7 +69,11 @@ export function computePermissionApi(user: User | null): PermissionApi {
   const level = (section: string): number => {
     if (!user) return 0;
     if (!levels) return isLegacyAdminFullAccess(user) ? AclLevel.HARD_DELETE : 0;
-    return levels[normalizeSection(section)] ?? 0;
+    const value = levels[normalizeSection(section)];
+    // Sekcja dodana PO zalogowaniu (brak w section_levels z loginu) → admin/grupa admin ma bypass na
+    // wszystko, więc nie chowamy jej pozycji do czasu przelogowania. Kierownik (nie-admin) → 0 (ukryte).
+    if (value === undefined && isLegacyAdminFullAccess(user)) return AclLevel.HARD_DELETE;
+    return value ?? 0;
   };
   const can = (section: string, required: number): boolean => level(section) >= required;
 

@@ -11,7 +11,7 @@ import AdminPromotionV2EditPanel from '@/components/admin/AdminPromotionV2EditPa
 import AdminPromoCodeOverridePanel from '@/components/admin/AdminPromoCodeOverridePanel';
 import { ContractEditPanel } from '@/components/admin/ContractEditPanel';
 import { QualificationTemplateNew } from '@/components/admin/QualificationTemplateNew';
-import { ReservationDetailRightSidebar, RIGHT_SIDEBAR_WIDTH } from '@/components/admin/ReservationDetailRightSidebar';
+import { ReservationDetailRightSidebar } from '@/components/admin/ReservationDetailRightSidebar';
 import SectionGuard from '@/components/admin/SectionGuard';
 import UniversalModal from '@/components/admin/UniversalModal';
 import { ContractForm } from '@/components/profile/ContractForm';
@@ -37,6 +37,8 @@ import AdminVerifyCodeModal from '@/components/admin/AdminVerifyCodeModal';
 import DocumentVersionsList from '@/components/admin/DocumentVersionsList';
 import AneksPreview from '@/components/admin/AneksPreview';
 
+import AuthorizationsPanel from './_reservation-detail/components/AuthorizationsPanel';
+import EarlyLeaveButton from './_reservation-detail/components/EarlyLeaveButton';
 import { PaymentsPanel } from './_reservation-detail/components/PaymentsPanel';
 import { QualificationCardEditPanelLoader } from './_reservation-detail/components/QualificationCardEditPanelLoader';
 import { RejectDocumentPanelContent } from './_reservation-detail/components/RejectDocumentPanelContent';
@@ -2374,10 +2376,12 @@ export default function ReservationDetailPage() {
   return (
     <SectionGuard section="reservations">
       <AdminLayout>
-          <div style={{ marginRight: RIGHT_SIDEBAR_WIDTH }}>
-            <div className="h-full min-h-0 flex flex-col lg:flex-row animate-fadeIn -m-4">
-              {/* Lewa kolumna: header, banner, karta z zakładkami */}
-              <div className="flex-1 min-w-0 flex flex-col min-h-0">
+          {/* -mt/-mr/-mb-4 (full-bleed góra/prawo/dół) ale BEZ ujemnego lewego marginesu i BEZ
+              lewego paddingu — treść (granatowa belka + pasek zakładek) przylega FLUSH do menu,
+              zero białej przerwy. Pasek zakładek ma własny p-1.5, więc ikona „Płatności" nie wchodzi
+              pod menu. (Wcześniejszy pl-1 dawał 4px białej przerwy między menu a belką.) */}
+          <div className="h-full min-h-0 flex flex-col animate-fadeIn -mt-4 -mr-4 -mb-4">
+          {/* Górna belka (header) — pełna szerokość, nad układem karta|panel (RWD) */}
           <ReservationDetailHeader
             reservation={reservation}
             reservationNumber={reservationNumber}
@@ -2482,10 +2486,42 @@ export default function ReservationDetailPage() {
             profileLinkCopied={profileLinkCopied}
           />
 
-          <div className="p-4 flex-1 min-h-0 overflow-hidden lg:h-[calc(100vh-11rem)]">
+          {/* Pasek zakładek sekcji — PEŁNA SZEROKOŚĆ strony, od razu pod górną belką (rozkaz Pana:
+              nav na całą szerokość, panel Notatki/Zdarzenia poniżej). slate-800, zawijanie pill-tabs
+              (KAŻDA zakładka zawsze widoczna, w tym „Upoważnienia"), aktywna biała z czarnym napisem.
+              Te same ikony Lucide. */}
+          <nav
+            className="flex-shrink-0 flex flex-wrap gap-1 p-1.5 rounded-none bg-slate-800"
+            role="tablist"
+            aria-label="Sekcje rezerwacji"
+          >
+            {RESERVATION_PANELS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={activePanel === id}
+                aria-controls={`panel-${id}`}
+                id={`tab-${id}`}
+                onClick={() => goToPanel(id)}
+                className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded transition-colors whitespace-nowrap cursor-pointer ${
+                  activePanel === id
+                    ? 'bg-white text-slate-900 font-semibold shadow-sm'
+                    : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" aria-hidden />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+          {/* Układ pod paskiem: karta sekcji (lewo) + panel Notatki/Zdarzenia (prawo). RWD: stack < xl, obok ≥ xl. */}
+          <div className="flex-1 min-h-0 flex flex-col xl:flex-row min-w-0 gap-4 px-4 pb-4 pt-3 xl:h-[calc(100vh-14rem)]">
+            <div className="flex-1 min-w-0 min-h-0 overflow-hidden">
             <div className="relative h-full min-h-0">
             <div className="flex flex-col h-full min-h-0 min-w-0 overflow-hidden rounded-none border border-gray-200 bg-white shadow-sm">
-              {/* Alert niezatwierdzonych zmian w karcie — widoczny nad zakladkami, rozwijany */}
+              {/* Alert niezatwierdzonych zmian w karcie — POD paskiem zakładek (rozkaz Pana:
+                  granatowy pasek zakładek na górze, pomarańczowy alert pod spodem), rozwijany */}
               {hasUnsignedCardChanges && (
                 <UnsignedCardAlert
                   sections={unsignedCardSections}
@@ -2493,31 +2529,6 @@ export default function ReservationDetailPage() {
                   signedValues={signedValues}
                 />
               )}
-              <nav
-                className="flex-shrink-0 flex flex-nowrap rounded-none border-b border-gray-200 bg-gray-50/80 overflow-x-auto"
-                role="tablist"
-                aria-label="Sekcje rezerwacji"
-              >
-                {RESERVATION_PANELS.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="tab"
-                    aria-selected={activePanel === id}
-                    aria-controls={`panel-${id}`}
-                    id={`tab-${id}`}
-                    onClick={() => goToPanel(id)}
-                    className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap rounded-none border border-transparent -mb-px cursor-pointer ${
-                      activePanel === id
-                        ? 'bg-[#1d283d] text-white border-t border-x border-[#1d283d] border-b-0'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 flex-shrink-0" aria-hidden />
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </nav>
                 <div
                   id="panel-content"
                   className="flex-1 overflow-auto min-h-0 min-w-0 rounded-none p-4 border-t-0"
@@ -3746,6 +3757,11 @@ export default function ReservationDetailPage() {
             </div>
             )}
 
+            {/* Trello 352: zakładka Upoważnienia — podgląd z zatwierdzonej karty + ręczna notatka RADSAS */}
+            {activePanel === 'upowaznienia' && (
+              <AuthorizationsPanel reservationNumber={reservationNumber ?? ''} />
+            )}
+
             {activePanel === 'inne' && (
             <>
             {/* Ochrony – stan lokalny (protectionDraft), zapis przyciskiem „Zapisz”, kolory: niebieski=zapisane, zielony=do dodania, wyszarzenie=do usunięcia */}
@@ -4164,26 +4180,11 @@ export default function ReservationDetailPage() {
                       <span className="text-gray-500" data-testid="early-leave-status">nie</span>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    data-testid="early-leave-toggle"
-                    onClick={async () => {
-                      const isOn = reservation.transport_early_leave === 1;
-                      const note = isOn ? null : (window.prompt('Powód wyjazdu przed zakończeniem (opcjonalnie):') || null);
-                      await authenticatedApiCall(`/api/transport-lists/reservations/${reservation.id}/early-leave`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ early_leave: !isOn, note }),
-                      });
-                      await refetchReservation();
-                    }}
-                    className={`rounded px-3 py-1.5 text-sm font-medium ${
-                      reservation.transport_early_leave === 1
-                        ? 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                        : 'bg-red-600 text-white hover:bg-red-700'}`}
-                  >
-                    {reservation.transport_early_leave === 1 ? 'Odznacz' : 'Oznacz wyjazd przed zakończeniem'}
-                  </button>
+                  <EarlyLeaveButton
+                    reservationId={reservation.id}
+                    active={reservation.transport_early_leave === 1}
+                    onChanged={refetchReservation}
+                  />
                 </div>
               </div>
             </div>
@@ -4864,9 +4865,7 @@ export default function ReservationDetailPage() {
             </div>
           </div>
           </div>
-          </div>
-          </div>
-          </div>
+          {/* Prawy panel Notatki/Zdarzenia — kolumna in-flow w tym samym wierszu co karta (RWD). */}
           <ReservationDetailRightSidebar
             getContent={rightSidebarGetContent}
             // DEPRECATED 2026-05-24 REZ-1828: suggestedTab='documents' wyłączone — tab 'documents'
@@ -4876,6 +4875,8 @@ export default function ReservationDetailPage() {
             // ACL 2026-06-28: ukryj zakładkę notatek dla kont tylko-do-odczytu (poziom < WRITE na reservations).
             hideNotes={!canSeeNotes}
           />
+          </div>
+          </div>
             {/* Modal archiwizacji rezerwacji */}
             <UniversalModal
               isOpen={showDeleteModal}

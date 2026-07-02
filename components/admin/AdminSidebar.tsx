@@ -16,7 +16,7 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  Users,
+  BarChart3,
 } from 'lucide-react';
 import Image from 'next/image';
 import OnlineClientsCounter from './OnlineClientsCounter';
@@ -26,6 +26,7 @@ import { useEffect, useState } from 'react';
 
 import { useSidebar } from '@/context/SidebarContext';
 import { authService } from '@/lib/services/AuthService';
+import { usePermission } from '@/lib/hooks/usePermission';
 
 /**
  * Admin Sidebar Component
@@ -103,6 +104,7 @@ export default function AdminSidebar() {
   }
 
   const user = authService.getCurrentUser();
+  const perm = usePermission();
   interface UserWithDefaults { groups: string[]; }
   const defaultUser: UserWithDefaults = { groups: [] };
   const userWithDefaults: UserWithDefaults = user || defaultUser;
@@ -125,17 +127,19 @@ export default function AdminSidebar() {
     return true;
   });
 
-  // „Klienci online" — TYLKO dla prawdziwych adminów (grupa admin). Konta read-only (np. Kierownik) NIE
-  // widzą tej pozycji (rozkaz Pana: tylko admini, nikt inny). Backend i tak egzekwuje (require_admin_bypass).
-  if (isAdmin) {
-    const onlineItem = {
-      href: '/admin-panel/online-klienci', icon: Users, label: 'Klienci online',
-      key: 'online-klienci', section: 'system',
+  // „Statystyka" — NAD „Ustawieniami" (rozkaz Pana 2026-06-30), widoczna wg ACL (sekcja `statistics`,
+  // poziom ≥ Odczyt). Grupa bez zaznaczonego checkboxa „Statystyki" NIE widzi pozycji (deny-by-default);
+  // backend i tak egzekwuje (403). Podgląd „kto online TERAZ" (/online-klienci) nie ma już osobnej pozycji
+  // menu (decyzja Pana) — jest dostępny ZE strony Statystyki (karty „Online teraz" + link) i z licznika pod logo.
+  if (perm.canRead('statistics')) {
+    const statystykaItem = {
+      href: '/admin-panel/statystyka', icon: BarChart3, label: 'Statystyka',
+      key: 'statystyka', section: 'statistics',
     };
     const idx = menuItems.findIndex(i => i.key === 'settings');
     menuItems = idx >= 0
-      ? [...menuItems.slice(0, idx), onlineItem, ...menuItems.slice(idx)]
-      : [...menuItems, onlineItem];
+      ? [...menuItems.slice(0, idx), statystykaItem, ...menuItems.slice(idx)]
+      : [...menuItems, statystykaItem];
   }
 
   const isActive = (href: string) => {
@@ -154,7 +158,8 @@ export default function AdminSidebar() {
     return (
       <div
         className="fixed left-0 bg-slate-800 z-50 shadow-xl animate-pulse"
-        style={{ width: '256px', top: 0, height: '100vh' }}
+        // top/height z paska środowiska (--app-banner-h): sidebar OBNIŻA się pod pasek, nie chowa się pod nim.
+        style={{ width: '256px', top: 'var(--app-banner-h, 0px)', height: 'calc(100vh - var(--app-banner-h, 0px))' }}
       >
         {/* Logo skeleton */}
         <div className="flex items-center justify-center" style={{ height: '64px' }}>
@@ -181,8 +186,9 @@ export default function AdminSidebar() {
       className="fixed left-0 bg-slate-800 z-50 transition-all duration-300 ease-in-out shadow-xl flex flex-col"
       style={{
         width: sidebarWidth,
-        top: 0,
-        height: '100vh',
+        // top/height z paska środowiska (--app-banner-h): sidebar OBNIŻA się pod pasek, nie chowa się pod nim.
+        top: 'var(--app-banner-h, 0px)',
+        height: 'calc(100vh - var(--app-banner-h, 0px))',
       }}
     >
       {/* Logo section */}
@@ -210,13 +216,14 @@ export default function AdminSidebar() {
         {/* Collapse toggle button */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center shadow-lg border-2 border-slate-800 transition-colors cursor-pointer z-10"
+          // Białe koło z granatową ikoną (rozkaz Pana) — widoczne na ciemnym menu i na styku z treścią.
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center shadow-lg border-2 border-slate-800 transition-colors cursor-pointer z-10"
           title={isCollapsed ? 'Rozwiń menu' : 'Zwiń menu'}
         >
           {isCollapsed ? (
-            <ChevronRight className="w-4 h-4 text-white" />
+            <ChevronRight className="w-4 h-4 text-slate-800" />
           ) : (
-            <ChevronLeft className="w-4 h-4 text-white" />
+            <ChevronLeft className="w-4 h-4 text-slate-800" />
           )}
         </button>
       </div>

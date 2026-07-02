@@ -9,16 +9,41 @@ interface DateRangeCalendarProps {
   onExcludedChange: (excluded: Set<string>) => void;
   onApply: () => void;
   onClear: () => void;
+  /** 'sm' (domyślny — filtry rezerwacji, kompaktowy) | 'lg' (statystyka — szerszy, czytelny, profesjonalny). */
+  size?: 'sm' | 'lg';
 }
 
 const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
 const DAY_NAMES = ['Pn','Wt','Śr','Cz','Pt','Sb','Nd'];
 
+// Style per rozmiar — 'sm' zachowuje DOTYCHCZASOWY wygląd (zero regresji w filtrach), 'lg' = wersja pro.
+const SIZES = {
+  sm: {
+    container: 'p-3',
+    nav: 'w-4 h-4', navBtn: 'p-1',
+    month: 'text-xs',
+    dayName: 'text-[10px] py-0.5',
+    cell: 'h-7 text-xs', gap: 'gap-0',
+    info: 'text-[10px]',
+    btn: 'px-3 py-1.5 text-xs',
+  },
+  lg: {
+    container: 'p-4 w-[22rem]',
+    nav: 'w-5 h-5', navBtn: 'p-1.5',
+    month: 'text-base',
+    dayName: 'text-xs py-1.5',
+    cell: 'h-10 text-sm', gap: 'gap-1',
+    info: 'text-xs',
+    btn: 'px-4 py-2 text-sm',
+  },
+} as const;
+
 function toYMD(d: Date): string {
   return d.toISOString().split('T')[0];
 }
 
-export default function DateRangeCalendar({ rangeFrom, rangeTo, excludedDates, onRangeChange, onExcludedChange, onApply, onClear }: DateRangeCalendarProps) {
+export default function DateRangeCalendar({ rangeFrom, rangeTo, excludedDates, onRangeChange, onExcludedChange, onApply, onClear, size = 'sm' }: DateRangeCalendarProps) {
+  const S = SIZES[size];
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -104,36 +129,36 @@ export default function DateRangeCalendar({ rangeFrom, rangeTo, excludedDates, o
   const excludedCount = excludedDates.size;
 
   return (
-    <div className="mb-3 p-3 border border-gray-200 bg-gray-50">
+    <div className={`mb-3 ${S.container} border border-gray-200 bg-gray-50`}>
       {/* Navigation */}
       <div className="flex items-center justify-between mb-2">
-        <button type="button" onClick={prevMonth} className="p-1 hover:bg-gray-200 rounded text-gray-600">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        <button type="button" onClick={prevMonth} className={`${S.navBtn} hover:bg-gray-200 rounded text-gray-600`}>
+          <svg className={S.nav} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
         </button>
-        <span className="text-xs font-semibold text-gray-700">{MONTH_NAMES[viewMonth]} {viewYear}</span>
-        <button type="button" onClick={nextMonth} className="p-1 hover:bg-gray-200 rounded text-gray-600">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+        <span className={`${S.month} font-semibold text-gray-700`}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
+        <button type="button" onClick={nextMonth} className={`${S.navBtn} hover:bg-gray-200 rounded text-gray-600`}>
+          <svg className={S.nav} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
         </button>
       </div>
 
       {/* Day names */}
-      <div className="grid grid-cols-7 gap-0 mb-1">
+      <div className={`grid grid-cols-7 ${S.gap} mb-1`}>
         {DAY_NAMES.map(dn => (
-          <div key={dn} className="text-center text-[10px] font-medium text-gray-400 py-0.5">{dn}</div>
+          <div key={dn} className={`text-center ${S.dayName} font-medium text-gray-400`}>{dn}</div>
         ))}
       </div>
 
       {/* Days grid */}
-      <div className="grid grid-cols-7 gap-0">
+      <div className={`grid grid-cols-7 ${S.gap}`}>
         {daysInMonth.map((d, i) => {
-          if (!d) return <div key={`empty-${i}`} className="h-7" />;
+          if (!d) return <div key={`empty-${i}`} className={S.cell} />;
           const inRange = isInRange(d);
           const excluded = isExcluded(d);
           const isStart = isRangeStart(d);
           const isEnd = isRangeEnd(d);
           const isToday = toYMD(d) === toYMD(today);
 
-          let bg = 'hover:bg-gray-100';
+          let bg = size === 'lg' ? 'hover:bg-[#03adf0]/20' : 'hover:bg-gray-100';
           let text = 'text-gray-700';
           let border = '';
 
@@ -157,7 +182,7 @@ export default function DateRangeCalendar({ rangeFrom, rangeTo, excludedDates, o
               key={toYMD(d)}
               type="button"
               onClick={() => handleDayClick(d)}
-              className={`h-7 text-xs rounded ${bg} ${text} ${border} transition-colors`}
+              className={`${S.cell} rounded ${bg} ${text} ${border} transition-colors`}
             >
               {d.getDate()}
             </button>
@@ -167,16 +192,16 @@ export default function DateRangeCalendar({ rangeFrom, rangeTo, excludedDates, o
 
       {/* Info + buttons */}
       <div className="mt-2 pt-2 border-t border-gray-200">
-        <div className="text-[10px] text-gray-500 mb-2">
+        <div className={`${S.info} text-gray-500 mb-2`}>
           {rangeInfo}
           {excludedCount > 0 && <span className="ml-1 text-orange-600">({excludedCount} dni wykluczone)</span>}
         </div>
         <div className="flex items-center justify-end gap-2">
-          <button type="button" onClick={onClear} className="px-3 py-1.5 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 rounded">
+          <button type="button" onClick={onClear} className={`${S.btn} text-gray-700 bg-gray-100 hover:bg-gray-200 rounded`}>
             Wyczyść
           </button>
           {rangeFrom && rangeTo && (
-            <button type="button" onClick={onApply} className="px-3 py-1.5 text-xs text-white bg-[#03adf0] hover:bg-[#0288c7] rounded">
+            <button type="button" onClick={onApply} className={`${S.btn} text-white bg-[#03adf0] hover:bg-[#0288c7] rounded`}>
               Zastosuj
             </button>
           )}

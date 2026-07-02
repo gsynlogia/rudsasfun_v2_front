@@ -7,6 +7,7 @@ import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import type { Camp, CampProperty } from '@/types/reservation';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
+import AdminPageHeader from './AdminPageHeader';
 import CampPropertyForm from './CampPropertyForm';
 import DeleteConfirmationModal, { DeleteItemType } from './DeleteConfirmationModal';
 
@@ -504,9 +505,8 @@ export default function CampsManagementTable() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="mb-2 flex items-center justify-between" style={{ marginTop: 0, paddingTop: 0, marginRight: '16px' }}>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Obozy</h1>
+      {/* Granatowa belka (AdminPageHeader) — spójna ze stylem Rezerwacji/Szczegółów rezerwacji */}
+      <AdminPageHeader title="Obozy">
         <button
           onClick={handleCreateCamp}
           className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200 text-sm font-medium"
@@ -515,7 +515,7 @@ export default function CampsManagementTable() {
           <Plus className="w-4 h-4" />
           Dodaj obóz
         </button>
-      </div>
+      </AdminPageHeader>
 
       {/* Search Bar */}
       <div className="mb-3">

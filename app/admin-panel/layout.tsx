@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 
+import AdminHeartbeat from '@/components/admin/AdminHeartbeat';
 import AuthGuard from '@/components/admin/AuthGuard';
 import { AdminRightPanelProvider } from '@/context/AdminRightPanelContext';
 import { SidebarProvider } from '@/context/SidebarContext';
@@ -33,6 +34,8 @@ export default function AdminPanelLayout({
   return (
     <SidebarProvider>
       <AuthGuard requireAdmin={false}>
+        {/* Heartbeat pracownika — bije na każdej stronie panelu (zalogowany admin/kierownik) */}
+        <AdminHeartbeat />
         <AdminRightPanelProvider>
           {children}
         </AdminRightPanelProvider>

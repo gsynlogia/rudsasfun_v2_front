@@ -4,15 +4,15 @@ import { ArrowRight, MessageSquare, Mail } from 'lucide-react';
 import Link from 'next/link';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import SectionGuard from '@/components/admin/SectionGuard';
 
 export default function WiadomosciPage() {
   return (
     <SectionGuard section="cms">
       <AdminLayout>
+        <AdminPageHeader title="Wiadomości" />
         <div className="container mx-auto p-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-8">Wiadomości</h1>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Link
               href="/admin-panel/wiadomosci/sms"

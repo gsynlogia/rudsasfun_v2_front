@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 
 import type { Camp, CampProperty } from '@/types/reservation';
 import { API_BASE_URL } from '@/utils/api-config';
+import { authenticatedFetch } from '@/utils/api-auth';
 
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import UniversalModal from './UniversalModal';
@@ -78,7 +79,7 @@ export default function TransportsManagement() {
   const fetchTransports = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/camps/transports/all`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/api/camps/transports/all`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -189,7 +190,7 @@ export default function TransportsManagement() {
         cities: citiesData,
       };
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_BASE_URL}/api/camps/transports`,
         {
           method: 'POST',
@@ -235,7 +236,7 @@ export default function TransportsManagement() {
   }>> => {
     try {
       setLoadingUsage(true);
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_BASE_URL}/api/camps/transports/${transportId}/usage`,
         {
           method: 'GET',
@@ -288,7 +289,7 @@ export default function TransportsManagement() {
       setError(null);
 
       // Independent transport - use DELETE endpoint by transport ID
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_BASE_URL}/api/camps/transports/${selectedTransport.id}`,
         {
           method: 'DELETE',
@@ -344,7 +345,7 @@ export default function TransportsManagement() {
         campId = transport.camp_ids[0];
       } else if (transport.property_id) {
         // Fetch turnus to get camp_id
-        const turnusResponse = await fetch(
+        const turnusResponse = await authenticatedFetch(
           `${API_BASE_URL}/api/camps/properties/${transport.property_id}`,
           {
             method: 'GET',
@@ -361,7 +362,7 @@ export default function TransportsManagement() {
 
       if (transport.property_id && campId) {
         // First get current transport data
-        const getResponse = await fetch(
+        const getResponse = await authenticatedFetch(
           `${API_BASE_URL}/api/camps/${campId}/properties/${transport.property_id}/transport`,
           {
             method: 'GET',
@@ -378,7 +379,7 @@ export default function TransportsManagement() {
         const currentTransport = await getResponse.json();
 
         // Update with new name
-        const updateResponse = await fetch(
+        const updateResponse = await authenticatedFetch(
           `${API_BASE_URL}/api/camps/${campId}/properties/${transport.property_id}/transport`,
           {
             method: 'PUT',
@@ -404,7 +405,7 @@ export default function TransportsManagement() {
         }
       } else {
         // Independent transport - use new PUT endpoint by transport ID
-        const updateResponse = await fetch(
+        const updateResponse = await authenticatedFetch(
           `${API_BASE_URL}/api/camps/transports/${transportId}`,
           {
             method: 'PUT',

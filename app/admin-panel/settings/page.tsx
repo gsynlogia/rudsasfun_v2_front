@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import SectionGuard from '@/components/admin/SectionGuard';
 import { authService } from '@/lib/services/AuthService';
 import { authenticatedApiCall } from '@/utils/api-auth';
@@ -73,10 +74,10 @@ export default function SettingsPage() {
   return (
     <SectionGuard section="settings">
       <AdminLayout>
+      <AdminPageHeader title="Ustawienia" />
       <div className="w-full">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Ustawienia</h1>
+        <div className="mb-6 mt-6">
           <p className="text-sm text-gray-600">Zarządzaj ustawieniami systemu</p>
         </div>
 

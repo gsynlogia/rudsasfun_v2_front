@@ -37,7 +37,9 @@ export function ReservationDetailHeader({
 }: ReservationDetailHeaderProps) {
   return (
     <>
-      <div className="bg-slate-800 shadow-md p-3 sticky top-0 z-20 mb-4">
+      {/* pr-16: rezerwuje miejsce na pływający dzwonek powiadomień (AdminLayout, fixed top-11 right-3 z-50),
+          żeby nie nachodził na przyciski („Usuń rezerwację" itp.) po rozciągnięciu nagłówka na pełną szerokość. */}
+      <div className="bg-slate-800 shadow-md p-3 pr-16 sticky top-0 z-20 mb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button

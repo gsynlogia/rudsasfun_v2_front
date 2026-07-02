@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { headers } from 'next/headers';
 
-import DevBanner from '@/components/DevBanner';
+import AppTopBanner from '@/components/AppTopBanner';
 import MaintenancePage from '@/components/MaintenancePage';
 import TestBanner from '@/components/TestBanner';
 import { ToastProvider } from '@/components/ToastContainer';
@@ -79,6 +79,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        // data-app-banner steruje wysokością paska (--app-banner-h w globals.css) — pojedyncze
+        // źródło prawdy, żaden widok nie hardcoduje 24px. 'dev' = pasek widoczny, 'none' = 0.
+        data-app-banner={isDev ? 'dev' : 'none'}
       >
         {/* Google Tag Manager (noscript) */}
         {gtmEnabled && (
@@ -97,7 +100,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         ) : (
           <ReservationProvider>
             <ToastProvider>
-              <DevBanner isDev={isDev} />
+              {/* Pasek środowiska — element najwyższego poziomu, zawsze na górze przeglądarki,
+                  na każdym widoku. Skalowalny (AppTopBanner) — gotowy też pod produkcję. */}
+              {isDev && <AppTopBanner message="Wersja developerska — dane testowe" variant="dev" />}
               <TestBanner />
               {children}
             </ToastProvider>

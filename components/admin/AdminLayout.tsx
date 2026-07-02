@@ -95,17 +95,15 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isPanelOpen, close]);
 
-  // Belka developerska ("Wersja developerska — dane testowe") przeniesiona do root layoutu
-  // (components/DevBanner.tsx), renderowana raz w app/layout.tsx. Tutaj nie duplikujemy.
+  // Globalny pasek środowiska (AppTopBanner) renderowany raz w root layout (app/layout.tsx).
+  // Tutaj nie duplikujemy — odejmujemy tylko jego wysokość przez zmienną CSS (patrz niżej).
 
   return (
-    // 2026-05-31 (Cz. 6 fix): h-[calc(100dvh-24px)] zamiast min-h-screen.
-    // Powod: DevBanner (root layout) zajmuje 24px ponad, min-h-screen=100vh tworzyl scroll
-    // przegladarki (24px+100vh=924>900). Teraz cala wysokosc = viewport-banner, content wewnatrz
-    // scrolluje sam (main ma overflow-auto). Dla wszystkich widokow admin: zaden nie traci
-    // funkcjonalnosci bo main area i tak scrollowala wewnatrz. UWAGA: jesli wprowadzisz drugi
-    // banner (np. TestBanner), zwieksz odjemnik (np. -48px).
-    <div className="w-full bg-white flex flex-col" style={{ height: 'calc(100dvh - 24px)' }}>
+    // Wysokość = viewport minus pasek środowiska. Zamiast hardcodować 24px używamy zmiennej
+    // --app-banner-h (globals.css, sterowana przez data-app-banner na <body>): 24px gdy pasek
+    // jest, 0px gdy go nie ma (np. produkcja). Dzięki temu widok NIE jest sprzężony z paskiem —
+    // zmiana/usunięcie paska nie wymaga ruszania tego pliku. Content scrolluje wewnątrz (main).
+    <div className="w-full bg-white flex flex-col" style={{ height: 'calc(100dvh - var(--app-banner-h, 0px))' }}>
       <div className="flex-1 flex overflow-hidden">
       {/* Sidebar with logo — data-acl-keep: nawigacja/wylogowanie zawsze aktywne (też w trybie read-only) */}
       <div data-acl-keep style={{ display: 'contents' }}>
@@ -114,7 +112,9 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
 
       {/* Main Content Area - scrollable, takes remaining space */}
       <div
-        className="flex-1 overflow-auto relative transition-all duration-300 pl-0.5"
+        // BEZ pl-0.5: 2px lewego paddingu pokazywały białe tło między ciemnym menu a treścią
+        // (widoczny biały pasek na każdym widoku admina). Treść przylega teraz do menu.
+        className="flex-1 overflow-auto relative transition-all duration-300"
         style={{ marginLeft: effectiveWidth }}
       >
         {/* Notification icon - fixed in top-right corner.
@@ -150,10 +150,13 @@ function AdminLayoutInner({ children }: AdminLayoutProps) {
 
       {/* Right Panel - notifications (w-96) or document (od lewego sidebara do prawej krawędzi) */}
       <div
-        className={`fixed top-0 h-full bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
+        className={`fixed h-full bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
           isPanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         style={{
+          // top/height z paska środowiska (--app-banner-h): panel zaczyna się pod paskiem, nie pod nim.
+          top: 'var(--app-banner-h, 0px)',
+          height: 'calc(100dvh - var(--app-banner-h, 0px))',
           ...(isDocumentMode ? { left: panelLeftPx, right: 0 } : { right: 0, width: '24rem' }),
         }}
       >

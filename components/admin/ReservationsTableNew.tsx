@@ -148,6 +148,7 @@ interface BackendReservationWithPayments {
   archived_at?: string | null;
   // Excel-only extras (zwracane tylko gdy include_extras=true)
   participant_gender?: string | null; // Trello #349 — płeć uczestnika (surowa, normalizowana w eksporcie)
+  authorizations_summary?: string | null; // Trello 352 — upoważnienia (tekst identyczny z zakładką), zawsze w response
   accommodation_request?: string | null;
   participant_additional_info?: string | null;
   additional_notes?: string | null;
@@ -305,6 +306,8 @@ interface ReservationPayment {
   invoiceIssued?: boolean;
   // Płeć uczestnika znormalizowana (Chłopiec/Dziewczynka) — kolumna "Płeć", ta sama wartość co Excel
   participantGender?: string;
+  // Trello 352 — upoważnienia (tekst jak zakładka: osoby + samodzielny powrót + notatka RADSAS)
+  authorizationsSummary?: string;
 }
 
 /**
@@ -1203,6 +1206,7 @@ const mapReservationToPaymentFormat = async (
     isArchived: reservation.is_archived || false,
     invoiceIssued: !!reservation.invoice_issued,
     participantGender: normalizeGenderLabel(reservation.participant_gender),
+    authorizationsSummary: reservation.authorizations_summary || undefined,
   };
 };
 
@@ -1815,6 +1819,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     depositAmount: 'Zaliczka',
     invoiceIssued: 'WYSTAWIONĄ FAKTURĘ',
     participantGender: 'Płeć',
+    authorizationsSummary: 'Upoważnienia',
   };
 
   /** Kolumny z datami – w filtrach sortowane od najnowszej do najstarszej */
@@ -1885,6 +1890,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     'contractStatus',
     'invoiceIssued',
     'participantGender',
+    'authorizationsSummary',
   ];
   const DEFAULT_COLUMNS = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true }));
 
@@ -2349,6 +2355,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           break;
         case 'participantGender':
           value = reservation.participantGender || '';
+          break;
+        case 'authorizationsSummary':
+          value = reservation.authorizationsSummary || '';
           break;
       }
       if (value !== null && value !== '') {
@@ -3071,6 +3080,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           participantCity: item.participant_city || '',
           // Trello #349 — płeć znormalizowana do czytelnej etykiety (Chłopiec/Dziewczynka) na potrzeby Excela.
           participantGender: normalizeGenderLabel(item.participant_gender),
+          authorizationsSummary: item.authorizations_summary || '',
           guardianName,
           guardianPhone,
           guardianEmail,
@@ -3247,6 +3257,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               break;
             case 'participantGender':
               value = reservation.participantGender || '';
+              break;
+            case 'authorizationsSummary':
+              value = reservation.authorizationsSummary || '';
               break;
             default:
               value = '';
@@ -3904,6 +3917,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             isArchived: reservation.is_archived || false,
             invoiceIssued: !!reservation.invoice_issued,
             participantGender: normalizeGenderLabel(reservation.participant_gender),
+            authorizationsSummary: reservation.authorizations_summary || undefined,
           } as ReservationPayment;
         });
 
@@ -4133,6 +4147,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         return reservation.invoiceIssued ? 'Tak' : 'Nie';
       case 'participantGender':
         return reservation.participantGender || '-';
+      case 'authorizationsSummary':
+        return reservation.authorizationsSummary || '-';
       default:
         return null;
     }
@@ -5832,6 +5848,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                             return (
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
                                 <span className="text-sm text-gray-900">{reservation.participantGender || '-'}</span>
+                              </td>
+                            );
+                          } else if (columnKey === 'authorizationsSummary') {
+                            // Trello 352 — upoważnienia (identyczne z zakładką). Długi tekst zawijany, pełny w title.
+                            return (
+                              <td key={columnKey} className="px-4 py-2 align-top">
+                                <span className="text-sm text-gray-900 block max-w-xs whitespace-pre-wrap break-words" title={reservation.authorizationsSummary || ''}>{reservation.authorizationsSummary || '-'}</span>
                               </td>
                             );
                           }

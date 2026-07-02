@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback } from 'react';
 
 import { authenticatedApiCall } from '@/utils/api-auth';
 
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
+
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import UniversalModal from './UniversalModal';
 
@@ -233,8 +235,10 @@ export default function SourcesManagement() {
   };
 
   return (
-    <div className="container mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Zarządzanie Źródłami Informacji (CMS)</h1>
+    <>
+      <AdminPageHeader title="Źródła" />
+
+      <div className="container mx-auto p-6 bg-white rounded-lg shadow-md">
 
       {/* Search and Add New */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
@@ -493,6 +497,7 @@ export default function SourcesManagement() {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

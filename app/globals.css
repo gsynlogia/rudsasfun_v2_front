@@ -10,6 +10,27 @@
   --warning-red: #D62828;
   --text-gray: #666666;
   --placeholder-gray: #999999;
+  /* Wysokość globalnego paska środowiska (AppTopBanner). Pojedyncze źródło prawdy:
+     layouty pełnoekranowe liczą calc(100dvh - var(--app-banner-h)), zamiast hardcodować 24px.
+     0 gdy paska nie ma (np. produkcja bez paska). Ustawiane przez data-app-banner na <body>. */
+  --app-banner-h: 0px;
+}
+
+/* Pasek widoczny (wersja deweloperska) → rezerwuje 24px (= h-6 AppTopBanner). */
+body[data-app-banner='dev'] {
+  --app-banner-h: 24px;
+}
+
+/* === Dostosowanie „pełnej wysokości ekranu" do paska środowiska ===
+   Pasek OBNIŻA layout (rezerwuje miejsce na górze), a NIE zasłania go. Każdy widok używający
+   pełnej wysokości (min-h-screen / h-screen) dopasowuje się sam: wysokość = viewport MINUS pasek.
+   Bez paska var=0px → pełne 100vh (zero zmian, prod). Reguły BEZ @layer wygrywają z Tailwind
+   @layer utilities w kaskadzie — bez `!important` (zakaz !important w projekcie). */
+.min-h-screen {
+  min-height: calc(100vh - var(--app-banner-h, 0px));
+}
+.h-screen {
+  height: calc(100vh - var(--app-banner-h, 0px));
 }
 
 @theme inline {

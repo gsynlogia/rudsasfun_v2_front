@@ -3,15 +3,15 @@
 import Link from 'next/link';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import SectionGuard from '@/components/admin/SectionGuard';
 
 export default function DietsPage() {
   return (
     <SectionGuard section="diets">
       <AdminLayout>
+        <AdminPageHeader title="Diety" />
         <div className="p-6">
-          <h1 className="text-2xl font-bold mb-6">Zarządzanie dietami</h1>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Link
               href="/admin-panel/diets/general"

@@ -4,14 +4,15 @@ import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import SectionGuard from '@/components/admin/SectionGuard';
 
 export default function PromotionsPage() {
   return (
     <SectionGuard section="promotions">
       <AdminLayout>
+        <AdminPageHeader title="Promocje" />
         <div className="p-6">
-          <h1 className="text-2xl font-bold mb-6">Zarządzanie promocjami</h1>
 
           {/* Nowy system — wyróżniony */}
           <Link

@@ -15,6 +15,7 @@ import {
   isRecentReminder,
 } from '@/lib/utils/computeReminderRowColor';
 
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AlreadySignedInfoModal from './AlreadySignedInfoModal';
 import BulkRemindModal from './BulkRemindModal';
 import RecentlyRemindedInfoModal from './RecentlyRemindedInfoModal';
@@ -751,133 +752,160 @@ export default function DocumentsOverviewTable({
 
   const thBase = 'px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wide';
 
+  // Rozkaz Pana 2026-06-30: akcje naglowka (przyciski/checkboxy po prawej) wyciagniete do zmiennej,
+  // zeby uzyc ich jako children GRANATOWEJ belki (AdminPageHeader) w mode='active' oraz w bialym
+  // naglowku modala "Skuteczne powiadomienia" (mode='effective'). Logika/onClick/style BEZ zmian (1:1).
+  const headerActions = (
+    <>
+      {loading && rows.length > 0 && (
+        <RefreshCw className="w-4 h-4 animate-spin text-[#03adf0]" />
+      )}
+      {/* Cz. 5 Krok 4b (2026-05-31): mocno widoczny pomaranczowy przycisk gdy aktywne filtry */}
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={clearAllFilters}
+          className="inline-flex items-center px-3 py-1.5 text-sm font-semibold border-2 border-orange-500 bg-orange-100 text-orange-800 hover:bg-orange-200 cursor-pointer transition-colors"
+          title={`Usun wszystkie ustawione filtry (${activeFilterKeys.length})`}
+        >
+          <FilterX className="w-4 h-4 mr-1.5" />
+          Usuń ustawione filtry ({activeFilterKeys.length})
+        </button>
+      )}
+      {/* Cz. 6 Krok 6C (2026-05-31): bulk action buttons — wyswietlane gdy zaznaczono >=1 rezerwacje (tylko mode='active') */}
+      {mode === 'active' && selectedIds.size > 0 && (
+        <>
+          <span className="text-sm font-medium text-gray-200 pr-1 border-r border-gray-500 mr-1">
+            Akcja dla {selectedIds.size}:
+          </span>
+          <button
+            type="button"
+            onClick={() => setBulkChannel('email')}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+            title={`Wyslij Email do ${selectedIds.size} zaznaczonych`}
+          >
+            <Mail className="w-4 h-4 mr-1.5" />
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => setBulkChannel('sms')}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+            title={`Wyslij SMS do ${selectedIds.size} zaznaczonych`}
+          >
+            <MessageSquare className="w-4 h-4 mr-1.5" />
+            SMS
+          </button>
+          <button
+            type="button"
+            onClick={() => setBulkChannel('both')}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium border bg-slate-700 border-slate-700 text-white hover:bg-slate-800 cursor-pointer transition-colors"
+            title={`Wyslij Email + SMS do ${selectedIds.size} zaznaczonych`}
+          >
+            <Send className="w-4 h-4 mr-1.5" />
+            Email + SMS
+          </button>
+        </>
+      )}
+      {/* ======================================================================== */}
+      {/* === FRAGMENT "UKRYJ NAJNOWSZE PRZYPOMNIENIA" — CHECKBOX (do mod.) === */}
+      {/* User explicit Cz. 7 v2 (2026-05-31): rename "powiadomienia" → "przypomnienia" */}
+      {/* + nowy checkbox "Odblokuj zablokowane przypomnienia" obok (logika 3 dni Warsaw) */}
+      {/* ======================================================================== */}
+      {mode === 'active' && (
+        <label
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+          title="Ukryj rezerwacje gdzie w ostatnich 3 dniach (dzis/wczoraj/przedwczoraj) wyslano Email / SMS / Email+SMS (failed nie liczy)."
+        >
+          <input
+            type="checkbox"
+            checked={hideRecentReminders}
+            onChange={toggleHideRecent}
+            className="w-4 h-4 cursor-pointer accent-orange-600"
+          />
+          Ukryj najnowsze przypomnienia
+        </label>
+      )}
+      {mode === 'active' && (
+        <label
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+          title="Odblokuj mozliwosc wyslania reminderu mimo niedawnego (≤2 dni). Bez tego przyciski przy 'swiezo przypomnianych' sa zablokowane, a bulk pomija je."
+        >
+          <input
+            type="checkbox"
+            checked={allowRecentReminders}
+            onChange={toggleAllowRecent}
+            className="w-4 h-4 cursor-pointer accent-orange-600"
+          />
+          Odblokuj zablokowane przypomnienia
+        </label>
+      )}
+      {mode === 'active' && (
+        <label
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+          title="Ukryj rezerwacje, gdzie OBA dokumenty sa juz w pelni podpisane/zatwierdzone (domyslnie pokazujemy wszystkie)."
+        >
+          <input
+            type="checkbox"
+            checked={hideApproved}
+            onChange={toggleHideApproved}
+            className="w-4 h-4 cursor-pointer accent-orange-600"
+          />
+          Ukryj zatwierdzone
+        </label>
+      )}
+      {mode === 'active' && (
+        <button
+          type="button"
+          onClick={openEffectiveModal}
+          className="inline-flex items-center px-3 py-1.5 text-sm font-medium border bg-green-50 border-green-300 text-green-800 hover:bg-green-100 cursor-pointer transition-colors"
+          title="Pokaz rezerwacje gdzie OBA dokumenty zostaly podpisane SMS-em"
+        >
+          <CheckCircle2 className="w-4 h-4 mr-1.5" />
+          Skuteczne powiadomienia
+        </button>
+      )}
+    </>
+  );
+
   return (
     // Cz. 4 (2026-05-29): sticky header tabeli + sticky paginacja na dole.
     // `absolute inset-0` żeby zająć cały `<main>` (który w AdminLayout ma overflow-auto) —
     // wewnątrz mamy własny scroll container TYLKO dla tbody, header tabeli i pagination zostają na miejscu.
     <div className={mode === 'effective' ? 'flex flex-col bg-white h-full' : 'absolute inset-0 flex flex-col bg-white'}>
+      {/* Rozkaz Pana 2026-06-30: wspolna GRANATOWA belka (AdminPageHeader) na gorze widoku
+          panelu admina — w stylu Rezerwacji/Szczegolow rezerwacji. Belka tylko dla glownego
+          widoku (mode='active'); w modalu "Skuteczne powiadomienia" (mode='effective') zostaje
+          dotychczasowy bialy naglowek, bo sticky granatowa belka nie pasuje do tresci modala.
+          Akcje (przyciski/checkboxy po prawej) przeniesione do children belki 1:1 (bez zmiany logiki). */}
+      {mode === 'active' && (
+        <AdminPageHeader title="Dokumenty">
+          {headerActions}
+        </AdminPageHeader>
+      )}
+      {mode === 'effective' && (
       <div className="flex-shrink-0 px-4 py-3 border-b bg-white flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold text-gray-900">
-            {mode === 'effective' ? 'Skuteczne powiadomienia' : 'Dokumenty'}
+            Skuteczne powiadomienia
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {mode === 'effective'
-              ? 'Rezerwacje gdzie OBA dokumenty (umowa + karta) zostaly podpisane SMS-em. Po przypomnieniu = klient zareagowal na reminder. Klient sam = podpisal bez przypomnienia.'
-              : 'Lista rezerwacji ze statusami umowy i karty kwalifikacyjnej. Filtry przy każdej kolumnie (▼). Rezerwacje gdzie OBA dokumenty zostaly podpisane SMS-em znajdziesz w "Skuteczne powiadomienia".'}
+            Rezerwacje gdzie OBA dokumenty (umowa + karta) zostaly podpisane SMS-em. Po przypomnieniu = klient zareagowal na reminder. Klient sam = podpisal bez przypomnienia.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {loading && rows.length > 0 && (
-            <RefreshCw className="w-4 h-4 animate-spin text-[#03adf0]" />
-          )}
-          {/* Cz. 5 Krok 4b (2026-05-31): mocno widoczny pomaranczowy przycisk gdy aktywne filtry */}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className="inline-flex items-center px-3 py-1.5 text-sm font-semibold border-2 border-orange-500 bg-orange-100 text-orange-800 hover:bg-orange-200 cursor-pointer transition-colors"
-              title={`Usun wszystkie ustawione filtry (${activeFilterKeys.length})`}
-            >
-              <FilterX className="w-4 h-4 mr-1.5" />
-              Usuń ustawione filtry ({activeFilterKeys.length})
-            </button>
-          )}
-          {/* Cz. 6 Krok 6C (2026-05-31): bulk action buttons — wyswietlane gdy zaznaczono >=1 rezerwacje (tylko mode='active') */}
-          {mode === 'active' && selectedIds.size > 0 && (
-            <>
-              <span className="text-sm font-medium text-gray-700 pr-1 border-r border-gray-300 mr-1">
-                Akcja dla {selectedIds.size}:
-              </span>
-              <button
-                type="button"
-                onClick={() => setBulkChannel('email')}
-                className="inline-flex items-center px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-                title={`Wyslij Email do ${selectedIds.size} zaznaczonych`}
-              >
-                <Mail className="w-4 h-4 mr-1.5" />
-                Email
-              </button>
-              <button
-                type="button"
-                onClick={() => setBulkChannel('sms')}
-                className="inline-flex items-center px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-                title={`Wyslij SMS do ${selectedIds.size} zaznaczonych`}
-              >
-                <MessageSquare className="w-4 h-4 mr-1.5" />
-                SMS
-              </button>
-              <button
-                type="button"
-                onClick={() => setBulkChannel('both')}
-                className="inline-flex items-center px-3 py-1.5 text-sm font-medium border bg-slate-700 border-slate-700 text-white hover:bg-slate-800 cursor-pointer transition-colors"
-                title={`Wyslij Email + SMS do ${selectedIds.size} zaznaczonych`}
-              >
-                <Send className="w-4 h-4 mr-1.5" />
-                Email + SMS
-              </button>
-            </>
-          )}
-          {/* ======================================================================== */}
-          {/* === FRAGMENT "UKRYJ NAJNOWSZE PRZYPOMNIENIA" — CHECKBOX (do mod.) === */}
-          {/* User explicit Cz. 7 v2 (2026-05-31): rename "powiadomienia" → "przypomnienia" */}
-          {/* + nowy checkbox "Odblokuj zablokowane przypomnienia" obok (logika 3 dni Warsaw) */}
-          {/* ======================================================================== */}
-          {mode === 'active' && (
-            <label
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-              title="Ukryj rezerwacje gdzie w ostatnich 3 dniach (dzis/wczoraj/przedwczoraj) wyslano Email / SMS / Email+SMS (failed nie liczy)."
-            >
-              <input
-                type="checkbox"
-                checked={hideRecentReminders}
-                onChange={toggleHideRecent}
-                className="w-4 h-4 cursor-pointer accent-orange-600"
-              />
-              Ukryj najnowsze przypomnienia
-            </label>
-          )}
-          {mode === 'active' && (
-            <label
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-              title="Odblokuj mozliwosc wyslania reminderu mimo niedawnego (≤2 dni). Bez tego przyciski przy 'swiezo przypomnianych' sa zablokowane, a bulk pomija je."
-            >
-              <input
-                type="checkbox"
-                checked={allowRecentReminders}
-                onChange={toggleAllowRecent}
-                className="w-4 h-4 cursor-pointer accent-orange-600"
-              />
-              Odblokuj zablokowane przypomnienia
-            </label>
-          )}
-          {mode === 'active' && (
-            <label
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
-              title="Ukryj rezerwacje, gdzie OBA dokumenty sa juz w pelni podpisane/zatwierdzone (domyslnie pokazujemy wszystkie)."
-            >
-              <input
-                type="checkbox"
-                checked={hideApproved}
-                onChange={toggleHideApproved}
-                className="w-4 h-4 cursor-pointer accent-orange-600"
-              />
-              Ukryj zatwierdzone
-            </label>
-          )}
-          {mode === 'active' && (
-            <button
-              type="button"
-              onClick={openEffectiveModal}
-              className="inline-flex items-center px-3 py-1.5 text-sm font-medium border bg-green-50 border-green-300 text-green-800 hover:bg-green-100 cursor-pointer transition-colors"
-              title="Pokaz rezerwacje gdzie OBA dokumenty zostaly podpisane SMS-em"
-            >
-              <CheckCircle2 className="w-4 h-4 mr-1.5" />
-              Skuteczne powiadomienia
-            </button>
-          )}
+          {headerActions}
         </div>
       </div>
+      )}
+      {/* Opis widoku glownego — slim bialy pasek pod granatowa belka (mode='active'). */}
+      {mode === 'active' && (
+        <div className="flex-shrink-0 px-4 py-2 border-b bg-white">
+          <p className="text-sm text-gray-500">
+            Lista rezerwacji ze statusami umowy i karty kwalifikacyjnej. Filtry przy każdej kolumnie (▼). Rezerwacje gdzie OBA dokumenty zostaly podpisane SMS-em znajdziesz w &quot;Skuteczne powiadomienia&quot;.
+          </p>
+        </div>
+      )}
 
       {/* Cz. 7 fix (2026-05-31): banner zaznaczenia — uproszczony.
           Master checkbox JUZ zaznacza wszystko 1 klikiem (bez 2-stopniowego flow). Banner pokazuje

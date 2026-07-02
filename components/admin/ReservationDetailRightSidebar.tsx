@@ -63,8 +63,9 @@ function setStoredTab(tab: ReservationRightTabId) {
 }
 
 /**
- * Prawy pasek na stronie szczegółów rezerwacji – przyklejony na stałe (jak lewy sidebar),
- * pełna wysokość okna. Zakładki: Notatki wewnętrzne | Zdarzenia klienta | Wersje dokumentów z bazy.
+ * Prawy panel na stronie szczegółów rezerwacji – kolumna in-flow w wierszu szczegółów (RWD):
+ * obok karty treści na desktopie (≥ xl), pod spodem na węższych ekranach/mobile.
+ * Zakładki: Notatki wewnętrzne | Zdarzenia klienta | Wersje dokumentów z bazy.
  * Aktywna zakładka zapisywana w localStorage (admin_reservation_right_tab).
  */
 export function ReservationDetailRightSidebar({
@@ -104,8 +105,9 @@ export function ReservationDetailRightSidebar({
     <aside
       role="complementary"
       aria-label="Notatki, zdarzenia i wersje dokumentów rezerwacji"
-      className="fixed top-0 right-0 z-40 flex flex-col h-screen bg-[#1d283d] border-l border-white/10 shadow-xl"
-      style={{ width: RIGHT_SIDEBAR_WIDTH }}
+      // In-flow (RWD): kolumna w wierszu szczegółów — obok karty na desktopie (≥ xl, 320px),
+      // pod spodem (pełna szerokość) na węższych ekranach/mobile. Ramka spójna z kartą treści.
+      className="flex flex-col bg-[#1d283d] border border-gray-200 shadow-sm overflow-hidden w-full xl:w-80 xl:flex-shrink-0 xl:h-full min-h-[22rem] xl:min-h-0"
     >
       {/* Pasek zakładek – ikony Lucide */}
       <div className="flex items-stretch border-b border-white/20 flex-shrink-0">

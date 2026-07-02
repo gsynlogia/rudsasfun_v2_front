@@ -9,6 +9,7 @@ import {
   Heart,
   FileCheck,
   Utensils,
+  KeyRound,
 } from 'lucide-react';
 
 export const RESERVATION_PANELS = [
@@ -19,6 +20,7 @@ export const RESERVATION_PANELS = [
   { id: 'zdrowie', label: 'Zdrowie', icon: Heart },
   { id: 'informacje', label: 'Informacje i wniosek', icon: FileCheck },
   { id: 'inne', label: 'Dodatki, diety, faktura, źródło', icon: Utensils },
+  { id: 'upowaznienia', label: 'Upoważnienia', icon: KeyRound },
 ] as const;
 
 export type PanelId = (typeof RESERVATION_PANELS)[number]['id'];
