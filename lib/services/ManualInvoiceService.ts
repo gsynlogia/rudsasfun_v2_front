@@ -32,19 +32,21 @@ export interface ManualInvoiceResponse {
 export interface ManualInvoiceCreate {
   reservation_id: number;
   user_id: number;
-  invoice_number: string;
+  // Pola faktury OPCJONALNE (życzenie Joanny) — backend uzupełnia defaulty gdy puste
+  // (auto-numer RCZ-{rez}-{seq}, kwoty 0, daty teraz, nabywca z rezerwacji).
+  invoice_number?: string;
   invoice_pdf_path?: string | null;
-  total_amount: number;
-  net_amount: number;
-  tax_amount: number;
+  total_amount?: number;
+  net_amount?: number;
+  tax_amount?: number;
   is_paid?: boolean;
   paid_at?: string | null;
   is_canceled?: boolean;
   canceled_at?: string | null;
-  issue_date: string;
-  sell_date: string;
-  payment_to: string;
-  buyer_name: string;
+  issue_date?: string;
+  sell_date?: string;
+  payment_to?: string;
+  buyer_name?: string;
   buyer_tax_no?: string | null;
   buyer_email?: string | null;
   notes?: string | null;

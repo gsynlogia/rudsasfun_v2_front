@@ -45,6 +45,8 @@ interface ReservationDetails {
   created_at?: string | null;
   updated_at?: string | null;
   user_id?: number;
+  // Ręczna flaga „Wystawiono fakturę" (checkbox Joanny) — niezależna od istnienia faktury w systemie.
+  invoice_issued_manual?: boolean;
 }
 
 interface Addon {
@@ -95,6 +97,7 @@ export default function ReservationPaymentsPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [specialPriceDraft, setSpecialPriceDraft] = useState<string>('');
   const [savingSpecialPrice, setSavingSpecialPrice] = useState(false);
+  const [savingInvoiceIssued, setSavingInvoiceIssued] = useState(false);
 
   // Search states
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
@@ -812,10 +815,42 @@ export default function ReservationPaymentsPage() {
             {/* Faktury - w drugim wierszu */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-semibold text-gray-900">Faktury</h2>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <h2 className="text-base font-semibold text-gray-900">Faktury</h2>
+                  {/* Checkbox Joanny „Wystawiono fakturę" — niezależne oznaczenie że faktura wystawiona
+                      (np. poza systemem). Zsynchronizowane z kolumną „Wystawiona faktura" na liście płatności.
+                      Zaznaczony → blokuje dodawanie/edycję faktury w systemie (odznacz, aby wprowadzić pełną fakturę). */}
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!reservation.invoice_issued_manual}
+                      disabled={savingInvoiceIssued}
+                      onChange={async (e) => {
+                        const issued = e.target.checked;
+                        setSavingInvoiceIssued(true);
+                        try {
+                          const updated = await authenticatedApiCall<ReservationDetails>(
+                            `/api/reservations/by-number/${reservationNumber}/admin/invoice-issued`,
+                            { method: 'PATCH', body: JSON.stringify({ issued }) },
+                          );
+                          setReservation(updated);
+                          showSuccess(issued ? 'Oznaczono jako wystawioną fakturę' : 'Odznaczono wystawienie faktury');
+                        } catch {
+                          showError('Nie udało się zapisać oznaczenia faktury.');
+                        } finally {
+                          setSavingInvoiceIssued(false);
+                        }
+                      }}
+                      className="w-4 h-4 accent-[#03adf0] cursor-pointer disabled:opacity-50"
+                    />
+                    Wystawiono fakturę
+                  </label>
+                </div>
                 <button
                   onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/faktura/nowa`)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200 text-sm"
+                  disabled={!!reservation.invoice_issued_manual}
+                  title={reservation.invoice_issued_manual ? 'Odznacz pole „Wystawiono fakturę”, aby dodać fakturę w systemie' : undefined}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ borderRadius: 0 }}
                 >
                   <PlusIcon className="w-4 h-4" />
@@ -863,8 +898,13 @@ export default function ReservationPaymentsPage() {
                         return (
                           <tr
                             key={`${invoice.type}-${invoice.id}`}
-                            onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/faktura/${invoice.id}`)}
-                            className="hover:bg-gray-50 cursor-pointer transition-colors"
+                            onClick={() => {
+                              // Gdy faktura oznaczona ręcznie jako wystawiona — edycja zablokowana (odznacz checkbox).
+                              if (reservation.invoice_issued_manual) return;
+                              router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/faktura/${invoice.id}`);
+                            }}
+                            title={reservation.invoice_issued_manual ? 'Odznacz pole „Wystawiono fakturę”, aby edytować fakturę' : undefined}
+                            className={`hover:bg-gray-50 transition-colors ${reservation.invoice_issued_manual ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                           >
                             <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{invoice.invoice_number}</td>
                             <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">{formatDate(invoice.issue_date)}</td>

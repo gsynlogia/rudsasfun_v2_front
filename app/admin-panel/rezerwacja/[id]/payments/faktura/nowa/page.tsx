@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import SectionGuard from '@/components/admin/SectionGuard';
 import { useToast } from '@/components/ToastContainer';
-import { manualInvoiceService } from '@/lib/services/ManualInvoiceService';
+import { manualInvoiceService, ManualInvoiceCreate } from '@/lib/services/ManualInvoiceService';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
@@ -118,45 +118,35 @@ export default function NewInvoicePage() {
     const netNum = parseFloat(netAmount);
     const taxNum = parseFloat(taxAmount);
 
-    if (isNaN(totalNum) || totalNum <= 0) {
-      showError('Kwota całkowita musi być większa od 0');
-      return;
-    }
-
-    if (!invoiceNumber.trim()) {
-      showError('Numer faktury jest wymagany');
-      return;
-    }
-
-    if (!buyerName.trim()) {
-      showError('Nazwa nabywcy jest wymagana');
-      return;
-    }
-
-    if (!issueDate || !sellDate || !paymentTo) {
-      showError('Wszystkie daty są wymagane');
+    // Pola faktury są OPCJONALNE (życzenie Joanny) — Joanna może uzupełnić dane później
+    // (np. datę sprzedaży/płatności po sezonie). Walidujemy tylko poprawność podanych wartości;
+    // wysyłamy WYŁĄCZNIE wypełnione pola, backend uzupełnia sensowne defaulty.
+    if (totalAmount.trim() !== '' && (isNaN(totalNum) || totalNum < 0)) {
+      showError('Kwota całkowita nie może być ujemna');
       return;
     }
 
     setIsSaving(true);
     try {
-      await manualInvoiceService.create({
+      const payload: ManualInvoiceCreate = {
         reservation_id: reservation.id,
         user_id: reservation.user_id || 0,
-        invoice_number: invoiceNumber.trim(),
-        total_amount: totalNum,
-        net_amount: netNum,
-        tax_amount: taxNum,
-        issue_date: new Date(issueDate).toISOString(),
-        sell_date: new Date(sellDate).toISOString(),
-        payment_to: new Date(paymentTo).toISOString(),
-        buyer_name: buyerName.trim(),
-        buyer_tax_no: buyerTaxNo.trim() || null,
-        buyer_email: buyerEmail.trim() || null,
-        notes: notes.trim() || null,
         is_paid: false,
         is_canceled: false,
-      });
+      };
+      if (invoiceNumber.trim()) payload.invoice_number = invoiceNumber.trim();
+      if (totalAmount.trim() !== '' && !isNaN(totalNum)) payload.total_amount = totalNum;
+      if (netAmount.trim() !== '' && !isNaN(netNum)) payload.net_amount = netNum;
+      if (taxAmount.trim() !== '' && !isNaN(taxNum)) payload.tax_amount = taxNum;
+      if (issueDate) payload.issue_date = new Date(issueDate).toISOString();
+      if (sellDate) payload.sell_date = new Date(sellDate).toISOString();
+      if (paymentTo) payload.payment_to = new Date(paymentTo).toISOString();
+      if (buyerName.trim()) payload.buyer_name = buyerName.trim();
+      if (buyerTaxNo.trim()) payload.buyer_tax_no = buyerTaxNo.trim();
+      if (buyerEmail.trim()) payload.buyer_email = buyerEmail.trim();
+      if (notes.trim()) payload.notes = notes.trim();
+
+      await manualInvoiceService.create(payload);
 
       showSuccess('Faktura została dodana pomyślnie');
       router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments`);
@@ -222,7 +212,6 @@ export default function NewInvoicePage() {
                   id="invoiceNumber"
                   value={invoiceNumber}
                   onChange={(e) => setInvoiceNumber(e.target.value)}
-                  required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                   style={{ borderRadius: 0 }}
                   placeholder="FV/2025/001"
@@ -241,7 +230,6 @@ export default function NewInvoicePage() {
                     min="0.01"
                     value={totalAmount}
                     onChange={(e) => handleAmountChange(e.target.value, 'total')}
-                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                     style={{ borderRadius: 0 }}
                     placeholder="0.00"
@@ -291,7 +279,6 @@ export default function NewInvoicePage() {
                     id="issueDate"
                     value={issueDate}
                     onChange={(e) => setIssueDate(e.target.value)}
-                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                     style={{ borderRadius: 0 }}
                   />
@@ -305,7 +292,6 @@ export default function NewInvoicePage() {
                     id="sellDate"
                     value={sellDate}
                     onChange={(e) => setSellDate(e.target.value)}
-                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                     style={{ borderRadius: 0 }}
                   />
@@ -319,7 +305,6 @@ export default function NewInvoicePage() {
                     id="paymentTo"
                     value={paymentTo}
                     onChange={(e) => setPaymentTo(e.target.value)}
-                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                     style={{ borderRadius: 0 }}
                   />
@@ -335,7 +320,6 @@ export default function NewInvoicePage() {
                   id="buyerName"
                   value={buyerName}
                   onChange={(e) => setBuyerName(e.target.value)}
-                  required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
                   style={{ borderRadius: 0 }}
                   placeholder="Imię i nazwisko lub nazwa firmy"
