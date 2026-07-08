@@ -692,11 +692,17 @@ export default function AdditionalServicesTiles({
                 <div className="flex items-start">
                   <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
                   <div>
-                    <h4 className="text-sm font-semibold text-blue-900 mb-2">
-                      Kieszonkowe dla dziecka
-                    </h4>
                     <p className="text-sm text-blue-800">
-                      Funkcja będzie aktywna podczas trwania turnusu
+                      Sekcja niedostępna w Panelu Klienta. Prosimy skontaktować się z kierownikiem wypoczynku (numer telefonu dostępny na stronie internetowej{' '}
+                      <a
+                        href="https://radsas-fun.pl/kontakt-do-kierownikow-na-obozach-letnich/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold underline hover:text-blue-900"
+                      >
+                        Kontakt do kierowników na obozach letnich
+                      </a>
+                      ).
                     </p>
                   </div>
                 </div>

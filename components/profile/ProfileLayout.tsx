@@ -9,7 +9,7 @@ import Footer from '../Footer';
 import ClientHeartbeat from './ClientHeartbeat';
 import HeaderTop from '../HeaderTop';
 
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info } from 'lucide-react';
 
 import ProfileSidebar from './ProfileSidebar';
 
@@ -40,6 +40,27 @@ function SystemAlertBanner() {
             </p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * InvoiceInfoBanner
+ * Stały (nierozwijany) żółty komunikat informacyjny o terminie wystawiania faktur.
+ * Wyświetlany dokładnie pod SystemAlertBanner na każdym widoku panelu klienta.
+ * Treść statyczna — na życzenie klienta Radsas (2026-07-09).
+ */
+function InvoiceInfoBanner() {
+  return (
+    <div className="mb-4 sm:mb-6">
+      <div className="bg-yellow-50 border border-yellow-300 p-3 sm:p-4 rounded-xl">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-yellow-800 font-medium flex-1">
+            Faktury wystawiamy w ciągu 14 dni od daty zakończenia się obozu/kolonii i wysyłamy na adres mailowy podany podczas rezerwacji.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -178,6 +199,8 @@ export default function ProfileLayout({ children }: ProfileLayoutProps) {
           <div className="flex-1 w-full lg:pl-6">
             {/* System Update Alert — zwijany */}
             <SystemAlertBanner />
+            {/* Komunikat o fakturach — żółty, stały (pod niebieskim alertem) */}
+            <InvoiceInfoBanner />
             {children}
           </div>
         </div>
