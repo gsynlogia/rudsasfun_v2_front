@@ -26,6 +26,7 @@ import { reservationService, ReservationResponse } from '@/lib/services/Reservat
 import { buildPromoCodeCostRow, PromotionV2Snapshot as PromotionV2SnapshotData } from '@/lib/buildPromoCodeCostRow';
 import { buildPromotionV2CostRow } from '@/lib/buildPromotionV2CostRow';
 import { computeReservationStatusLabel } from '@/lib/utils/computeReservationStatusLabel';
+import { describeInvoiceDeclaration } from '@/lib/utils/invoiceDeclaration';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
 import DashedLine from '../DashedLine';
@@ -853,6 +854,10 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   // Get source name (prefer source_name, fallback to selected_source)
   const source = reservation.source_name || reservation.selected_source || 'Brak danych';
 
+  // Deklaracja faktury złożona przy rezerwacji — te same dane, które widzi admin
+  // (wspólny endpoint /by-number). Klient ma tylko podgląd; edycja wyłącznie przez biuro.
+  const invoiceDeclaration = describeInvoiceDeclaration(reservation);
+
   const [unsignedAlertExpanded, setUnsignedAlertExpanded] = useState(false);
 
   // Get accommodation
@@ -1183,6 +1188,31 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                 </>
               )}
             </div>
+          </div>
+
+          <DashedLine />
+
+          {/* Faktura — deklaracja złożona przy rezerwacji (podgląd; zmiany tylko przez biuro) */}
+          <div>
+            <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1 sm:mb-2">Faktura</h5>
+            {!invoiceDeclaration.wants ? (
+              <div className="text-xs sm:text-sm text-gray-700">Nie</div>
+            ) : (
+              <div className="text-xs sm:text-sm text-gray-700 space-y-1">
+                <div>Tak — dane do faktury:</div>
+                {invoiceDeclaration.lines.length > 0 ? (
+                  <div className="text-gray-900">
+                    {invoiceDeclaration.lines.map((line) => (
+                      <div key={line}>{line}</div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-gray-500">
+                    Brak danych do faktury — prosimy o kontakt z biurem w celu ich uzupełnienia.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <DashedLine />

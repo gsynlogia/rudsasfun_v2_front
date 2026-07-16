@@ -32,4 +32,34 @@ describe('AppTopBanner — pasek środowiska', () => {
     expect(el).toHaveClass('bg-slate-800');
     expect(el).not.toHaveClass('bg-red-600');
   });
+
+  describe('linki do testowych skrzynek (SMS + e-mail)', () => {
+    const links = {
+      smsUrl: 'https://phone.radsas.syn.test',
+      emailUrl: 'https://email.radsas.syn.test',
+    };
+
+    it('renderuje SMS i e-mail w nawiasie, każdy do NOWEJ karty', () => {
+      render(<AppTopBanner message="Wersja developerska — dane testowe" sandboxLinks={links} />);
+
+      const sms = screen.getByRole('link', { name: 'SMS' });
+      expect(sms).toHaveAttribute('href', links.smsUrl);
+      expect(sms).toHaveAttribute('target', '_blank');
+      expect(sms).toHaveAttribute('rel', expect.stringContaining('noopener'));
+
+      const email = screen.getByRole('link', { name: 'e-mail' });
+      expect(email).toHaveAttribute('href', links.emailUrl);
+      expect(email).toHaveAttribute('target', '_blank');
+      expect(email).toHaveAttribute('rel', expect.stringContaining('noopener'));
+
+      // nawias wokół linków
+      expect(screen.getByRole('status')).toHaveTextContent(/\(\s*SMS\s*,\s*e-mail\s*\)/);
+    });
+
+    it('bez sandboxLinks → pasek nadal ostrzega, ale BEZ linków (prod/nieznany host)', () => {
+      render(<AppTopBanner message="Wersja developerska — dane testowe" />);
+      expect(screen.getByText(/Wersja developerska/i)).toBeInTheDocument();
+      expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+  });
 });

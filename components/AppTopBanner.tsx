@@ -13,6 +13,8 @@
  * (patrz globals.css + data-app-banner na <body>), żeby ŻADEN widok nie hardcodował 24px —
  * layouty pełnoekranowe liczą `calc(100dvh - var(--app-banner-h))`.
  */
+import type { SandboxLinks } from '@/lib/utils/devSandboxLinks';
+
 export type AppTopBannerVariant = 'dev' | 'prod' | 'info' | 'warning';
 
 const VARIANT_CLASSES: Record<AppTopBannerVariant, string> = {
@@ -27,18 +29,43 @@ interface AppTopBannerProps {
   message: string;
   /** Wariant kolorystyczny — domyślnie 'dev' (czerwony). */
   variant?: AppTopBannerVariant;
+  /**
+   * Adresy atrap skrzynek (SMS + e-mail) dla BIEŻĄCEGO środowiska.
+   * `undefined`/`null` → pasek bez linków (produkcja, nieznany host). Patrz lib/utils/devSandboxLinks.
+   */
+  sandboxLinks?: SandboxLinks | null;
 }
 
-export default function AppTopBanner({ message, variant = 'dev' }: AppTopBannerProps) {
+/** Podkreślony odnośnik na pasku — otwiera atrapę skrzynki w nowej karcie. */
+function BannerLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline underline-offset-2 hover:no-underline focus:outline-none focus-visible:ring-1 focus-visible:ring-white/80 rounded-sm"
+    >
+      {label}
+    </a>
+  );
+}
+
+export default function AppTopBanner({ message, variant = 'dev', sandboxLinks }: AppTopBannerProps) {
   return (
     <div
       role="status"
       aria-live="polite"
       // h-6 = 24px = wartość zmiennej --app-banner-h (globals.css). sticky top-0 → zawsze na górze.
       // z-[100] nad chrome widoków (sidebar z-50, modale z-50) — pasek środowiska zawsze na wierzchu.
-      className={`sticky top-0 z-[100] w-full h-6 flex items-center justify-center text-center text-xs font-medium leading-none ${VARIANT_CLASSES[variant]}`}
+      className={`sticky top-0 z-[100] w-full h-6 flex items-center justify-center gap-1 text-center text-xs font-medium leading-none ${VARIANT_CLASSES[variant]}`}
     >
-      {message}
+      <span>{message}</span>
+      {sandboxLinks && (
+        <span>
+          (<BannerLink href={sandboxLinks.smsUrl} label="SMS" />,{' '}
+          <BannerLink href={sandboxLinks.emailUrl} label="e-mail" />)
+        </span>
+      )}
     </div>
   );
 }

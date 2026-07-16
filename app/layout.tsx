@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { headers } from 'next/headers';
 
 import AppTopBanner from '@/components/AppTopBanner';
+import { resolveSandboxLinks } from '@/lib/utils/devSandboxLinks';
 import MaintenancePage from '@/components/MaintenancePage';
 import TestBanner from '@/components/TestBanner';
 import { ToastProvider } from '@/components/ToastContainer';
@@ -53,6 +54,9 @@ export default async function RootLayout({
   // DevBanner — widoczny na każdym nie-prod hoście (dev synlogia.dev, localhost).
   // Hostname-based (runtime, SSR), bo NEXT_PUBLIC_* env są zapiekane do bundla build-time.
   const isDev = !isProdHost(host);
+  // Linki do atrap skrzynek (SMS/e-mail) — inne lokalnie, inne na DEV (osobne maszyny i bazy).
+  // Na produkcji i nieznanym hoście → null, czyli pasek bez linków.
+  const sandboxLinks = resolveSandboxLinks(host);
 
   return (
     <html lang="en">
@@ -102,7 +106,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             <ToastProvider>
               {/* Pasek środowiska — element najwyższego poziomu, zawsze na górze przeglądarki,
                   na każdym widoku. Skalowalny (AppTopBanner) — gotowy też pod produkcję. */}
-              {isDev && <AppTopBanner message="Wersja developerska — dane testowe" variant="dev" />}
+              {isDev && (
+                <AppTopBanner
+                  message="Wersja developerska — dane testowe"
+                  variant="dev"
+                  sandboxLinks={sandboxLinks}
+                />
+              )}
               <TestBanner />
               {children}
             </ToastProvider>
