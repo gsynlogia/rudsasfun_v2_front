@@ -17,6 +17,7 @@ import { buildListReturnUrl } from '@/lib/utils/listReturnUrl';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
+import { usePermission } from '@/lib/hooks/usePermission';
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
 
@@ -1373,6 +1374,13 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
   const { detailTarget = 'reservation', tableModule = 'reservations' } = props;
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Dostosowanie kolumn (wybór + reset) to akcja edycji WIDOKU — dostępna tylko dla kont
+  // z prawem zapisu w danej sekcji. Konta tylko-do-odczytu (np. „Kierownik", poziom 10)
+  // NIE widzą przycisków „Kolumny"/„Resetuj" — inaczej mogłyby sobie odsłonić ukryte kolumny
+  // (incydent 2026-07-19: kierownik zresetował kolumny na prod). Wzorzec jak `canSeeNotes`.
+  const permission = usePermission();
+  const canManageColumns = permission.canWrite(tableModule === 'payments' ? 'payments' : 'reservations');
   const pathname = usePathname();
   const { showInfo, showSuccess, showError } = useToast();
   const { openDocument, close: closeRightPanel } = useAdminRightPanel();
@@ -5232,22 +5240,27 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             <span className="hidden xl:inline">{isExporting ? 'Eksport...' : 'Excel'}</span>
           </button>
 
-          <button
-            onClick={handleOpenColumnModal}
-            className="px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-500 transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
-            title="Wybierz kolumny"
-          >
-            <Columns className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">Kolumny</span>
-          </button>
-          <button
-            onClick={() => setResetColumnsModalOpen(true)}
-            className="px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-500 transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
-            title="Resetuj do domyślnych ustawień kolumn"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">Resetuj do domyślnych ustawień</span>
-          </button>
+          {/* Kolumny/Reset — tylko konta z prawem edycji sekcji (read-only ich nie widzi) */}
+          {canManageColumns && (
+            <>
+              <button
+                onClick={handleOpenColumnModal}
+                className="px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-500 transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
+                title="Wybierz kolumny"
+              >
+                <Columns className="w-3.5 h-3.5" />
+                <span className="hidden xl:inline">Kolumny</span>
+              </button>
+              <button
+                onClick={() => setResetColumnsModalOpen(true)}
+                className="px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-500 transition-colors text-sm flex items-center gap-1.5 cursor-pointer"
+                title="Resetuj do domyślnych ustawień kolumn"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden xl:inline">Resetuj do domyślnych ustawień</span>
+              </button>
+            </>
+          )}
 
           {/* Results count - pushed to right */}
           <span className="ml-auto text-xs text-slate-300 whitespace-nowrap">Znaleziono: <strong className="text-white">{serverPagination?.total || 0}</strong> | Na stronie: <strong className="text-white">{itemsPerPage}</strong></span>
