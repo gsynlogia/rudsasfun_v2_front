@@ -19,6 +19,7 @@ import type {
 import {
   listConnections, getConnectionCities, getConnectionParticipants, listTabors, assignParticipant, deleteTabor,
   deleteConnection, setEarlyLeave, getEarlyLeaveStats, getSeasonCities, getSeasonParticipants,
+  getSeasonEarlyLeave,
   getOrphanedAssignments, autoCleanupOrphaned, removeParticipant, reorderTaborParticipants,
 } from '@/lib/services/transportListsApi';
 import {
@@ -69,6 +70,10 @@ export default function TransportListsManagement() {
   const [earlyLeaveTarget, setEarlyLeaveTarget] = useState<number | null>(null);
   const [earlyLeaveNote, setEarlyLeaveNote] = useState('');
   const [earlyLeaveCount, setEarlyLeaveCount] = useState(0);
+  // Trello 344 — worek „Wyjechali przed czasem" (osobna kategoria, aktywny sezon)
+  const [earlyLeaveList, setEarlyLeaveList] = useState<ParticipantRow[]>([]);
+  const [earlyLeaveListOpen, setEarlyLeaveListOpen] = useState(false);
+  const [earlyLeaveListLoading, setEarlyLeaveListLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);  // „Tabela"
@@ -475,11 +480,77 @@ export default function TransportListsManagement() {
         </div>
       )}
 
-      {/* statystyka wyjazdu przed zakończeniem (dyskretna) */}
+      {/* statystyka wyjazdu przed zakończeniem (dyskretna) + worek „Wyjechali przed czasem" */}
       {!loading && (
-        <div className="text-right text-xs text-gray-500" data-testid="early-leave-stat">
-          Wyjazd przed zakończeniem (ogółem):{' '}
-          <span className={`font-semibold ${earlyLeaveCount > 0 ? 'text-red-600' : 'text-gray-700'}`}>{earlyLeaveCount}</span>
+        <div className="text-right text-xs text-gray-500 flex items-center justify-end gap-3" data-testid="early-leave-stat">
+          <span>
+            Wyjazd przed zakończeniem (ogółem):{' '}
+            <span className={`font-semibold ${earlyLeaveCount > 0 ? 'text-red-600' : 'text-gray-700'}`}>{earlyLeaveCount}</span>
+          </span>
+          <button
+            type="button"
+            data-testid="early-leave-worek-btn"
+            onClick={async () => {
+              setEarlyLeaveListOpen(true);
+              setEarlyLeaveListLoading(true);
+              try {
+                setEarlyLeaveList(await getSeasonEarlyLeave());
+              } catch {
+                setEarlyLeaveList([]);
+              } finally {
+                setEarlyLeaveListLoading(false);
+              }
+            }}
+            className="px-2.5 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200 font-medium cursor-pointer"
+          >
+            Wyjechali przed czasem
+          </button>
+        </div>
+      )}
+
+      {earlyLeaveListOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="early-leave-worek-modal">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <h3 className="font-semibold text-slate-800">
+                Wyjechali przed czasem — sezon ({earlyLeaveList.length})
+              </h3>
+              <button type="button" onClick={() => setEarlyLeaveListOpen(false)}
+                className="text-gray-400 hover:text-gray-700 cursor-pointer" data-testid="early-leave-worek-close">✕</button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              <p className="text-xs text-gray-500 mb-3">
+                Osobna kategoria: uczestnicy oznaczeni jako „wyjazd przed zakończeniem" w bieżącym
+                sezonie. Trafiają tu automatycznie po oznaczeniu — nie mieszają się z listami powrotnymi.
+              </p>
+              {earlyLeaveListLoading ? (
+                <div className="text-sm text-gray-500 py-6 text-center">Ładowanie…</div>
+              ) : earlyLeaveList.length === 0 ? (
+                <div className="text-sm text-gray-500 py-6 text-center" data-testid="early-leave-worek-empty">
+                  Brak osób oznaczonych jako „wyjazd przed zakończeniem" w bieżącym sezonie.
+                </div>
+              ) : (
+                <table className="w-full text-sm" data-testid="early-leave-worek-table">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 border-b">
+                      <th className="py-1.5">Uczestnik</th>
+                      <th className="py-1.5">Turnus</th>
+                      <th className="py-1.5">Miasto powrotu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {earlyLeaveList.map((p) => (
+                      <tr key={p.reservation_id} className="border-b last:border-0" data-testid="early-leave-worek-row">
+                        <td className="py-1.5">{[p.last_name, p.first_name].filter(Boolean).join(' ') || '—'}</td>
+                        <td className="py-1.5">{p.tag || '—'}</td>
+                        <td className="py-1.5">{p.city || 'transport własny'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

@@ -88,6 +88,12 @@ export async function getTagsDetailed(): Promise<TagDetail[]> {
   return jsonOrThrow(await authenticatedFetch(`${BASE}/season/tags-detailed`), 'getTagsDetailed');
 }
 
+// Trello 344 — worek „Wyjechali przed czasem" (osobna kategoria, aktywny sezon)
+export async function getSeasonEarlyLeave(): Promise<ParticipantRow[]> {
+  return jsonOrThrow(
+    await authenticatedFetch(`${BASE}/season/early-leave`), 'getSeasonEarlyLeave');
+}
+
 // ---------- DESTYNACJE / TRASY (G02: CRUD kolorów + przypisań miast) ----------
 export async function listRoutes(): Promise<TransportRoute[]> {
   return jsonOrThrow(await authenticatedFetch(`${BASE}/routes`), 'listRoutes');

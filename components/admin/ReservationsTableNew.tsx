@@ -71,6 +71,7 @@ interface FilterOptions {
   hasSkuter: string[];
   hasEnergylandia: string[];
   hasTermy: string[];
+  transportEarlyLeave: string[];
   // Amount filters from backend (all unique values from entire database)
   totalAmount: string[];
   paidAmount: string[];
@@ -149,6 +150,7 @@ interface BackendReservationWithPayments {
   archived_at?: string | null;
   // Excel-only extras (zwracane tylko gdy include_extras=true)
   participant_gender?: string | null; // Trello #349 — płeć uczestnika (surowa, normalizowana w eksporcie)
+  transport_early_leave?: boolean | number | null; // Trello 344 — wyjazd przed zakończeniem
   authorizations_summary?: string | null; // Trello 352 — upoważnienia (tekst identyczny z zakładką), zawsze w response
   accommodation_request?: string | null;
   participant_additional_info?: string | null;
@@ -307,6 +309,7 @@ interface ReservationPayment {
   invoiceIssued?: boolean;
   // Płeć uczestnika znormalizowana (Chłopiec/Dziewczynka) — kolumna "Płeć", ta sama wartość co Excel
   participantGender?: string;
+  transportEarlyLeave?: boolean;
   // Trello 352 — upoważnienia (tekst jak zakładka: osoby + samodzielny powrót + notatka RADSAS)
   authorizationsSummary?: string;
 }
@@ -1207,6 +1210,7 @@ const mapReservationToPaymentFormat = async (
     isArchived: reservation.is_archived || false,
     invoiceIssued: !!reservation.invoice_issued,
     participantGender: normalizeGenderLabel(reservation.participant_gender),
+    transportEarlyLeave: !!reservation.transport_early_leave,
     authorizationsSummary: reservation.authorizations_summary || undefined,
   };
 };
@@ -1827,6 +1831,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     depositAmount: 'Zaliczka',
     invoiceIssued: 'WYSTAWIONĄ FAKTURĘ',
     participantGender: 'Płeć',
+    transportEarlyLeave: 'Wyjechał przed',
     authorizationsSummary: 'Upoważnienia',
   };
 
@@ -1898,6 +1903,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     'contractStatus',
     'invoiceIssued',
     'participantGender',
+    'transportEarlyLeave',
     'authorizationsSummary',
   ];
   const DEFAULT_COLUMNS = DEFAULT_COLUMN_ORDER.map(key => ({ key, visible: true }));
@@ -2363,6 +2369,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           break;
         case 'participantGender':
           value = reservation.participantGender || '';
+          break;
+        case 'transportEarlyLeave':
+          value = reservation.transportEarlyLeave ? 'Tak' : 'Nie';
           break;
         case 'authorizationsSummary':
           value = reservation.authorizationsSummary || '';
@@ -3088,6 +3097,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           participantCity: item.participant_city || '',
           // Trello #349 — płeć znormalizowana do czytelnej etykiety (Chłopiec/Dziewczynka) na potrzeby Excela.
           participantGender: normalizeGenderLabel(item.participant_gender),
+          transportEarlyLeave: !!item.transport_early_leave,
           authorizationsSummary: item.authorizations_summary || '',
           guardianName,
           guardianPhone,
@@ -3265,6 +3275,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               break;
             case 'participantGender':
               value = reservation.participantGender || '';
+              break;
+            case 'transportEarlyLeave':
+              value = reservation.transportEarlyLeave ? 'Tak' : 'Nie';
               break;
             case 'authorizationsSummary':
               value = reservation.authorizationsSummary || '';
@@ -3925,6 +3938,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             isArchived: reservation.is_archived || false,
             invoiceIssued: !!reservation.invoice_issued,
             participantGender: normalizeGenderLabel(reservation.participant_gender),
+    transportEarlyLeave: !!reservation.transport_early_leave,
             authorizationsSummary: reservation.authorizations_summary || undefined,
           } as ReservationPayment;
         });
@@ -4155,6 +4169,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         return reservation.invoiceIssued ? 'Tak' : 'Nie';
       case 'participantGender':
         return reservation.participantGender || '-';
+      case 'transportEarlyLeave':
+        return reservation.transportEarlyLeave ? 'Tak' : 'Nie';
       case 'authorizationsSummary':
         return reservation.authorizationsSummary || '-';
       default:
@@ -5743,6 +5759,16 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                                 <span className="text-sm text-gray-900">
                                   {reservation.transportReturn || '-'}
                                 </span>
+                              </td>
+                            );
+                          } else if (columnKey === 'transportEarlyLeave') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap text-center">
+                                {reservation.transportEarlyLeave ? (
+                                  <Check className="w-5 h-5 text-orange-600 mx-auto" />
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
                               </td>
                             );
                           } else if (columnKey === 'hasOaza') {
