@@ -12,6 +12,7 @@ import DateRangeCalendar from '@/components/admin/DateRangeCalendar';
 import DocumentStatusBadge, { getDocumentStatusVisual, DocumentStatus } from '@/components/admin/DocumentStatusBadge';
 import { getExportSheetName, normalizeGenderLabel } from '@/lib/exportExcelUtils';
 import { dedupeFilterValues } from '@/lib/utils/dedupeFilterValues';
+import { computeTransportMatch } from '@/lib/utils/transportMatch';
 import { polishSort } from '@/lib/utils/polishSort';
 import { buildListReturnUrl } from '@/lib/utils/listReturnUrl';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
@@ -309,6 +310,7 @@ interface ReservationPayment {
   invoiceIssued?: boolean;
   // Płeć uczestnika znormalizowana (Chłopiec/Dziewczynka) — kolumna "Płeć", ta sama wartość co Excel
   participantGender?: string;
+  transportMatch?: string;  // Karta 193: zgodnosc transportu tam=powrot
   transportEarlyLeave?: boolean;
   // Trello 352 — upoważnienia (tekst jak zakładka: osoby + samodzielny powrót + notatka RADSAS)
   authorizationsSummary?: string;
@@ -1210,6 +1212,7 @@ const mapReservationToPaymentFormat = async (
     isArchived: reservation.is_archived || false,
     invoiceIssued: !!reservation.invoice_issued,
     participantGender: normalizeGenderLabel(reservation.participant_gender),
+    transportMatch: computeTransportMatch(reservation),
     transportEarlyLeave: !!reservation.transport_early_leave,
     authorizationsSummary: reservation.authorizations_summary || undefined,
   };
@@ -1831,6 +1834,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     depositAmount: 'Zaliczka',
     invoiceIssued: 'WYSTAWIONĄ FAKTURĘ',
     participantGender: 'Płeć',
+    transportMatch: 'Transport tam=powrót',
     transportEarlyLeave: 'Wyjechał przed',
     authorizationsSummary: 'Upoważnienia',
   };
@@ -1903,6 +1907,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     'contractStatus',
     'invoiceIssued',
     'participantGender',
+    'transportMatch',
     'transportEarlyLeave',
     'authorizationsSummary',
   ];
@@ -2369,6 +2374,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           break;
         case 'participantGender':
           value = reservation.participantGender || '';
+          break;
+        case 'transportMatch':
+          value = reservation.transportMatch || '';
           break;
         case 'transportEarlyLeave':
           value = reservation.transportEarlyLeave ? 'Tak' : 'Nie';
@@ -3097,6 +3105,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           participantCity: item.participant_city || '',
           // Trello #349 — płeć znormalizowana do czytelnej etykiety (Chłopiec/Dziewczynka) na potrzeby Excela.
           participantGender: normalizeGenderLabel(item.participant_gender),
+          transportMatch: computeTransportMatch(item),
           transportEarlyLeave: !!item.transport_early_leave,
           authorizationsSummary: item.authorizations_summary || '',
           guardianName,
@@ -3275,6 +3284,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               break;
             case 'participantGender':
               value = reservation.participantGender || '';
+              break;
+            case 'transportMatch':
+              value = reservation.transportMatch || '';
               break;
             case 'transportEarlyLeave':
               value = reservation.transportEarlyLeave ? 'Tak' : 'Nie';
@@ -3938,6 +3950,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             isArchived: reservation.is_archived || false,
             invoiceIssued: !!reservation.invoice_issued,
             participantGender: normalizeGenderLabel(reservation.participant_gender),
+    transportMatch: computeTransportMatch(reservation),
     transportEarlyLeave: !!reservation.transport_early_leave,
             authorizationsSummary: reservation.authorizations_summary || undefined,
           } as ReservationPayment;
@@ -4169,6 +4182,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         return reservation.invoiceIssued ? 'Tak' : 'Nie';
       case 'participantGender':
         return reservation.participantGender || '-';
+      case 'transportMatch':
+        return reservation.transportMatch || '-';
       case 'transportEarlyLeave':
         return reservation.transportEarlyLeave ? 'Tak' : 'Nie';
       case 'authorizationsSummary':
@@ -5887,6 +5902,18 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                             return (
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
                                 <span className="text-sm text-gray-900">{reservation.participantGender || '-'}</span>
+                              </td>
+                            );
+                          } else if (columnKey === 'transportMatch') {
+                            // Karta 193: zgodność transportu tam=powrót (Zgodny/Różny) — kolorowany badge.
+                            const tm = reservation.transportMatch || '-';
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap">
+                                {tm === '-' ? (
+                                  <span className="text-sm text-gray-400">-</span>
+                                ) : (
+                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tm === 'Zgodny' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{tm}</span>
+                                )}
                               </td>
                             );
                           } else if (columnKey === 'authorizationsSummary') {
