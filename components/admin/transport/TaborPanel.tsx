@@ -116,8 +116,8 @@ function TaborCard(
               <span className="font-semibold text-gray-900">
                 {TYPE_LABEL[tabor.type] ?? tabor.type} {tabor.name ?? ''}
               </span>
-              {/* BUG 014: Ania prosi o WIĘKSZĄ cyferkę numeru taboru (była za mała). */}
-              {tabor.number && <span className="rounded bg-gray-200 px-2 py-0.5 text-base font-bold text-gray-800" data-testid="tabor-number">#{tabor.number}</span>}
+              {/* BUG 014 (Ania 2026-09-14): numer taboru ma być DUŻY i wyraźny — kierowca/Ania czytają go z daleka. */}
+              {tabor.number && <span className="rounded-md bg-sky-600 px-2.5 py-0.5 text-xl font-extrabold leading-none text-white" data-testid="tabor-number">#{tabor.number}</span>}
               {tabor.document_approved && (
                 <span className="flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-700">
                   <CheckCircle2 className="h-3 w-3" /> lista kompletna

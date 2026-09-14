@@ -224,6 +224,7 @@ export default function CampTurnusEditPage({
   // Form state
   const [period, setPeriod] = useState<'lato' | 'zima'>('lato');
   const [city, setCity] = useState('');
+  const [address, setAddress] = useState('');   // Trello: adres ośrodka do umowy
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number>(50);
@@ -352,6 +353,7 @@ export default function CampTurnusEditPage({
             // Populate form with property data
             setPeriod(propertyData.period as 'lato' | 'zima');
             setCity(propertyData.city);
+            setAddress((propertyData as { address?: string }).address || '');
             // Convert ISO date to YYYY-MM-DD format for input
             setStartDate(propertyData.start_date.split('T')[0]);
             setEndDate(propertyData.end_date.split('T')[0]);
@@ -457,14 +459,14 @@ export default function CampTurnusEditPage({
 
       console.log('[CampTurnusEditPage] Saving:', { campId, turnusId, period, city, startDate, endDate });
 
-      const response = await fetch(`${API_BASE_URL}/api/camps/${campId}/properties/${turnusId}`, {
+      // Zapis przez authenticatedApiCall (dołącza token JWT). Wcześniej był surowy fetch bez tokena,
+      // który pod ACL_ENFORCE zwracał 403 („sekcja 'camps' wymaga edycji") — zapis turnusu nie działał.
+      await authenticatedApiCall(`${API_BASE_URL}/api/camps/${campId}/properties/${turnusId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           period: 'lato', // Always "lato"
           city: city.trim(),
+          address: address.trim() || null,   // Trello: adres ośrodka do umowy
           start_date: startDate,
           end_date: endDate,
           max_participants: maxParticipants,
@@ -474,12 +476,6 @@ export default function CampTurnusEditPage({
           max_age: maxAge === '' ? null : maxAge,
         }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        console.error('[CampTurnusEditPage] Save error:', errorData);
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-      }
 
       console.log('[CampTurnusEditPage] Property save successful');
 
@@ -1312,6 +1308,27 @@ export default function CampTurnusEditPage({
                 placeholder="np. Wiele"
                 disabled={saving}
               />
+            </div>
+
+            {/* Adres ośrodka do umowy (Trello „w umowie brak adresu ośrodka") */}
+            <div>
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
+                <MapPin className="w-4 h-4 inline mr-1" />
+                Adres ośrodka (do umowy)
+              </label>
+              <input
+                id="address"
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm transition-all duration-200"
+                style={{ borderRadius: 0 }}
+                placeholder="np. ul. Jeziorna 5, 83-441 Wiele"
+                disabled={saving}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Trafia do umowy w polu „Ośrodek wypoczynkowy/kolonijny". Puste = umowa pokazuje nazwę turnusu.
+              </p>
             </div>
 
             {/* Dates and Max Participants */}

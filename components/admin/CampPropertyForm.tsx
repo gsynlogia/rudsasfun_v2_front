@@ -4,6 +4,7 @@ import { X, Save, Calendar, MapPin, Tag } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 import type { CampProperty } from '@/types/reservation';
+import { authenticatedApiCall } from '@/utils/api-auth';
 import { API_BASE_URL } from '@/utils/api-config';
 
 interface CampPropertyFormProps {
@@ -25,6 +26,7 @@ export default function CampPropertyForm({
 }: CampPropertyFormProps) {
   const [_period, setPeriod] = useState<'lato' | 'zima'>('lato');
   const [city, setCity] = useState('');
+  const [address, setAddress] = useState('');   // Trello: adres ośrodka do umowy
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number>(50);
@@ -54,6 +56,7 @@ export default function CampPropertyForm({
     if (property) {
       setPeriod(property.period as 'lato' | 'zima');
       setCity(property.city);
+      setAddress((property as { address?: string }).address || '');
       // Convert ISO date to YYYY-MM-DD format for input
       setStartDate(property.start_date.split('T')[0]);
       setEndDate(property.end_date.split('T')[0]);
@@ -105,6 +108,7 @@ export default function CampPropertyForm({
         ? JSON.stringify({
             period: 'lato', // Always "lato" for new turnus
             city: city.trim(),
+            address: address.trim() || null,
             start_date: startDate,
             end_date: endDate,
             max_participants: maxParticipants,
@@ -119,6 +123,7 @@ export default function CampPropertyForm({
             camp_id: campId,
             period: 'lato', // Always "lato" for new turnus
             city: city.trim(),
+            address: address.trim() || null,
             start_date: startDate,
             end_date: endDate,
             max_participants: maxParticipants,
@@ -130,18 +135,8 @@ export default function CampPropertyForm({
             hide_protections_section: hideProtections,
           });
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-      }
+      // authenticatedApiCall dołącza token JWT. Surowy fetch bez tokena dawał 403 pod ACL_ENFORCE.
+      await authenticatedApiCall(url, { method, body });
 
       onSuccess();
     } catch (err) {
@@ -197,6 +192,26 @@ export default function CampPropertyForm({
             placeholder="np. Wiele"
             disabled={loading}
           />
+        </div>
+
+        {/* Trello „w umowie brak adresu ośrodka": pełny adres ośrodka wstawiany do umowy. */}
+        <div>
+          <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
+            <MapPin className="w-4 h-4 inline mr-1" />
+            Adres ośrodka (do umowy)
+          </label>
+          <input
+            id="address"
+            type="text"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] focus:border-transparent"
+            placeholder="np. ul. Jeziorna 5, 83-441 Wiele"
+            disabled={loading}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Trafia do umowy w polu „Ośrodek wypoczynkowy/kolonijny". Puste = umowa pokazuje jak dotąd nazwę turnusu.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
