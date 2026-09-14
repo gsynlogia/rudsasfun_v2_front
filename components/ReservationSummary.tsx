@@ -249,13 +249,17 @@ export default function ReservationSummary({ currentStep, onNext, totalPrice: pr
           </div>
         )}
 
-        {/* Transport - special formatting */}
-        {transportItem && (
+        {/* Transport - special formatting.
+            Karta 28 (Trello): gdy transport WŁASNY (brak kosztu = brak itemu), pokaż „Transport 0 zł"
+            zamiast pomijać sekcję — tak by w podsumowaniu po prawej zawsze było widać status transportu. */}
+        {(transportItem || transportData) && (
           <div className="w-full mb-2">
             <div className="text-sm text-gray-600 mb-1 flex items-center justify-between w-full">
               <span>Transport:</span>
               <span className="font-medium">
-                {transportItem.price > 0 ? '+' : ''}{transportItem.price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł
+                {transportItem
+                  ? `${transportItem.price > 0 ? '+' : ''}${transportItem.price.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł`
+                  : '0 zł'}
               </span>
             </div>
             {transportData && (

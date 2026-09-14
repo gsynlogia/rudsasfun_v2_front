@@ -10,14 +10,15 @@ export default function TransportPage() {
       </h2>
       <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8">
         <p className="text-sm sm:text-base text-gray-700">
-          Informacje o transporcie dostępne są na naszej stronie internetowej{' '}
+          {/* Karta 41 (Trello): poprawny link kierujący do szczegółów transportu na obozy. */}
+          Szczegóły transportu z miast (rozkład, miejsca zbiórki, ceny) znajdziesz na naszej stronie:{' '}
           <a
-            href="https://www.radsas-fun.pl"
+            href="https://radsas-fun.pl/transporty/transport-na-obozy/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#03adf0] font-medium hover:text-[#0288c7] hover:underline"
           >
-            www.radsas-fun.pl
+            radsas-fun.pl/transporty/transport-na-obozy
           </a>
         </p>
       </div>
