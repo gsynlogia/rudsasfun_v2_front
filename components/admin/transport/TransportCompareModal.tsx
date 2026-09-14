@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * Widok „Porównaj" (Nr 35) — zestawienie DOKŁADNIE 2 połączeń obok siebie (rozkaz Pana: max 2).
- * Krok 1: wybór 2 połączeń checkboxami (limit 2). Krok 2: tabele liczb per miasto side-by-side.
+ * Widok „Porównaj" (Nr 35 + karta „11. Porównaj") — zestawienie 2..6 połączeń obok siebie.
+ * Karta Radka/Krzysztofa: porównaj 3+ transporty, miasta w kolejności trasowej (display_order),
+ * kolory per miasto, „0 gdy transport nie występuje — miasta na tym samym poziomie" (wyrównane wiersze).
  */
 import { X, GitCompare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -10,8 +11,9 @@ import { useEffect, useState } from 'react';
 import type { Connection, CompareEntry } from '@/lib/types/transportLists';
 import { listConnections, compareConnections } from '@/lib/services/transportListsApi';
 import { boundedToggle, swapAdjacent, removeAt } from '@/lib/utils/transportSelection';
+import { routeRowClasses } from '@/lib/utils/transportRouteColors';
 
-const COMPARE_MAX = 2;   // rozkaz Pana 2026-06-21: porównanie ograniczone do max 2
+const COMPARE_MAX = 6;   // Szymon 2026-09-14: 3+ transporty (zdjęty stary limit 2 z 2026-06-21). Górny 6 = czytelność UI.
 
 export default function TransportCompareModal({ onClose }: { onClose: () => void }) {
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -51,7 +53,7 @@ export default function TransportCompareModal({ onClose }: { onClose: () => void
         <div className="flex-1 overflow-auto px-5 py-4">
           {!result ? (
             <>
-              <p className="mb-2 text-sm text-gray-600">Zaznacz dokładnie 2 połączenia do porównania (max 2):</p>
+              <p className="mb-2 text-sm text-gray-600">Zaznacz od 2 do {COMPARE_MAX} połączeń do porównania:</p>
               <ul className="flex flex-col gap-1.5" data-testid="compare-options">
                 {connections.map((c) => {
                   const limitReached = selected.size >= COMPARE_MAX && !selected.has(c.id);
@@ -72,54 +74,83 @@ export default function TransportCompareModal({ onClose }: { onClose: () => void
               {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             </>
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${result.length}, minmax(240px, 1fr))` }}
-              data-testid="compare-grid">
-              {result.map((e, idx) => {
-                const total = e.cities.reduce((s, c) => s + c.razem, 0);
-                const isReturn = e.direction === 'return';
-                return (
-                  <div key={e.connection_id} data-testid="compare-column"
-                    className={`overflow-hidden rounded-lg border-2 ${isReturn ? 'border-amber-200' : 'border-sky-200'}`}>
-                    <div className={`flex items-start justify-between gap-1 border-b px-3 py-2 ${isReturn ? 'bg-amber-50' : 'bg-sky-50'}`}>
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold text-gray-900">{e.name}</div>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-xs">
-                          <span className={`rounded px-1.5 py-0.5 font-medium ${isReturn ? 'bg-amber-200 text-amber-800' : 'bg-sky-200 text-sky-800'}`}>
-                            {isReturn ? 'POWRÓT' : 'DO ośrodka'}
-                          </span>
-                          <span className="font-bold tabular-nums text-gray-700">ŁĄCZNIE {total}</span>
-                        </div>
-                      </div>
-                      {/* BUG 016: przekładanie + usuwanie kolumny porównania */}
-                      <div className="flex shrink-0 gap-0.5">
-                        <button type="button" onClick={() => moveColumn(idx, -1)} disabled={idx === 0}
-                          data-testid="compare-move-left" title="Przesuń w lewo"
-                          className="rounded p-1 text-gray-500 hover:bg-white disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => moveColumn(idx, 1)} disabled={idx === result.length - 1}
-                          data-testid="compare-move-right" title="Przesuń w prawo"
-                          className="rounded p-1 text-gray-500 hover:bg-white disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => removeColumn(idx)}
-                          data-testid="compare-remove" title="Usuń z porównania"
-                          className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"><X className="h-4 w-4" /></button>
-                      </div>
-                    </div>
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-left text-gray-500"><th className="px-2 py-1">Przystanek</th><th className="px-2 py-1 text-right">Łącznie</th></tr>
-                      </thead>
-                      <tbody>
-                        {e.cities.map((c) => (
-                          <tr key={c.transport_city_id ?? c.city} className="border-t border-gray-50">
-                            <td className="px-2 py-1">{c.city}</td>
-                            <td className="px-2 py-1 text-right font-medium tabular-nums">{c.razem}</td>
+            (() => {
+              // Karta „11. Porównaj" (wzór Radka): jedna wyrównana tabela — miasta w wierszach w kolejności
+              // trasowej (display_order), z kolorami per miasto; każde połączenie w osobnej kolumnie pokazuje
+              // liczbę lub „0" (miasta na tym samym poziomie). Wiersz RAZEM na dole.
+              const cityMeta = new Map<string, { order: number; color: string | null }>();
+              result.forEach((e) => e.cities.forEach((c) => {
+                if (!cityMeta.has(c.city)) cityMeta.set(c.city, { order: c.display_order ?? 9999, color: c.route_color });
+              }));
+              const allCities = [...cityMeta.entries()]
+                .sort((a, b) => (a[1].order - b[1].order) || a[0].localeCompare(b[0], 'pl'))
+                .map(([city]) => city);
+              const countFor = (e: CompareEntry, city: string) => e.cities.find((c) => c.city === city)?.razem ?? 0;
+              const colTotal = (e: CompareEntry) => e.cities.reduce((s, c) => s + c.razem, 0);
+              return (
+                <div className="overflow-auto" data-testid="compare-grid">
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr>
+                        <th className="sticky left-0 z-10 bg-white px-2 py-2 text-left font-semibold text-gray-700">Miasto</th>
+                        {result.map((e, idx) => {
+                          const isReturn = e.direction === 'return';
+                          return (
+                            <th key={e.connection_id} data-testid="compare-column"
+                              className={`px-2 py-2 text-center align-top ${isReturn ? 'bg-amber-50' : 'bg-sky-50'}`}>
+                              <div className="flex items-center justify-center gap-0.5">
+                                <button type="button" onClick={() => moveColumn(idx, -1)} disabled={idx === 0}
+                                  data-testid="compare-move-left" title="W lewo"
+                                  className="rounded p-0.5 text-gray-500 hover:bg-white disabled:opacity-30"><ChevronLeft className="h-3.5 w-3.5" /></button>
+                                <span className="max-w-[150px] truncate font-semibold text-gray-900">{e.name}</span>
+                                <button type="button" onClick={() => moveColumn(idx, 1)} disabled={idx === result.length - 1}
+                                  data-testid="compare-move-right" title="W prawo"
+                                  className="rounded p-0.5 text-gray-500 hover:bg-white disabled:opacity-30"><ChevronRight className="h-3.5 w-3.5" /></button>
+                                <button type="button" onClick={() => removeColumn(idx)}
+                                  data-testid="compare-remove" title="Usuń z porównania"
+                                  className="rounded p-0.5 text-gray-500 hover:bg-red-50 hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
+                              </div>
+                              <div className="mt-0.5">
+                                <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${isReturn ? 'bg-amber-200 text-amber-800' : 'bg-sky-200 text-sky-800'}`}>
+                                  {isReturn ? 'POWRÓT' : 'DO ośrodka'}
+                                </span>
+                              </div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allCities.map((city) => {
+                        const bg = routeRowClasses(cityMeta.get(city)?.color, false);
+                        return (
+                          <tr key={city} className={`border-t border-gray-100 ${bg}`}>
+                            <td className="sticky left-0 z-10 bg-inherit px-2 py-1 font-medium text-gray-800">{city}</td>
+                            {result.map((e) => {
+                              const n = countFor(e, city);
+                              return (
+                                <td key={e.connection_id}
+                                  className={`px-2 py-1 text-center tabular-nums ${n === 0 ? 'text-gray-300' : 'font-medium text-gray-900'}`}>
+                                  {n}
+                                </td>
+                              );
+                            })}
                           </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-gray-300 font-bold">
+                        <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-gray-800">RAZEM</td>
+                        {result.map((e) => (
+                          <td key={e.connection_id} className="px-2 py-1.5 text-center tabular-nums text-gray-900">{colTotal(e)}</td>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })}
-            </div>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              );
+            })()
           )}
         </div>
 
