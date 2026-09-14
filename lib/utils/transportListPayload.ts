@@ -22,6 +22,7 @@ export function addBlankParticipant(payload: ListPayload, isReturn: boolean): Li
     lp: payload.participants.length + 1, reservation_id: 0,
     first_name: '', last_name: '', rocznik: null, opiekun: null, kontakt: null,
     turnus: null, przystanek: '', miejsce_zbiorki: '', is_transfer: false,
+    temat: '', uwagi: '',
     ...(isReturn ? { upowaznienia: '' } : {}),
   };
   return { ...payload, participants: renumberLp([...payload.participants, blank]) };
@@ -49,9 +50,34 @@ export function compareListRows(a: ListPayloadParticipant, b: ListPayloadPartici
 }
 
 /**
- * BUG 008 (nowa osoba „przesunie się gdzie ma być") + BUG 006 („to samo dotyczy wygenerowanej listy"):
- * sortuje wiersze listy wg komparatora i renumeruje LP 1..n.
+ * Karta 6 (Trello „6. Lista transportowa finalna"): kolejność MIAST na liście = kolejność ich
+ * POJAWIENIA (czyli wprowadzania do autokaru), a NIE alfabetycznie — autokar jedzie trasą ustaloną
+ * przez kierownika (np. najpierw Warszawa, potem Łódź). W obrębie miasta zachowana kolejność
+ * wprowadzania. Pusty przystanek (nowo dodana osoba bez destynacji) ląduje na końcu. Renumeracja LP 1..n.
+ * Spójne z backendem `_build_list_payload` (transport_service.py).
  */
 export function sortListParticipants(participants: ListPayloadParticipant[]): ListPayloadParticipant[] {
-  return renumberLp([...participants].sort(compareListRows));
+  return renumberLp(orderListRows(participants));
+}
+
+/** Zwraca wiersze w kolejności listy (miasta wg pojawienia, w obrębie wg wprowadzania), bez renumeracji. */
+export function orderListRows<T extends ListPayloadParticipant>(participants: T[]): T[] {
+  const firstIdx = new Map<string, number>();
+  participants.forEach((p, i) => {
+    const stop = (p.przystanek ?? '').trim();
+    if (stop && !firstIdx.has(stop)) firstIdx.set(stop, i);
+  });
+  return participants
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => {
+      const sa = (a.p.przystanek ?? '').trim();
+      const sb = (b.p.przystanek ?? '').trim();
+      const ea = sa ? 0 : 1, eb = sb ? 0 : 1;
+      if (ea !== eb) return ea - eb;                       // pusty przystanek na koniec
+      const fa = sa ? (firstIdx.get(sa) ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+      const fb = sb ? (firstIdx.get(sb) ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+      if (fa !== fb) return fa - fb;                        // kolejność pojawienia miasta
+      return a.i - b.i;                                     // kolejność wprowadzania w obrębie miasta
+    })
+    .map((x) => x.p);
 }

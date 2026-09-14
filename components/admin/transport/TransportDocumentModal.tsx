@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 
 import type { Direction, ListPayload, ListPayloadParticipant, TransportListDetail } from '@/lib/types/transportLists';
 import { releaseList, getList, patchList, approveList, downloadListExcel } from '@/lib/services/transportListsApi';
-import { addBlankParticipant, removeParticipantAt, sortListParticipants, compareListRows } from '@/lib/utils/transportListPayload';
+import { addBlankParticipant, removeParticipantAt, sortListParticipants } from '@/lib/utils/transportListPayload';
 
 interface Props {
   taborId: number;
@@ -103,12 +103,27 @@ export default function TransportDocumentModal({ taborId, direction, listId, onC
     URL.revokeObjectURL(url);
   }
 
-  // BUG 008/006: grupy budowane z POSORTOWANEJ kolejności (przystanek→resort→nazwisko) — nowo dodana
-  // osoba „przesuwa się tam, gdzie ma być" po wpisaniu destynacji. idx pozostaje oryginalny (do edycji).
+  // Karta 6 (Trello): grupy miast w kolejności POJAWIENIA (= wprowadzania do autokaru), NIE alfabetycznie.
+  // W obrębie miasta kolejność wprowadzania. Pusty przystanek na końcu. idx pozostaje oryginalny (do edycji).
+  const _rows = (payload?.participants ?? []).map((row, idx) => ({ row, idx }));
+  const _firstIdx = new Map<string, number>();
+  _rows.forEach(({ row }, i) => {
+    const stop = (row.przystanek ?? '').trim();
+    if (stop && !_firstIdx.has(stop)) _firstIdx.set(stop, i);
+  });
   const groups: { stop: string; rows: { row: ListPayloadParticipant; idx: number }[] }[] = [];
-  (payload?.participants ?? [])
-    .map((row, idx) => ({ row, idx }))
-    .sort((a, b) => compareListRows(a.row, b.row))
+  _rows
+    .map((r, i) => ({ ...r, i }))
+    .sort((a, b) => {
+      const sa = (a.row.przystanek ?? '').trim();
+      const sb = (b.row.przystanek ?? '').trim();
+      const ea = sa ? 0 : 1, eb = sb ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      const fa = sa ? (_firstIdx.get(sa) ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+      const fb = sb ? (_firstIdx.get(sb) ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+      if (fa !== fb) return fa - fb;
+      return a.i - b.i;
+    })
     .forEach(({ row, idx }) => {
       const stop = (row.przystanek ?? '').trim() || '—';
       const g = groups.find((x) => x.stop === stop);
@@ -146,7 +161,7 @@ export default function TransportDocumentModal({ taborId, direction, listId, onC
               <table className="w-full border-collapse text-xs" data-testid="document-table">
                 <thead>
                   <tr className="bg-gray-100 text-left">
-                    {['LP', 'Imię', 'Nazwisko', 'Rocznik', 'Opiekun', 'Kontakt', 'Turnus', 'Przystanek', 'Miejsce zbiórki']
+                    {['LP', 'Imię', 'Nazwisko', 'Rocznik', 'Opiekun', 'Kontakt', 'Turnus', 'Przystanek', 'Miejsce zbiórki', 'Uwagi']
                       .map((h) => <th key={h} className="border px-1.5 py-1">{h}</th>)}
                     {isReturn && <th className="border px-1.5 py-1" data-testid="col-upowaznienia">Upoważnienia</th>}
                     {!immutable && <th className="border px-1.5 py-1" />}
@@ -190,6 +205,12 @@ export default function TransportDocumentModal({ taborId, direction, listId, onC
                         <input value={row.miejsce_zbiorki ?? ''} disabled={immutable}
                           onChange={(e) => updateRow(idx, 'miejsce_zbiorki', e.target.value)}
                           className="w-full bg-transparent px-1 text-xs" placeholder="adres + godzina" />
+                      </td>
+                      {/* Karta 8/12 (Trello): uwagi dodatkowe per uczestnik (nr2) — edytowalne, zapisywane w buforze. */}
+                      <td className="border px-1 py-0.5">
+                        <input value={row.uwagi ?? ''} disabled={immutable} data-testid="document-uwagi"
+                          onChange={(e) => updateRow(idx, 'uwagi', e.target.value)}
+                          className="w-full bg-transparent px-1 text-xs" placeholder="uwagi" />
                       </td>
                       {isReturn && (
                         <td className="border px-1 py-0.5">

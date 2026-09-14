@@ -168,6 +168,8 @@ export interface ListPayloadParticipant {
   miejsce_zbiorki: string;
   is_transfer: boolean;
   upowaznienia?: string; // tylko dla powrotu
+  temat?: string;        // Karta 9: temat/program uczestnika (z topic_snapshot) — w Excelu, podgląd read-only
+  uwagi?: string;        // Karta 8/12: uwagi dodatkowe per uczestnik (nr2) — bufor ręczny, edytowalne
 }
 
 export interface ListPayload {
