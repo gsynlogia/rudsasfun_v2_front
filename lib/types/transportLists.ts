@@ -164,6 +164,7 @@ export interface ListPayloadParticipant {
   opiekun: string | null;
   kontakt: string | null;
   turnus: string | null;
+  osrodek?: string | null;  // Karta 4: ośrodek (Beaver/Sawa/Limba) — kolumna „Ośrodek" w Excelu
   przystanek: string | null;
   miejsce_zbiorki: string;
   is_transfer: boolean;
