@@ -46,6 +46,11 @@ export default function InvoicesAndPayments() {
   const [error, setError] = useState<string | null>(null);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
+  // 15.07/31.07 (Joanna): czy klient zamówił fakturę podczas rezerwacji i na jakie dane
+  const [invoiceOrders, setInvoiceOrders] = useState<Array<{
+    reservationId: number; reservationName: string; participantName?: string;
+    wantsInvoice: boolean; recipient: string;
+  }>>([]);
 
   // Load user's invoices and payments
   useEffect(() => {
@@ -82,6 +87,21 @@ export default function InvoicesAndPayments() {
         });
 
         setDocuments(documentsList);
+
+        // 15.07/31.07 (Joanna): dla każdej rezerwacji — czy zamówiono fakturę i na jakie dane (z formularza rezerwacji)
+        const invoiceOrdersList = reservations.map((r) => {
+          const reservationName = `REZ-${new Date(r.created_at).getFullYear()}-${String(r.id).padStart(3, '0')}`;
+          const participantName = `${r.participant_first_name || ''} ${r.participant_last_name || ''}`.trim() || undefined;
+          const addr = [r.invoice_street, [r.invoice_postal_code, r.invoice_city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+          let recipient = '';
+          if (r.wants_invoice) {
+            recipient = r.invoice_type === 'company'
+              ? [r.invoice_company_name, r.invoice_nip ? `NIP ${r.invoice_nip}` : '', addr].filter(Boolean).join(' · ')
+              : [`${r.invoice_first_name || ''} ${r.invoice_last_name || ''}`.trim(), addr].filter(Boolean).join(' · ');
+          }
+          return { reservationId: r.id, reservationName, participantName, wantsInvoice: !!r.wants_invoice, recipient };
+        });
+        setInvoiceOrders(invoiceOrdersList);
 
         // Load manual payments from all reservations
         const allManualPayments: ManualPaymentResponse[] = [];
@@ -257,6 +277,35 @@ export default function InvoicesAndPayments() {
         <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">
           Faktury
         </h3>
+
+        {/* 21.08 (Joanna): informacja w sekcji Faktury */}
+        <div className="mb-4 sm:mb-6 rounded-lg border border-sky-200 bg-sky-50 p-3 sm:p-4 text-xs sm:text-sm text-sky-900">
+          Faktury wystawiane są tylko klientom, którzy zgłosili chęć jej otrzymania podczas rezerwacji lub mailowo.
+        </div>
+
+        {/* 15.07/31.07 (Joanna): czy klient zamówił fakturę podczas rezerwacji i na jakie dane */}
+        {invoiceOrders.length > 0 && (
+          <div className="mb-4 sm:mb-6 bg-white rounded-lg shadow-sm p-4 sm:p-5">
+            <h4 className="text-sm sm:text-base font-semibold text-gray-900 mb-3">Zamówienie faktury (z formularza rezerwacji)</h4>
+            <ul className="space-y-2">
+              {invoiceOrders.map((o) => (
+                <li key={o.reservationId} className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-3 text-xs sm:text-sm">
+                  <span className="font-medium text-gray-900 shrink-0">
+                    {o.reservationName}{o.participantName ? ` · ${o.participantName}` : ''}
+                  </span>
+                  {o.wantsInvoice ? (
+                    <span className="text-gray-700">
+                      <span className="font-medium text-green-700">Zamówiono fakturę</span>
+                      {' — na dane: '}{o.recipient || 'brak szczegółowych danych'}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">Nie zamówiono faktury podczas rezerwacji</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {documents.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
