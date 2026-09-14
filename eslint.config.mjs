@@ -13,8 +13,6 @@ const eslintConfig = defineConfig([
     'build/**',
     'next-env.d.ts',
     'node_modules/**',
-    'tests/**', // Ignoruj testy w podstawowych regułach
-    'playwright-report/**', // wygenerowane raporty Playwright
   ]),
   {
     rules: {
@@ -250,18 +248,6 @@ const eslintConfig = defineConfig([
     files: ['**/components/**/*.tsx', '**/app/**/*.tsx', '**/pages/**/*.tsx'],
     rules: {
       // Pozwól na function declarations dla komponentów React/Next.js
-      'func-style': 'off',
-    },
-  },
-  // Dodatkowa konfiguracja dla plików testowych
-  {
-    files: ['**/*.test.ts', '**/*.test.tsx', '**/tests/**/*.ts', '**/tests/**/*.tsx'],
-    rules: {
-      // Pozwól na console.log w testach
-      'no-console': 'off',
-      // Pozwól na any w testach
-      '@typescript-eslint/no-explicit-any': 'off',
-      // Pozwól na function declarations w testach (dla lepszej czytelności)
       'func-style': 'off',
     },
   },
