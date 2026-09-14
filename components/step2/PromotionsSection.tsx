@@ -543,14 +543,17 @@ export default function PromotionsSection() {
                         ? promotionJustification.years.join(', ')
                         : promotionJustification.years || ''
                       }
-                      onChange={(e) => {
-                        const yearsStr = e.target.value;
-                        const years = yearsStr.split(',').map(y => y.trim()).filter(y => y);
-                        setPromotionJustification({
-                          ...promotionJustification,
-                          years: years,
-                        });
-                      }}
+                      onChange={(e) => setPromotionJustification({
+                        ...promotionJustification,
+                        // BON (Trello/WhatsApp 20.02): przechowuj SUROWY tekst podczas pisania — nie filtruj
+                        // pustych segmentów po każdym znaku, bo to zjadało przecinek i spację ("2023, 2024").
+                        years: e.target.value,
+                      })}
+                      onBlur={(e) => setPromotionJustification({
+                        ...promotionJustification,
+                        // Normalizacja do tablicy dopiero po opuszczeniu pola.
+                        years: e.target.value.split(',').map((y) => y.trim()).filter(Boolean),
+                      })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0]"
                       placeholder="Wpisz lata uczestnictwa (np. 2023, 2024, 2025)"
                       required
