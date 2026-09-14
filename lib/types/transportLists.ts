@@ -175,7 +175,8 @@ export interface ListPayloadParticipant {
 export interface ListPayload {
   direction: Direction;
   header_note?: string;
-  notes?: string;                 // BUG 017: dodatkowe uwagi do listy (osobne od „za przednią szybę")
+  transport_info?: string;        // Karta 8/12 (makieta Figma): „Informacje dodatkowe do transportu" (uwagi nr1)
+  notes?: string;                 // BUG 017: dodatkowe uwagi do listy (uwagi nr2, osobne od „za przednią szybę")
   tabor: Partial<Tabor>;
   participants: ListPayloadParticipant[];
 }

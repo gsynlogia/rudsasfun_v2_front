@@ -239,8 +239,17 @@ export default function TransportDocumentModal({ taborId, direction, listId, onC
                 </button>
               )}
 
-              {/* BUG 017 (Krzysztof): brakowało okna na uwagi — osobne od nagłówka „za przednią szybę". */}
+              {/* Karta 8/12 (makieta Figma): DWA pola uwag pod tabelą — „uwagi nr1" i „uwagi nr2". */}
               <div className="mt-4">
+                <label htmlFor="document-transport-info" className="mb-1 block text-sm font-medium text-gray-700">Informacje dodatkowe do transportu</label>
+                <textarea id="document-transport-info" data-testid="document-transport-info" rows={2} disabled={immutable}
+                  value={payload.transport_info ?? ''}
+                  onChange={(e) => setPayload((p) => (p ? { ...p, transport_info: e.target.value } : p))}
+                  placeholder="Informacje dodatkowe do transportu…"
+                  className="w-full rounded border border-gray-300 p-2 text-sm" />
+              </div>
+              {/* BUG 017 (Krzysztof): okno uwag osobne od nagłówka „za przednią szybę" (uwagi nr2). */}
+              <div className="mt-3">
                 <label htmlFor="document-notes" className="mb-1 block text-sm font-medium text-gray-700">Dodatkowe uwagi</label>
                 <textarea id="document-notes" data-testid="document-notes" rows={2} disabled={immutable}
                   value={payload.notes ?? ''}
