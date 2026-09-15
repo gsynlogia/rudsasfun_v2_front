@@ -23,8 +23,8 @@ function getDiffText(signed: string, draft: string): string {
   return draft;
 }
 import { reservationService, ReservationResponse } from '@/lib/services/ReservationService';
-import { buildPromoCodeCostRow, PromotionV2Snapshot as PromotionV2SnapshotData } from '@/lib/buildPromoCodeCostRow';
-import { buildPromotionV2CostRow } from '@/lib/buildPromotionV2CostRow';
+import { PromotionV2Snapshot as PromotionV2SnapshotData } from '@/lib/buildPromoCodeCostRow';
+import { buildReservationCostRows, formatCostRowAmount } from '@/lib/buildReservationCostRows';
 import { computeReservationStatusLabel } from '@/lib/utils/computeReservationStatusLabel';
 import { describeInvoiceDeclaration } from '@/lib/utils/invoiceDeclaration';
 import { getApiBaseUrlRuntime } from '@/utils/api-config';
@@ -1373,86 +1373,9 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
 
           {/* Cost breakdown (same structure as step 4 basket) – dynamic from API, no hardcoded amounts */}
           {(() => {
-            const hasBase = reservation.base_price != null && reservation.base_price > 0;
-            const hasDiet = reservation.diet_name && (reservation.diet_price ?? 0) !== 0;
-            const hasAddons = reservation.addons_data && reservation.addons_data.length > 0;
-            const hasProtection =
-              reservation.selected_protection &&
-              reservation.selected_protection.length > 0 &&
-              reservation.protection_names &&
-              reservation.protection_prices;
-            const hasTransport = reservation.transport_price != null && reservation.transport_price > 0;
-            const hasLegacyPromotion = reservation.promotion_name != null && reservation.promotion_name !== '';
-            const promotionV2Row = buildPromotionV2CostRow(promoV2Snapshot);
-            const promoCodeRow = buildPromoCodeCostRow(promoV2Snapshot);
-            const showBreakdown =
-              hasBase || hasDiet || hasAddons || hasProtection || hasTransport || hasLegacyPromotion || !!promotionV2Row || !!promoCodeRow;
-
-            if (!showBreakdown) return null;
-
-            const formatAmount = (value: number): string => {
-              if (value >= 0) return `+${value.toFixed(2)} zł`;
-              return `${value.toFixed(2)} zł`;
-            };
-
-            const rows: { label: string; amount?: number; infoOnly?: boolean }[] = [];
-
-            if (hasBase) {
-              rows.push({ label: 'Cena podstawowa', amount: reservation.base_price! });
-            }
-            if (hasDiet) {
-              rows.push({
-                label: reservation.diet_name!,
-                amount: reservation.diet_price ?? 0,
-              });
-            }
-            if (hasAddons) {
-              for (const addon of reservation.addons_data!) {
-                rows.push({ label: addon.name, amount: addon.price });
-              }
-            }
-            if (hasProtection) {
-              for (const id of reservation.selected_protection!) {
-                const name = reservation.protection_names![id] ?? reservation.protection_names![String(id)];
-                if (!name) continue;
-                const price = reservation.protection_prices![name.toLowerCase()] ?? 0;
-                rows.push({ label: name, amount: price });
-              }
-            }
-            if (hasTransport) {
-              const dep =
-                reservation.departure_type === 'wlasny'
-                  ? 'Własny transport'
-                  : (reservation.departure_city ?? '');
-              const ret =
-                reservation.return_type === 'wlasny'
-                  ? 'Własny transport'
-                  : (reservation.return_city ?? '');
-              rows.push({
-                label: `Transport (WYJAZD: ${dep} / POWRÓT: ${ret})`,
-                amount: reservation.transport_price!,
-              });
-            }
-            if (promotionV2Row) {
-              rows.push(promotionV2Row);
-            } else if (hasLegacyPromotion) {
-              if (reservation.promotion_does_not_reduce_price) {
-                rows.push({
-                  label: `${reservation.promotion_name} – nie obniża ceny`,
-                  infoOnly: true,
-                });
-              } else if (reservation.promotion_price != null && reservation.promotion_price !== 0) {
-                rows.push({
-                  label: reservation.promotion_name!,
-                  amount: -Math.abs(reservation.promotion_price),
-                });
-              } else {
-                rows.push({ label: reservation.promotion_name!, infoOnly: true });
-              }
-            }
-            if (promoCodeRow) {
-              rows.push(promoCodeRow);
-            }
+            // Podział kosztów w pure-helperze (DRY — ten sam podział w sekcji „Płatności i Faktury").
+            const rows = buildReservationCostRows(reservation, promoV2Snapshot);
+            if (rows.length === 0) return null;
 
             return (
               <div className="mb-3 sm:mb-4">
@@ -1465,7 +1388,7 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                         <span className="text-gray-500 italic">–</span>
                       ) : (
                         <span className="font-medium tabular-nums text-gray-900">
-                          {row.amount! >= 0 ? formatAmount(row.amount!) : `${row.amount!.toFixed(2)} zł`}
+                          {row.amount! >= 0 ? formatCostRowAmount(row.amount!) : `${row.amount!.toFixed(2)} zł`}
                         </span>
                       )}
                     </div>
