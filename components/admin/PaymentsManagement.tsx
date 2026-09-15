@@ -1,5 +1,12 @@
 'use client';
 
+// DEPRECATED 2026-09-15 (TD-041, tasks_plan/tech-debt.md): komponent NIEUŻYWANY.
+// Widoki płatności /admin-panel i /admin-panel/payments renderują ReservationsTableNew,
+// nie ten plik. Wszystkie wystąpienia „PaymentsManagement" w kodzie to tylko komentarze
+// (app/admin-panel/page.tsx, ReservationMain.tsx, admins/[id]/edit) — zero importów.
+// Kandydat do usunięcia po cyklu deprecation — NIE kasować bez wyraźnej zgody Szymona
+// (analiza może się mylić: dynamiczne wywołania, przyszłe użycie). Odkryte przy bugu #17.
+
 import { Search, ChevronUp, ChevronDown, Check, CreditCard, FileText, Building2, Shield, Utensils, Plus, AlertCircle, Download, FileSpreadsheet, XCircle, RotateCcw, RefreshCw, Trash2, Columns, GripVertical, Filter, X as XIcon, Info, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
