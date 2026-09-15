@@ -1084,16 +1084,10 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               <label>2) Data urodzenia uczestnika/dziecka</label>
               {(() => {
                 const dobRaw = formData.childDOB || '';
-                const yearMatch = dobRaw.match(/^(\d{4})/);
-                const birthYear = yearMatch ? parseInt(yearMatch[1], 10) : null;
-                const minYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear - 1 : null;
-                const maxYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear : null;
-                // Sam rocznik (np. "2012") traktujemy jako niewypelnione — dopiero pelna data YYYY-MM-DD jest wartoscia
-                const dobValue =
-                  /^\d{4}-\d{2}-\d{2}$/.test(dobRaw) ? dobRaw
-                  : '';
-                const minDate = minYear !== null && minYear !== undefined ? `${minYear}-01-01` : undefined;
-                const maxDate = maxYear !== null && maxYear !== undefined ? `${maxYear}-12-31` : undefined;
+                // Bug (Trello, blocker): min/max roku były wyliczane z PRE-WYPEŁNIONEJ wartości (birthYear-1..birthYear),
+                // co blokowało wybór PRAWIDŁOWEGO dla obozu rocznika dziecka. Usunięto sztuczne ograniczenie kalendarza.
+                // Sam rocznik (np. "2012") traktujemy jako niewypełnione — dopiero pełna data YYYY-MM-DD jest wartością.
+                const dobValue = /^\d{4}-\d{2}-\d{2}$/.test(dobRaw) ? dobRaw : '';
                 return (
                   <>
                     <input
@@ -1104,8 +1098,6 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         handleChange('childDOB', e.target.value);
                         setChildDOBError(null);
                       }}
-                      min={minDate}
-                      max={maxDate}
                       readOnly={printMode || viewMode === 'zatwierdzona'}
                       className={`input-line ${isEditable ? 'editable-field' : ''} ${childDOBError ? 'border-red-500' : ''} ${!dobValue ? 'text-gray-400' : ''}`}
                       aria-invalid={!!childDOBError}

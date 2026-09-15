@@ -1072,16 +1072,12 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 const normalized = ddmmyyyy
                   ? `${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`
                   : dobRaw;
-                const yearMatch = normalized.match(/^(\d{4})/);
-                const birthYear = yearMatch ? parseInt(yearMatch[1], 10) : null;
-                const minYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear - 1 : null;
-                const maxYear = birthYear !== null && birthYear !== undefined && !isNaN(birthYear) ? birthYear : null;
+                // Bug (Trello, blocker): min/max roku wyliczane z PRE-WYPEŁNIONEJ wartości (birthYear-1..birthYear)
+                // blokowały wybór PRAWIDŁOWEGO dla obozu rocznika dziecka — usunięto sztuczne ograniczenie kalendarza.
                 const dobValue =
                   /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized
                   : /^\d{4}$/.test(normalized) ? `${normalized}-01-01`
                   : '';
-                const minDate = minYear !== null && minYear !== undefined ? `${minYear}-01-01` : undefined;
-                const maxDate = maxYear !== null && maxYear !== undefined ? `${maxYear}-12-31` : undefined;
                 return (
                   <>
                     <input
@@ -1091,8 +1087,6 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                         handleChange('childDOB', e.target.value);
                         setChildDOBError(null);
                       }}
-                      min={minDate}
-                      max={maxDate}
                       readOnly={readOnlyView}
                       className={`input-line ${isEditable ? 'editable-field' : ''} ${childDOBError ? 'border-red-500' : ''}`}
                       aria-invalid={!!childDOBError}
