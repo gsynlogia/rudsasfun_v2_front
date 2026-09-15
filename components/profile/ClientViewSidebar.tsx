@@ -49,7 +49,7 @@ const menuItems: MenuItem[] = [
   //   iconSvg: 'dollar',
   // },
   {
-    label: 'Faktury i płatności',
+    label: 'Płatności i Faktury',
     path: 'faktury-i-platnosci',
     iconSvg: 'file-text',
   },

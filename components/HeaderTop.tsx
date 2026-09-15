@@ -88,10 +88,15 @@ export default function HeaderTop({ fixed = false, hideLogo = false, fixedHeight
             </div>
           )}
 
-          {/* Mobile: płatności na pasku – cena większa, pod nią status; skeleton gdy loading */}
+          {/* Mobile: płatności na pasku – cena większa, pod nią status; skeleton gdy loading.
+              Trello „Badge płatności przenosi do sekcji Płatności i Faktury": klikalny → sekcja. */}
           {!hideLogo && !fixedHeight && paymentHeader && (
             <div className="lg:hidden flex-1 flex items-center justify-center min-w-0 px-1 sm:px-2">
-              <div className="flex flex-col items-center justify-center gap-0.5">
+              <Link
+                href="/profil/faktury-i-platnosci"
+                className="flex flex-col items-center justify-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                aria-label="Przejdź do sekcji Płatności i Faktury"
+              >
                 {paymentHeader.loading ? (
                   <>
                     <div className="h-6 w-16 bg-gray-200 rounded animate-pulse" aria-hidden />
@@ -128,7 +133,7 @@ export default function HeaderTop({ fixed = false, hideLogo = false, fixedHeight
                 </div>
                   </>
                 )}
-              </div>
+              </Link>
             </div>
           )}
 
