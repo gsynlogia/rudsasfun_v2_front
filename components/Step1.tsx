@@ -23,7 +23,26 @@ interface ParentData {
   street: string;
   postalCode: string;
   city: string;
+  // Trello #26: opiekun 2 obowiązkowy — dwa wykluczające się checkboxy „ucieczki".
+  // Zaznaczenie któregokolwiek chowa pola opiekuna 2 i znosi ich wymagalność.
+  noSecondParent?: boolean;   // „Brak drugiego opiekuna"
+  limitedRights?: boolean;    // „Ograniczone prawa rodzicielskie"
 }
+
+// Pusty opiekun (DRY — stan początkowy + uzupełnianie do 2 opiekunów).
+const makeBlankParent = (id: string): ParentData => ({
+  id,
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '+48',
+  phoneNumber: '',
+  street: '',
+  postalCode: '',
+  city: '',
+  noSecondParent: false,
+  limitedRights: false,
+});
 
 /**
  * Step1 Component - Personal Data
@@ -112,18 +131,10 @@ export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
   const availableBirthYears = getAvailableBirthYears();
 
+  // Trello #26: opiekun 2 jest OBOWIĄZKOWY — zawsze obecny (2 opiekunów od startu).
   const [parents, setParents] = useState<ParentData[]>([
-    {
-      id: '1',
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '+48',
-      phoneNumber: '',
-      street: '',
-      postalCode: '',
-      city: '',
-    },
+    makeBlankParent('1'),
+    makeBlankParent('2'),
   ]);
 
   // Validation errors for parent fields
@@ -134,33 +145,26 @@ export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabl
   // Flag to prevent saving empty data before loading from sessionStorage
   const isDataLoadedRef = useRef(false);
 
-  const addParent = () => {
-    if (parents.length >= 2) return;
-
-    const newParent: ParentData = {
-      id: Date.now().toString(),
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '+48',
-      phoneNumber: '',
-      street: '',
-      postalCode: '',
-      city: '',
-    };
-    setParents([...parents, newParent]);
-  };
-
-  const removeParent = (id: string) => {
-    if (parents.length > 1) {
-      setParents(parents.filter((p) => p.id !== id));
-      // Remove errors for deleted parent
-      setParentErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[id];
-        return newErrors;
-      });
-    }
+  // Trello #26: opiekun 2 obowiązkowy — zamiast checkboxów „Brak" / „Ograniczone prawa
+  // rodzicielskie" (mutually exclusive). Zaznaczenie chowa pola opiekuna 2 i czyści jego błędy.
+  const toggleParentEscapeFlag = (id: string, flag: 'noSecondParent' | 'limitedRights') => {
+    setParents((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const next = !p[flag];
+        return {
+          ...p,
+          noSecondParent: flag === 'noSecondParent' ? next : false,
+          limitedRights: flag === 'limitedRights' ? next : false,
+        };
+      }),
+    );
+    // Wyczyść błędy opiekuna 2 — pola przestają być wymagane, gdy checkbox zaznaczony.
+    setParentErrors((prev) => {
+      const nextErrors = { ...prev };
+      delete nextErrors[id];
+      return nextErrors;
+    });
   };
 
   // Update parent and clear errors for that field
@@ -192,6 +196,12 @@ export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const validateParent = (parent: ParentData, index: number): Record<string, string> => {
     const errors: Record<string, string> = {};
     const isFirstGuardian = index === 0;
+
+    // Trello #26: opiekun 2 z zaznaczonym „Brak" lub „Ograniczone prawa rodzicielskie" — pola ukryte,
+    // nic nie walidujemy (wtedy dane opiekuna 2 nie są wymagane).
+    if (!isFirstGuardian && (parent.noSecondParent || parent.limitedRights)) {
+      return errors;
+    }
 
     // Always required for both guardians
     if (!parent.firstName || parent.firstName.trim() === '') {
@@ -479,10 +489,15 @@ export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabl
       // Only update if data exists in sessionStorage
       if (savedData.parents && savedData.parents.length > 0) {
         // Ensure parents have IDs
-        const parentsWithIds = savedData.parents.map((p, idx) => ({
+        const parentsWithIds: ParentData[] = savedData.parents.map((p, idx) => ({
+          ...makeBlankParent((idx + 1).toString()),
           ...p,
           id: p.id || (idx + 1).toString(),
         }));
+        // Trello #26: opiekun 2 zawsze obecny — uzupełnij, gdy stary zapis miał tylko 1 opiekuna.
+        while (parentsWithIds.length < 2) {
+          parentsWithIds.push(makeBlankParent((parentsWithIds.length + 1).toString()));
+        }
         setParents(parentsWithIds);
       }
       if (savedData.participantData) {
@@ -563,22 +578,43 @@ export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabl
         {parents.map((parent, index) => (
           <div key={parent.id} className={index > 0 ? 'mt-4 sm:mt-6' : ''}>
             {index > 0 && (
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-medium text-gray-700">
+              <div className="mb-3 sm:mb-4">
+                <h3 className="text-base sm:text-lg font-medium text-gray-700 mb-2">
                   Opiekun {index + 1}
                 </h3>
-                {parents.length > 1 && (
-                  <button
-                    onClick={() => removeParent(parent.id)}
-                    disabled={disabled}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Usuń opiekuna
-                  </button>
-                )}
+                {/* Trello #26: opiekun 2 obowiązkowy — checkboxy „ucieczki" chowają pola i znoszą wymóg */}
+                <div className="flex flex-col sm:flex-row sm:gap-6 gap-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!parent.noSecondParent}
+                      onChange={() => toggleParentEscapeFlag(parent.id, 'noSecondParent')}
+                      disabled={disabled}
+                      className="w-4 h-4 accent-[#03adf0] cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    Brak drugiego opiekuna
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!parent.limitedRights}
+                      onChange={() => toggleParentEscapeFlag(parent.id, 'limitedRights')}
+                      disabled={disabled}
+                      className="w-4 h-4 accent-[#03adf0] cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    Ograniczone prawa rodzicielskie
+                  </label>
+                </div>
               </div>
             )}
             <section className="bg-white p-4 sm:p-6">
+              {index > 0 && (parent.noSecondParent || parent.limitedRights) ? (
+                <p className="text-sm text-gray-500">
+                  {parent.noSecondParent
+                    ? 'Zaznaczono „Brak drugiego opiekuna" — dane opiekuna 2 nie są wymagane.'
+                    : 'Zaznaczono „Ograniczone prawa rodzicielskie" — dane opiekuna 2 nie są wymagane.'}
+                </p>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -725,23 +761,10 @@ export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabl
                   )}
                 </div>
               </div>
+              )}
             </section>
           </div>
         ))}
-        {parents.length < 2 && (
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={addParent}
-              disabled={disabled}
-              className="text-[#03adf0] hover:text-[#0288c7] text-sm font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Dodaj opiekuna
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Dane uczestnika */}

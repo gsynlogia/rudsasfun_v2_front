@@ -24,6 +24,9 @@ export interface Step1FormData {
     street: string;
     postalCode: string;
     city: string;
+    // Trello #26: opiekun 2 obowiązkowy — checkboxy „ucieczki" (Brak / ograniczone prawa).
+    noSecondParent?: boolean;
+    limitedRights?: boolean;
   }>;
   participantData: {
     firstName: string;
