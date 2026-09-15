@@ -27,6 +27,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
     "identity-obj-proxy": "^3.0.0",
+    "knip": "^5.88.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
