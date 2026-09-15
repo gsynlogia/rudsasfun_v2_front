@@ -781,12 +781,22 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
   // Get dates
   const dates = formatDateRange(reservation.property_start_date, reservation.property_end_date);
 
-  // Tytuł przelewu: nazwa kolonii/obozu, termin, imię i nazwisko uczestnika, nr tel. wpłacającego
+  // Tytuł przelewu (Trello: prosimy o inną kolejność) —
+  // Nazwisko Imię uczestnika, Numer Rezerwacji, Tag turnusu, Temat obozu, Numer telefonu.
   const firstParent = reservation.parents_data?.[0];
   const payerPhone = firstParent
     ? [firstParent.phone, firstParent.phoneNumber].filter(Boolean).join(' ').trim() || ''
     : '';
-  const transferTitle = [campName, dates, participantName, payerPhone ? `tel. ${payerPhone}` : ''].filter(Boolean).join(', ');
+  const participantSurnameFirst = reservation.participant_last_name && reservation.participant_first_name
+    ? `${reservation.participant_last_name} ${reservation.participant_first_name}`
+    : participantName;
+  const transferTitle = [
+    participantSurnameFirst,
+    reservationNumber,
+    reservation.property_tag || '',
+    campName,
+    payerPhone,
+  ].filter(Boolean).join(', ');
 
   // Get center/city
   const _center = reservation.property_city || 'Brak danych';
