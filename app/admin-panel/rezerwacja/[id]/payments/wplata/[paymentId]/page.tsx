@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowLeft, Save, Upload, X, FileText, Download, Trash2, AlertTriangle } from 'lucide-react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -9,6 +9,7 @@ import SectionGuard from '@/components/admin/SectionGuard';
 import { useToast } from '@/components/ToastContainer';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { normalizeAmount } from '@/lib/utils/normalizeAmount';
+import { buildPaymentsDetailUrl } from '@/lib/utils/paymentsReturnUrl';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
@@ -19,6 +20,9 @@ interface ReservationDetails {
 export default function EditPaymentPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Zachowaj adres powrotu na listę (filtry/wyszukiwarka) w drodze powrotnej do szczegółów płatności.
+  const returnTo = searchParams?.get('returnTo');
   const reservationNumber = typeof params?.id === 'string'
     ? params.id
     : Array.isArray(params?.id)
@@ -115,7 +119,7 @@ export default function EditPaymentPage() {
         showSuccess('Wpłata została zaktualizowana pomyślnie');
       }
 
-      router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments`);
+      router.push(buildPaymentsDetailUrl(reservationNumber, returnTo));
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Błąd podczas aktualizacji wpłaty');
     } finally {
@@ -156,7 +160,7 @@ export default function EditPaymentPage() {
         <div className="h-full flex flex-col">
           <div className="mb-6 flex items-center gap-4">
             <button
-              onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments`)}
+              onClick={() => router.push(buildPaymentsDetailUrl(reservationNumber, returnTo))}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded"
               style={{ borderRadius: 0, cursor: 'pointer' }}
             >
@@ -359,7 +363,7 @@ export default function EditPaymentPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments`)}
+                    onClick={() => router.push(buildPaymentsDetailUrl(reservationNumber, returnTo))}
                     className="px-6 py-2 bg-gray-200 text-gray-800 hover:bg-gray-300 transition-all duration-200"
                     style={{ borderRadius: 0 }}
                   >
@@ -374,7 +378,7 @@ export default function EditPaymentPage() {
                       try {
                         await manualPaymentService.delete(paymentId);
                         showSuccess('Wpłata została usunięta pomyślnie');
-                        router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments`);
+                        router.push(buildPaymentsDetailUrl(reservationNumber, returnTo));
                       } catch (err) {
                         showError(err instanceof Error ? err.message : 'Błąd podczas usuwania wpłaty');
                       } finally {

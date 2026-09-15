@@ -13,6 +13,7 @@ import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualInvoiceService, ManualInvoiceResponse } from '@/lib/services/ManualInvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { paymentService, PaymentResponse } from '@/lib/services/PaymentService';
+import { returnToQuerySuffix } from '@/lib/utils/paymentsReturnUrl';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 interface ReservationDetails {
@@ -83,6 +84,9 @@ export default function ReservationPaymentsPage() {
   // BUG 001/002 (Ania): pełny URL listy (filtry + wyszukiwarka + sort) — powrót MUSI zachować filtry,
   // nie tylko numer strony. returnTo budowany przez ReservationsTableNew (buildListReturnUrl).
   const returnTo = searchParams?.get('returnTo');
+  // BUG „wyszukiwarka nie zapamiętuje nazwiska": przewlekamy returnTo w głąb (wpłata/faktura),
+  // żeby po powrocie z pod-strony przycisk „wstecz" na szczegółach dalej znał adres listy z filtrami.
+  const returnToSuffix = returnToQuerySuffix(returnTo);
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
@@ -716,7 +720,7 @@ export default function ReservationPaymentsPage() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-semibold text-gray-900">Wpłaty</h2>
                 <button
-                  onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/wplata/nowa`)}
+                  onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/wplata/nowa${returnToSuffix}`)}
                   className="flex items-center gap-2 px-3 py-1.5 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200 text-sm"
                   style={{ borderRadius: 0 }}
                 >
@@ -775,7 +779,7 @@ export default function ReservationPaymentsPage() {
                             key={`${payment.type}-${payment.id}`}
                             onClick={() => {
                               if (payment.type === 'manual') {
-                                router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/wplata/${payment.id}`);
+                                router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/wplata/${payment.id}${returnToSuffix}`);
                               } else {
                                 // Tpay payments are read-only, maybe show details in modal or just don't navigate
                                 // For now, don't navigate for Tpay payments
@@ -847,7 +851,7 @@ export default function ReservationPaymentsPage() {
                   </label>
                 </div>
                 <button
-                  onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/faktura/nowa`)}
+                  onClick={() => router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/faktura/nowa${returnToSuffix}`)}
                   disabled={!!reservation.invoice_issued_manual}
                   title={reservation.invoice_issued_manual ? 'Odznacz pole „Wystawiono fakturę”, aby dodać fakturę w systemie' : undefined}
                   className="flex items-center gap-2 px-3 py-1.5 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -901,7 +905,7 @@ export default function ReservationPaymentsPage() {
                             onClick={() => {
                               // Gdy faktura oznaczona ręcznie jako wystawiona — edycja zablokowana (odznacz checkbox).
                               if (reservation.invoice_issued_manual) return;
-                              router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/faktura/${invoice.id}`);
+                              router.push(`/admin-panel/rezerwacja/${reservationNumber}/payments/faktura/${invoice.id}${returnToSuffix}`);
                             }}
                             title={reservation.invoice_issued_manual ? 'Odznacz pole „Wystawiono fakturę”, aby edytować fakturę' : undefined}
                             className={`hover:bg-gray-50 transition-colors ${reservation.invoice_issued_manual ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
