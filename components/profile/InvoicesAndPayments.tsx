@@ -3,10 +3,13 @@
 import { FileText, Download, CheckCircle, XCircle, Calendar, CreditCard, Loader2, Paperclip } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { PromotionV2Snapshot } from '@/lib/buildPromoCodeCostRow';
+import { buildReservationCostRows, formatCostRowAmount, type CostRow } from '@/lib/buildReservationCostRows';
 import { contractService } from '@/lib/services/ContractService';
 import { invoiceService, InvoiceResponse } from '@/lib/services/InvoiceService';
 import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/ManualPaymentService';
 import { reservationService, type ReservationResponse } from '@/lib/services/ReservationService';
+import { authenticatedApiCall } from '@/utils/api-auth';
 import { API_BASE_URL } from '@/utils/api-config';
 
 interface Document {
@@ -51,6 +54,10 @@ export default function InvoicesAndPayments() {
     reservationId: number; reservationName: string; participantName?: string;
     wantsInvoice: boolean; recipient: string;
   }>>([]);
+  // Trello „dodać szczegóły płatności z podziałem": podział kosztów per rezerwacja (jak w rezerwacji)
+  const [costBreakdowns, setCostBreakdowns] = useState<Array<{
+    reservationId: number; reservationName: string; participantName: string; totalPrice: number; rows: CostRow[];
+  }>>([]);
 
   // Load user's invoices and payments
   useEffect(() => {
@@ -65,6 +72,38 @@ export default function InvoicesAndPayments() {
         // Get reservations to match with invoices
         const reservations: ReservationResponse[] = await reservationService.getMyReservations(0, 100);
         const reservationsMap = new Map(reservations.map(r => [r.id, r]));
+
+        // Podział kosztów per rezerwacja (ten sam co w podsumowaniu rezerwacji — pure helper).
+        // WAŻNE: getMyReservations zwraca lekki obiekt bez base_price/addons_data; pełny podział
+        // daje endpoint by-number (jak strona detalu). Snapshot promocji v2 pobieramy osobno.
+        const breakdowns = await Promise.all(
+          reservations.map(async (r) => {
+            const num = r.reservation_number ?? `REZ-${r.id}`;
+            let full: ReservationResponse = r;
+            if (r.reservation_number) {
+              try {
+                full = await reservationService.getReservationByNumber(r.reservation_number);
+              } catch {
+                full = r;
+              }
+            }
+            let promoV2: PromotionV2Snapshot | null = null;
+            try {
+              promoV2 = await authenticatedApiCall<PromotionV2Snapshot | null>(`/api/v2/reservations/${r.id}/promotion-v2`);
+            } catch {
+              promoV2 = null;
+            }
+            const participantName = [full.participant_first_name, full.participant_last_name].filter(Boolean).join(' ');
+            return {
+              reservationId: r.id,
+              reservationName: num,
+              participantName,
+              totalPrice: Number(full.total_price ?? r.total_price ?? 0),
+              rows: buildReservationCostRows(full, promoV2),
+            };
+          }),
+        );
+        setCostBreakdowns(breakdowns.filter((b) => b.rows.length > 0));
 
         // Map invoices to documents
         const documentsList: Document[] = invoicesResponse.invoices.map((invoice: InvoiceResponse) => {
@@ -272,6 +311,42 @@ export default function InvoicesAndPayments() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
+      {/* Szczegóły kosztów (podział jak w podsumowaniu rezerwacji) — Trello „dodać szczegóły" */}
+      {costBreakdowns.length > 0 && (
+        <div>
+          <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">
+            Szczegóły kosztów
+          </h3>
+          <div className="space-y-4">
+            {costBreakdowns.map((b) => (
+              <div key={b.reservationId} className="bg-white rounded-lg shadow-sm p-4 sm:p-5">
+                <h4 className="text-sm sm:text-base font-semibold text-gray-900 mb-3">
+                  {b.reservationName}{b.participantName ? ` · ${b.participantName}` : ''}
+                </h4>
+                <div className="bg-gray-50 rounded-lg p-3 sm:p-4 space-y-1.5 text-xs sm:text-sm">
+                  {b.rows.map((row, idx) => (
+                    <div key={idx} className="flex justify-between items-center gap-3">
+                      <span className="text-gray-700">{row.label}</span>
+                      {row.infoOnly ? (
+                        <span className="text-gray-500 italic shrink-0">–</span>
+                      ) : (
+                        <span className="font-medium tabular-nums text-gray-900 shrink-0">
+                          {row.amount! >= 0 ? formatCostRowAmount(row.amount!) : `${row.amount!.toFixed(2)} zł`}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center gap-3 pt-2 border-t border-gray-200 font-semibold">
+                    <span className="text-gray-900">Koszt całkowity</span>
+                    <span className="text-gray-900 tabular-nums shrink-0">{b.totalPrice.toFixed(2)} zł</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Invoices Section */}
       <div>
         <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">
