@@ -10,6 +10,7 @@ import { manualPaymentService, ManualPaymentResponse } from '@/lib/services/Manu
 import { paymentService } from '@/lib/services/PaymentService';
 import { qualificationCardService, QualificationCardResponse } from '@/lib/services/QualificationCardService';
 import { ReservationResponse } from '@/lib/services/ReservationService';
+import { getClientDocumentDotPresentation } from '@/lib/utils/clientDocumentDotLabel';
 
 import { getStaticAssetUrl } from '@/utils/api-config';
 import UniversalModal from '../admin/UniversalModal';
@@ -362,6 +363,11 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
     await loadQualificationCard();
   };
 
+  // Kolor + opis kropki statusu dla umowy i karty (Trello: klient nie wie, co oznaczają kolory).
+  // Liczone tą samą 3-stanową logiką co same kropki, żeby tekst zgadzał się z kolorem.
+  const contractDot = getClientDocumentDotPresentation(reservation.contract_status);
+  const cardDot = getClientDocumentDotPresentation(reservation.qualification_card_status);
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -379,20 +385,18 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Umowa</p>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
             <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
-              {(() => {
-                const status = reservation.contract_status;
-                if (status === 'approved' || status === 'accepted') {
-                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full" />;
-                } else if (status === 'rejected') {
-                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full" />;
-                } else {
-                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full" />;
-                }
-              })()}
+              <div
+                title={contractDot.label}
+                className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${contractDot.dotClass} rounded-full`}
+              />
             </div>
             <div className="flex flex-col items-center gap-2 sm:gap-3">
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
               <p className="text-[10px] sm:text-xs text-gray-600 text-center">Umowa</p>
+              {/* Opis kolorowej kropki (Trello: klient nie wie, co oznaczają kolory) */}
+              <p className={`text-[9px] sm:text-[11px] font-medium text-center leading-tight ${contractDot.textClass}`}>
+                {contractDot.label}
+              </p>
               <button
                 onClick={() => {
                   const formatReservationNumber = (reservationId: number, createdAt: string) => {
@@ -494,21 +498,19 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
           <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Karta kwalifikacyjna</p>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
             <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
-              {(() => {
-                const status = reservation.qualification_card_status;
-                if (status === 'approved') {
-                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full" />;
-                } else if (status === 'rejected') {
-                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full" />;
-                } else {
-                  return <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full" />;
-                }
-              })()}
+              <div
+                title={cardDot.label}
+                className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${cardDot.dotClass} rounded-full`}
+              />
             </div>
             <div className="flex flex-col items-center gap-2 sm:gap-3">
               <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
               <p className="text-[10px] sm:text-xs text-gray-600 text-center">
                 {loadingCard ? 'Ładowanie...' : 'Karta kwalifikacyjna'}
+              </p>
+              {/* Opis kolorowej kropki (Trello: klient nie wie, co oznaczają kolory) */}
+              <p className={`text-[9px] sm:text-[11px] font-medium text-center leading-tight ${cardDot.textClass}`}>
+                {cardDot.label}
               </p>
               <button
                 onClick={async () => {
