@@ -179,6 +179,8 @@ interface BackendReservationWithPayments {
   invoice_postal_code?: string | null;
   invoice_nip?: string | null;
   invoice_issued?: boolean;
+  // Aśka 2026-10-06 — koszt transportu doliczony klientowi (jak w szczegółach rezerwacji); null = błąd wyceny
+  transport_price?: number | null;
 }
 
 interface PaginatedPaymentsResponse {
@@ -3156,6 +3158,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           invoiceCodeCity: [item.invoice_postal_code || '', item.invoice_city || ''].filter(Boolean).join(' '),
           invoiceNip: item.invoice_nip || '',
           invoiceIssued: !!item.invoice_issued,
+          transportPrice: item.transport_price ?? '',
         };
       });
 
@@ -3309,7 +3312,7 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
       //   - nie wymagają decyzji biznesowych
       //   - nie mają ryzyka RODO (psychiatryka/PESEL pominięte do osobnej decyzji)
       type ExportRow = (typeof exportData)[number];
-      type AmountKey = 'payment4Amount' | 'payment5Amount' | 'payment6Amount' | 'payment7Amount';
+      type AmountKey = 'payment4Amount' | 'payment5Amount' | 'payment6Amount' | 'payment7Amount' | 'transportPrice';
       // 30 Excel-only kolumn — 11 z ETAP 1 (wpłaty 4-5, kod, info, zakwat, zgody) + 19 z ETAP 2 (wpłaty 6-7, dieta, zdrowie, faktura)
       // Pełna lista 64 kolumn Joanny: 34 panel + 30 excel-only = 64.
       const EXCEL_ONLY_COLUMNS: Array<{ header: string; amountKey?: AmountKey; getValue: (r: ExportRow) => string | number }> = [
@@ -3323,6 +3326,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         { header: 'Data wpłaty 6', getValue: r => r.payment6?.date || '' },
         { header: 'Wpłata 7', amountKey: 'payment7Amount', getValue: r => r.payment7?.amount ?? '' },
         { header: 'Data wpłaty 7', getValue: r => r.payment7?.date || '' },
+        // Aśka (WhatsApp 2026-10-06): koszt transportu doliczony klientowi — ta sama kwota co w szczegółach rezerwacji.
+        { header: 'Koszt transportu', amountKey: 'transportPrice', getValue: r => r.transportPrice },
         // Kod rabatowy + dane uczestnika (ETAP 1 + ETAP 2)
         { header: 'Kod Rabatowy', getValue: r => r.kodRabatowy },
         { header: 'dieta', getValue: r => r.dietName },
