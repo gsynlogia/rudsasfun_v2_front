@@ -4,6 +4,7 @@
  */
 
 import { authService } from '@/lib/services/AuthService';
+import { guardiansToSubmit } from '@/lib/utils/guardians';
 // Import types from sessionStorage
 import { API_BASE_URL } from '@/utils/api-config';
 import type {
@@ -520,9 +521,9 @@ class ReservationService {
     totalPrice: number,
     depositAmount?: number,
   ): CreateReservationRequest {
-    // Send all parents/guardians to backend
-    // All parents are saved to database, but only first parent is used for payment processing
-    const allParents = step1Data.parents || [];
+    // Opiekun 2 z zaznaczonym „Brak drugiego opiekuna" / „Ograniczone prawa rodzicielskie" nie jest wysyłany
+    // (pola ukryte i puste — backend odrzucał całą rezerwację błędem 422).
+    const allParents = guardiansToSubmit(step1Data.parents || []);
 
     return {
       camp_id: campId,

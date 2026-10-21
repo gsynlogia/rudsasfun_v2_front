@@ -8,6 +8,7 @@ import UniversalModal from '@/components/admin/UniversalModal';
 import { useReservation } from '@/context/ReservationContext';
 import { paymentService } from '@/lib/services/PaymentService';
 import { reservationService, ReservationService } from '@/lib/services/ReservationService';
+import { guardiansToSubmit } from '@/lib/utils/guardians';
 import type { StepComponentProps, ReservationItem } from '@/types/reservation';
 import {
   defaultStep1FormData,
@@ -807,9 +808,9 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const firstParent: ParentData = (step1Data?.parents && step1Data.parents.length > 0)
     ? step1Data.parents[0]
     : defaultParent;
-  const secondParent: ParentData | null = (step1Data?.parents && step1Data.parents.length > 1)
-    ? step1Data.parents[1]
-    : null;
+  // Opiekun 2 tylko wtedy, gdy zostanie wysłany — bez pustego bloku przy „Brak" / „Ograniczone prawa".
+  const submittedParents = guardiansToSubmit(step1Data?.parents || []);
+  const secondParent: ParentData | null = submittedParents.length > 1 ? submittedParents[1] : null;
   const participant: ParticipantData = step1Data?.participantData || defaultParticipant;
 
   // Helper to format phone number
