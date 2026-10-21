@@ -3,11 +3,13 @@
 import { ArrowLeft, Save, Calendar, MapPin, Truck, Copy, Search, Trash2, UtensilsCrossed, Tag, Shield } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import AdminLayout from '@/components/admin/AdminLayout';
 import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
+import SeasonTiles from '@/components/admin/SeasonTiles';
 import UniversalModal from '@/components/admin/UniversalModal';
+import type { Season } from '@/lib/types/seasons';
 import type { Camp, CampProperty, CampPropertyTransport, TransportCity } from '@/types/reservation';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
@@ -223,6 +225,13 @@ export default function CampTurnusEditPage({
 
   // Form state
   const [period, setPeriod] = useState<'lato' | 'zima'>('lato');
+  const [seasonId, setSeasonId] = useState<number | null>(null);
+  const [originalStartDate, setOriginalStartDate] = useState('');
+  // Okres lato/zima bierze się z wybranego sezonu (2026-10-21) — koniec „lato” na sztywno.
+  const handleSeasonChange = useCallback((season: Season) => {
+    setSeasonId(season.id);
+    setPeriod(season.period);
+  }, []);
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');   // Trello: adres ośrodka do umowy
   const [startDate, setStartDate] = useState('');
@@ -352,10 +361,12 @@ export default function CampTurnusEditPage({
           } else {
             // Populate form with property data
             setPeriod(propertyData.period as 'lato' | 'zima');
+            setSeasonId(propertyData.season_id ?? null);
             setCity(propertyData.city);
             setAddress((propertyData as { address?: string }).address || '');
             // Convert ISO date to YYYY-MM-DD format for input
             setStartDate(propertyData.start_date.split('T')[0]);
+            setOriginalStartDate(propertyData.start_date.split('T')[0]);
             setEndDate(propertyData.end_date.split('T')[0]);
             setMaxParticipants(propertyData.max_participants || 50);
             setBasePrice(propertyData.base_price || 2200);
@@ -433,8 +444,9 @@ export default function CampTurnusEditPage({
     const todayDate = new Date(today);
     todayDate.setHours(0, 0, 0, 0);
 
-    // Check if start date is not in the past
-    if (start < todayDate) {
+    // Data startu w przeszłości blokuje tylko jej zmianę — edycja trwającego albo archiwalnego
+    // turnusu (np. ceny) musi działać (Szymon 2026-10-21).
+    if (startDate !== originalStartDate && start < todayDate) {
       setError('Data rozpoczęcia nie może być w przeszłości');
       return;
     }
@@ -444,6 +456,11 @@ export default function CampTurnusEditPage({
     minEndDate.setDate(minEndDate.getDate() + 1);
     if (end < minEndDate) {
       setError('Data zakończenia musi być co najmniej 1 dzień po dacie rozpoczęcia');
+      return;
+    }
+
+    if (seasonId === null) {
+      setError('Wybierz sezon');
       return;
     }
 
@@ -464,7 +481,8 @@ export default function CampTurnusEditPage({
       await authenticatedApiCall(`${API_BASE_URL}/api/camps/${campId}/properties/${turnusId}`, {
         method: 'PUT',
         body: JSON.stringify({
-          period: 'lato', // Always "lato"
+          period,
+          season_id: seasonId,
           city: city.trim(),
           address: address.trim() || null,   // Trello: adres ośrodka do umowy
           start_date: startDate,
@@ -1284,12 +1302,12 @@ export default function CampTurnusEditPage({
               </div>
             )}
 
-            {/* Period - hidden, always set to "lato" */}
-            <input
-              type="hidden"
-              id="period"
-              value="lato"
-            />
+            <fieldset>
+              <legend className="block text-sm font-medium text-gray-700 mb-2">
+                Sezon <span className="text-red-500">*</span>
+              </legend>
+              <SeasonTiles value={seasonId} onChange={handleSeasonChange} />
+            </fieldset>
 
             {/* City */}
             <div>

@@ -74,14 +74,24 @@ export async function autoCleanupOrphaned(
 
 // ---------- AUTOMATYZACJA SEZONOWA (rozkaz Pana 2026-06-19) ----------
 // Miasta + uczestnicy generowani z całego sezonu (wszystkie aktywne turnusy) — bez „Dodaj połączenie".
-export async function getSeasonCities(direction: Direction): Promise<CityCounts[]> {
-  return jsonOrThrow(
-    await authenticatedFetch(`${BASE}/season/cities?direction=${direction}`), 'getSeasonCities');
+// Sezony (2026-10-21): seasonId = punkt odniesienia (np. zarchiwizowane lato); brak = bieżący sezon.
+function seasonParam(seasonId: number | null, separator: '?' | '&'): string {
+  return seasonId !== null ? `${separator}season_id=${seasonId}` : '';
 }
 
-export async function getSeasonParticipants(direction: Direction): Promise<ParticipantRow[]> {
-  return jsonOrThrow(
-    await authenticatedFetch(`${BASE}/season/participants?direction=${direction}`), 'getSeasonParticipants');
+export async function getSeasonCities(
+  direction: Direction, seasonId: number | null = null,
+): Promise<CityCounts[]> {
+  return jsonOrThrow(await authenticatedFetch(
+    `${BASE}/season/cities?direction=${direction}${seasonParam(seasonId, '&')}`), 'getSeasonCities');
+}
+
+export async function getSeasonParticipants(
+  direction: Direction, seasonId: number | null = null,
+): Promise<ParticipantRow[]> {
+  return jsonOrThrow(await authenticatedFetch(
+    `${BASE}/season/participants?direction=${direction}${seasonParam(seasonId, '&')}`),
+    'getSeasonParticipants');
 }
 
 export async function getTagsDetailed(): Promise<TagDetail[]> {
@@ -89,9 +99,10 @@ export async function getTagsDetailed(): Promise<TagDetail[]> {
 }
 
 // Trello 344 — worek „Wyjechali przed czasem" (osobna kategoria, aktywny sezon)
-export async function getSeasonEarlyLeave(): Promise<ParticipantRow[]> {
+export async function getSeasonEarlyLeave(seasonId: number | null = null): Promise<ParticipantRow[]> {
   return jsonOrThrow(
-    await authenticatedFetch(`${BASE}/season/early-leave`), 'getSeasonEarlyLeave');
+    await authenticatedFetch(`${BASE}/season/early-leave${seasonParam(seasonId, '?')}`),
+    'getSeasonEarlyLeave');
 }
 
 // ---------- DESTYNACJE / TRASY (G02: CRUD kolorów + przypisań miast) ----------

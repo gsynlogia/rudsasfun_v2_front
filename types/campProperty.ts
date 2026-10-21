@@ -16,6 +16,9 @@ export interface CampProperty {
   is_full?: boolean;
   is_ended?: boolean;
   visible_in_reservation?: boolean;
+  season_id?: number | null;
+  season_name?: string | null;
+  season_archived?: boolean;
   hide_promotions_section?: boolean;
   hide_addons_section?: boolean;
   hide_protections_section?: boolean;

@@ -1,15 +1,18 @@
 'use client';
 
-import { Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Calendar, MapPin, Plus } from 'lucide-react';
+import { Building2, Search, ChevronUp, ChevronDown, X, ChevronDown as ChevronDownIcon, Check, Edit, Trash2, Calendar, MapPin, Plus, CalendarRange } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from 'react';
 
+import { inArchiveScope, parseArchiveScope, type ArchiveScope } from '@/lib/utils/seasons';
 import type { Camp, CampProperty } from '@/types/reservation';
 import { authenticatedApiCall } from '@/utils/api-auth';
 
 import AdminPageHeader from './AdminPageHeader';
+import ArchiveScopeSwitch from './ArchiveScopeSwitch';
 import CampPropertyForm from './CampPropertyForm';
 import DeleteConfirmationModal, { DeleteItemType } from './DeleteConfirmationModal';
+import SeasonsModal from './SeasonsModal';
 
 interface CampWithProperties extends Camp {
   properties: CampProperty[];
@@ -23,6 +26,9 @@ interface CampWithProperties extends Camp {
 export default function CampsManagementTable() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Sezony (2026-10-21): przełącznik turnusów i okno „Sezony” trzymane w URL (RULES_FRONTEND #D).
+  const archiveScope = parseArchiveScope(searchParams?.get('archive'));
+  const seasonsModalOpen = searchParams?.get('sezony') === '1';
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
 
   // State for camps data
@@ -84,6 +90,28 @@ export default function CampsManagementTable() {
     const newUrl = params.toString() ? `/admin-panel/camps?${params.toString()}` : '/admin-panel/camps';
     router.replace(newUrl);
   };
+
+  const setUrlParam = (key: string, value: string | null) => {
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    if (value === null) {
+      params.delete(key);
+    } else {
+      params.set(key, value);
+    }
+    const query = params.toString();
+    router.replace(query ? `/admin-panel/camps?${query}` : '/admin-panel/camps');
+  };
+
+  const handleArchiveScopeChange = (scope: ArchiveScope) => {
+    setUrlParam('archive', scope === 'active' ? null : scope);
+  };
+
+  // Turnusy obozu w zakresie przełącznika Aktualne / Archiwalne / Wszystkie.
+  const scopedProperties = useCallback(
+    (camp: CampWithProperties): CampProperty[] =>
+      (camp.properties ?? []).filter((prop) => inArchiveScope(prop.season_archived, archiveScope)),
+    [archiveScope],
+  );
 
   // Multi-select state for cities
   const [isCitySelectOpen, setIsCitySelectOpen] = useState(false);
@@ -183,8 +211,8 @@ export default function CampsManagementTable() {
             bValue = b.name;
             break;
           case 'propertiesCount':
-            aValue = a.properties?.length || 0;
-            bValue = b.properties?.length || 0;
+            aValue = scopedProperties(a).length;
+            bValue = scopedProperties(b).length;
             break;
           case 'createdAt':
             aValue = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -205,7 +233,7 @@ export default function CampsManagementTable() {
     }
 
     return filtered;
-  }, [searchQuery, periodFilter, cityFilters, sortColumn, sortDirection, allCamps]);
+  }, [searchQuery, periodFilter, cityFilters, sortColumn, sortDirection, allCamps, scopedProperties]);
 
   // Pagination
   const totalPages = Math.ceil(filteredCamps.length / itemsPerPage);
@@ -508,6 +536,15 @@ export default function CampsManagementTable() {
       {/* Granatowa belka (AdminPageHeader) — spójna ze stylem Rezerwacji/Szczegółów rezerwacji */}
       <AdminPageHeader title="Obozy">
         <button
+          type="button"
+          onClick={() => setUrlParam('sezony', '1')}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-[#03adf0] border-2 border-[#03adf0] hover:bg-[#03adf0] hover:text-white transition-all duration-200 text-sm font-medium"
+          style={{ borderRadius: 0, cursor: 'pointer' }}
+        >
+          <CalendarRange className="w-4 h-4" aria-hidden="true" />
+          Sezony
+        </button>
+        <button
           onClick={handleCreateCamp}
           className="flex items-center gap-2 px-4 py-2 bg-[#03adf0] text-white hover:bg-[#0288c7] transition-all duration-200 text-sm font-medium"
           style={{ borderRadius: 0, cursor: 'pointer' }}
@@ -516,6 +553,12 @@ export default function CampsManagementTable() {
           Dodaj obóz
         </button>
       </AdminPageHeader>
+
+      <SeasonsModal
+        isOpen={seasonsModalOpen}
+        onClose={() => setUrlParam('sezony', null)}
+        onArchived={() => void loadCamps()}
+      />
 
       {/* Search Bar */}
       <div className="mb-3">
@@ -538,6 +581,12 @@ export default function CampsManagementTable() {
 
       {/* Filters */}
       <div className="mb-3 flex flex-wrap gap-2">
+        <ArchiveScopeSwitch
+          name="campsArchiveScope"
+          tone="light"
+          value={archiveScope}
+          onChange={handleArchiveScopeChange}
+        />
         {/* Period Filters */}
         {availablePeriods.map(period => (
           <button
@@ -786,12 +835,12 @@ export default function CampsManagementTable() {
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <span className="text-sm text-gray-900">
-                            {camp.properties?.length || 0}
+                            {scopedProperties(camp).length}
                           </span>
                         </td>
                         <td className="px-4 py-2">
                           <div className="flex flex-wrap gap-1">
-                            {camp.properties?.slice(0, 3).map((prop) => (
+                            {scopedProperties(camp).slice(0, 3).map((prop) => (
                               <span
                                 key={prop.id}
                                 className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
@@ -799,9 +848,9 @@ export default function CampsManagementTable() {
                                 {getPeriodLabel(prop.period)} - {prop.city}
                               </span>
                             ))}
-                            {camp.properties && camp.properties.length > 3 && (
+                            {scopedProperties(camp).length > 3 && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                +{camp.properties.length - 3}
+                                +{scopedProperties(camp).length - 3}
                               </span>
                             )}
                           </div>
@@ -845,9 +894,9 @@ export default function CampsManagementTable() {
                                   Dodaj turnus
                                 </button>
                               </div>
-                              {camp.properties && camp.properties.length > 0 ? (
+                              {scopedProperties(camp).length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  {camp.properties.map((property) => (
+                                  {scopedProperties(camp).map((property) => (
                                     <div key={property.id} className="bg-white rounded-lg p-4 border border-gray-200 relative">
                                       <div className="space-y-2">
                                         <div className="flex items-center justify-between">

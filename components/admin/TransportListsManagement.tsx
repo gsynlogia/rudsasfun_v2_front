@@ -11,8 +11,11 @@ import {
   MapPin, Home, Plus, Users, Hash, GitCompare, ListChecks, Table2, Bus, AlertCircle, X, UserX, Trash2,
   Palette,
 } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { listSeasons } from '@/lib/services/seasonsApi';
+import type { Season } from '@/lib/types/seasons';
 import type {
   Connection, Direction, CityCounts, ParticipantRow, Tabor, OrphanedAssignment,
 } from '@/lib/types/transportLists';
@@ -22,6 +25,7 @@ import {
   getSeasonEarlyLeave,
   getOrphanedAssignments, autoCleanupOrphaned, removeParticipant, reorderTaborParticipants,
 } from '@/lib/services/transportListsApi';
+import { parseSeasonId } from '@/lib/utils/seasons';
 import {
   type Resort, type SelectionState, emptySelection, toggleCity, toggleResortCell, toggleMaster,
   hasAnySelection, calculateSelectedTotal, selectDisplayedParticipants, isTransferParticipant, toggleColumnKey,
@@ -32,6 +36,7 @@ import AddTaborModal from './transport/AddTaborModal';
 import CitiesPanel from './transport/CitiesPanel';
 import DeleteTaborModal from './transport/DeleteTaborModal';
 import ParticipantsPanel, { PARTICIPANT_COLUMN_META, DEFAULT_VISIBLE_COLUMNS } from './transport/ParticipantsPanel';
+import SeasonFilter from './transport/SeasonFilter';
 import TaborOverflowModal from './transport/TaborOverflowModal';
 import TaborPanel from './transport/TaborPanel';
 import TransportCompareModal from './transport/TransportCompareModal';
@@ -39,11 +44,18 @@ import TransportDocumentModal from './transport/TransportDocumentModal';
 import TransportListsModal from './transport/TransportListsModal';
 import RoutesManagerModal from './transport/RoutesManagerModal';
 
+const TRANSPORT_LISTS_PATH = '/admin-panel/transports/listy-transportowe';
 type PanelMode = 'numbers' | 'participants'; // toggle Cyfry / Uczestnicy
 const ALL_RESORTS: Resort[] = ['beaver', 'sawa', 'limba'];
 
 export default function TransportListsManagement() {
   const [direction, setDirection] = useState<Direction>('arrival');
+  // Sezony (2026-10-21): wybór sezonu w URL (?sezon=ID) — bez wyboru listy liczą bieżący sezon.
+  const router = useRouter();
+  const pathname = usePathname() ?? TRANSPORT_LISTS_PATH;
+  const searchParams = useSearchParams();
+  const seasonId = parseSeasonId(searchParams?.get('sezon'));
+  const [seasons, setSeasons] = useState<Season[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [activeConnectionId, setActiveConnectionId] = useState<number | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>('numbers');
@@ -111,6 +123,21 @@ export default function TransportListsManagement() {
 
   useEffect(() => { void loadConnections(); }, [loadConnections]);
 
+  useEffect(() => {
+    listSeasons().then(setSeasons).catch(() => setSeasons([]));
+  }, []);
+
+  const handleSeasonChange = (id: number | null) => {
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    if (id === null) {
+      params.delete('sezon');
+    } else {
+      params.set('sezon', String(id));
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
   // Reload danych aktywnego źródła: SEZON (auto z bazy) gdy brak połączenia, inaczej dane połączenia.
   // BUG 003: `silent` pomija flagę loading — panele NIE znikają (nie unmountują), więc rozwinięty tabor
   // zostaje otwarty po usunięciu uczestnika. reloadKey i tak wymusza odświeżenie liczb/list w taborach.
@@ -119,8 +146,8 @@ export default function TransportListsManagement() {
     try {
       if (activeConnectionId == null) {
         const [c, p] = await Promise.all([
-          getSeasonCities(direction).catch(() => [] as CityCounts[]),
-          getSeasonParticipants(direction).catch(() => [] as ParticipantRow[]),
+          getSeasonCities(direction, seasonId).catch(() => [] as CityCounts[]),
+          getSeasonParticipants(direction, seasonId).catch(() => [] as ParticipantRow[]),
         ]);
         setCities(c); setParticipants(p); setTabors([]); setOrphaned([]); setAutoRemovedCount(0);
       } else {
@@ -141,7 +168,7 @@ export default function TransportListsManagement() {
     } finally {
       setLoading(false);
     }
-  }, [activeConnectionId, direction]);
+  }, [activeConnectionId, direction, seasonId]);
 
   useEffect(() => {
     setTransferCities(new Set());
@@ -300,6 +327,7 @@ export default function TransportListsManagement() {
         <div className="flex items-center gap-2">
           <Bus className="h-6 w-6 text-sky-600" />
           <h1 className="text-xl font-semibold text-gray-900">Listy transportowe</h1>
+          <SeasonFilter seasons={seasons} value={seasonId} onChange={handleSeasonChange} />
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => setCompareOpen(true)} data-testid="open-compare"
@@ -494,7 +522,7 @@ export default function TransportListsManagement() {
               setEarlyLeaveListOpen(true);
               setEarlyLeaveListLoading(true);
               try {
-                setEarlyLeaveList(await getSeasonEarlyLeave());
+                setEarlyLeaveList(await getSeasonEarlyLeave(seasonId));
               } catch {
                 setEarlyLeaveList([]);
               } finally {

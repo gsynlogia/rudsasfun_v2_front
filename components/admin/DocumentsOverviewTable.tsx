@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { getDocumentsScopeParams } from '@/lib/utils/documentsQueryParams';
+import { parseArchiveScope, type ArchiveScope } from '@/lib/utils/seasons';
 import {
   computeReminderRowColor,
   computeActiveRowColor,
@@ -16,6 +17,8 @@ import {
 } from '@/lib/utils/computeReminderRowColor';
 
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
+import ArchiveScopeSwitch from '@/components/admin/ArchiveScopeSwitch';
+
 import AlreadySignedInfoModal from './AlreadySignedInfoModal';
 import BulkRemindModal from './BulkRemindModal';
 import RecentlyRemindedInfoModal from './RecentlyRemindedInfoModal';
@@ -276,6 +279,13 @@ function ownUrlKeys(urlPrefix: string = ''): string[] {
 
 // Cz. 6 (2026-05-31): backend params BEZ urlPrefix (backend uzywa standardowych nazw 'page', 'filter_X').
 // effectiveShowOrganic dodawane tylko w mode='effective'.
+/** Dokleja archive_filter (sezony 2026-10-21) do zapytania o listę Dokumentów. */
+function withArchiveScope(qs: string, scope: ArchiveScope): string {
+  const params = new URLSearchParams(qs);
+  params.set('archive_filter', scope);
+  return params.toString();
+}
+
 function buildQueryString(
   page: number,
   filters: FiltersState,
@@ -405,6 +415,10 @@ export default function DocumentsOverviewTable({
   // Cz. 6 (2026-05-31): urlPrefix — main uzywa '', modal uzywa 'effective_'.
   // To pozwala obu tabelom (main + modal) wspolistniec w URL bez konfliktu paginacji/filtrow.
   const urlPrefix = mode === 'effective' ? 'effective_' : '';
+  // Sezony (2026-10-21): przełącznik Aktualne/Archiwalne/Wszystkie tylko w widoku głównym; okno
+  // „Skuteczne powiadomienia” liczy jak dotąd ze wszystkich rezerwacji.
+  const archiveScope: ArchiveScope =
+    mode === 'active' ? parseArchiveScope(searchParams?.get('archive')) : 'all';
 
   // Init z URL (raz przy mount + przy zmianie URL — np. back button)
   const initialPage = parseInt(searchParams?.get(`${urlPrefix}page`) || '1', 10) || 1;
@@ -516,7 +530,10 @@ export default function DocumentsOverviewTable({
     setLoading(true);
     setError(null);
     try {
-      const qs = buildQueryString(page, f, mode, effectiveShowOrganic, hideRecentReminders, hideApproved, sortBy, sortDir);
+      const qs = withArchiveScope(
+        buildQueryString(page, f, mode, effectiveShowOrganic, hideRecentReminders, hideApproved, sortBy, sortDir),
+        archiveScope,
+      );
       const data = await authenticatedApiCall<PaginatedResponse>(
         `/api/reservations/paginated?${qs}`,
       );
@@ -532,7 +549,7 @@ export default function DocumentsOverviewTable({
     } finally {
       if (token === fetchTokenRef.current) setLoading(false);
     }
-  }, [mode, effectiveShowOrganic, hideRecentReminders, hideApproved, sortBy, sortDir]);
+  }, [mode, effectiveShowOrganic, hideRecentReminders, hideApproved, sortBy, sortDir, archiveScope]);
 
   useEffect(() => {
     fetchPage(currentPage, filters);
@@ -687,7 +704,10 @@ export default function DocumentsOverviewTable({
     // Fetch wszystkich IDs z aktualnymi filtrami
     setSelectAllLoading(true);
     try {
-      const qs = buildQueryString(1, filters, mode, effectiveShowOrganic, hideRecentReminders);
+      const qs = withArchiveScope(
+        buildQueryString(1, filters, mode, effectiveShowOrganic, hideRecentReminders),
+        archiveScope,
+      );
       const params = new URLSearchParams(qs);
       params.delete('page');
       params.delete('limit');
@@ -701,6 +721,21 @@ export default function DocumentsOverviewTable({
     } finally {
       setSelectAllLoading(false);
     }
+  }
+
+  function handleArchiveScopeChange(scope: ArchiveScope) {
+    // Inny zakres = inna lista: wracamy na 1. stronę i czyścimy zaznaczenie.
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    if (scope === 'active') {
+      params.delete('archive');
+    } else {
+      params.set('archive', scope);
+    }
+    params.delete(`${urlPrefix}page`);
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+    const search = params.toString();
+    router.replace(`/admin-panel/documents${search ? `?${search}` : ''}`, { scroll: false });
   }
 
   function updateUrl(page: number, f: FiltersState) {
@@ -757,6 +792,14 @@ export default function DocumentsOverviewTable({
   // naglowku modala "Skuteczne powiadomienia" (mode='effective'). Logika/onClick/style BEZ zmian (1:1).
   const headerActions = (
     <>
+      {mode === 'active' && (
+        <ArchiveScopeSwitch
+          name="documentsArchiveScope"
+          tone="dark"
+          value={archiveScope}
+          onChange={handleArchiveScopeChange}
+        />
+      )}
       {loading && rows.length > 0 && (
         <RefreshCw className="w-4 h-4 animate-spin text-[#03adf0]" />
       )}

@@ -1,11 +1,14 @@
 'use client';
 
 import { X, Save, Calendar, MapPin, Tag } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
+import type { Season } from '@/lib/types/seasons';
 import type { CampProperty } from '@/types/reservation';
 import { authenticatedApiCall } from '@/utils/api-auth';
 import { API_BASE_URL } from '@/utils/api-config';
+
+import SeasonTiles from './SeasonTiles';
 
 interface CampPropertyFormProps {
   campId: number;
@@ -24,7 +27,8 @@ export default function CampPropertyForm({
   onSuccess,
   onCancel,
 }: CampPropertyFormProps) {
-  const [_period, setPeriod] = useState<'lato' | 'zima'>('lato');
+  const [period, setPeriod] = useState<'lato' | 'zima'>('lato');
+  const [seasonId, setSeasonId] = useState<number | null>(null);
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');   // Trello: adres ośrodka do umowy
   const [startDate, setStartDate] = useState('');
@@ -38,6 +42,12 @@ export default function CampPropertyForm({
   const [hideProtections, setHideProtections] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Okres lato/zima bierze się z wybranego sezonu (2026-10-21) — koniec „lato” na sztywno.
+  const handleSeasonChange = useCallback((season: Season) => {
+    setSeasonId(season.id);
+    setPeriod(season.period);
+  }, []);
 
   const isEditMode = property !== null;
 
@@ -55,6 +65,7 @@ export default function CampPropertyForm({
   useEffect(() => {
     if (property) {
       setPeriod(property.period as 'lato' | 'zima');
+      setSeasonId(property.season_id ?? null);
       setCity(property.city);
       setAddress((property as { address?: string }).address || '');
       // Convert ISO date to YYYY-MM-DD format for input
@@ -76,6 +87,10 @@ export default function CampPropertyForm({
     setError(null);
 
     try {
+      if (seasonId === null) {
+        throw new Error('Wybierz sezon');
+      }
+
       // Validate dates
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -106,7 +121,8 @@ export default function CampPropertyForm({
       const method = isEditMode ? 'PUT' : 'POST';
       const body = isEditMode
         ? JSON.stringify({
-            period: 'lato', // Always "lato" for new turnus
+            period,
+            season_id: seasonId,
             city: city.trim(),
             address: address.trim() || null,
             start_date: startDate,
@@ -121,7 +137,8 @@ export default function CampPropertyForm({
           })
         : JSON.stringify({
             camp_id: campId,
-            period: 'lato', // Always "lato" for new turnus
+            period,
+            season_id: seasonId,
             city: city.trim(),
             address: address.trim() || null,
             start_date: startDate,
@@ -170,12 +187,16 @@ export default function CampPropertyForm({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Period field - hidden, always set to "lato" */}
-        <input
-          type="hidden"
-          id="period"
-          value="lato"
-        />
+        <fieldset>
+          <legend className="block text-sm font-medium text-gray-700 mb-2">
+            Sezon <span className="text-red-500">*</span>
+          </legend>
+          <SeasonTiles
+            value={seasonId}
+            onChange={handleSeasonChange}
+            preselectCurrent={!isEditMode}
+          />
+        </fieldset>
 
         <div>
           <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
