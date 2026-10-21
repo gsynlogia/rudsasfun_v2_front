@@ -63,3 +63,7 @@ sticky-test-screenshots/
 /playwright-report/
 /screenshots_playwright/
 /playwright/.auth/
+# testy mutacyjne (Stryker)
+.stryker-tmp
+reports/mutation
+e2e-results

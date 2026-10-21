@@ -8,7 +8,10 @@
     "build:check": "next build",
     "start": "next start",
     "lint": "eslint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:mutation": "stryker run",
+    "test:e2e": "node e2e/kreator.mjs local brak e2e-results/local_brak && node e2e/kreator.mjs local ograniczone e2e-results/local_ograniczone && node e2e/kreator.mjs local dwoje e2e-results/local_dwoje"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
@@ -20,6 +23,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^8.7.1",
+    "@stryker-mutator/vitest-runner": "^8.7.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -28,7 +33,9 @@
     "eslint-config-next": "16.0.10",
     "identity-obj-proxy": "^3.0.0",
     "knip": "^5.88.1",
+    "playwright-core": "^1.56.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }
