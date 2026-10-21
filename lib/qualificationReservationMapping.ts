@@ -8,6 +8,7 @@ import type { ReservationData } from './contractReservationMapping';
 export interface QualificationFormReservationData {
   reservationId?: string;
   turnName?: string;
+  turnPeriod?: string;
   campLocation?: string;
   campDates?: string;
   childName?: string;
@@ -402,6 +403,7 @@ export function mapReservationToQualificationForm(
   return {
     reservationId: data.reservation_number || (data.id ? `REZ-2026-${data.id}` : undefined),
     turnName: turnName || undefined,
+    turnPeriod: data.property_period || undefined,
     campLocation: campLocation || undefined,
     campDates: campDates || undefined,
     childName: childName || undefined,

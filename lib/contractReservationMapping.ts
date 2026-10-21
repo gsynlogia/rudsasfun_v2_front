@@ -5,6 +5,7 @@
  */
 
 export interface ReservationData {
+  property_period?: string | null; // 'lato' | 'zima' — wersja karty kwalifikacyjnej
   id: number;
   reservation_number: string;
   participant_first_name: string;

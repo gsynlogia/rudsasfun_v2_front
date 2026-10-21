@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import type { SignedQualificationPayload } from '@/lib/qualificationReservationMapping';
+import { CARD_ACTIVITIES, CARD_ADDITIONAL_INFO_HINT, qualificationCardSeason } from '@/lib/qualificationSeasonTexts';
 import { signedPayloadOverlayOnly, signedPayloadToFormState, getSecondParentFromPayload } from '@/lib/qualificationReservationMapping';
 import { authService } from '@/lib/services/AuthService';
 import { isValidPesel } from '@/lib/utils/pesel';
@@ -69,6 +70,7 @@ interface QualificationFormProps {
   reservationId?: number | null;
   reservationData?: {
     turnName?: string;
+    turnPeriod?: string;
     campLocation?: string;
     campDates?: string;
     childName?: string;
@@ -145,6 +147,8 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
   const [healthChronicTags, setHealthChronicTags] = useState<string[]>([]);
   const [healthDysfunctionsTags, setHealthDysfunctionsTags] = useState<string[]>([]);
   const [healthPsychiatricTags, setHealthPsychiatricTags] = useState<string[]>([]);
+  // Wersja karty LATO/ZIMA z okresu turnusu, bez roku (Trello v9VIJ4V1).
+  const cardSeason = qualificationCardSeason(reservationData?.turnPeriod);
   const [healthAdditionalNotes, setHealthAdditionalNotes] = useState('');
   /** Który modal tagów zdrowia jest otwarty: null | 'chronic' | 'dysfunctions' | 'psychiatric' */
   const [healthTagModal, setHealthTagModal] = useState<null | 'chronic' | 'dysfunctions' | 'psychiatric'>(null);
@@ -1033,11 +1037,11 @@ export function QualificationForm({ reservationId: reservationIdProp, reservatio
           {/* Nagłówek */}
           <div className="header">
             <div className="date">{getCurrentDateTime()}</div>
-            <div className="title-center">Karta Kwalifikacyjna Uczestnika Wypoczynku LATO 2026</div>
+            <div className="title-center">Karta Kwalifikacyjna Uczestnika Wypoczynku {cardSeason}</div>
             <Image src="/logo.png" alt="RADSAS fun" width={75} height={40} className="logo" />
           </div>
 
-          <h1 className="main-title">KARTA KWALIFIKACYJNA UCZESTNIKA WYPOCZYNKU LATO 2026</h1>
+          <h1 className="main-title">KARTA KWALIFIKACYJNA UCZESTNIKA WYPOCZYNKU {cardSeason}</h1>
 
           {!printMode && viewMode !== 'zatwierdzona' && (
             <div className="no-print" style={{ background: '#f0f7ff', border: '1px solid #b3d4ff', borderRadius: '6px', padding: '0.8rem 1.2rem', marginBottom: '0.5rem' }}>
@@ -1404,10 +1408,11 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                   value={healthAdditionalNotes}
                   onChange={(e) => setHealthAdditionalNotes(e.target.value)}
                   readOnly={printMode || viewMode === 'zatwierdzona'}
-                  className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
+                  className={`textarea-field print-hide ${isEditable ? 'editable-field' : ''}`}
                   rows={2}
                   placeholder="Pozostałe informacje (np. po przecinku)"
                 />
+                <div className="print-text">{healthAdditionalNotes}</div>
               </div>
             </div>
           </section>
@@ -1426,7 +1431,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
                 W CZASIE POBYTU DZIECKA NA KOLONII ORGANIZOWANEJ PRZEZ FIRMĘ RADSAS FUN SP. Z O.O.
               </p>
               <div className="info-text-below">
-                Stwierdzam brak przeciwwskazań do uczestnictwa w specjalistycznych imprezach i obozach oraz uprawiania takiej zajęć rekreacji ruchowej jak m.in.: jazda na quadach, skuterze wodnym, bananie wodnym, ścianka wspinaczkowa, park linowy, kąpiele w jeziorze, park wodny, kajaki i rowerki wodne, Energylandia, Aquapark.
+                Stwierdzam brak przeciwwskazań do uczestnictwa w specjalistycznych imprezach i obozach oraz uprawiania takiej zajęć rekreacji ruchowej jak m.in.: {CARD_ACTIVITIES[cardSeason]}
               </div>
             </div>
           </section>
@@ -1438,7 +1443,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
         <div className="page">
           <div className="header-simple">
             <div className="date">{getCurrentDateTime()}</div>
-            <div className="title-center">Karta Kwalifikacyjna Uczestnika Wypoczynku LATO 2026</div>
+            <div className="title-center">Karta Kwalifikacyjna Uczestnika Wypoczynku {cardSeason}</div>
             <Image src="/logo.png" alt="RADSAS fun" width={60} height={32} className="logo-small" />
           </div>
 
@@ -1553,15 +1558,16 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
           <section className="section">
             <h2 className="section-title">III INFORMACJE DODATKOWE</h2>
             <div className="info-text">
-              Prosimy o podanie dodatkowych informacji np. przyjedzie dzień później, rodzic ma ograniczone prawa rodzicielskie, ma urodziny podczas obozu, boi się balonów, itp.
+              {CARD_ADDITIONAL_INFO_HINT[cardSeason]}
             </div>
             <textarea
               value={formData.additionalInfo}
               onChange={(e) => handleChange('additionalInfo', e.target.value)}
               readOnly={printMode || viewMode === 'zatwierdzona'}
-              className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
+              className={`textarea-field print-hide ${isEditable ? 'editable-field' : ''}`}
               rows={2}
             />
+            <div className="print-text">{formData.additionalInfo}</div>
           </section>
 
           {/* Sekcja IV - Karta Kwalifikacyjna */}
@@ -1575,9 +1581,10 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
               value={formData.vaccineInfo}
               onChange={(e) => handleChange('vaccineInfo', e.target.value)}
               readOnly={printMode || viewMode === 'zatwierdzona'}
-              className={`textarea-field ${isEditable ? 'editable-field' : ''}`}
+              className={`textarea-field print-hide ${isEditable ? 'editable-field' : ''}`}
               rows={2}
             />
+            <div className="print-text">{formData.vaccineInfo}</div>
           </section>
 
           {/* Sekcja V */}
@@ -1859,9 +1866,7 @@ PLACÓWKĘ WYPOCZYNKU – impreza organizowana przez Radsas Fun sp. z o.o. z sie
 
           {/* Sekcja VII */}
           <section className="section">
-            <h2 className="section-title">VII POTWIERDZENIE PRZEZ KIEROWNIKA WYPOCZYNKU POBYTU UCZESTNIKA WYPOCZYNKU W/REJSCU WYPOCZYNKU (WYPEŁNIANIE PRZEZ
-KIEROWNIKA DO CELÓW WAMNET ŻYWIENIA WYRSTAWANIE SA NA PODSTAWE ODREDREGO WNICSKU RODZICAROPIEKUNA
-PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CHOROBY PRZEBYTE W TRAKCIE)</h2>
+            <h2 className="section-title">VII POTWIERDZENIE PRZEZ KIEROWNIKA WYPOCZYNKU POBYTU UCZESTNIKA WYPOCZYNKU W MIEJSCU WYPOCZYNKU (WYPEŁNIANE PRZEZ KIEROWNIKA DO CELÓW WEWNĘTRZNYCH, WYSTAWIANE SĄ NA PODSTAWIE ODRĘBNEGO WNIOSKU RODZICA / OPIEKUNA PRAWNEGO) I INFORMACJE O UCZESTNIKU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CHOROBY PRZEBYTE W TRAKCIE)</h2>
 
             <div className="field-group">
               <label>Uczestnik przybywał (impreza wypoczynku)</label>
@@ -3020,6 +3025,26 @@ PRAWNEGO) I INFORMACJE O UCZESTNIU W CZASIE TRWANIA WYPOCZYNKU (STAN ZDROWIA, CH
           font-size: 7.5pt;
           color: #555;
           font-weight: 600;
+        }
+      
+        .print-text {
+          display: none;
+        }
+
+        @media print {
+          /* Wydruk pokazuje cały tekst rodzica, a nie tylko 2 linijki pola (Trello v9VIJ4V1). */
+          .print-hide {
+            display: none;
+          }
+
+          .print-text {
+            display: block;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            min-height: 2.5em;
+          }
         }
       `}</style>
     </>
