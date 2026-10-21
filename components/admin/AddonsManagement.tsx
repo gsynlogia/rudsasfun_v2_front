@@ -19,6 +19,7 @@ interface Addon {
   display_order: number;
   is_active: boolean;
   default_selected?: boolean;
+  is_mandatory?: boolean;
   centers?: string[];
   created_at: string;
   updated_at: string;
@@ -49,6 +50,7 @@ export default function AddonsManagement() {
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [selectedCenters, setSelectedCenters] = useState<string[]>([]);
   const [addonDefaultSelected, setAddonDefaultSelected] = useState<boolean>(true);
+  const [addonMandatory, setAddonMandatory] = useState<boolean>(false);
 
   // Available centers
   const availableCenters = ['SAWA', 'BEAVER', 'LIMBA'];
@@ -99,6 +101,7 @@ export default function AddonsManagement() {
     setSelectedAddon(null);
     setSelectedCenters([]);
     setAddonDefaultSelected(true); // Domyślnie zaznaczone
+    setAddonMandatory(false);
   };
 
   // Open create modal
@@ -116,6 +119,7 @@ export default function AddonsManagement() {
     setAddonIconSvg(addon.icon_svg || '');
     setSelectedCenters(addon.centers || []);
     setAddonDefaultSelected(addon.default_selected ?? true);
+    setAddonMandatory(addon.is_mandatory ?? false);
     // If addon has icon_url, construct full URL for preview
     if (addon.icon_url) {
       const API_BASE_URL = getApiBaseUrlRuntime();
@@ -228,6 +232,7 @@ export default function AddonsManagement() {
         is_active: true,
         display_order: 0, // Will be set to max + 1 on backend if 0
         default_selected: addonDefaultSelected,
+        is_mandatory: addonMandatory,
         centers: selectedCenters, // Include selected centers
       };
 
@@ -777,6 +782,22 @@ export default function AddonsManagement() {
               <p className="text-xs text-gray-500 mt-1 ml-6">
                 Jeśli zaznaczone, dodatek będzie automatycznie wybrany w kroku 2 procesu rezerwacji
               </p>
+            </div>
+
+            {/* Obowiązkowy (ZIMA 2027 — SKIPASS) */}
+            <div>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={addonMandatory}
+                  onChange={(e) => setAddonMandatory(e.target.checked)}
+                  className="mr-2 w-4 h-4 text-[#03adf0] border-gray-300 rounded focus:ring-[#03adf0]"
+                  disabled={saving}
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Obowiązkowy (zaznaczony, bez możliwości odznaczenia)
+                </span>
+              </label>
             </div>
 
             {/* Actions */}

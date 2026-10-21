@@ -18,6 +18,7 @@ interface Addon {
   icon_url?: string | null;
   icon_svg?: string | null;
   default_selected?: boolean;
+  is_mandatory?: boolean;
 }
 
 /**
@@ -113,6 +114,7 @@ export default function AddonsSection() {
           icon_url?: string | null;
           icon_svg?: string | null;
           default_selected?: boolean;
+          is_mandatory?: boolean;
         }) => ({
           id: addon.id.toString(),
           name: addon.name,
@@ -121,15 +123,24 @@ export default function AddonsSection() {
           icon_url: addon.icon_url,
           icon_svg: addon.icon_svg,
           default_selected: addon.default_selected ?? false,
+          is_mandatory: addon.is_mandatory ?? false,
         }));
         setAddons(addonsFromApi);
+
+        // Dodatki obowiązkowe (np. SKIPASS) są zawsze zaznaczone — także przy danych zapisanych wcześniej.
+        const mandatoryIds = addonsFromApi
+          .filter((addon: Addon) => addon.is_mandatory)
+          .map((addon: Addon) => addon.id);
+        if (mandatoryIds.length > 0) {
+          setSelectedAddons((prev) => new Set([...prev, ...mandatoryIds]));
+        }
 
         // Auto-select addons with default_selected = true if no saved data exists
         const savedData = loadStep2FormData();
         if (!savedData || !savedData.selectedAddons || !Array.isArray(savedData.selectedAddons) || savedData.selectedAddons.length === 0) {
           // No saved data - auto-select addons with default_selected = true
           const defaultSelectedIds = addonsFromApi
-            .filter((addon: Addon) => addon.default_selected)
+            .filter((addon: Addon) => addon.default_selected || addon.is_mandatory)
             .map((addon: Addon) => addon.id);
           if (defaultSelectedIds.length > 0) {
             setSelectedAddons(new Set(defaultSelectedIds));
@@ -375,7 +386,10 @@ export default function AddonsSection() {
             return (
               <button
                 key={addon.id}
+                aria-disabled={addon.is_mandatory || undefined}
                 onClick={() => {
+                  // Dodatku obowiązkowego nie da się odznaczyć (arkusz „Dodatki”, ZIMA 2027).
+                  if (addon.is_mandatory) return;
                   // Trello 355: przy DODAWANIU (dokupywaniu) pokaż modal; przy odznaczaniu — od razu
                   if (selectedAddons.has(addon.id)) {
                     toggleAddon(addon.id);
@@ -438,6 +452,13 @@ export default function AddonsSection() {
                 }`}>
                   {addon.price > 0 ? `+${addon.price} zł` : '0 zł'}
                 </span>
+                {addon.is_mandatory && (
+                  <span className={`text-[9px] sm:text-[10px] font-semibold ${
+                    isSelected ? 'text-white' : 'text-gray-600'
+                  }`}>
+                    Obowiązkowy
+                  </span>
+                )}
               </button>
             );
           })}
