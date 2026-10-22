@@ -11,7 +11,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:mutation": "stryker run",
-    "test:e2e": "node e2e/kreator.mjs local brak e2e-results/local_brak && node e2e/kreator.mjs local ograniczone e2e-results/local_ograniczone && node e2e/kreator.mjs local dwoje e2e-results/local_dwoje"
+    "test:e2e": "node e2e/run.mjs local",
+    "test:e2e:dev": "node e2e/run.mjs dev"
   },
   "dependencies": {
     "chart.js": "^4.5.1",

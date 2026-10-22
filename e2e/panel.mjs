@@ -1,3 +1,4 @@
+// DEPRECATED 2026-10-22: zastąpione przez e2e/run.mjs (15 scenariuszy ZIMA 2027); usunięcie dopiero po zgodzie Szymona (TD-047).
 // Test end-to-end panelu klienta na DEV: Magic Link → umowa i karta rezerwacji → podpis kodem SMS (podgląd SMS na DEV).
 // Uruchomienie: node e2e/panel.mjs <numer REZ-…> <katalog wyników>
 import fs from 'node:fs';

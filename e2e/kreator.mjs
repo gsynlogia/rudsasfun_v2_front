@@ -1,3 +1,4 @@
+// DEPRECATED 2026-10-22: zastąpione przez e2e/run.mjs (15 scenariuszy ZIMA 2027); usunięcie dopiero po zgodzie Szymona (TD-047).
 // Test end-to-end kreatora (przeglądarka na monitorze Odyssey): Magic Link → kroki 1–5 → złożenie rezerwacji.
 // Uruchomienie: node e2e/kreator.mjs <local|dev> <brak|ograniczone|dwoje> <katalog wyników>
 // Lokalnie link logowania jest czytany z lokalnej bazy, na DEV z podglądu maili (emails-rezerwacja-radsasfun.synlogia.dev).
