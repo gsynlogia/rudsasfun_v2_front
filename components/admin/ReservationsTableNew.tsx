@@ -72,6 +72,8 @@ interface FilterOptions {
   hasSkuter: string[];
   hasEnergylandia: string[];
   hasTermy: string[];
+  hasSkipass: string[];
+  hasSkiEquipment: string[];
   transportEarlyLeave: string[];
   // Amount filters from backend (all unique values from entire database)
   totalAmount: string[];
@@ -299,6 +301,8 @@ interface ReservationPayment {
   hasSkuter?: boolean;
   hasEnergylandia?: boolean;
   hasTermy?: boolean;
+  hasSkipass?: boolean;
+  hasSkiEquipment?: boolean;
   // Document statuses
   contractStatus?: string | null;
   qualificationCardStatus?: string | null;
@@ -1092,6 +1096,8 @@ const mapReservationToPaymentFormat = async (
   let hasSkuter = false;
   let hasEnergylandia = false;
   let hasTermy = false;
+  let hasSkipass = false;
+  let hasSkiEquipment = false;
 
   // Check protections for Oaza and Tarcza
   if (protectionNames) {
@@ -1114,6 +1120,9 @@ const mapReservationToPaymentFormat = async (
       if (addonNameLower.includes('skuter')) hasSkuter = true;
       if (addonNameLower.includes('energylandia')) hasEnergylandia = true;
       if (addonNameLower.includes('termy')) hasTermy = true;
+      // zima 2027: SKIPASS i „Komplet sprzętu narciarskiego …” (po nazwie, jak dodatki letnie)
+      if (addonNameLower.includes('skipass')) hasSkipass = true;
+      if (addonNameLower.includes('narciarsk')) hasSkiEquipment = true;
     }
   });
 
@@ -1206,6 +1215,8 @@ const mapReservationToPaymentFormat = async (
     hasSkuter,
     hasEnergylandia,
     hasTermy,
+    hasSkipass,
+    hasSkiEquipment,
     contractStatus: reservation.contract_status || null,
     qualificationCardStatus: reservation.qualification_card_status || null,
     payment1,
@@ -1830,6 +1841,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     hasSkuter: 'Skuter',
     hasEnergylandia: 'Energylandia',
     hasTermy: 'Termy',
+    hasSkipass: 'SKIPASS',
+    hasSkiEquipment: 'Komplet narciarski',
     qualificationCardStatus: 'Karta kwalifikacyjna',
     contractStatus: 'Umowa',
     status: 'Status wpłaty',
@@ -1905,6 +1918,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
     'hasSkuter',
     'hasEnergylandia',
     'hasTermy',
+    'hasSkipass',
+    'hasSkiEquipment',
     'qualificationCardStatus',
     'contractStatus',
     'invoiceIssued',
@@ -2351,6 +2366,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           break;
         case 'hasTermy':
           value = reservation.hasTermy ? 'Tak' : 'Nie';
+          break;
+        case 'hasSkipass':
+          value = reservation.hasSkipass ? 'Tak' : 'Nie';
+          break;
+        case 'hasSkiEquipment':
+          value = reservation.hasSkiEquipment ? 'Tak' : 'Nie';
           break;
         case 'qualificationCardStatus':
           value = getDocumentStatusVisual(reservation.qualificationCardStatus as DocumentStatus).label;
@@ -3083,6 +3104,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         const hasSkuter = addonNamesLower.includes('skuter');
         const hasEnergylandia = addonNamesLower.includes('energylandia');
         const hasTermy = addonNamesLower.includes('termy');
+        const hasSkipass = addonNamesLower.includes('skipass');
+        const hasSkiEquipment = addonNamesLower.includes('narciarsk');
 
         // Use reservation_number from API if available, otherwise generate from ID (fallback)
         const exportBaseNumber = item.reservation_number || `REZ-${new Date(item.created_at || '').getFullYear()}-${item.id}`;
@@ -3127,6 +3150,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           hasSkuter,
           hasEnergylandia,
           hasTermy,
+          hasSkipass,
+          hasSkiEquipment,
           qualificationCardStatus: item.qualification_card_status || '',
           contractStatus: item.contract_status || '',
           paymentStatus: item.payment_status || 'unpaid',
@@ -3263,6 +3288,12 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             case 'hasTermy':
               value = reservation.hasTermy ? 'Tak' : 'Nie';
               break;
+            case 'hasSkipass':
+              value = reservation.hasSkipass ? 'Tak' : 'Nie';
+              break;
+            case 'hasSkiEquipment':
+              value = reservation.hasSkiEquipment ? 'Tak' : 'Nie';
+              break;
             case 'qualificationCardStatus':
               // Bug Ani 2026-06-01: helper obsługuje też signed_pending_admin (podpisana SMS, czeka admin).
               value = getDocumentStatusVisual(reservation.qualificationCardStatus as DocumentStatus).label;
@@ -3339,6 +3370,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         { header: 'Skuter', getValue: r => r.hasSkuter ? 'Tak' : 'Nie' },
         { header: 'Energylandia', getValue: r => r.hasEnergylandia ? 'Tak' : 'Nie' },
         { header: 'Termy', getValue: r => r.hasTermy ? 'Tak' : 'Nie' },
+        { header: 'SKIPASS', getValue: r => r.hasSkipass ? 'Tak' : 'Nie' },
+        { header: 'Komplet narciarski', getValue: r => r.hasSkiEquipment ? 'Tak' : 'Nie' },
         // Zdrowie (ETAP 2) — Joanna: #45-50 + #51
         { header: 'Choroby przewlekłe', getValue: r => r.healthChronicDiseases ? 'Tak' : 'Nie' },
         { header: 'info o chorobach przewlekłych', getValue: r => r.healthChronicDiseasesInfo },
@@ -3880,6 +3913,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
           let hasSkuter = false;
           let hasEnergylandia = false;
           let hasTermy = false;
+          let hasSkipass = false;
+          let hasSkiEquipment = false;
           selectedAddonsList.forEach((addonId: string | number) => {
             const data = addonsMap.get(String(addonId));
             if (data?.name) {
@@ -3888,6 +3923,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
               if (n.includes('skuter')) hasSkuter = true;
               if (n.includes('energylandia')) hasEnergylandia = true;
               if (n.includes('termy')) hasTermy = true;
+              if (n.includes('skipass')) hasSkipass = true;
+              if (n.includes('narciarsk')) hasSkiEquipment = true;
             }
           });
 
@@ -3947,6 +3984,8 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
             hasSkuter,
             hasEnergylandia,
             hasTermy,
+            hasSkipass,
+            hasSkiEquipment,
             contractStatus: reservation.contract_status || null,
             qualificationCardStatus: reservation.qualification_card_status || null,
             payment1: allPaymentRecords[0] || null,
@@ -4168,6 +4207,10 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         return reservation.hasEnergylandia ? 'Tak' : 'Nie';
       case 'hasTermy':
         return reservation.hasTermy ? 'Tak' : 'Nie';
+      case 'hasSkipass':
+        return reservation.hasSkipass ? 'Tak' : 'Nie';
+      case 'hasSkiEquipment':
+        return reservation.hasSkiEquipment ? 'Tak' : 'Nie';
       case 'qualificationCardStatus':
         return getDocumentStatusVisual(reservation.qualificationCardStatus as DocumentStatus).label;
       case 'contractStatus':
@@ -5845,6 +5888,26 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
                             return (
                               <td key={columnKey} className="px-4 py-2 whitespace-nowrap text-center">
                                 {reservation.hasTermy ? (
+                                  <Check className="w-5 h-5 text-green-600 mx-auto" />
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            );
+                          } else if (columnKey === 'hasSkipass') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap text-center">
+                                {reservation.hasSkipass ? (
+                                  <Check className="w-5 h-5 text-green-600 mx-auto" />
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            );
+                          } else if (columnKey === 'hasSkiEquipment') {
+                            return (
+                              <td key={columnKey} className="px-4 py-2 whitespace-nowrap text-center">
+                                {reservation.hasSkiEquipment ? (
                                   <Check className="w-5 h-5 text-green-600 mx-auto" />
                                 ) : (
                                   <span className="text-gray-400">-</span>

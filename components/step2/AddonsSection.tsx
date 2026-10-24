@@ -28,6 +28,8 @@ interface Addon {
 export default function AddonsSection() {
   const params = useParams();
   const { reservation, addReservationItem, removeReservationItem } = useReservation();
+  // Ramka z opisem atrakcji (info_header) opisuje ośrodki letnie — przy turnusach zimowych jej nie pokazujemy (Aśka 2026-10-24).
+  const isWinterTurnus = reservation.camp?.properties?.period === 'zima';
   const editionIdFromUrl = params?.editionId as string | undefined;
   const propertyIdFromUrl = editionIdFromUrl !== null && editionIdFromUrl !== undefined && editionIdFromUrl !== '' && !Number.isNaN(Number(editionIdFromUrl))
     ? Number(editionIdFromUrl)
@@ -474,7 +476,7 @@ export default function AddonsSection() {
               <div className="animate-pulse bg-gray-200 h-4 rounded w-full"></div>
             </div>
           </div>
-        ) : addons.length > 0 && (infoHeader || addons.some(a => a.description)) ? (
+        ) : addons.length > 0 && !isWinterTurnus && (infoHeader || addons.some(a => a.description)) ? (
           <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg">
             <Info className="w-5 h-5 text-[#03adf0] flex-shrink-0 mt-0.5" />
             <div className="flex-1">
