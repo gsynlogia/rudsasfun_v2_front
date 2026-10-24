@@ -3613,7 +3613,9 @@ export default function ReservationsTableNew(props: ReservationsTableNewProps = 
         // Fetch addons (requires authentication)
         try {
           const { authenticatedApiCall } = await import('@/utils/api-auth');
-          const addonsResponse = await authenticatedApiCall<{ addons: Array<{ id: number; name: string; price: number }>; total: number }>('/api/addons?include_inactive=true');
+          // Ukośnik przed „?”: bez niego backend odsyła 307, a przeglądarka na produkcji to przekierowanie blokuje
+          // (pusta mapa dodatków = kolumny Quad/Termy/SKIPASS/Komplet zawsze „–”). 2026-10-24.
+          const addonsResponse = await authenticatedApiCall<{ addons: Array<{ id: number; name: string; price: number }>; total: number }>('/api/addons/?include_inactive=true');
           const addonsMapData = new Map<string, { name: string; price: number }>();
           if (addonsResponse && addonsResponse.addons && Array.isArray(addonsResponse.addons)) {
             addonsResponse.addons.forEach(addon => {
