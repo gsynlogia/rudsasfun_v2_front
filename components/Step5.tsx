@@ -46,6 +46,9 @@ interface Source {
  * Step5 Component - Summary and Payment
  * Displays reservation summary and payment options
  */
+/** Opis wpisany przez klienta przy „Tak” w stanie zdrowia — ma być widoczny w podsumowaniu (Trello #382). */
+const healthDetailSuffix = (details?: string): string => (details && details.trim() ? ` — ${details.trim()}` : '');
+
 export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabled = false }: StepComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -901,11 +904,14 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 {step1Data ? (
                   <>
-                    <div>Choroby przewlekłe: {getHealthStatusLabel(step1Data.healthQuestions.chronicDiseases)}</div>
-                    <div>Dysfunkcje: {getHealthStatusLabel(step1Data.healthQuestions.dysfunctions)}</div>
-                    <div>Leczenie psychiatryczne: {getHealthStatusLabel(step1Data.healthQuestions.psychiatric)}</div>
+                    <div>Choroby przewlekłe: {getHealthStatusLabel(step1Data.healthQuestions.chronicDiseases)}{healthDetailSuffix(step1Data.healthDetails?.chronicDiseases)}</div>
+                    <div>Dysfunkcje: {getHealthStatusLabel(step1Data.healthQuestions.dysfunctions)}{healthDetailSuffix(step1Data.healthDetails?.dysfunctions)}</div>
+                    <div>Leczenie psychiatryczne: {getHealthStatusLabel(step1Data.healthQuestions.psychiatric)}{healthDetailSuffix(step1Data.healthDetails?.psychiatric)}</div>
                     {step1Data.additionalNotes && step1Data.additionalNotes.trim() !== '' ? (
                       <div>Inne: {step1Data.additionalNotes}</div>
+                    ) : null}
+                    {step1Data.participantAdditionalInfo && step1Data.participantAdditionalInfo.trim() !== '' ? (
+                      <div>Informacje dodatkowe dotyczące uczestnika: {step1Data.participantAdditionalInfo}</div>
                     ) : null}
                   </>
                 ) : (

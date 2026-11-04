@@ -1282,7 +1282,8 @@ export default function ReservationMain({ reservation, isDetailsExpanded, onTogg
                   const showField = (label: string, signedVal: string | undefined, resVal: string | undefined, draftVal: string | undefined) => {
                     const base = signedVal ?? resVal ?? '';
                     const diff = draftVal && draftVal !== base ? getDiffText(base, draftVal) : '';
-                    if (!base && !diff) return null;
+                    // Zaznaczone „Tak” bez opisu też ma być widoczne (Trello #382).
+                    if (!base && !diff) return <div key={label}>{label}: Tak</div>;
                     return (
                       <div key={label}>
                         {label}: {base || ''}
