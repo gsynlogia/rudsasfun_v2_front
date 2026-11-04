@@ -98,7 +98,6 @@ export default function GeneralDietsManagement() {
     setIconSvg(diet.icon_svg || '');
     // If diet has icon_url, construct full URL for preview
     if (diet.icon_url) {
-      const API_BASE_URL = getApiBaseUrlRuntime();
       // Check if icon_url is already a full URL or just a relative path
       if (diet.icon_url.startsWith('http://') || diet.icon_url.startsWith('https://')) {
         // Already a full URL, use it directly
@@ -109,7 +108,8 @@ export default function GeneralDietsManagement() {
         setIconRelativePath(relativePath);
       } else {
         // Relative path, construct full URL
-        setIconUploadUrl(`${API_BASE_URL}/static/${diet.icon_url}`);
+        // Lista zwraca już adres z /static/, więc doklejanie go drugi raz dawało zepsuty obrazek w podglądzie.
+        setIconUploadUrl(getStaticAssetUrl(diet.icon_url) || null);
         setIconRelativePath(diet.icon_url);
       }
     } else {

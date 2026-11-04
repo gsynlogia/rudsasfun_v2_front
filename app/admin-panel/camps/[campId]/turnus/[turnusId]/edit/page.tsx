@@ -1,7 +1,6 @@
 'use client';
 
 import { ArrowLeft, Save, Calendar, MapPin, Truck, Copy, Search, Trash2, UtensilsCrossed, Tag, Shield } from 'lucide-react';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -12,6 +11,7 @@ import UniversalModal from '@/components/admin/UniversalModal';
 import type { Season } from '@/lib/types/seasons';
 import type { Camp, CampProperty, CampPropertyTransport, TransportCity } from '@/types/reservation';
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { getStaticAssetUrl } from '@/utils/api-config';
 
 // Helper interface for transport city with defaults
 interface TransportCityWithDefaults {
@@ -94,6 +94,7 @@ interface StandardDiet {
   id: number;
   name: string;
   price: number;
+  icon_url?: string | null;
 }
 
 // Jedna pozycja w turnusie = jedna dieta do odpięcia; dieta własna może mieć kilka wierszy z cenami.
@@ -1623,7 +1624,7 @@ export default function CampTurnusEditPage({
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <UtensilsCrossed className="w-5 h-5 text-gray-600" />
-                  <h2 className="text-lg font-semibold text-gray-900">Dietary prescriptions</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">Diety</h2>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1705,12 +1706,10 @@ export default function CampTurnusEditPage({
                             {/* Show icon if available */}
                             {diet.icon_url && (
                               <div className="mt-2">
-                                <Image
-                                  src={diet.icon_url}
+                                <img
+                                  src={getStaticAssetUrl(diet.icon_url) || ''}
                                   alt={diet.name || 'Dieta'}
-                                  width={32}
-                                  height={32}
-                                  className="object-contain"
+                                  className="w-8 h-8 object-contain"
                                 />
                               </div>
                             )}
@@ -2395,8 +2394,15 @@ export default function CampTurnusEditPage({
                   }`}
                   style={{ borderRadius: 0 }}
                 >
-                  <p className="text-sm font-medium text-gray-900">{diet.name}</p>
-                  <p className="text-xs text-gray-700 mt-1">Cena: {Number(diet.price).toFixed(2)} PLN</p>
+                  <div className="flex items-center gap-3">
+                    {getStaticAssetUrl(diet.icon_url) && (
+                      <img src={getStaticAssetUrl(diet.icon_url)} alt={diet.name} className="w-8 h-8 object-contain flex-shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{diet.name}</p>
+                      <p className="text-xs text-gray-700 mt-1">Cena: {Number(diet.price).toFixed(2)} PLN</p>
+                    </div>
+                  </div>
                 </div>
               ))}
               {filteredDiets.length > 0 && (

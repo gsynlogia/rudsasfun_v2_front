@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Plus, Edit, Search, Trash2, Save, X } from '
 import { useState, useEffect } from 'react';
 
 import { authenticatedApiCall } from '@/utils/api-auth';
+import { getStaticAssetUrl } from '@/utils/api-config';
 
 interface GeneralDietRelation {
   id: number;
@@ -32,6 +33,7 @@ interface GeneralDiet {
   name: string;
   price: number;
   display_name: string;
+  icon_url?: string | null;
 }
 
 interface CampProperty {
@@ -44,6 +46,12 @@ interface CampProperty {
 }
 
 const DIETS_PAGE_SIZE = 25;
+
+function DietIcon({ iconUrl, name }: { iconUrl?: string | null; name: string }) {
+  const src = getStaticAssetUrl(iconUrl);
+  if (!src) return null;
+  return <img src={src} alt={name} className="w-6 h-6 object-contain flex-shrink-0" />;
+}
 
 export default function CenterDietsManagement() {
   const [diets, setDiets] = useState<CenterDiet[]>([]);
@@ -286,7 +294,11 @@ export default function CenterDietsManagement() {
                   {diet.general_diets && diet.general_diets.length > 0 ? (
                     <div className="space-y-1">
                       {diet.general_diets.map((rel) => (
-                        <div key={rel.id} className="text-xs">
+                        <div key={rel.id} className="text-xs flex items-center gap-2">
+                          <DietIcon
+                            iconUrl={generalDiets.find((gd) => gd.id === rel.general_diet_id)?.icon_url}
+                            name={rel.general_diet_name}
+                          />
                           {rel.general_diet_name}: {rel.price.toFixed(2)} PLN
                         </div>
                       ))}
@@ -424,7 +436,8 @@ export default function CenterDietsManagement() {
                         className="mr-2"
                         disabled={saving}
                       />
-                      <span className="text-sm text-gray-700">
+                      <DietIcon iconUrl={gd.icon_url} name={gd.display_name} />
+                      <span className="text-sm text-gray-700 ml-2">
                         {gd.display_name} - {gd.price.toFixed(2)} PLN
                       </span>
                     </label>
@@ -445,6 +458,7 @@ export default function CenterDietsManagement() {
 
                       return (
                         <div key={generalDietId} className="flex items-center gap-4">
+                          <DietIcon iconUrl={generalDiet.icon_url} name={generalDiet.display_name} />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-gray-700">{generalDiet.display_name}</p>
                             <p className="text-xs text-gray-500">
