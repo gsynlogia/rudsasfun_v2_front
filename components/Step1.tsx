@@ -5,6 +5,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react
 
 
 import { useReservation } from '@/context/ReservationContext';
+import { authService } from '@/lib/services/AuthService';
 import type { StepComponentProps } from '@/types/reservation';
 import { API_BASE_URL } from '@/utils/api-config';
 import { isFakeDataEnabled, getFakeStep1Data } from '@/utils/fakeData';
@@ -144,6 +145,20 @@ export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabl
   const validationAttemptedRef = useRef(false);
   // Flag to prevent saving empty data before loading from sessionStorage
   const isDataLoadedRef = useRef(false);
+
+  // Trello #198: e-mail opiekuna 1 to zawsze e-mail konta klienta — nie można go zmienić ani wpisać cudzego.
+  // Bez konta z e-mailem (np. panel admina) pole działa jak dotąd.
+  const [accountEmail, setAccountEmail] = useState('');
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setAccountEmail(user?.user_type === 'client' ? (user.email || '').trim() : '');
+  }, []);
+  const firstParentEmail = parents[0]?.email;
+  useEffect(() => {
+    if (accountEmail && firstParentEmail !== accountEmail) {
+      setParents((prev) => prev.map((p, i) => (i === 0 ? { ...p, email: accountEmail } : p)));
+    }
+  }, [accountEmail, firstParentEmail]);
 
   // Trello #26: opiekun 2 obowiązkowy — zamiast checkboxów „Brak" / „Ograniczone prawa
   // rodzicielskie" (mutually exclusive). Zaznaczenie chowa pola opiekuna 2 i czyści jego błędy.
@@ -659,9 +674,10 @@ export default function Step1({ onNext: _onNext, onPrevious: _onPrevious, disabl
                     value={parent.email}
                     onChange={(e) => updateParent(parent.id, 'email', e.target.value)}
                     disabled={disabled}
+                    readOnly={index === 0 && !!accountEmail}
                     className={`w-full px-3 sm:px-4 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-[#03adf0] disabled:bg-gray-100 disabled:cursor-not-allowed ${
                       (parentErrors[parent.id] && parentErrors[parent.id].email) ? 'border-red-500' : 'border-gray-400'
-                    }`}
+                    }${index === 0 && accountEmail ? ' bg-gray-100 cursor-not-allowed' : ''}`}
                   />
                   {(parentErrors[parent.id] && parentErrors[parent.id].email) && (
                     <p className="mt-1 text-xs text-red-600">{parentErrors[parent.id].email}</p>

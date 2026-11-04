@@ -57,7 +57,9 @@ export const guardianEmail = (s) => CLIENT_EMAIL.replace('@', `+e2e-${s.id.toLow
 
 async function fillGuardians(page, s) {
   await fillAfterLabel(page, 'Imię *', 'Szymon'); await fillAfterLabel(page, 'Nazwisko *', 'Test E2E');
-  await page.locator('input[type=email]').first().fill(guardianEmail(s));
+  // Pole z e-mailem konta jest tylko do odczytu (Trello #198) — wpisujemy, gdy jest edytowalne (np. panel admina).
+  const firstEmail = page.locator('input[type=email]').first();
+  if (await firstEmail.isEditable()) await firstEmail.fill(guardianEmail(s));
   await page.locator('input[type=tel]').first().fill(CLIENT_PHONE);
   await fillAfterLabel(page, 'Ulica i numer', 'Testowa 1'); await fillAfterLabel(page, 'Kod pocztowy', '80-001');
   await fillAfterLabel(page, 'Miejscowość', 'Gdańsk');
