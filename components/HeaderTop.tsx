@@ -144,7 +144,7 @@ export default function HeaderTop({ fixed = false, hideLogo = false, fixedHeight
               <>
                 <div className="flex items-center gap-6">
                   <Link
-                    href="https://radsas-fun.pl/kategoria-produktu/obozy-i-kolonie-dla-dzieci-i-mlodziezy/"
+                    href="https://www.radsas-fun.pl"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-gray-600 hover:text-[#03adf0] transition-colors"
@@ -300,7 +300,7 @@ export default function HeaderTop({ fixed = false, hideLogo = false, fixedHeight
           <div className="lg:hidden border-t border-gray-200 bg-white">
             <div className="max-w-container px-3 py-4 space-y-3">
               <Link
-                href="https://radsas-fun.pl/kategoria-produktu/obozy-i-kolonie-dla-dzieci-i-mlodziezy/"
+                href="https://www.radsas-fun.pl"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-gray-600 hover:text-[#03adf0] transition-colors text-sm py-2"
