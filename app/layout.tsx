@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { headers } from 'next/headers';
 
 import AppTopBanner from '@/components/AppTopBanner';
+import AuthFetchInstaller from '@/components/AuthFetchInstaller';
 import { resolveSandboxLinks } from '@/lib/utils/devSandboxLinks';
 import MaintenancePage from '@/components/MaintenancePage';
 import TestBanner from '@/components/TestBanner';
@@ -114,6 +115,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 />
               )}
               <TestBanner />
+              <AuthFetchInstaller />
               {children}
             </ToastProvider>
           </ReservationProvider>
