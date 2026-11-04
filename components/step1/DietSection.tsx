@@ -31,6 +31,7 @@ export default function DietSection() {
   const params = useParams();
 
   const [selectedDietId, setSelectedDietId] = useState<number | null>(null);
+  const [isDietSectionHidden, setIsDietSectionHidden] = useState(false);
   const [diets, setDiets] = useState<Diet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +83,25 @@ export default function DietSection() {
 
         let dietsData: Diet[] = [];
 
+        if (propertyId && campId) {
+          const campResponse = await fetch(`${API_BASE_URL}/api/camps/${campId}`);
+          if (campResponse.ok) {
+            const camp = await campResponse.json() as { properties?: Array<{ id: number; hide_diet_section?: boolean }> };
+            if (camp.properties?.find((property) => property.id === propertyId)?.hide_diet_section) {
+              // Turnus bez diety: zapisany wcześniej wybór nie może trafić do rezerwacji ani do ceny.
+              setIsDietSectionHidden(true);
+              setSelectedDietId(null);
+              prevDietIdRef.current = null;
+              removeReservationItemsByType('diet');
+              const savedStep1 = loadStep1FormData();
+              if (savedStep1) {
+                saveStep1FormData({ ...savedStep1, selectedDietId: null, parents: savedStep1.parents || [] });
+              }
+              return;
+            }
+          }
+        }
+
         // First, try to get diets assigned to this turnus (property_id)
         // This endpoint returns:
         // - Diets from turnus_diets table (many-to-many)
@@ -128,6 +148,12 @@ export default function DietSection() {
                       console.log('[DietSection] Mapped diet:', { original: td, mapped: mappedDiet });
                       return mappedDiet;
                     });
+                  // Ta sama dieta może przyjść z dwóch przypisań (standardowa i własna). Zostaje wiersz o najniższym
+                  // numerze relacji, bo tę samą cenę bierze backend przy liczeniu rezerwacji.
+                  const relationOrder = (diet: Diet & { relation_id?: number }) => diet.relation_id ?? 0;
+                  dietsData = [...dietsData]
+                    .sort((left, right) => relationOrder(left) - relationOrder(right))
+                    .filter((diet, index, all) => all.findIndex((other) => other.id === diet.id) === index);
                   console.log('[DietSection] Using turnus-specific diets (including general diets from center diet relations):', dietsData.length);
                 }
               } else {
@@ -326,6 +352,10 @@ export default function DietSection() {
 
   // Filter only active diets
   const activeDiets = diets.filter(diet => diet.is_active);
+
+  if (isDietSectionHidden) {
+    return null;
+  }
 
   if (loading) {
     return (

@@ -90,6 +90,43 @@ const fetchCampProperty = (campId: number, propertyId: number): Promise<CampProp
 /**
  * Fetch diets assigned to a turnus
  */
+interface StandardDiet {
+  id: number;
+  name: string;
+  price: number;
+}
+
+// Jedna pozycja w turnusie = jedna dieta do odpięcia; dieta własna może mieć kilka wierszy z cenami.
+interface TurnusDietGroup {
+  key: string;
+  title: string | null;
+  centerDietId: number | null;
+  dietId: number;
+  items: any[];
+}
+
+const groupTurnusDiets = (diets: any[]): TurnusDietGroup[] => {
+  const groups = new Map<string, TurnusDietGroup>();
+  diets.forEach((diet) => {
+    const centerDietId: number | null = diet.center_diet_id ?? null;
+    const key = centerDietId !== null ? `center-${centerDietId}` : `diet-${diet.id}`;
+    const group = groups.get(key);
+    if (group) {
+      group.items.push(diet);
+      return;
+    }
+    const hasTitle = centerDietId !== null && !diet.is_standard && !diet.has_no_relations;
+    groups.set(key, {
+      key,
+      title: hasTitle ? diet.center_diet_name || null : null,
+      centerDietId,
+      dietId: diet.id,
+      items: [diet],
+    });
+  });
+  return Array.from(groups.values());
+};
+
 const fetchTurnusDiets = async (campId: number, propertyId: number): Promise<any[]> => {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
   try {
@@ -264,7 +301,8 @@ export default function CampTurnusEditPage({
   const [loadingAvailableDiets, setLoadingAvailableDiets] = useState(false);
   const [searchDietQuery, setSearchDietQuery] = useState('');
   const [showDeleteDietModal, setShowDeleteDietModal] = useState(false);
-  const [dietToDelete, setDietToDelete] = useState<number | null>(null);
+  const [dietToDelete, setDietToDelete] = useState<TurnusDietGroup | null>(null);
+  const [standardDiets, setStandardDiets] = useState<StandardDiet[]>([]);
   const [isDeletingDiet, setIsDeletingDiet] = useState(false);
 
   // Promotions state
@@ -720,18 +758,17 @@ export default function CampTurnusEditPage({
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.rezerwacja.radsas-fun.pl';
       // Use regular fetch for public endpoint (no authentication required)
       // Fetch center diets (not general diets or diets table)
-      const response = await fetch(`${API_BASE_URL}/api/center-diets/public`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const [response, standardResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/center-diets/public`),
+        fetch(`${API_BASE_URL}/api/general-diets/public`),
+      ]);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok || !standardResponse.ok) {
+        throw new Error(`HTTP error! status: ${response.status}/${standardResponse.status}`);
       }
 
       const data = await response.json();
+      setStandardDiets(await standardResponse.json());
       // Response is List[CenterDietResponse] - array of center diets
       const diets = Array.isArray(data) ? data : [];
       console.log('[CampTurnusEditPage] Fetched available center diets:', diets.length);
@@ -739,6 +776,7 @@ export default function CampTurnusEditPage({
     } catch (err) {
       console.error('[CampTurnusEditPage] Error fetching available center diets:', err);
       setAvailableDiets([]);
+      setStandardDiets([]);
     } finally {
       setLoadingAvailableDiets(false);
     }
@@ -788,6 +826,7 @@ export default function CampTurnusEditPage({
       const updatedDiets = await fetchTurnusDiets(campId, turnusId);
       console.log('[CampTurnusEditPage] Reloaded diets:', updatedDiets);
       setTurnusDiets(updatedDiets);
+      setProperty((current) => (current ? { ...current, hide_diet_section: false } : current));
 
       setShowAvailableDietsModal(false);
       setSearchDietQuery('');
@@ -802,6 +841,44 @@ export default function CampTurnusEditPage({
     }
   };
 
+  const handleSelectStandardDiet = async (diet: StandardDiet) => {
+    if (!campId || !turnusId) return;
+    try {
+      setLoadingDiets(true);
+      setError(null);
+      await authenticatedApiCall(
+        `/api/camps/${campId}/properties/${turnusId}/standard-diets/${diet.id}`,
+        { method: 'POST' },
+      );
+      setTurnusDiets(await fetchTurnusDiets(campId, turnusId));
+      setProperty((current) => (current ? { ...current, hide_diet_section: false } : current));
+      setShowAvailableDietsModal(false);
+      setSearchDietQuery('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Błąd podczas przypisywania diety');
+    } finally {
+      setLoadingDiets(false);
+    }
+  };
+
+  const handleToggleNoDiet = async () => {
+    if (!campId || !turnusId) return;
+    const hideDietSection = !property?.hide_diet_section;
+    try {
+      setLoadingDiets(true);
+      setError(null);
+      await authenticatedApiCall(`/api/camps/${campId}/properties/${turnusId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ hide_diet_section: hideDietSection }),
+      });
+      setProperty((current) => (current ? { ...current, hide_diet_section: hideDietSection } : current));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Błąd podczas zapisu');
+    } finally {
+      setLoadingDiets(false);
+    }
+  };
+
   const handleRemoveDiet = async () => {
     if (!dietToDelete || !campId || !turnusId) return;
 
@@ -809,8 +886,11 @@ export default function CampTurnusEditPage({
       setIsDeletingDiet(true);
       setError(null);
 
+      const removePath = dietToDelete.centerDietId !== null
+        ? `center-diets/${dietToDelete.centerDietId}`
+        : `diets/${dietToDelete.dietId}`;
       await authenticatedApiCall(
-        `/api/camps/${campId}/properties/${turnusId}/diets/${dietToDelete}`,
+        `/api/camps/${campId}/properties/${turnusId}/${removePath}`,
         {
           method: 'DELETE',
         },
@@ -846,6 +926,9 @@ export default function CampTurnusEditPage({
       diet.description?.toLowerCase().includes(query)
     );
   });
+  const filteredStandardDiets = standardDiets.filter((diet) =>
+    !searchDietQuery.trim() || diet.name.toLowerCase().includes(searchDietQuery.toLowerCase()),
+  );
 
   // Promotions functions
   const fetchAvailablePromotions = async () => {
@@ -1542,26 +1625,50 @@ export default function CampTurnusEditPage({
                   <UtensilsCrossed className="w-5 h-5 text-gray-600" />
                   <h2 className="text-lg font-semibold text-gray-900">Dietary prescriptions</h2>
                 </div>
-                <button
-                  onClick={handleOpenAvailableDiets}
-                  className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[#03adf0] border border-[#03adf0] hover:bg-[#E0F2FF] transition-all duration-200"
-                  style={{ borderRadius: 0, cursor: 'pointer' }}
-                  disabled={saving || loading || loadingDiets}
-                  title="Wybierz z dostępnych diet"
-                >
-                  <Copy className="w-3 h-3" />
-                  Wybierz dietę
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleToggleNoDiet}
+                    aria-pressed={Boolean(property?.hide_diet_section)}
+                    className={`px-3 py-1.5 text-xs font-medium border transition-all duration-200 ${
+                      property?.hide_diet_section
+                        ? 'bg-gray-800 text-white border-gray-800'
+                        : 'text-gray-700 border-gray-400 hover:bg-gray-100'
+                    }`}
+                    style={{ borderRadius: 0, cursor: 'pointer' }}
+                    disabled={saving || loading || loadingDiets}
+                  >
+                    Bez diety
+                  </button>
+                  <button
+                    onClick={handleOpenAvailableDiets}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[#03adf0] border border-[#03adf0] hover:bg-[#E0F2FF] transition-all duration-200"
+                    style={{ borderRadius: 0, cursor: 'pointer' }}
+                    disabled={saving || loading || loadingDiets}
+                    title="Wybierz z dostępnych diet"
+                  >
+                    <Copy className="w-3 h-3" />
+                    Wybierz dietę
+                  </button>
+                </div>
               </div>
 
               {/* Selected Diets Display */}
-              {turnusDiets.length > 0 ? (
+              {property?.hide_diet_section ? (
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center text-sm font-medium text-gray-800">
+                  Bez diety
+                </div>
+              ) : turnusDiets.length > 0 ? (
                 <div className="space-y-3">
-                  {turnusDiets.map((diet) => (
-                    <div key={diet.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  {groupTurnusDiets(turnusDiets).map((group) => (
+                    <div key={group.key} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="mb-2">
+                          {group.title && (
+                            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{group.title}</p>
+                          )}
+                          {group.items.map((diet) => (
+                          <div key={diet.id} className="mb-2">
                             {/* Display general diet name (not "Dieta dla ośrodka") */}
                             <h3 className="text-sm font-semibold text-gray-900">
                               {diet.name || 'Dieta bez nazwy'}
@@ -1590,7 +1697,7 @@ export default function CampTurnusEditPage({
                             {diet.price !== undefined && (
                               <p className="text-xs text-gray-700 mt-1 font-medium">
                                 Cena: {diet.price.toFixed(2)} PLN
-                                {diet.is_center_diet_relation && (
+                                {diet.is_center_diet_relation && !diet.is_standard && (
                                   <span className="text-gray-500 ml-1">(cena dla ośrodka)</span>
                                 )}
                               </p>
@@ -1608,18 +1715,17 @@ export default function CampTurnusEditPage({
                               </div>
                             )}
                           </div>
+                          ))}
                         </div>
                         <button
                           onClick={() => {
-                            // Use relation_id if available (for center diet relations), otherwise use diet.id
-                            const dietIdToDelete = diet.relation_id || diet.id;
-                            setDietToDelete(dietIdToDelete);
+                            setDietToDelete(group);
                             setShowDeleteDietModal(true);
                           }}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-300 hover:bg-red-50 transition-all duration-200"
                           style={{ borderRadius: 0, cursor: 'pointer' }}
                           disabled={saving || loading || isDeletingDiet}
-                          title={diet.is_center_diet_relation ? 'Usuń relację z center diet' : 'Usuń przypisanie diety'}
+                          title="Usuń przypisanie diety"
                         >
                           <Trash2 className="w-3 h-3" />
                           Usuń
@@ -1632,11 +1738,6 @@ export default function CampTurnusEditPage({
           <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-center text-sm">
             <p className="text-yellow-800 font-medium mb-1">
               Brak przypisanych diet do wyświetlenia
-            </p>
-            <p className="text-yellow-700 text-xs">
-              Center diet może być przypisany do turnusu, ale nie ma relacji z general diets.
-              <br />
-              Aby diety były widoczne w rezerwacji, dodaj relacje z general diets w edycji center diet.
             </p>
             <button
               onClick={handleOpenAvailableDiets}
@@ -2263,9 +2364,9 @@ export default function CampTurnusEditPage({
         <div className="flex-1 overflow-y-auto p-4">
           {loadingAvailableDiets ? (
             <div className="text-center text-gray-500 py-8">Ładowanie dostępnych diet...</div>
-          ) : filteredDiets.length === 0 ? (
+          ) : filteredDiets.length === 0 && filteredStandardDiets.length === 0 ? (
             <div className="text-center text-gray-500 py-8">
-              {availableDiets.length === 0 ? (
+              {availableDiets.length === 0 && standardDiets.length === 0 ? (
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-2">Brak dostępnych diet</p>
                   <p className="text-xs text-gray-500">Nie znaleziono żadnych dostępnych diet w systemie.</p>
@@ -2279,9 +2380,32 @@ export default function CampTurnusEditPage({
             </div>
           ) : (
             <div className="space-y-3">
+              {filteredStandardDiets.length > 0 && (
+                <h3 className="text-sm font-semibold text-gray-900">Diety standardowe</h3>
+              )}
+              {filteredStandardDiets.map((diet) => (
+                <div
+                  key={`standard-${diet.id}`}
+                  data-testid="standard-diet-option"
+                  onClick={() => {
+                    if (!loadingDiets) handleSelectStandardDiet(diet);
+                  }}
+                  className={`p-4 border border-gray-200 hover:border-[#03adf0] hover:bg-[#E0F2FF] transition-all duration-200 cursor-pointer ${
+                    loadingDiets ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  style={{ borderRadius: 0 }}
+                >
+                  <p className="text-sm font-medium text-gray-900">{diet.name}</p>
+                  <p className="text-xs text-gray-700 mt-1">Cena: {Number(diet.price).toFixed(2)} PLN</p>
+                </div>
+              ))}
+              {filteredDiets.length > 0 && (
+                <h3 className="text-sm font-semibold text-gray-900 pt-3">Diety własne</h3>
+              )}
               {filteredDiets.map((diet) => (
                 <div
                   key={diet.id}
+                  data-testid="own-diet-option"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -2329,8 +2453,8 @@ export default function CampTurnusEditPage({
         }}
         onConfirm={handleRemoveDiet}
         itemType="diet"
-        itemName={turnusDiets.find(d => d.id === dietToDelete)?.name || 'Dieta'}
-        itemId={dietToDelete || 0}
+        itemName={dietToDelete?.title || dietToDelete?.items[0]?.name || 'Dieta'}
+        itemId={dietToDelete?.centerDietId ?? dietToDelete?.dietId ?? 0}
         additionalInfo="Przypisanie diety do tego turnusu zostanie usunięte. Dieta pozostanie w systemie i będzie dostępna do przypisania do innych turnusów."
         isLoading={isDeletingDiet}
       />

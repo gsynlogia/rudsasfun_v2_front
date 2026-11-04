@@ -1,4 +1,5 @@
 export interface CampProperty {
+  hide_diet_section?: boolean;
   id: number;
   camp_id: number;
   period: string;

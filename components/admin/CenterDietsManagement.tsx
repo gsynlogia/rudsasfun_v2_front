@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Edit, Search, Trash2, Save, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 import { authenticatedApiCall } from '@/utils/api-auth';
@@ -43,6 +43,8 @@ interface CampProperty {
   end_date: string;
 }
 
+const DIETS_PAGE_SIZE = 25;
+
 export default function CenterDietsManagement() {
   const [diets, setDiets] = useState<CenterDiet[]>([]);
   const [generalDiets, setGeneralDiets] = useState<GeneralDiet[]>([]);
@@ -58,18 +60,40 @@ export default function CenterDietsManagement() {
   const [selectedGeneralDietIds, setSelectedGeneralDietIds] = useState<number[]>([]);
   const [generalDietPrices, setGeneralDietPrices] = useState<Record<number, number>>({}); // general_diet_id -> price
   const [dietDescription, setDietDescription] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  useEffect(() => {
+    fetchGeneralDiets();
+  }, []);
 
   useEffect(() => {
     fetchDiets();
-    fetchGeneralDiets();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- lista zależy tylko od strony i wyszukiwania
+  }, [page, search]);
+
+  // Wpisywanie w wyszukiwarkę nie wysyła zapytania po każdej literze.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const fetchDiets = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await authenticatedApiCall<{ diets: CenterDiet[]; total: number; page: number; limit: number }>('/api/center-diets/');
+      const query = new URLSearchParams({ page: String(page), limit: String(DIETS_PAGE_SIZE) });
+      if (search) query.set('search', search);
+      const data = await authenticatedApiCall<{ diets: CenterDiet[]; total: number; page: number; limit: number }>(`/api/center-diets/?${query.toString()}`);
       setDiets(data.diets || []);
+      setTotal(data.total || 0);
+      setHasLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Błąd podczas ładowania diet');
       console.error('[CenterDietsManagement] Error fetching diets:', err);
@@ -168,7 +192,14 @@ export default function CenterDietsManagement() {
         });
       }
 
-      await fetchDiets();
+      // Nowa dieta jest na górze pierwszej strony, więc po jej dodaniu wracamy tam, żeby było ją widać.
+      if (!selectedDiet && (page !== 1 || search)) {
+        setSearchInput('');
+        setSearch('');
+        setPage(1);
+      } else {
+        await fetchDiets();
+      }
       resetForm();
       setShowCreateModal(false);
       setShowEditModal(false);
@@ -200,7 +231,7 @@ export default function CenterDietsManagement() {
     }
   };
 
-  if (loading) {
+  if (loading && !hasLoaded) {
     return (
       <div className="p-6">
         <p className="text-gray-600">Ładowanie diet dla ośrodków...</p>
@@ -226,6 +257,17 @@ export default function CenterDietsManagement() {
           <p className="text-sm text-red-800">{error}</p>
         </div>
       )}
+
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Szukaj po nazwie diety..."
+          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#03adf0] text-sm"
+        />
+      </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <table className="w-full">
@@ -271,6 +313,28 @@ export default function CenterDietsManagement() {
             ))}
           </tbody>
         </table>
+        <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 text-sm text-gray-600">
+          <span>Diet: {total}</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page <= 1 || loading}
+              aria-label="Poprzednia strona"
+              className="p-1 text-[#03adf0] disabled:text-gray-300"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span>Strona {page} z {Math.max(1, Math.ceil(total / DIETS_PAGE_SIZE))}</span>
+            <button
+              onClick={() => setPage((current) => current + 1)}
+              disabled={page >= Math.ceil(total / DIETS_PAGE_SIZE) || loading}
+              aria-label="Następna strona"
+              className="p-1 text-[#03adf0] disabled:text-gray-300"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Create/Edit Modal */}
