@@ -82,7 +82,10 @@ async function fillParticipant(page, s) {
   await afterLabel(page, 'Płeć').selectOption(s.id.endsWith('1') ? 'Dziewczynka' : 'Chłopiec');
   await fillAfterLabel(page, 'Miejsce zamieszkania (miasto)', 'Gdańsk');
   // Tekst kafelka bywa sklejony („Standardowa0 zł”) — nazwa diety, potem cena.
-  await page.locator('button:visible', { hasText: new RegExp(`^\\s*${s.diet}\\s*[+\\d]`) }).first().click();
+  // Turnus „Bez diety” nie ma tej sekcji, więc nie ma czego klikać.
+  if (await page.getByText('Dieta uczestnika').count()) {
+    await page.locator('button:visible', { hasText: new RegExp(`^\\s*${s.diet}\\s*[+\\d]`) }).first().click();
+  }
   await confirmDialogs(page);
   if (s.health) {
     await page.locator('input[type=radio][name=chronicDiseases][value=Tak]').check();

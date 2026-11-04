@@ -920,15 +920,17 @@ export default function Step5({ onNext: _onNext, onPrevious: _onPrevious, disabl
               </div>
             </div>
 
-            {/* Right: Diet */}
-            <div>
-              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
-                Dieta uczestnika
-              </h3>
-              <div className="text-xs sm:text-sm text-gray-700">
-                {step1Data ? getDietLabel(step1Data.selectedDietId) : 'Nie wybrano'}
+            {/* Right: Diet (turnus „Bez diety” nie ma diety, więc nie ma czego pokazywać) */}
+            {step1Data?.selectedDietId ? (
+              <div>
+                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2 sm:mb-3">
+                  Dieta uczestnika
+                </h3>
+                <div className="text-xs sm:text-sm text-gray-700">
+                  {getDietLabel(step1Data.selectedDietId)}
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
 
           <DashedLine />
