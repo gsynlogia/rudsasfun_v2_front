@@ -37,6 +37,10 @@ export function getClientDocumentDotPresentation(
   if (status === 'rejected') {
     return { color: 'red', dotClass: 'bg-red-500', textClass: 'text-red-600', label: 'odrzucone' };
   }
-  // signed_pending_admin / in_verification / pending / brak → żółty (dokument w toku weryfikacji)
-  return { color: 'yellow', dotClass: 'bg-yellow-400', textClass: 'text-yellow-600', label: 'wgrane, weryfikowane' };
+  // Klient podpisał kodem SMS, teraz kolej biura (Ania 2026-10-30). Kolor zostaje ten sam, zmienia się tylko napis.
+  if (status === 'signed_pending_admin') {
+    return { color: 'yellow', dotClass: 'bg-yellow-400', textClass: 'text-yellow-600', label: 'w trakcie weryfikacji biura' };
+  }
+  // in_verification bez SMS / pending / brak dokumentu → to klient ma coś zrobić, napis ma go do tego skłonić.
+  return { color: 'yellow', dotClass: 'bg-yellow-400', textClass: 'text-yellow-600', label: 'oczekuje na podpisanie przez klienta' };
 }

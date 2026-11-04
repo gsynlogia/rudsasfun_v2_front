@@ -380,6 +380,54 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
 
       {/* Document Cards */}
       <div className="space-y-3 sm:space-y-4">
+        {/* Karta nad umową: klienci podpisywali tylko dokument widoczny u góry, a karta jest dla biura ważniejsza (Trello #370). */}
+        {/* Qualification Card */}
+        <div>
+          <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Karta kwalifikacyjna</p>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
+            <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
+              <div
+                title={cardDot.label}
+                className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${cardDot.dotClass} rounded-full`}
+              />
+            </div>
+            <div className="flex flex-col items-center gap-2 sm:gap-3">
+              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
+              <p className="text-[10px] sm:text-xs text-gray-600 text-center">
+                {loadingCard ? 'Ładowanie...' : 'Karta kwalifikacyjna'}
+              </p>
+              {/* Opis kolorowej kropki (Trello: klient nie wie, co oznaczają kolory) */}
+              <p className={`text-[9px] sm:text-[11px] font-medium text-center leading-tight ${cardDot.textClass}`}>
+                {cardDot.label}
+              </p>
+              <button
+                onClick={async () => {
+                  try {
+                    if (!cardDataCompleted) {
+                      setShowQualificationCardModal(true);
+                      return;
+                    }
+                    const formatReservationNumber = (reservationId: number, createdAt: string) => {
+                      const year = new Date(createdAt).getFullYear();
+                      const paddedId = String(reservationId).padStart(3, '0');
+                      return `REZ-${year}-${paddedId}`;
+                    };
+                    const reservationNumber = reservation.reservation_number ?? formatReservationNumber(reservationIdNum, reservation.created_at);
+                    const url = `${basePath}/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
+                    window.open(url, '_blank');
+                  } catch (error: any) {
+                    console.error('Error opening qualification card:', error);
+                    alert(error.message || 'Nie udało się otworzyć karty kwalifikacyjnej. Spróbuj ponownie.');
+                  }
+                }}
+                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] hover:bg-[#0299d6] text-white text-[10px] sm:text-xs rounded transition-colors text-center"
+              >
+                Karta kwalifikacyjna
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Agreement Card */}
         <div>
           <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Umowa</p>
@@ -492,53 +540,6 @@ export default function ReservationSidebar({ reservationId, reservation, isDetai
         </div>
         END OF ORIGINAL AGREEMENT CARD
         */}
-
-        {/* Qualification Card */}
-        <div>
-          <p className="text-[10px] sm:text-xs font-medium text-gray-700 mb-1 sm:mb-2">Karta kwalifikacyjna</p>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 bg-white relative">
-            <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
-              <div
-                title={cardDot.label}
-                className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${cardDot.dotClass} rounded-full`}
-              />
-            </div>
-            <div className="flex flex-col items-center gap-2 sm:gap-3">
-              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
-              <p className="text-[10px] sm:text-xs text-gray-600 text-center">
-                {loadingCard ? 'Ładowanie...' : 'Karta kwalifikacyjna'}
-              </p>
-              {/* Opis kolorowej kropki (Trello: klient nie wie, co oznaczają kolory) */}
-              <p className={`text-[9px] sm:text-[11px] font-medium text-center leading-tight ${cardDot.textClass}`}>
-                {cardDot.label}
-              </p>
-              <button
-                onClick={async () => {
-                  try {
-                    if (!cardDataCompleted) {
-                      setShowQualificationCardModal(true);
-                      return;
-                    }
-                    const formatReservationNumber = (reservationId: number, createdAt: string) => {
-                      const year = new Date(createdAt).getFullYear();
-                      const paddedId = String(reservationId).padStart(3, '0');
-                      return `REZ-${year}-${paddedId}`;
-                    };
-                    const reservationNumber = reservation.reservation_number ?? formatReservationNumber(reservationIdNum, reservation.created_at);
-                    const url = `${basePath}/aktualne-rezerwacje/${reservationNumber}/karta-kwalifikacyjna`;
-                    window.open(url, '_blank');
-                  } catch (error: any) {
-                    console.error('Error opening qualification card:', error);
-                    alert(error.message || 'Nie udało się otworzyć karty kwalifikacyjnej. Spróbuj ponownie.');
-                  }
-                }}
-                className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 bg-[#03adf0] hover:bg-[#0299d6] text-white text-[10px] sm:text-xs rounded transition-colors text-center"
-              >
-                Karta kwalifikacyjna
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* Authorization Card – niedostępny, moduł dostępny wkrótce */}
         <div className="select-none opacity-75 cursor-not-allowed">
