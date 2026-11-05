@@ -16,6 +16,16 @@ interface InvoiceDataSectionProps {
   invoiceType?: 'private' | 'company';
 }
 
+const PRIVATE_FIELDS = [
+  { field: 'firstName', label: 'Imię', placeholder: 'Imię', type: 'text' },
+  { field: 'lastName', label: 'Nazwisko', placeholder: 'Nazwisko', type: 'text' },
+  { field: 'email', label: 'Adres e-mail', placeholder: 'Adres e-mail', type: 'email' },
+  { field: 'phone', label: 'Telefon', placeholder: 'Telefon', type: 'tel' },
+  { field: 'street', label: 'Ulica i numer', placeholder: 'Ulica i numer', type: 'text' },
+  { field: 'postalCode', label: 'Kod pocztowy', placeholder: 'np. 00-000', type: 'text' },
+  { field: 'city', label: 'Miejscowość', placeholder: 'Miejscowość', type: 'text' },
+] as const;
+
 export default function InvoiceDataSection({ invoiceType: propInvoiceType }: InvoiceDataSectionProps = {}) {
   // If prop is provided, use it; otherwise default to 'company' (since this component is only rendered for company)
   const [invoiceType, setInvoiceType] = useState<'private' | 'company'>(propInvoiceType || 'company');
@@ -138,7 +148,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
   }, [invoiceType, privateData, companyData]);
 
   // Validate private person fields
-  const _validatePrivate = useCallback((): boolean => {
+  const validatePrivate = useCallback((): boolean => {
     const errors: Record<string, string> = {};
 
     if (!privateData.firstName || privateData.firstName.trim() === '') {
@@ -193,11 +203,9 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
     return Object.keys(errors).length === 0;
   }, [companyData]);
 
-  // Combined validation - always validate company since this component is only rendered for company
   const validateInvoiceData = useCallback((): boolean => {
-    // This component is only rendered when invoiceType === 'company', so always validate company
-    return validateCompany();
-  }, [validateCompany]);
+    return invoiceType === 'private' ? validatePrivate() : validateCompany();
+  }, [invoiceType, validateCompany, validatePrivate]);
 
   // Expose validation function for external use (e.g., Step3 validation)
   useEffect(() => {
@@ -211,7 +219,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
     };
   }, [validateInvoiceData]);
 
-  const _updatePrivateField = (field: keyof typeof privateData, value: string) => {
+  const updatePrivateField = (field: keyof typeof privateData, value: string) => {
     setPrivateData((prev) => ({ ...prev, [field]: value }));
     // Clear error for this field when user starts typing
     if (privateErrors[field]) {
@@ -260,7 +268,29 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
 
         <DashedLine />
 
-        {/* Always show company form since this component is only rendered when invoiceType === 'company' */}
+        {invoiceType === 'private' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" data-testid="invoice-private-form">
+          {PRIVATE_FIELDS.map(({ field, label, placeholder, type }) => (
+            <div key={field}>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                {label} <span className="text-red-500">*</span>
+                <input
+                  type={type}
+                  value={privateData[field]}
+                  onChange={(e) => updatePrivateField(field, e.target.value)}
+                  placeholder={placeholder}
+                  className={`mt-1 w-full px-3 sm:px-4 py-2 border text-sm font-normal focus:outline-none focus:ring-2 focus:ring-[#03adf0] ${
+                    privateErrors[field] ? 'border-red-500' : 'border-gray-400'
+                  }`}
+                />
+              </label>
+              {privateErrors[field] && (
+                <p className="text-xs text-red-500 mt-1">{privateErrors[field]}</p>
+              )}
+            </div>
+          ))}
+        </div>
+        ) : (
         <div className="space-y-4 sm:space-y-6">
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -369,6 +399,7 @@ export default function InvoiceDataSection({ invoiceType: propInvoiceType }: Inv
               </div>
             </div>
         </div>
+        )}
       </section>
     </div>
   );

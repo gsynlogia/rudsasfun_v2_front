@@ -16,7 +16,7 @@ import WantsInvoiceSection from './step3/WantsInvoiceSection';
 /**
  * Step3 Component - Invoices
  * Contains: Invoice type selection, Invoice data form (only for company), Invoice delivery options (only for company)
- * For private person: only type selection is shown, no invoice data fields
+ * For private person: invoice data fields are prefilled from Step 1 and can be edited
  */
 export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabled: _disabled = false }: StepComponentProps) {
   const [invoiceType, setInvoiceType] = useState<'private' | 'company'>('private');
@@ -132,23 +132,19 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
 
   // Combined validation function for Step3 (InvoiceData + InvoiceDelivery)
   // For company: validate invoice data and delivery sections
-  // For private person: only validate delivery if paper version is selected
+  // For private person: validate invoice data and delivery as well
   const validateStep3 = useCallback((): boolean => {
     // Always validate delivery section (for both private and company, if paper version is selected)
     const validateDelivery = (window as any).validateInvoiceDeliverySection;
     const deliveryValid = validateDelivery ? validateDelivery() : true;
 
-    // If private person, only validate delivery (no invoice data required)
-    if (invoiceType === 'private') {
-      return deliveryValid;
-    }
-
-    // If company, validate both invoice data and delivery sections
+    // Dane do faktury sprawdzamy także u osoby prywatnej. Bez tego kreator bez komunikatu cofał z kroku 4 na 3,
+    // gdy w kroku 1 nie było adresu, bo strażnik kroków (isStep3Filled) wymaga kompletu danych.
     const validateInvoiceData = (window as any).validateInvoiceDataSection;
     const invoiceDataValid = validateInvoiceData ? validateInvoiceData() : true;
 
     return invoiceDataValid && deliveryValid;
-  }, [invoiceType]);
+  }, []);
 
   // Expose combined validation function
   useEffect(() => {
@@ -235,13 +231,9 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
           {/* Invoice Type Section */}
           <InvoiceTypeSection />
 
-          {/* Invoice Data Section - Only show for company */}
-          {invoiceType === 'company' && (
-            <>
-              <DashedLine />
-              <InvoiceDataSection invoiceType={invoiceType} />
-            </>
-          )}
+          {/* Karta 378: dane do faktury wpisuje także osoba prywatna, tak jak firma. */}
+          <DashedLine />
+          <InvoiceDataSection invoiceType={invoiceType} />
 
           {/* Invoice Delivery Section - Only show for company */}
           {invoiceType === 'company' && (
