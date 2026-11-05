@@ -12,6 +12,7 @@ import InvoiceDataSection from './step3/InvoiceDataSection';
 import InvoiceDeliverySection from './step3/InvoiceDeliverySection';
 import InvoiceTypeSection from './step3/InvoiceTypeSection';
 import WantsInvoiceSection from './step3/WantsInvoiceSection';
+import { fullParentPhone } from '@/lib/utils/parentPhone';
 
 /**
  * Step3 Component - Invoices
@@ -76,7 +77,7 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
               firstName: firstParent.firstName || '',
               lastName: firstParent.lastName || '',
               email: firstParent.email || '',
-              phone: firstParent.phone || '+48',
+              phone: fullParentPhone(firstParent),
               street: firstParent.street || '',
               postalCode: firstParent.postalCode || '',
               city: firstParent.city || '',
@@ -189,7 +190,7 @@ export default function Step3({ onNext: _onNext, onPrevious: _onPrevious, disabl
           firstName: firstParent.firstName || '',
           lastName: firstParent.lastName || '',
           email: firstParent.email || '',
-          phone: firstParent.phone || '+48',
+          phone: fullParentPhone(firstParent),
           street: firstParent.street || '',
           postalCode: firstParent.postalCode || '',
           city: firstParent.city || '',
