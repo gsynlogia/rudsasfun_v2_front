@@ -52,6 +52,7 @@ export default async function RootLayout({
   const host = (await headers()).get('host');
   const gtmEnabled = isProdHost(host) && isGtmEnabled();
   const gtmId = getGtmId();
+  const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
   // DevBanner — widoczny na każdym nie-prod hoście (dev synlogia.dev, localhost).
   // Hostname-based (runtime, SSR), bo NEXT_PUBLIC_* env są zapiekane do bundla build-time.
   const isDev = !isProdHost(host);
@@ -81,6 +82,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           />
         )}
         {/* End Google Tag Manager */}
+        {/* Statystyki Umami (Synlogia) — tylko na produkcyjnych domenach; skrypt i wysyłka przez synlogia.com/umami */}
+        {umamiWebsiteId && isProdHost(host) && (
+          <script defer src="https://synlogia.com/umami/script.js" data-website-id={umamiWebsiteId} />
+        )}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
